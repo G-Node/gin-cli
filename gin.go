@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/G-Node/gin-cli/proto"
+	"github.com/docopt/docopt-go"
+	"github.com/howeyc/gopass"
 )
 
 func close(b io.ReadCloser) {
@@ -137,18 +139,66 @@ func GetSSHKeys(user string, token string) []string {
 }
 
 func main() {
-	user := "alice"
-	pass := "testtest"
-	auth, err := login(user, pass)
-	if err != nil {
-		fmt.Println(err)
+	usage := `
+GIN command line client
+
+Usage:
+	gin login [<username>]
+
+`
+
+	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
+
+	var username, password string
+
+	if args["<username>"] == nil {
+		username = ""
+	} else {
+		username = args["<username>"].(string)
 	}
 
-	fmt.Println("[Login success] Got access token")
-	fmt.Printf("Auth success. The following rights have been granted: %v\n", auth.Scope)
+	if username == "" {
+		// prompt for login
+		fmt.Print("Login: ")
+		username = ""
+		fmt.Scanln(&username)
+	}
 
-	keys := GetSSHKeys(user, auth.AccessToken)
-	fmt.Printf("Keys for user %s:\n", user)
+	// prompt for password
+	password = ""
+	fmt.Print("Password: ")
+	pwbytes, err := gopass.GetPasswdMasked()
+	fmt.Println()
+	if err != nil {
+		// read error or gopass.ErrInterrupted
+		if err == gopass.ErrInterrupted {
+			fmt.Println("Cancelled.")
+			return
+		}
+		if err == gopass.ErrMaxLengthExceeded {
+			fmt.Println("Error: Input too long.")
+			return
+		}
+	}
+
+	password = string(pwbytes)
+
+	if password == "" {
+		fmt.Println("No password provided. Aborting.")
+		return
+	}
+
+	auth, err := login(username, password)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("[Login success] You are now logged in as %s\n", username)
+	fmt.Printf("The following permissions have been granted: %v\n", strings.Replace(auth.Scope, " ", ", ", -1))
+
+	keys := GetSSHKeys(username, auth.AccessToken)
+	fmt.Printf("\nKeys for user %s:\n", username)
 	for _, k := range keys {
 		fmt.Println("\t-", k)
 
