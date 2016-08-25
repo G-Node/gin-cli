@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/G-Node/gin-cli/proto"
+	"github.com/G-Node/gin-auth/proto"
 	"github.com/docopt/docopt-go"
 	"github.com/howeyc/gopass"
 )
@@ -66,7 +66,7 @@ func SearchAccount(query string) ([]proto.Account, error) {
 	return results, nil
 }
 
-func login(user string, pass string) (proto.AuthResponse, error) {
+func login(user string, pass string) (proto.TokenResponse, error) {
 
 	params := url.Values{}
 	params.Add("scope", "repo-read repo-write account-read account-write")
@@ -82,7 +82,7 @@ func login(user string, pass string) (proto.AuthResponse, error) {
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	client := http.Client{}
 	res, err := client.Do(req)
-	var authresp proto.AuthResponse
+	var authresp proto.TokenResponse
 
 	if err != nil {
 		return authresp, err
@@ -102,12 +102,14 @@ func login(user string, pass string) (proto.AuthResponse, error) {
 		return authresp, err
 	}
 
+	// store token
+
 	return authresp, nil
 
 }
 
 // GetSSHKeys return logged in user's SSH keys
-func GetSSHKeys(user string, token string) []string {
+func GetSSHKeys(user string, token string) []proto.SSHKey {
 	address := fmt.Sprintf("%s/api/accounts/%s/keys", host, user)
 	req, _ := http.NewRequest("GET", address, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -126,15 +128,9 @@ func GetSSHKeys(user string, token string) []string {
 
 	b, err := ioutil.ReadAll(res.Body)
 
-	var keyInfo []proto.SSHKey
+	var keys []proto.SSHKey
 
-	err = json.Unmarshal(b, &keyInfo)
-
-	var keys = make([]string, len(keyInfo))
-
-	for idx, k := range keyInfo {
-		keys[idx] = k.Key
-	}
+	err = json.Unmarshal(b, &keys)
 
 	return keys
 }
@@ -199,10 +195,11 @@ Usage:
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)
 	fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(auth.Scope, " ", ", ", -1))
 
-	// keys := GetSSHKeys(username, auth.AccessToken)
-	// fmt.Printf("\nKeys for user %s:\n", username)
-	// for _, k := range keys {
-	// 	fmt.Println("\t-", k)
+	keys := GetSSHKeys(username, auth.AccessToken)
+	fmt.Printf("\nKey fingerprints:\n")
 
-	// }
+	for _, k := range keys {
+		fmt.Printf("\t• %s\n", k.Fingerprint)
+	}
+
 }
