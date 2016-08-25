@@ -82,14 +82,15 @@ func login(user string, pass string) (proto.AuthResponse, error) {
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	client := http.Client{}
 	res, err := client.Do(req)
-	defer close(res.Body)
 	var authresp proto.AuthResponse
 
 	if err != nil {
 		return authresp, err
-	} else if status := res.StatusCode; status != 200 {
-		return authresp, fmt.Errorf("[Login error] Server returned status: %d", status)
+	} else if res.StatusCode != 200 {
+		return authresp, fmt.Errorf("[Login error] %s", res.Status)
 	}
+
+	defer close(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 
@@ -190,17 +191,18 @@ Usage:
 
 	auth, err := login(username, password)
 	if err != nil {
+		fmt.Println("Authentication failed!")
 		fmt.Println(err)
 		return
 	}
 
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)
-	fmt.Printf("The following permissions have been granted: %v\n", strings.Replace(auth.Scope, " ", ", ", -1))
+	fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(auth.Scope, " ", ", ", -1))
 
-	keys := GetSSHKeys(username, auth.AccessToken)
-	fmt.Printf("\nKeys for user %s:\n", username)
-	for _, k := range keys {
-		fmt.Println("\t-", k)
+	// keys := GetSSHKeys(username, auth.AccessToken)
+	// fmt.Printf("\nKeys for user %s:\n", username)
+	// for _, k := range keys {
+	// 	fmt.Println("\t-", k)
 
-	}
+	// }
 }
