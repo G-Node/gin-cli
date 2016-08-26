@@ -212,8 +212,15 @@ func printAccountInfo(args map[string]interface{}) error {
 
 	address := fmt.Sprintf("%s/api/accounts/%s", host, username)
 	req, err := http.NewRequest("GET", address, nil)
-	token := "" // TODO: Get token from file
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	if err != nil {
+		return err
+	}
+
+	tokenBytes, err := ioutil.ReadFile("token")
+	if err == nil {
+		token := string(tokenBytes)
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	}
 
 	client := http.Client{}
 	res, err := client.Do(req)
@@ -238,7 +245,7 @@ func printAccountInfo(args map[string]interface{}) error {
 	buffAppend(&fullnameBuffer, info.MiddleName)
 	buffAppend(&fullnameBuffer, info.LastName)
 
-	var outBuffer bytes.Buffer
+	// var outBuffer bytes.Buffer
 
 	fmt.Printf("Username: %s\nFull name: %s\nEmail: %v\nAffiliation: %v\n",
 		info.Login, fullnameBuffer.String(), info.Email, info.Affiliation)
