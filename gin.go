@@ -1,5 +1,7 @@
 package main
 
+// TODO: Nicer error handling. Print useful, descriptive messages.
+
 import (
 	"bytes"
 	"encoding/json"
@@ -24,9 +26,10 @@ func close(b io.ReadCloser) {
 	}
 }
 
-func buffAppend(buffer *bytes.Buffer, str string) {
+// condAppend Conditionally append to a buffer
+func condAppend(b *bytes.Buffer, str string) {
 	if str != "" {
-		buffer.WriteString(fmt.Sprintf("%s ", str))
+		b.WriteString(str + " ")
 	}
 }
 
@@ -226,9 +229,10 @@ func printAccountInfo(args map[string]interface{}) error {
 	res, err := client.Do(req)
 
 	if err != nil {
-		fmt.Printf("[Error] Account information request failed: %s\n", err)
+		fmt.Printf("[Error] Request failed: %s\n", err)
+		return err
 	} else if res.StatusCode != 200 {
-		fmt.Printf("Request failed. Server returned; %s", res.Status)
+		return fmt.Errorf("[Account search error] Server returned: %d", res.Status)
 	}
 
 	defer close(res.Body)
@@ -240,15 +244,33 @@ func printAccountInfo(args map[string]interface{}) error {
 
 	var fullnameBuffer bytes.Buffer
 
-	buffAppend(&fullnameBuffer, info.Title)
-	buffAppend(&fullnameBuffer, info.FirstName)
-	buffAppend(&fullnameBuffer, info.MiddleName)
-	buffAppend(&fullnameBuffer, info.LastName)
+	condAppend(&fullnameBuffer, info.Title)
+	condAppend(&fullnameBuffer, info.FirstName)
+	condAppend(&fullnameBuffer, info.MiddleName)
+	condAppend(&fullnameBuffer, info.LastName)
 
-	// var outBuffer bytes.Buffer
+	var outBuffer bytes.Buffer
 
-	fmt.Printf("Username: %s\nFull name: %s\nEmail: %v\nAffiliation: %v\n",
-		info.Login, fullnameBuffer.String(), info.Email, info.Affiliation)
+	outBuffer.WriteString(fmt.Sprintf("User [%s]\nName: %s\n", info.Login, fullnameBuffer.String()))
+
+	if info.Email.Email != "" {
+		outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email.Email))
+		// TODO: Display public status if current user == info.Login
+	}
+
+	var affiliationBuffer bytes.Buffer
+	affiliation := info.Affiliation
+
+	condAppend(&affiliationBuffer, affiliation.Department)
+	condAppend(&affiliationBuffer, affiliation.Institute)
+	condAppend(&affiliationBuffer, affiliation.City)
+	condAppend(&affiliationBuffer, affiliation.Country)
+
+	if affiliationBuffer.Len() > 0 {
+		outBuffer.WriteString(fmt.Sprintf("Affiliation: %s\n", affiliationBuffer.String()))
+	}
+
+	fmt.Println(outBuffer.String())
 
 	return nil
 }
@@ -258,8 +280,8 @@ func main() {
 GIN command line client
 
 Usage:
-	gin login       [<username>]
-	gin accountinfo [<username>]
+	gin login     [<username>]
+	gin userinfo  [<username>]
 
 `
 
@@ -270,10 +292,10 @@ Usage:
 		if err != nil {
 			fmt.Println("Authentication failed!")
 		}
-	} else if args["accountinfo"].(bool) {
+	} else if args["userinfo"].(bool) {
 		err := printAccountInfo(args)
 		if err != nil {
-			fmt.Println("Error looking up account information.")
+			fmt.Println(err)
 		}
 	}
 
