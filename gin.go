@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,8 @@ import (
 	"github.com/howeyc/gopass"
 )
 
+const host = "http://localhost:8081"
+
 func close(b io.ReadCloser) {
 	err := b.Close()
 	if err != nil {
@@ -21,7 +24,11 @@ func close(b io.ReadCloser) {
 	}
 }
 
-const host = "http://localhost:8081"
+func buffAppend(buffer *bytes.Buffer, str string) {
+	if str != "" {
+		buffer.WriteString(fmt.Sprintf("%s ", str))
+	}
+}
 
 // RequestAccount requests a specific account by name
 func RequestAccount(name string) (proto.Account, error) {
@@ -158,12 +165,12 @@ func login(args map[string]interface{}) error {
 // GetSSHKeys return logged in user's SSH keys
 func GetSSHKeys(user string, token string) []proto.SSHKey {
 	address := fmt.Sprintf("%s/api/accounts/%s/keys", host, user)
+	// TODO: Check err and req.StatusCode
 	req, _ := http.NewRequest("GET", address, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	client := http.Client{}
 	res, err := client.Do(req)
-	defer close(res.Body)
 
 	if err != nil {
 		fmt.Println("Request for keys returned error:", err)
@@ -172,6 +179,8 @@ func GetSSHKeys(user string, token string) []proto.SSHKey {
 		fmt.Println("Request for keys returned status code", status)
 		return nil
 	}
+
+	defer close(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 
@@ -184,6 +193,57 @@ func GetSSHKeys(user string, token string) []proto.SSHKey {
 
 func printAccountInfo(args map[string]interface{}) error {
 
+	// assume username was specified for now
+	// TODO: Resolve logged in username if no username was provided
+	var username string
+
+	if args["<username>"] == nil {
+		username = ""
+	} else {
+		username = args["<username>"].(string)
+	}
+
+	if username == "" {
+		// prompt for login
+		fmt.Print("Specify username for info lookup: ")
+		username = ""
+		fmt.Scanln(&username)
+	}
+
+	address := fmt.Sprintf("%s/api/accounts/%s", host, username)
+	req, err := http.NewRequest("GET", address, nil)
+	token := "" // TODO: Get token from file
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	client := http.Client{}
+	res, err := client.Do(req)
+
+	if err != nil {
+		fmt.Printf("[Error] Account information request failed: %s\n", err)
+	} else if res.StatusCode != 200 {
+		fmt.Printf("Request failed. Server returned; %s", res.Status)
+	}
+
+	defer close(res.Body)
+
+	b, err := ioutil.ReadAll(res.Body)
+	var info proto.Account
+
+	err = json.Unmarshal(b, &info)
+
+	var fullnameBuffer bytes.Buffer
+
+	buffAppend(&fullnameBuffer, info.Title)
+	buffAppend(&fullnameBuffer, info.FirstName)
+	buffAppend(&fullnameBuffer, info.MiddleName)
+	buffAppend(&fullnameBuffer, info.LastName)
+
+	var outBuffer bytes.Buffer
+
+	fmt.Printf("Username: %s\nFull name: %s\nEmail: %v\nAffiliation: %v\n",
+		info.Login, fullnameBuffer.String(), info.Email, info.Affiliation)
+
+	return nil
 }
 
 func main() {
@@ -191,7 +251,7 @@ func main() {
 GIN command line client
 
 Usage:
-	gin login [<username>]
+	gin login       [<username>]
 	gin accountinfo [<username>]
 
 `
@@ -205,6 +265,9 @@ Usage:
 		}
 	} else if args["accountinfo"].(bool) {
 		err := printAccountInfo(args)
+		if err != nil {
+			fmt.Println("Error looking up account information.")
+		}
 	}
 
 	// keys := GetSSHKeys()
