@@ -27,9 +27,9 @@ func close(b io.ReadCloser) {
 }
 
 // condAppend Conditionally append to a buffer
-func condAppend(b *bytes.Buffer, str string) {
-	if str != "" {
-		b.WriteString(str + " ")
+func condAppend(b *bytes.Buffer, str *string) {
+	if str != nil && *str != "" {
+		b.WriteString(*str + " ")
 	}
 }
 
@@ -232,7 +232,7 @@ func printAccountInfo(args map[string]interface{}) error {
 		fmt.Printf("[Error] Request failed: %s\n", err)
 		return err
 	} else if res.StatusCode != 200 {
-		return fmt.Errorf("[Account search error] Server returned: %d", res.Status)
+		return fmt.Errorf("[Account search error] Server returned: %s", res.Status)
 	}
 
 	defer close(res.Body)
@@ -245,29 +245,31 @@ func printAccountInfo(args map[string]interface{}) error {
 	var fullnameBuffer bytes.Buffer
 
 	condAppend(&fullnameBuffer, info.Title)
-	condAppend(&fullnameBuffer, info.FirstName)
+	condAppend(&fullnameBuffer, &info.FirstName)
 	condAppend(&fullnameBuffer, info.MiddleName)
-	condAppend(&fullnameBuffer, info.LastName)
+	condAppend(&fullnameBuffer, &info.LastName)
 
 	var outBuffer bytes.Buffer
 
 	outBuffer.WriteString(fmt.Sprintf("User [%s]\nName: %s\n", info.Login, fullnameBuffer.String()))
 
-	if info.Email.Email != "" {
+	if info.Email != nil && info.Email.Email != "" {
 		outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email.Email))
 		// TODO: Display public status if current user == info.Login
 	}
 
-	var affiliationBuffer bytes.Buffer
-	affiliation := info.Affiliation
+	if info.Affiliation != nil {
+		var affiliationBuffer bytes.Buffer
+		affiliation := info.Affiliation
 
-	condAppend(&affiliationBuffer, affiliation.Department)
-	condAppend(&affiliationBuffer, affiliation.Institute)
-	condAppend(&affiliationBuffer, affiliation.City)
-	condAppend(&affiliationBuffer, affiliation.Country)
+		condAppend(&affiliationBuffer, &affiliation.Department)
+		condAppend(&affiliationBuffer, &affiliation.Institute)
+		condAppend(&affiliationBuffer, &affiliation.City)
+		condAppend(&affiliationBuffer, &affiliation.Country)
 
-	if affiliationBuffer.Len() > 0 {
-		outBuffer.WriteString(fmt.Sprintf("Affiliation: %s\n", affiliationBuffer.String()))
+		if affiliationBuffer.Len() > 0 {
+			outBuffer.WriteString(fmt.Sprintf("Affiliation: %s\n", affiliationBuffer.String()))
+		}
 	}
 
 	fmt.Println(outBuffer.String())
