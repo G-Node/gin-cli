@@ -188,9 +188,14 @@ func login(args map[string]interface{}) error {
 
 }
 
-// GetSSHKeys return logged in user's SSH keys
-func GetSSHKeys(user string, token string) []proto.SSHKey {
-	address := fmt.Sprintf("%s/api/accounts/%s/keys", host, user)
+func printKeys(printFull bool) error {
+	username, token := loadToken()
+
+	if username == "" {
+		fmt.Println()
+		return fmt.Errorf("This action requires login.")
+	}
+	address := fmt.Sprintf("%s/api/accounts/%s/keys", host, username)
 	// TODO: Check err and req.StatusCode
 	req, _ := http.NewRequest("GET", address, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -305,9 +310,9 @@ func main() {
 GIN command line client
 
 Usage:
-	gin login     [<username>]
-	gin userinfo  [<username>]
-
+	gin login [<username>]
+	gin info  [<username>]
+	gin keys  [--print-keys]
 `
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
@@ -317,18 +322,21 @@ Usage:
 		if err != nil {
 			fmt.Println("Authentication failed!")
 		}
-	} else if args["userinfo"].(bool) {
+	} else if args["info"].(bool) {
 		err := printAccountInfo(args)
 		if err != nil {
 			fmt.Println(err)
 		}
+	} else if args["keys"].(bool) {
+		printFullKeys := false
+		if args["--print-keys"].(bool) {
+			printFullKeys = true
+		}
+		err := printKeys(printFullKeys)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
-
-	// keys := GetSSHKeys()
-	// fmt.Printf("\nKey fingerprints:\n")
-
-	// for _, k := range keys {
-	// 	fmt.Printf("\t• %s\n", k.Fingerprint)
-	// }
 
 }
