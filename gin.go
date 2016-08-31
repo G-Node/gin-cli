@@ -212,15 +212,31 @@ func printKeys(printFull bool) error {
 
 	var keys []proto.SSHKey
 	err = json.Unmarshal(b, &keys)
+
+	nkeys := len(keys)
+
+	var message string
+	if nkeys == 0 {
+		message = "There are no keys "
+	} else if nkeys == 1 {
+		message = "You have 1 key "
+	} else {
+		message = fmt.Sprintf("%v keys are ", nkeys)
+	}
+	fmt.Printf("%s associated with your account.\n\n", message)
 	for idx, key := range keys {
-		fmt.Printf("%v - %s\n", idx+1, key.Description)
-		fmt.Printf("Fingerprint: %s\n", key.Fingerprint)
+		fmt.Printf("  [%v] \"%s\"\n", idx+1, key.Description)
+		fmt.Printf("  Fingerprint: %s\n", key.Fingerprint)
 		if printFull {
 			fmt.Printf("Key: %s\n", key.Key)
 		}
 	}
 
 	return err
+}
+
+func addKey() error {
+	return nil
 }
 
 func printAccountInfo(userarg interface{}) error {
