@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/G-Node/gin-auth/proto"
@@ -74,6 +75,33 @@ func SearchAccount(query string) ([]proto.Account, error) {
 	err = json.Unmarshal(body, &results)
 
 	return results, nil
+}
+
+func storeToken(username string, token string) error {
+	userTokenStr := username + "\n" + token
+
+	err := ioutil.WriteFile("token", []byte(userTokenStr), 0600)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func loadToken() (string, string) {
+	userTokenBytes, err := ioutil.ReadFile("token")
+	var username, token string
+
+	if err == nil {
+		userTokenString := string(userTokenBytes)
+		userToken := strings.Split(userTokenString, "\n")
+		username = userToken[0]
+		token = userToken[1]
+	}
+	// TODO: Handle error
+
+	return username, token
 }
 
 func login(args map[string]interface{}) error {
@@ -151,12 +179,7 @@ func login(args map[string]interface{}) error {
 		return err
 	}
 
-	// store token
-	err = ioutil.WriteFile("token", []byte(authresp.AccessToken), 0600)
-
-	if err != nil {
-		return err
-	}
+	storeToken(username, authresp.AccessToken)
 
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)
 	fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
@@ -188,20 +211,24 @@ func GetSSHKeys(user string, token string) []proto.SSHKey {
 	b, err := ioutil.ReadAll(res.Body)
 
 	var keys []proto.SSHKey
-
 	err = json.Unmarshal(b, &keys)
+	for idx, key := range keys {
+		fmt.Printf("%v - %s\n", idx+1, key.Description)
+		fmt.Printf("Fingerprint: %s\n", key.Fingerprint)
+		if printFull {
+			fmt.Printf("Key: %s\n", key.Key)
+		}
+	}
 
-	return keys
+	return err
 }
 
 func printAccountInfo(args map[string]interface{}) error {
-
-	// assume username was specified for now
-	// TODO: Resolve logged in username if no username was provided
 	var username string
+	currentUser, token := loadToken()
 
 	if args["<username>"] == nil {
-		username = ""
+		username = currentUser
 	} else {
 		username = args["<username>"].(string)
 	}
@@ -219,11 +246,7 @@ func printAccountInfo(args map[string]interface{}) error {
 		return err
 	}
 
-	tokenBytes, err := ioutil.ReadFile("token")
-	if err == nil {
-		token := string(tokenBytes)
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	client := http.Client{}
 	res, err := client.Do(req)
