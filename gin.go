@@ -104,21 +104,16 @@ func loadToken() (string, string) {
 	return username, token
 }
 
-func login(args map[string]interface{}) error {
+func login(userarg interface{}) error {
 
 	var username, password string
 
-	if args["<username>"] == nil {
-		username = ""
-	} else {
-		username = args["<username>"].(string)
-	}
-
-	if username == "" {
+	if userarg == nil {
 		// prompt for login
 		fmt.Print("Login: ")
-		username = ""
 		fmt.Scanln(&username)
+	} else {
+		username = userarg.(string)
 	}
 
 	// prompt for password
@@ -228,14 +223,14 @@ func printKeys(printFull bool) error {
 	return err
 }
 
-func printAccountInfo(args map[string]interface{}) error {
+func printAccountInfo(userarg interface{}) error {
 	var username string
 	currentUser, token := loadToken()
 
-	if args["<username>"] == nil {
+	if userarg == nil {
 		username = currentUser
 	} else {
-		username = args["<username>"].(string)
+		username = userarg.(string)
 	}
 
 	if username == "" {
@@ -317,17 +312,18 @@ Usage:
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
 
-	if args["login"].(bool) {
-		err := login(args)
+	switch {
+	case args["login"].(bool):
+		err := login(args["<username>"])
 		if err != nil {
 			fmt.Println("Authentication failed!")
 		}
-	} else if args["info"].(bool) {
-		err := printAccountInfo(args)
+	case args["info"].(bool):
+		err := printAccountInfo(args["<username>"])
 		if err != nil {
 			fmt.Println(err)
 		}
-	} else if args["keys"].(bool) {
+	case args["keys"].(bool):
 		printFullKeys := false
 		if args["--print-keys"].(bool) {
 			printFullKeys = true
