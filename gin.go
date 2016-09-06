@@ -323,7 +323,8 @@ GIN command line client
 Usage:
 	gin login [<username>]
 	gin info  [<username>]
-	gin keys  [--print-keys]
+	gin keys  [-v | --verbose]
+	gin keys add
 `
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
@@ -341,7 +342,7 @@ Usage:
 		}
 	case args["keys"].(bool):
 		printFullKeys := false
-		if args["--print-keys"].(bool) {
+		if args["-v"].(bool) || args["--verbose"].(bool) {
 			printFullKeys = true
 		}
 		err := printKeys(printFullKeys)
