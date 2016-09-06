@@ -66,8 +66,8 @@ func SearchAccount(query string) ([]proto.Account, error) {
 
 	if err != nil {
 		return results, err
-	} else if status := res.StatusCode; status != 200 {
-		return results, fmt.Errorf("[Account search error] Server returned status: %d", status)
+	} else if res.StatusCode != 200 {
+		return results, fmt.Errorf("[Account search error] Server returned: %s", res.Status)
 	}
 
 	body, _ := ioutil.ReadAll(res.Body)
@@ -188,7 +188,7 @@ func printKeys(printFull bool) error {
 
 	if username == "" {
 		fmt.Println()
-		return fmt.Errorf("This action requires login.")
+		return fmt.Errorf("You are not logged in.")
 	}
 	address := fmt.Sprintf("%s/api/accounts/%s/keys", host, username)
 	// TODO: Check err and req.StatusCode
@@ -199,11 +199,9 @@ func printKeys(printFull bool) error {
 	res, err := client.Do(req)
 
 	if err != nil {
-		fmt.Println("Request for keys returned error:", err)
-		return nil
-	} else if status := res.StatusCode; status != 200 {
-		fmt.Println("Request for keys returned status code", status)
-		return nil
+		return fmt.Errorf("Request for keys returned error: %s", err)
+	} else if res.StatusCode != 200 {
+		return fmt.Errorf("[Keys request error] Server returned: %s", res.Status)
 	}
 
 	defer close(res.Body)
@@ -219,16 +217,16 @@ func printKeys(printFull bool) error {
 	if nkeys == 0 {
 		message = "There are no keys "
 	} else if nkeys == 1 {
-		message = "You have 1 key "
+		message = "You have 1 key"
 	} else {
-		message = fmt.Sprintf("%v keys are ", nkeys)
+		message = fmt.Sprintf("%v keys are", nkeys)
 	}
 	fmt.Printf("%s associated with your account.\n\n", message)
 	for idx, key := range keys {
 		fmt.Printf("  [%v] \"%s\"\n", idx+1, key.Description)
 		fmt.Printf("  Fingerprint: %s\n", key.Fingerprint)
 		if printFull {
-			fmt.Printf("Key: %s\n", key.Key)
+			fmt.Printf("\n%s\n", key.Key)
 		}
 	}
 
@@ -236,6 +234,29 @@ func printKeys(printFull bool) error {
 }
 
 func addKey() error {
+
+	// TODO: Prompt user for key information
+	username, token := loadToken()
+
+	if username == "" {
+		fmt.Println()
+		return fmt.Errorf("You are not logged in.")
+	}
+	address := fmt.Sprintf("%s/api/accounts/%s/keys", host, username)
+	// TODO: Check err and req.StatusCode
+	params := url.Values{}
+	req, _ := http.NewRequest("POST", address, strings.NewReader(params.Encode()))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	client := http.Client{}
+	res, err := client.Do(req)
+
+	if err != nil {
+		return fmt.Errorf("Error: %s", err)
+	} else if res.StatusCode != 200 {
+		return fmt.Errorf("[Add key error] Server returned: %s", res.Status)
+	}
+
+	close(res.Body)
 	return nil
 }
 
@@ -328,6 +349,12 @@ Usage:
 `
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
+
+	akerr := addKey()
+	if akerr != nil {
+		fmt.Println(akerr)
+		os.Exit(1)
+	}
 
 	switch {
 	case args["login"].(bool):
