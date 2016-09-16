@@ -236,6 +236,7 @@ func printKeys(printFull bool) error {
 func addKey() error {
 
 	// TODO: Prompt user for key information
+	// TODO: Allow use to speciry pubkey file (default to ~/.ssh/id_rsa.pub ?)
 	username, token := loadToken()
 
 	if username == "" {
@@ -244,10 +245,7 @@ func addKey() error {
 	}
 	address := fmt.Sprintf("%s/api/accounts/%s/keys", host, username)
 	// TODO: Check err and req.StatusCode
-	params := url.Values{}
 	key := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDRpAtSInDz5M1a8nkY7TyEYx5MCvAdL+A2P5k5e7w5v8kizR7fMDtfG+PM33hEV54R2kFV+ga+JQw1GQjZfWOR71Yo3sGpRZMjr8cHGXLWmEvOemHYPrXs5FWm78X1XTXoCwmkhO7akyaPfKIHJUDsbxjjy0VsK6LHG/28fArct5s9+GDq7p46ifph1g3m6khIqGmdIZnkULZh7WIG10pJIx2HNpzYS3CSr4Er3Pmzwg0YZMRE25uJUGcsed9+s4RvbKuPyZewSqEtb4ACYCERcm3KnCKdpWfZMUB2v87Td6+eqG5YcxuAoJtK9fVqhZIslDroonnCvCXNd4WQBLwR alice-test1"
-	params.Add("description", "foobaroojfo")
-	params.Add("key", key)
 
 	mkBody := func(key, description string) io.Reader {
 		pw := &struct {
@@ -258,7 +256,6 @@ func addKey() error {
 		return bytes.NewReader(b)
 	}
 
-	// req, _ := http.NewRequest("POST", address, strings.NewReader(params.Encode()))
 	req, _ := http.NewRequest("POST", address, mkBody(key, "ll"))
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -365,11 +362,11 @@ Usage:
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
 
-	akerr := addKey()
-	if akerr != nil {
-		fmt.Println(akerr)
-		os.Exit(1)
-	}
+	// akerr := addKey()
+	// if akerr != nil {
+	// 	fmt.Println(akerr)
+	// 	os.Exit(1)
+	// }
 
 	switch {
 	case args["login"].(bool):
