@@ -18,7 +18,9 @@ import (
 	"github.com/howeyc/gopass"
 )
 
-const host = "http://localhost:8081"
+// const host = "http://localhost:8081"
+const auth = "https://auth.gin.g-node.org"
+const repo = "https://repo.gin.g-node.org"
 
 func close(b io.ReadCloser) {
 	err := b.Close()
@@ -38,7 +40,7 @@ func condAppend(b *bytes.Buffer, str *string) {
 func RequestAccount(name string) (proto.Account, error) {
 	var acc proto.Account
 
-	address := fmt.Sprintf("%s/api/accounts/%s", host, name)
+	address := fmt.Sprintf("%s/api/accounts/%s", auth, name)
 	res, err := http.Get(address)
 
 	if err != nil {
@@ -61,7 +63,7 @@ func SearchAccount(query string) ([]proto.Account, error) {
 
 	params := url.Values{}
 	params.Add("q", query)
-	url := fmt.Sprintf("%s/api/accounts?%s", host, params.Encode())
+	url := fmt.Sprintf("%s/api/accounts?%s", auth, params.Encode())
 	res, err := http.Get(url)
 
 	if err != nil {
@@ -148,7 +150,7 @@ func login(userarg interface{}) error {
 	params.Add("client_id", "gin")
 	params.Add("client_secret", "secret")
 
-	address := fmt.Sprintf("%s/oauth/token", host)
+	address := fmt.Sprintf("%s/oauth/token", auth)
 
 	req, _ := http.NewRequest("POST", address, strings.NewReader(params.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -190,7 +192,7 @@ func printKeys(printFull bool) error {
 		fmt.Println()
 		return fmt.Errorf("You are not logged in.")
 	}
-	address := fmt.Sprintf("%s/api/accounts/%s/keys", host, username)
+	address := fmt.Sprintf("%s/api/accounts/%s/keys", auth, username)
 	// TODO: Check err and req.StatusCode
 	req, _ := http.NewRequest("GET", address, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -243,7 +245,7 @@ func addKey() error {
 		fmt.Println()
 		return fmt.Errorf("You are not logged in.")
 	}
-	address := fmt.Sprintf("%s/api/accounts/%s/keys", host, username)
+	address := fmt.Sprintf("%s/api/accounts/%s/keys", auth, username)
 	// TODO: Check err and req.StatusCode
 	key := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDRpAtSInDz5M1a8nkY7TyEYx5MCvAdL+A2P5k5e7w5v8kizR7fMDtfG+PM33hEV54R2kFV+ga+JQw1GQjZfWOR71Yo3sGpRZMjr8cHGXLWmEvOemHYPrXs5FWm78X1XTXoCwmkhO7akyaPfKIHJUDsbxjjy0VsK6LHG/28fArct5s9+GDq7p46ifph1g3m6khIqGmdIZnkULZh7WIG10pJIx2HNpzYS3CSr4Er3Pmzwg0YZMRE25uJUGcsed9+s4RvbKuPyZewSqEtb4ACYCERcm3KnCKdpWfZMUB2v87Td6+eqG5YcxuAoJtK9fVqhZIslDroonnCvCXNd4WQBLwR alice-test1"
 
@@ -289,7 +291,7 @@ func printAccountInfo(userarg interface{}) error {
 		fmt.Scanln(&username)
 	}
 
-	address := fmt.Sprintf("%s/api/accounts/%s", host, username)
+	address := fmt.Sprintf("%s/api/accounts/%s", auth, username)
 	req, err := http.NewRequest("GET", address, nil)
 	if err != nil {
 		return err
