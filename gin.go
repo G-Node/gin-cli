@@ -247,7 +247,7 @@ func addKey() error {
 	}
 	address := fmt.Sprintf("%s/api/accounts/%s/keys", auth, username)
 	// TODO: Check err and req.StatusCode
-	key := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDRpAtSInDz5M1a8nkY7TyEYx5MCvAdL+A2P5k5e7w5v8kizR7fMDtfG+PM33hEV54R2kFV+ga+JQw1GQjZfWOR71Yo3sGpRZMjr8cHGXLWmEvOemHYPrXs5FWm78X1XTXoCwmkhO7akyaPfKIHJUDsbxjjy0VsK6LHG/28fArct5s9+GDq7p46ifph1g3m6khIqGmdIZnkULZh7WIG10pJIx2HNpzYS3CSr4Er3Pmzwg0YZMRE25uJUGcsed9+s4RvbKuPyZewSqEtb4ACYCERcm3KnCKdpWfZMUB2v87Td6+eqG5YcxuAoJtK9fVqhZIslDroonnCvCXNd4WQBLwR alice-test1"
+	key := ""
 
 	mkBody := func(key, description string) io.Reader {
 		pw := &struct {
@@ -363,12 +363,6 @@ Usage:
 `
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
-
-	// akerr := addKey()
-	// if akerr != nil {
-	// 	fmt.Println(akerr)
-	// 	os.Exit(1)
-	// }
 
 	switch {
 	case args["login"].(bool):
