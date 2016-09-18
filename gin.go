@@ -351,6 +351,33 @@ func printAccountInfo(userarg interface{}) error {
 	return nil
 }
 
+func listRepos() error {
+
+	_, token := loadToken()
+
+	address := fmt.Sprintf("%s/repos/public", repo)
+	// TODO: Check err and req.StatusCode
+	req, _ := http.NewRequest("GET", address, nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	client := http.Client{}
+	res, err := client.Do(req)
+
+	if err != nil {
+		return fmt.Errorf("Request for repos returned error: %s", err)
+	} else if res.StatusCode != 200 {
+		return fmt.Errorf("[Repo listing error] Server returned: %s", res.Status)
+	}
+
+	defer close(res.Body)
+
+	b, err := ioutil.ReadAll(res.Body)
+
+	print(string(b))
+
+	return err
+}
+
 func main() {
 	usage := `
 GIN command line client
@@ -360,6 +387,7 @@ Usage:
 	gin info  [<username>]
 	gin keys  [-v | --verbose]
 	gin keys add
+	gin repos
 `
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
@@ -381,6 +409,12 @@ Usage:
 			printFullKeys = true
 		}
 		err := printKeys(printFullKeys)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	case args["repos"].(bool):
+		err := listRepos()
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
