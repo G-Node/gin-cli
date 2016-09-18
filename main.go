@@ -14,12 +14,12 @@ import (
 	"strings"
 
 	"github.com/G-Node/gin-auth/proto"
+	"github.com/G-Node/gin-cli/auth"
 	"github.com/docopt/docopt-go"
-	"github.com/howeyc/gopass"
 )
 
 // const host = "http://localhost:8081"
-const auth = "https://auth.gin.g-node.org"
+const authhost = "https://auth.gin.g-node.org"
 const repo = "https://repo.gin.g-node.org"
 
 func close(b io.ReadCloser) {
@@ -40,7 +40,7 @@ func condAppend(b *bytes.Buffer, str *string) {
 func RequestAccount(name string) (proto.Account, error) {
 	var acc proto.Account
 
-	address := fmt.Sprintf("%s/api/accounts/%s", auth, name)
+	address := fmt.Sprintf("%s/api/accounts/%s", authhost, name)
 	res, err := http.Get(address)
 
 	if err != nil {
@@ -63,7 +63,7 @@ func SearchAccount(query string) ([]proto.Account, error) {
 
 	params := url.Values{}
 	params.Add("q", query)
-	url := fmt.Sprintf("%s/api/accounts?%s", auth, params.Encode())
+	url := fmt.Sprintf("%s/api/accounts?%s", authhost, params.Encode())
 	res, err := http.Get(url)
 
 	if err != nil {
@@ -77,18 +77,6 @@ func SearchAccount(query string) ([]proto.Account, error) {
 	err = json.Unmarshal(body, &results)
 
 	return results, nil
-}
-
-func storeToken(username string, token string) error {
-	userTokenStr := username + "\n" + token
-
-	err := ioutil.WriteFile("token", []byte(userTokenStr), 0600)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func loadToken() (string, string) {
@@ -106,85 +94,6 @@ func loadToken() (string, string) {
 	return username, token
 }
 
-func login(userarg interface{}) error {
-
-	var username, password string
-
-	if userarg == nil {
-		// prompt for login
-		fmt.Print("Login: ")
-		fmt.Scanln(&username)
-	} else {
-		username = userarg.(string)
-	}
-
-	// prompt for password
-	password = ""
-	fmt.Print("Password: ")
-	pwbytes, err := gopass.GetPasswdMasked()
-	fmt.Println()
-	if err != nil {
-		// read error or gopass.ErrInterrupted
-		if err == gopass.ErrInterrupted {
-			fmt.Println("Cancelled.")
-			return err
-		}
-		if err == gopass.ErrMaxLengthExceeded {
-			fmt.Println("Error: Input too long.")
-			return err
-		}
-	}
-
-	password = string(pwbytes)
-
-	if password == "" {
-		fmt.Println("No password provided. Aborting.")
-		return err
-	}
-
-	params := url.Values{}
-	params.Add("scope", "repo-read repo-write account-read account-write")
-	params.Add("username", username)
-	params.Add("password", password)
-	params.Add("grant_type", "password")
-	params.Add("client_id", "gin")
-	params.Add("client_secret", "secret")
-
-	address := fmt.Sprintf("%s/oauth/token", auth)
-
-	req, _ := http.NewRequest("POST", address, strings.NewReader(params.Encode()))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	client := http.Client{}
-	res, err := client.Do(req)
-	var authresp proto.TokenResponse
-
-	if err != nil {
-		return err
-	} else if res.StatusCode != 200 {
-		return fmt.Errorf("[Login error] %s", res.Status)
-	}
-
-	defer close(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(b, &authresp)
-	if err != nil {
-		return err
-	}
-
-	storeToken(username, authresp.AccessToken)
-
-	fmt.Printf("[Login success] You are now logged in as %s\n", username)
-	fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
-
-	return nil
-
-}
-
 func printKeys(printFull bool) error {
 	username, token := loadToken()
 
@@ -192,7 +101,7 @@ func printKeys(printFull bool) error {
 		fmt.Println()
 		return fmt.Errorf("You are not logged in.")
 	}
-	address := fmt.Sprintf("%s/api/accounts/%s/keys", auth, username)
+	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
 	// TODO: Check err and req.StatusCode
 	req, _ := http.NewRequest("GET", address, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -245,7 +154,7 @@ func addKey() error {
 		fmt.Println()
 		return fmt.Errorf("You are not logged in.")
 	}
-	address := fmt.Sprintf("%s/api/accounts/%s/keys", auth, username)
+	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
 	// TODO: Check err and req.StatusCode
 	key := ""
 
@@ -291,7 +200,7 @@ func printAccountInfo(userarg interface{}) error {
 		fmt.Scanln(&username)
 	}
 
-	address := fmt.Sprintf("%s/api/accounts/%s", auth, username)
+	address := fmt.Sprintf("%s/api/accounts/%s", authhost, username)
 	req, err := http.NewRequest("GET", address, nil)
 	if err != nil {
 		return err
@@ -387,14 +296,14 @@ Usage:
 	gin info  [<username>]
 	gin keys  [-v | --verbose]
 	gin keys add
-	gin repos
+	gin repos [<username>]
 `
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
 
 	switch {
 	case args["login"].(bool):
-		err := login(args["<username>"])
+		err := auth.Login(args["<username>"])
 		if err != nil {
 			fmt.Println("Authentication failed!")
 		}
