@@ -1,2 +1,6 @@
 # vim swap files
 *.swp
+
+# Idea
+*.iml
+.idea
