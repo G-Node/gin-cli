@@ -17,8 +17,9 @@ const authhost = "https://auth.gin.g-node.org"
 
 // Client struct for making requests
 type Client struct {
-	Host string
-	web  *http.Client
+	Host  string
+	Token string
+	web   *http.Client
 }
 
 // NewClient create new client for specific host
@@ -56,7 +57,7 @@ func LoadToken() (string, string) {
 		username = userToken[0]
 		token = userToken[1]
 	}
-	// TODO: Handle error
+	// TODO: Handle error. Return nil or empty strings?
 
 	return username, token
 }
@@ -91,7 +92,13 @@ func (client *Client) doLogin(username, password string) ([]byte, error) {
 // Get Send a GET request
 func (client *Client) Get(address string) (*http.Response, error) {
 	requrl := client.Host + address
-	res, err := client.web.Get(requrl)
+	req, err := http.NewRequest("GET", requrl, nil)
+	if err != nil {
+		// TODO: Handle error
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", client.Token))
+	res, err := client.web.Do(req)
+	println("Sending GET request to " + requrl)
 	if err != nil {
 		// TODO: Handle error
 		return res, err
@@ -160,15 +167,20 @@ func Login(userarg interface{}) error {
 }
 
 // RequestAccount requests a specific account by name
-func RequestAccount(name string) (proto.Account, error) {
+func RequestAccount(name, token string) (proto.Account, error) {
 	var acc proto.Account
 
 	client := NewClient(authhost)
+	client.Token = token
 	res, err := client.Get("/api/accounts/" + name)
 
 	if err != nil {
+		fmt.Printf("[Error] Request failed: %s\n", err)
 		return acc, err
+	} else if res.StatusCode != 200 {
+		return acc, fmt.Errorf("[Account search error] Server returned: %s", res.Status)
 	}
+
 	defer closeRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)

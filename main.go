@@ -124,7 +124,6 @@ func addKey() error {
 }
 
 func printAccountInfo(userarg interface{}) error {
-	// TODO: Call auth functions instead
 	var username string
 	currentUser, token := auth.LoadToken()
 
@@ -141,30 +140,10 @@ func printAccountInfo(userarg interface{}) error {
 		fmt.Scanln(&username)
 	}
 
-	address := fmt.Sprintf("%s/api/accounts/%s", authhost, username)
-	req, err := http.NewRequest("GET", address, nil)
+	info, err := auth.RequestAccount(username, token)
 	if err != nil {
 		return err
 	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-
-	client := http.Client{}
-	res, err := client.Do(req)
-
-	if err != nil {
-		fmt.Printf("[Error] Request failed: %s\n", err)
-		return err
-	} else if res.StatusCode != 200 {
-		return fmt.Errorf("[Account search error] Server returned: %s", res.Status)
-	}
-
-	defer close(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-	var info proto.Account
-
-	err = json.Unmarshal(b, &info)
 
 	var fullnameBuffer bytes.Buffer
 
