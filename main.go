@@ -35,6 +35,7 @@ func condAppend(b *bytes.Buffer, str *string) {
 }
 
 func printKeys(printFull bool) error {
+	// TODO: Use auth functions
 	username, token := auth.LoadToken()
 
 	if username == "" {
