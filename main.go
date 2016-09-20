@@ -9,9 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
-	"strings"
 
 	"github.com/G-Node/gin-auth/proto"
 	"github.com/G-Node/gin-cli/auth"
@@ -36,66 +34,8 @@ func condAppend(b *bytes.Buffer, str *string) {
 	}
 }
 
-// RequestAccount requests a specific account by name
-func RequestAccount(name string) (proto.Account, error) {
-	var acc proto.Account
-
-	address := fmt.Sprintf("%s/api/accounts/%s", authhost, name)
-	res, err := http.Get(address)
-
-	if err != nil {
-		return acc, err
-	}
-	defer close(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-
-	err = json.Unmarshal(b, &acc)
-	if err != nil {
-		return acc, err
-	}
-	return acc, nil
-}
-
-// SearchAccount Search for account
-func SearchAccount(query string) ([]proto.Account, error) {
-	var results []proto.Account
-
-	params := url.Values{}
-	params.Add("q", query)
-	url := fmt.Sprintf("%s/api/accounts?%s", authhost, params.Encode())
-	res, err := http.Get(url)
-
-	if err != nil {
-		return results, err
-	} else if res.StatusCode != 200 {
-		return results, fmt.Errorf("[Account search error] Server returned: %s", res.Status)
-	}
-
-	body, _ := ioutil.ReadAll(res.Body)
-
-	err = json.Unmarshal(body, &results)
-
-	return results, nil
-}
-
-func loadToken() (string, string) {
-	userTokenBytes, err := ioutil.ReadFile("token")
-	var username, token string
-
-	if err == nil {
-		userTokenString := string(userTokenBytes)
-		userToken := strings.Split(userTokenString, "\n")
-		username = userToken[0]
-		token = userToken[1]
-	}
-	// TODO: Handle error
-
-	return username, token
-}
-
 func printKeys(printFull bool) error {
-	username, token := loadToken()
+	username, token := auth.LoadToken()
 
 	if username == "" {
 		fmt.Println()
@@ -148,7 +88,7 @@ func addKey() error {
 
 	// TODO: Prompt user for key information
 	// TODO: Allow use to speciry pubkey file (default to ~/.ssh/id_rsa.pub ?)
-	username, token := loadToken()
+	username, token := auth.LoadToken()
 
 	if username == "" {
 		fmt.Println()
@@ -184,8 +124,9 @@ func addKey() error {
 }
 
 func printAccountInfo(userarg interface{}) error {
+	// TODO: Call auth functions instead
 	var username string
-	currentUser, token := loadToken()
+	currentUser, token := auth.LoadToken()
 
 	if userarg == nil {
 		username = currentUser
@@ -262,7 +203,7 @@ func printAccountInfo(userarg interface{}) error {
 
 func listRepos() error {
 
-	_, token := loadToken()
+	_, token := auth.LoadToken()
 
 	address := fmt.Sprintf("%s/repos/public", repo)
 	// TODO: Check err and req.StatusCode

@@ -13,6 +13,8 @@ import (
 	"github.com/howeyc/gopass"
 )
 
+const authhost = "https://auth.gin.g-node.org"
+
 // Client struct for making requests
 type Client struct {
 	Host string
@@ -43,6 +45,22 @@ func storeToken(username string, token string) error {
 	return nil
 }
 
+// LoadToken Get the current signed in username and auth token
+func LoadToken() (string, string) {
+	userTokenBytes, err := ioutil.ReadFile("token")
+	var username, token string
+
+	if err == nil {
+		userTokenString := string(userTokenBytes)
+		userToken := strings.Split(userTokenString, "\n")
+		username = userToken[0]
+		token = userToken[1]
+	}
+	// TODO: Handle error
+
+	return username, token
+}
+
 func (client *Client) doLogin(username, password string) ([]byte, error) {
 	params := url.Values{}
 	params.Add("scope", "repo-read repo-write account-read account-write")
@@ -68,6 +86,17 @@ func (client *Client) doLogin(username, password string) ([]byte, error) {
 
 	b, err := ioutil.ReadAll(res.Body)
 	return b, err
+}
+
+// Get Send a GET request
+func (client *Client) Get(address string) (*http.Response, error) {
+	requrl := client.Host + address
+	res, err := client.web.Get(requrl)
+	if err != nil {
+		// TODO: Handle error
+		return res, err
+	}
+	return res, err
 }
 
 // Login Request credentials, perform login, and store token
@@ -107,7 +136,7 @@ func Login(userarg interface{}) error {
 		return err
 	}
 
-	client := NewClient("https://auth.gin.g-node.org")
+	client := NewClient(authhost)
 	b, err := client.doLogin(username, password)
 	var authresp proto.TokenResponse
 	err = json.Unmarshal(b, &authresp)
@@ -128,4 +157,48 @@ func Login(userarg interface{}) error {
 
 	return nil
 
+}
+
+// RequestAccount requests a specific account by name
+func RequestAccount(name string) (proto.Account, error) {
+	var acc proto.Account
+
+	client := NewClient(authhost)
+	res, err := client.Get("/api/accounts/" + name)
+
+	if err != nil {
+		return acc, err
+	}
+	defer closeRes(res.Body)
+
+	b, err := ioutil.ReadAll(res.Body)
+
+	err = json.Unmarshal(b, &acc)
+	if err != nil {
+		return acc, err
+	}
+	return acc, nil
+}
+
+// SearchAccount Search for account
+func SearchAccount(query string) ([]proto.Account, error) {
+	var results []proto.Account
+
+	params := url.Values{}
+	params.Add("q", query)
+	url := fmt.Sprintf("%s/api/accounts?%s", authhost, params.Encode())
+	client := NewClient(authhost)
+	res, err := client.Get(url)
+
+	if err != nil {
+		return results, err
+	} else if res.StatusCode != 200 {
+		return results, fmt.Errorf("[Account search error] Server returned: %s", res.Status)
+	}
+
+	body, _ := ioutil.ReadAll(res.Body)
+
+	err = json.Unmarshal(body, &results)
+
+	return results, nil
 }
