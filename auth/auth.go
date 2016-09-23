@@ -34,10 +34,8 @@ func closeRes(b io.ReadCloser) {
 	}
 }
 
-func storeToken(username string, token string) error {
-	userTokenStr := username + "\n" + token
-
-	err := ioutil.WriteFile("token", []byte(userTokenStr), 0600)
+func storeToken(token string) error {
+	err := ioutil.WriteFile("token", []byte(token), 0600)
 
 	if err != nil {
 		return err
@@ -48,16 +46,31 @@ func storeToken(username string, token string) error {
 
 // LoadToken Get the current signed in username and auth token
 func LoadToken() (string, string) {
-	userTokenBytes, err := ioutil.ReadFile("token")
+	tokenBytes, err := ioutil.ReadFile("token")
+	tokenInfo := proto.TokenInfo{}
 	var username, token string
 
 	if err == nil {
-		userTokenString := string(userTokenBytes)
-		userToken := strings.Split(userTokenString, "\n")
-		username = userToken[0]
-		token = userToken[1]
+		// userTokenString := string(userTokenBytes)
+		// userToken := strings.Split(userTokenString, "\n")
+		// username = userToken[0]
+		// token = userToken[1]
+		token = string(tokenBytes)
 	}
-	// TODO: Handle error. Return nil or empty strings?
+
+	client := NewClient(authhost)
+	res, err := client.Get("/oauth/validate/" + token)
+
+	defer closeRes(res.Body)
+
+	b, err := ioutil.ReadAll(res.Body)
+
+	err = json.Unmarshal(b, &tokenInfo)
+	if err != nil {
+		return "", ""
+	}
+
+	username = tokenInfo.Login
 
 	return username, token
 }
@@ -98,7 +111,6 @@ func (client *Client) Get(address string) (*http.Response, error) {
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", client.Token))
 	res, err := client.web.Do(req)
-	println("Sending GET request to " + requrl)
 	if err != nil {
 		// TODO: Handle error
 		return res, err
@@ -152,7 +164,7 @@ func Login(userarg interface{}) error {
 		return err
 	}
 
-	err = storeToken(username, authresp.AccessToken)
+	err = storeToken(authresp.AccessToken)
 
 	if err != nil {
 		// Login success but unable to store token in file. Print error.
