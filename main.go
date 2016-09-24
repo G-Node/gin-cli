@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/G-Node/gin-auth/proto"
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/docopt/docopt-go"
 )
@@ -35,34 +34,11 @@ func condAppend(b *bytes.Buffer, str *string) {
 }
 
 func printKeys(printFull bool) error {
-	// TODO: Use auth functions
-	username, token := auth.LoadToken(true)
 
-	if username == "" {
-		fmt.Println()
-		return fmt.Errorf("You are not logged in.")
-	}
-	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
-	// TODO: Check err and req.StatusCode
-	req, _ := http.NewRequest("GET", address, nil)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-
-	client := http.Client{}
-	res, err := client.Do(req)
-
+	keys, err := auth.GetUserKeys()
 	if err != nil {
-		return fmt.Errorf("Request for keys returned error: %s", err)
-	} else if res.StatusCode != 200 {
-		return fmt.Errorf("[Keys request error] Server returned: %s", res.Status)
+		return err
 	}
-
-	defer close(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-
-	var keys []proto.SSHKey
-	err = json.Unmarshal(b, &keys)
-
 	nkeys := len(keys)
 
 	var message string
@@ -89,7 +65,7 @@ func addKey() error {
 
 	// TODO: Prompt user for key information
 	// TODO: Allow use to speciry pubkey file (default to ~/.ssh/id_rsa.pub ?)
-	username, token := auth.LoadToken(true)
+	username, token, err := auth.LoadToken(true)
 
 	if username == "" {
 		fmt.Println()
@@ -126,7 +102,7 @@ func addKey() error {
 
 func printAccountInfo(userarg interface{}) error {
 	var username string
-	currentUser, token := auth.LoadToken(true)
+	currentUser, token, err := auth.LoadToken(true)
 
 	if userarg == nil {
 		username = currentUser
@@ -183,7 +159,7 @@ func printAccountInfo(userarg interface{}) error {
 
 func listRepos() error {
 
-	_, token := auth.LoadToken(false)
+	_, token, err := auth.LoadToken(false)
 
 	address := fmt.Sprintf("%s/repos/public", repo)
 	// TODO: Check err and req.StatusCode

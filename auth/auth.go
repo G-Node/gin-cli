@@ -45,7 +45,7 @@ func storeToken(token string) error {
 }
 
 // LoadToken Get the current signed in username and auth token
-func LoadToken(warn bool) (string, string) {
+func LoadToken(warn bool) (string, string, error) {
 
 	tokenBytes, err := ioutil.ReadFile("token")
 	tokenInfo := proto.TokenInfo{}
@@ -57,17 +57,21 @@ func LoadToken(warn bool) (string, string) {
 		if warn {
 			fmt.Println("You are not logged in.")
 		}
-		return "", ""
+		return "", "", err
 	}
 
 	client := NewClient(authhost)
 	res, err := client.Get("/oauth/validate/" + token)
+	if err != nil {
+		fmt.Println("[Auth error] Error communicating with server.")
+		return "", "", err
+	}
 
 	defer closeRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return "", ""
+		return "", "", err
 	}
 
 	err = json.Unmarshal(b, &tokenInfo)
@@ -78,7 +82,37 @@ func LoadToken(warn bool) (string, string) {
 		fmt.Println("You are not logged in.")
 		token = ""
 	}
-	return username, token
+	return username, token, nil
+}
+
+// GetUserKeys Load token and request an slice of the user's keys
+func GetUserKeys() ([]proto.SSHKey, error) {
+	username, token, err := LoadToken(true)
+	if err != nil {
+		return nil, err
+	}
+	if token == "" {
+		return nil, fmt.Errorf("This command requires login.")
+	}
+
+	client := NewClient(authhost)
+	client.Token = token
+
+	res, err := client.Get(fmt.Sprintf("/api/accounts/%s/keys", username))
+
+	if err != nil {
+		return nil, fmt.Errorf("Request for keys returned error: %s", err)
+	} else if res.StatusCode != 200 {
+		return nil, fmt.Errorf("[Keys request error] Server returned: %s", res.Status)
+	}
+
+	defer closeRes(res.Body)
+
+	b, err := ioutil.ReadAll(res.Body)
+	var keys []proto.SSHKey
+	err = json.Unmarshal(b, &keys)
+
+	return keys, nil
 }
 
 func (client *Client) doLogin(username, password string) ([]byte, error) {
