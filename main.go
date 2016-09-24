@@ -122,7 +122,11 @@ func printAccountInfo(userarg interface{}) error {
 }
 
 func listRepos() error {
-	err := repo.GetRepos()
+	repos, err := repo.GetRepos()
+	for idx, repoInfo := range repos {
+		fmt.Printf("%d: %s [head: %s]\n", idx, repoInfo.Name, repoInfo.Head)
+		fmt.Printf(" - %s\n", repoInfo.Description)
+	}
 	return err
 }
 
