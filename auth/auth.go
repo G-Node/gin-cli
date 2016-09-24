@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -265,4 +266,42 @@ func SearchAccount(query string) ([]proto.Account, error) {
 	err = json.Unmarshal(body, &results)
 
 	return results, nil
+}
+
+// AddKey Adds the given key to the current user's authorised keys
+func AddKey(key string) error {
+
+	username, token, err := LoadToken(true)
+
+	if username == "" {
+		fmt.Println()
+		return fmt.Errorf("You are not logged in.")
+	}
+	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
+	// TODO: Check err and req.StatusCode
+
+	mkBody := func(key, description string) io.Reader {
+		pw := &struct {
+			Key         string `json:"key"`
+			Description string `json:"description"`
+		}{key, description}
+		b, _ := json.Marshal(pw)
+		return bytes.NewReader(b)
+	}
+
+	req, _ := http.NewRequest("POST", address, mkBody(key, "ll"))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	client := http.Client{}
+	res, err := client.Do(req)
+
+	if err != nil {
+		return fmt.Errorf("Error: %s", err)
+	} else if res.StatusCode != 200 {
+		return fmt.Errorf("[Add key error] Server returned: %s", res.Status)
+	}
+
+	closeRes(res.Body)
+	return nil
+
 }

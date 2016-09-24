@@ -4,7 +4,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -62,42 +61,12 @@ func printKeys(printFull bool) error {
 }
 
 func addKey() error {
-
 	// TODO: Prompt user for key information
 	// TODO: Allow use to speciry pubkey file (default to ~/.ssh/id_rsa.pub ?)
-	username, token, err := auth.LoadToken(true)
-
-	if username == "" {
-		fmt.Println()
-		return fmt.Errorf("You are not logged in.")
-	}
-	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
-	// TODO: Check err and req.StatusCode
 	key := ""
 
-	mkBody := func(key, description string) io.Reader {
-		pw := &struct {
-			Key         string `json:"key"`
-			Description string `json:"description"`
-		}{key, description}
-		b, _ := json.Marshal(pw)
-		return bytes.NewReader(b)
-	}
-
-	req, _ := http.NewRequest("POST", address, mkBody(key, "ll"))
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	client := http.Client{}
-	res, err := client.Do(req)
-
-	if err != nil {
-		return fmt.Errorf("Error: %s", err)
-	} else if res.StatusCode != 200 {
-		return fmt.Errorf("[Add key error] Server returned: %s", res.Status)
-	}
-
-	closeRes(res.Body)
-	return nil
+	err := auth.AddKey(key)
+	return err
 }
 
 func printAccountInfo(userarg interface{}) error {
@@ -210,11 +179,16 @@ Usage:
 			fmt.Println(err)
 		}
 	case args["keys"].(bool):
-		printFullKeys := false
-		if args["-v"].(bool) || args["--verbose"].(bool) {
-			printFullKeys = true
+		var err error
+		if args["add"].(bool) {
+			err = addKey()
+		} else {
+			printFullKeys := false
+			if args["-v"].(bool) || args["--verbose"].(bool) {
+				printFullKeys = true
+			}
+			err = printKeys(printFullKeys)
 		}
-		err := printKeys(printFullKeys)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
