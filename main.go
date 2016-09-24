@@ -6,17 +6,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"net/http"
 	"os"
 
 	"github.com/G-Node/gin-cli/auth"
+	"github.com/G-Node/gin-cli/repo"
 	"github.com/docopt/docopt-go"
 )
-
-// const host = "http://localhost:8081"
-const authhost = "https://auth.gin.g-node.org"
-const repo = "https://repo.gin.g-node.org"
 
 func closeRes(b io.ReadCloser) {
 	err := b.Close()
@@ -127,29 +122,7 @@ func printAccountInfo(userarg interface{}) error {
 }
 
 func listRepos() error {
-
-	_, token, err := auth.LoadToken(false)
-
-	address := fmt.Sprintf("%s/repos/public", repo)
-	// TODO: Check err and req.StatusCode
-	req, _ := http.NewRequest("GET", address, nil)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-
-	client := http.Client{}
-	res, err := client.Do(req)
-
-	if err != nil {
-		return fmt.Errorf("Request for repos returned error: %s", err)
-	} else if res.StatusCode != 200 {
-		return fmt.Errorf("[Repo listing error] Server returned: %s", res.Status)
-	}
-
-	defer closeRes(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-
-	print(string(b))
-
+	err := repo.GetRepos()
 	return err
 }
 
