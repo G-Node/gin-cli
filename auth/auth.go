@@ -45,17 +45,19 @@ func storeToken(token string) error {
 }
 
 // LoadToken Get the current signed in username and auth token
-func LoadToken() (string, string) {
+func LoadToken(warn bool) (string, string) {
+
 	tokenBytes, err := ioutil.ReadFile("token")
 	tokenInfo := proto.TokenInfo{}
 	var username, token string
 
 	if err == nil {
-		// userTokenString := string(userTokenBytes)
-		// userToken := strings.Split(userTokenString, "\n")
-		// username = userToken[0]
-		// token = userToken[1]
 		token = string(tokenBytes)
+	} else {
+		if warn {
+			fmt.Println("You are not logged in.")
+		}
+		return "", ""
 	}
 
 	client := NewClient(authhost)
@@ -64,14 +66,18 @@ func LoadToken() (string, string) {
 	defer closeRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
-
-	err = json.Unmarshal(b, &tokenInfo)
 	if err != nil {
 		return "", ""
 	}
 
-	username = tokenInfo.Login
+	err = json.Unmarshal(b, &tokenInfo)
 
+	username = tokenInfo.Login
+	if username == "" && warn {
+		// Token invalid: Delete file?
+		fmt.Println("You are not logged in.")
+		token = ""
+	}
 	return username, token
 }
 

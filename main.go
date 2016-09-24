@@ -36,7 +36,7 @@ func condAppend(b *bytes.Buffer, str *string) {
 
 func printKeys(printFull bool) error {
 	// TODO: Use auth functions
-	username, token := auth.LoadToken()
+	username, token := auth.LoadToken(true)
 
 	if username == "" {
 		fmt.Println()
@@ -89,7 +89,7 @@ func addKey() error {
 
 	// TODO: Prompt user for key information
 	// TODO: Allow use to speciry pubkey file (default to ~/.ssh/id_rsa.pub ?)
-	username, token := auth.LoadToken()
+	username, token := auth.LoadToken(true)
 
 	if username == "" {
 		fmt.Println()
@@ -126,7 +126,7 @@ func addKey() error {
 
 func printAccountInfo(userarg interface{}) error {
 	var username string
-	currentUser, token := auth.LoadToken()
+	currentUser, token := auth.LoadToken(true)
 
 	if userarg == nil {
 		username = currentUser
@@ -183,7 +183,7 @@ func printAccountInfo(userarg interface{}) error {
 
 func listRepos() error {
 
-	_, token := auth.LoadToken()
+	_, token := auth.LoadToken(false)
 
 	address := fmt.Sprintf("%s/repos/public", repo)
 	// TODO: Check err and req.StatusCode
