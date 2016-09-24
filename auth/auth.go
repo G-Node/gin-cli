@@ -11,29 +11,11 @@ import (
 	"strings"
 
 	"github.com/G-Node/gin-auth/proto"
+	"github.com/G-Node/gin-cli/client"
 	"github.com/howeyc/gopass"
 )
 
 const authhost = "https://auth.gin.g-node.org"
-
-// Client struct for making requests
-type Client struct {
-	Host  string
-	Token string
-	web   *http.Client
-}
-
-// NewClient create new client for specific host
-func NewClient(address string) *Client {
-	return &Client{Host: address, web: &http.Client{}}
-}
-
-func closeRes(b io.ReadCloser) {
-	err := b.Close()
-	if err != nil {
-		fmt.Println("Error during cleanup:", err)
-	}
-}
 
 func storeToken(token string) error {
 	err := ioutil.WriteFile("token", []byte(token), 0600)
@@ -61,14 +43,14 @@ func LoadToken(warn bool) (string, string, error) {
 		return "", "", err
 	}
 
-	client := NewClient(authhost)
-	res, err := client.Get("/oauth/validate/" + token)
+	authcl := client.NewClient(authhost)
+	res, err := authcl.Get("/oauth/validate/" + token)
 	if err != nil {
 		fmt.Println("[Auth error] Error communicating with server.")
 		return "", "", err
 	}
 
-	defer closeRes(res.Body)
+	defer client.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -96,10 +78,10 @@ func GetUserKeys() ([]proto.SSHKey, error) {
 		return nil, fmt.Errorf("This command requires login.")
 	}
 
-	client := NewClient(authhost)
-	client.Token = token
+	authcl := client.NewClient(authhost)
+	authcl.Token = token
 
-	res, err := client.Get(fmt.Sprintf("/api/accounts/%s/keys", username))
+	res, err := authcl.Get(fmt.Sprintf("/api/accounts/%s/keys", username))
 
 	if err != nil {
 		return nil, fmt.Errorf("Request for keys returned error: %s", err)
@@ -107,56 +89,13 @@ func GetUserKeys() ([]proto.SSHKey, error) {
 		return nil, fmt.Errorf("[Keys request error] Server returned: %s", res.Status)
 	}
 
-	defer closeRes(res.Body)
+	defer client.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 	var keys []proto.SSHKey
 	err = json.Unmarshal(b, &keys)
 
 	return keys, nil
-}
-
-func (client *Client) doLogin(username, password string) ([]byte, error) {
-	params := url.Values{}
-	params.Add("scope", "repo-read repo-write account-read account-write")
-	params.Add("username", username)
-	params.Add("password", password)
-	params.Add("grant_type", "password")
-	params.Add("client_id", "gin")
-	params.Add("client_secret", "secret")
-
-	address := fmt.Sprintf("%s/oauth/token", client.Host)
-
-	req, _ := http.NewRequest("POST", address, strings.NewReader(params.Encode()))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	res, err := client.web.Do(req)
-
-	if err != nil {
-		return nil, err
-	} else if res.StatusCode != 200 {
-		return nil, fmt.Errorf("[Login error] %s", res.Status)
-	}
-
-	defer closeRes(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-	return b, err
-}
-
-// Get Send a GET request
-func (client *Client) Get(address string) (*http.Response, error) {
-	requrl := client.Host + address
-	req, err := http.NewRequest("GET", requrl, nil)
-	if err != nil {
-		// TODO: Handle error
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", client.Token))
-	res, err := client.web.Do(req)
-	if err != nil {
-		// TODO: Handle error
-		return res, err
-	}
-	return res, err
 }
 
 // Login Request credentials, perform login, and store token
@@ -196,8 +135,8 @@ func Login(userarg interface{}) error {
 		return err
 	}
 
-	client := NewClient(authhost)
-	b, err := client.doLogin(username, password)
+	authcl := client.NewClient(authhost)
+	b, err := authcl.DoLogin(username, password)
 	var authresp proto.TokenResponse
 	err = json.Unmarshal(b, &authresp)
 
@@ -223,9 +162,9 @@ func Login(userarg interface{}) error {
 func RequestAccount(name, token string) (proto.Account, error) {
 	var acc proto.Account
 
-	client := NewClient(authhost)
-	client.Token = token
-	res, err := client.Get("/api/accounts/" + name)
+	authcl := client.NewClient(authhost)
+	authcl.Token = token
+	res, err := authcl.Get("/api/accounts/" + name)
 
 	if err != nil {
 		fmt.Printf("[Error] Request failed: %s\n", err)
@@ -234,7 +173,7 @@ func RequestAccount(name, token string) (proto.Account, error) {
 		return acc, fmt.Errorf("[Account search error] Server returned: %s", res.Status)
 	}
 
-	defer closeRes(res.Body)
+	defer client.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 
@@ -252,8 +191,8 @@ func SearchAccount(query string) ([]proto.Account, error) {
 	params := url.Values{}
 	params.Add("q", query)
 	url := fmt.Sprintf("%s/api/accounts?%s", authhost, params.Encode())
-	client := NewClient(authhost)
-	res, err := client.Get(url)
+	authcl := client.NewClient(authhost)
+	res, err := authcl.Get(url)
 
 	if err != nil {
 		return results, err
@@ -292,8 +231,8 @@ func AddKey(key string) error {
 	req, _ := http.NewRequest("POST", address, mkBody(key, "ll"))
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	client := http.Client{}
-	res, err := client.Do(req)
+	authcl := http.Client{}
+	res, err := authcl.Do(req)
 
 	if err != nil {
 		return fmt.Errorf("Error: %s", err)
@@ -301,7 +240,7 @@ func AddKey(key string) error {
 		return fmt.Errorf("[Add key error] Server returned: %s", res.Status)
 	}
 
-	closeRes(res.Body)
+	client.CloseRes(res.Body)
 	return nil
 
 }
