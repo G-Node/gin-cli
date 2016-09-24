@@ -19,7 +19,7 @@ import (
 const authhost = "https://auth.gin.g-node.org"
 const repo = "https://repo.gin.g-node.org"
 
-func close(b io.ReadCloser) {
+func closeRes(b io.ReadCloser) {
 	err := b.Close()
 	if err != nil {
 		fmt.Println("Error during cleanup:", err)
@@ -96,7 +96,7 @@ func addKey() error {
 		return fmt.Errorf("[Add key error] Server returned: %s", res.Status)
 	}
 
-	close(res.Body)
+	closeRes(res.Body)
 	return nil
 }
 
@@ -175,7 +175,7 @@ func listRepos() error {
 		return fmt.Errorf("[Repo listing error] Server returned: %s", res.Status)
 	}
 
-	defer close(res.Body)
+	defer closeRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 
