@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/G-Node/gin-cli/proto"
+	"github.com/G-Node/gin-core/gin"
 	"github.com/docopt/docopt-go"
 	"github.com/howeyc/gopass"
 )
@@ -24,8 +24,8 @@ func close(b io.ReadCloser) {
 const host = "http://localhost:8081"
 
 // RequestAccount requests a specific account by name
-func RequestAccount(name string) (proto.Account, error) {
-	var acc proto.Account
+func RequestAccount(name string) (gin.Account, error) {
+	var acc gin.Account
 
 	address := fmt.Sprintf("%s/api/accounts/%s", host, name)
 	res, err := http.Get(address)
@@ -45,8 +45,8 @@ func RequestAccount(name string) (proto.Account, error) {
 }
 
 // SearchAccount Search for account
-func SearchAccount(query string) ([]proto.Account, error) {
-	var results []proto.Account
+func SearchAccount(query string) ([]gin.Account, error) {
+	var results []gin.Account
 
 	params := url.Values{}
 	params.Add("q", query)
@@ -66,7 +66,7 @@ func SearchAccount(query string) ([]proto.Account, error) {
 	return results, nil
 }
 
-func login(user string, pass string) (proto.AuthResponse, error) {
+func login(user string, pass string) (gin.AuthResponse, error) {
 
 	params := url.Values{}
 	params.Add("scope", "repo-read repo-write account-read account-write")
@@ -83,7 +83,7 @@ func login(user string, pass string) (proto.AuthResponse, error) {
 	client := http.Client{}
 	res, err := client.Do(req)
 	defer close(res.Body)
-	var authresp proto.AuthResponse
+	var authresp gin.AuthResponse
 
 	if err != nil {
 		return authresp, err
@@ -125,7 +125,7 @@ func GetSSHKeys(user string, token string) []string {
 
 	b, err := ioutil.ReadAll(res.Body)
 
-	var keyInfo []proto.SSHKey
+	var keyInfo []gin.SSHKey
 
 	err = json.Unmarshal(b, &keyInfo)
 
