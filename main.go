@@ -63,7 +63,7 @@ func addKey() error {
 
 func printAccountInfo(userarg interface{}) error {
 	var username string
-	currentUser, token, err := auth.LoadToken(true)
+	currentUser, token, _ := auth.LoadToken(true)
 
 	if userarg == nil {
 		username = currentUser
@@ -72,7 +72,7 @@ func printAccountInfo(userarg interface{}) error {
 	}
 
 	if username == "" {
-		// prompt for login
+		// prompt for username
 		fmt.Print("Specify username for info lookup: ")
 		username = ""
 		fmt.Scanln(&username)
@@ -118,8 +118,41 @@ func printAccountInfo(userarg interface{}) error {
 	return nil
 }
 
-func listRepos() error {
-	repos, err := repo.GetRepos()
+func listUserRepos(userarg interface{}) error {
+	var username string
+	currentUser, token, _ := auth.LoadToken(true)
+
+	if userarg == nil {
+		username = currentUser
+	} else {
+		username = userarg.(string)
+	}
+
+	if username == "" {
+		// prompt for username
+		fmt.Print("Specify username for info lookup: ")
+		username = ""
+		fmt.Scanln(&username)
+	}
+
+	info, err := repo.GetRepos(username, token)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Repositories owned by %s\n", username)
+	for idx, r := range info {
+		print(idx)
+		print("  ")
+		println(r.Name)
+	}
+
+	return nil
+}
+
+func listPubRepos() error {
+	repos, err := repo.GetRepos("", "")
+	fmt.Printf("Public repositories\n")
 	for idx, repoInfo := range repos {
 		fmt.Printf("%d: %s [head: %s]\n", idx, repoInfo.Name, repoInfo.Head)
 		fmt.Printf(" - %s\n", repoInfo.Description)
@@ -133,27 +166,26 @@ GIN command line client
 
 Usage:
 	gin login [<username>]
+	gin repos [<username>]
 	gin info  [<username>]
 	gin keys  [-v | --verbose]
 	gin keys add
-	gin repos [<username>]
+	gin public
 `
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
 
+	var err error
+
 	switch {
 	case args["login"].(bool):
-		err := auth.Login(args["<username>"])
+		err = auth.Login(args["<username>"])
 		if err != nil {
 			fmt.Println("Authentication failed!")
 		}
 	case args["info"].(bool):
-		err := printAccountInfo(args["<username>"])
-		if err != nil {
-			fmt.Println(err)
-		}
+		err = printAccountInfo(args["<username>"])
 	case args["keys"].(bool):
-		var err error
 		if args["add"].(bool) {
 			err = addKey()
 		} else {
@@ -163,16 +195,14 @@ Usage:
 			}
 			err = printKeys(printFullKeys)
 		}
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
 	case args["repos"].(bool):
-		err := listRepos()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		err = listUserRepos(args["<username>"])
+	case args["public"].(bool):
+		err = listPubRepos()
+	}
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 }

@@ -4,26 +4,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 
-	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/client"
 	"github.com/G-Node/gin-repo/wire"
 )
 
 const repohost = "https://repo.gin.g-node.org"
 
-// GetRepos Get a list of all public repositories
-func GetRepos() ([]wire.Repo, error) {
-	_, token, err := auth.LoadToken(false)
-
+// GetRepos Get a list of a user's repositories
+func GetRepos(user, token string) ([]wire.Repo, error) {
 	repocl := client.NewClient(repohost)
-	repocl.Token = token
-	res, err := repocl.Get("/repos/public")
+	var res *http.Response
+	var err error
+	if user == "" {
+		res, err = repocl.Get("/repos/public")
+	} else {
+		repocl.Token = token
+		res, err = repocl.Get(fmt.Sprintf("/users/%s/repos", user))
+	}
 
 	if err != nil {
-		return nil, fmt.Errorf("Request for repos returned error: %s", err)
+		return nil, fmt.Errorf("Request for repositories returned error: %s", err)
 	} else if res.StatusCode != 200 {
-		return nil, fmt.Errorf("[Repo listing error] Server returned: %s", res.Status)
+		return nil, fmt.Errorf("[Repository request error] Server returned: %s", res.Status)
 	}
 
 	defer client.CloseRes(res.Body)
