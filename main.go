@@ -34,16 +34,13 @@ func printKeys(printFull bool) error {
 		return err
 	}
 	nkeys := len(keys)
-
-	var message string
-	if nkeys == 0 {
-		message = "There are no keys "
-	} else if nkeys == 1 {
-		message = "You have 1 key"
+	var plural string
+	if nkeys == 1 {
+		plural = ""
 	} else {
-		message = fmt.Sprintf("%v keys are", nkeys)
+		plural = "s"
 	}
-	fmt.Printf("%s associated with your account.\n\n", message)
+	fmt.Printf("You have %d key%s associated with your account.\n\n", nkeys, plural)
 	for idx, key := range keys {
 		fmt.Printf("  [%v] \"%s\"\n", idx+1, key.Description)
 		fmt.Printf("  Fingerprint: %s\n", key.Fingerprint)
