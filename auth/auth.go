@@ -10,8 +10,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/G-Node/gin-auth/proto"
 	"github.com/G-Node/gin-cli/client"
+	"github.com/G-Node/gin-core/gin"
 	"github.com/howeyc/gopass"
 )
 
@@ -31,7 +31,7 @@ func storeToken(token string) error {
 func LoadToken(warn bool) (string, string, error) {
 
 	tokenBytes, err := ioutil.ReadFile("token")
-	tokenInfo := proto.TokenInfo{}
+	tokenInfo := gin.TokenInfo{}
 	var username, token string
 
 	if err == nil {
@@ -69,7 +69,7 @@ func LoadToken(warn bool) (string, string, error) {
 }
 
 // GetUserKeys Load token and request an slice of the user's keys
-func GetUserKeys() ([]proto.SSHKey, error) {
+func GetUserKeys() ([]gin.SSHKey, error) {
 	username, token, err := LoadToken(true)
 	if err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func GetUserKeys() ([]proto.SSHKey, error) {
 	defer client.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
-	var keys []proto.SSHKey
+	var keys []gin.SSHKey
 	err = json.Unmarshal(b, &keys)
 
 	return keys, nil
@@ -137,7 +137,7 @@ func Login(userarg interface{}) error {
 
 	authcl := client.NewClient(authhost)
 	b, err := authcl.DoLogin(username, password)
-	var authresp proto.TokenResponse
+	var authresp gin.TokenResponse
 	err = json.Unmarshal(b, &authresp)
 
 	if err != nil {
@@ -159,8 +159,8 @@ func Login(userarg interface{}) error {
 }
 
 // RequestAccount requests a specific account by name
-func RequestAccount(name, token string) (proto.Account, error) {
-	var acc proto.Account
+func RequestAccount(name, token string) (gin.Account, error) {
+	var acc gin.Account
 
 	authcl := client.NewClient(authhost)
 	authcl.Token = token
@@ -185,8 +185,8 @@ func RequestAccount(name, token string) (proto.Account, error) {
 }
 
 // SearchAccount Search for account
-func SearchAccount(query string) ([]proto.Account, error) {
-	var results []proto.Account
+func SearchAccount(query string) ([]gin.Account, error) {
+	var results []gin.Account
 
 	params := url.Values{}
 	params.Add("q", query)
