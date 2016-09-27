@@ -20,7 +20,15 @@ func closeRes(b io.ReadCloser) {
 	}
 }
 
-// condAppend Conditionally append to a buffer
+func upload(path interface{}) error {
+	return fmt.Errorf("Command [upload] not yet implemented.")
+}
+
+func download(path interface{}) error {
+	return fmt.Errorf("Command [download] not yet implemented.")
+}
+
+// condAppend Conditionally append str to b if not empty
 func condAppend(b *bytes.Buffer, str *string) {
 	if str != nil && *str != "" {
 		b.WriteString(*str + " ")
@@ -180,6 +188,10 @@ Usage:
 		if err != nil {
 			fmt.Println("Authentication failed!")
 		}
+	case args["upload"].(bool):
+		err = upload(args["<path>"])
+	case args["download"].(bool):
+		err = download(args["<path>"])
 	case args["info"].(bool):
 		err = printAccountInfo(args["<username>"])
 	case args["keys"].(bool):
