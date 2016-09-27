@@ -21,10 +21,14 @@ func closeRes(b io.ReadCloser) {
 }
 
 func upload(path interface{}) error {
+	// Check if the current directory is a git repository.
+	// If it has any unstaged commits it should stage, commit, and push.
 	return fmt.Errorf("Command [upload] not yet implemented.")
 }
 
 func download(path interface{}) error {
+	// Check if the current directory is a git repository.
+	// Perform a git pull.
 	return fmt.Errorf("Command [download] not yet implemented.")
 }
 
