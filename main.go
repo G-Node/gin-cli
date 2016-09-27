@@ -120,19 +120,16 @@ func printAccountInfo(userarg interface{}) error {
 
 func listUserRepos(userarg interface{}) error {
 	var username string
-	currentUser, token, _ := auth.LoadToken(true)
+	currentUser, token, _ := auth.LoadToken(false)
+
+	if currentUser == "" {
+		return fmt.Errorf("This command requires login.")
+	}
 
 	if userarg == nil {
 		username = currentUser
 	} else {
 		username = userarg.(string)
-	}
-
-	if username == "" {
-		// prompt for username
-		fmt.Print("Specify username for info lookup: ")
-		username = ""
-		fmt.Scanln(&username)
 	}
 
 	info, err := repo.GetRepos(username, token)
@@ -142,9 +139,7 @@ func listUserRepos(userarg interface{}) error {
 
 	fmt.Printf("Repositories owned by %s\n", username)
 	for idx, r := range info {
-		print(idx)
-		print("  ")
-		println(r.Name)
+		fmt.Printf("%d:  %s\n", idx, r.Name)
 	}
 
 	return nil
