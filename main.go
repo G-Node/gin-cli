@@ -160,10 +160,12 @@ func main() {
 GIN command line client
 
 Usage:
-	gin login [<username>]
-	gin repos [<username>]
-	gin info  [<username>]
-	gin keys  [-v | --verbose]
+	gin login    [<username>]
+	gin upload   [<path>]
+	gin download [<path>]
+	gin repos    [<username>]
+	gin info     [<username>]
+	gin keys     [-v | --verbose]
 	gin keys add
 	gin public
 `
