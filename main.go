@@ -12,22 +12,31 @@ import (
 	"github.com/docopt/docopt-go"
 )
 
-func closeRes(b io.ReadCloser) {
-	err := b.Close()
-	if err != nil {
-		fmt.Println("Error during cleanup:", err)
+func createRepo(name, description interface{}) error {
+	repoName := ""
+	if name == nil || name.(string) != "" {
+		fmt.Print("Repository name: ")
+		repoName = ""
+		fmt.Scanln(&repoName)
 	}
+	repoDesc := ""
+	if description != nil {
+		repoDesc = description.(string)
+	}
+	return repo.CreateRepo(repoName, repoDesc)
 }
 
 func upload(path interface{}) error {
 	// Check if the current directory is a git repository.
 	// If it has any unstaged commits it should stage, commit, and push.
+	// repo.UploadRepo(path)
 	return fmt.Errorf("Command [upload] not yet implemented.")
 }
 
 func download(path interface{}) error {
 	// Check if the current directory is a git repository.
 	// Perform a git pull.
+	// repo.DownloadRepo(path)
 	return fmt.Errorf("Command [download] not yet implemented.")
 }
 
@@ -172,6 +181,7 @@ GIN command line client
 
 Usage:
 	gin login    [<username>]
+	gin create   [<name>] [-d <description>]
 	gin upload   [<path>]
 	gin download [<path>]
 	gin repos    [<username>]
@@ -191,6 +201,8 @@ Usage:
 		if err != nil {
 			fmt.Println("Authentication failed!")
 		}
+	case args["create"].(bool):
+		err = createRepo(args["<name>"], args["<description>"])
 	case args["upload"].(bool):
 		err = upload(args["<path>"])
 	case args["download"].(bool):

@@ -6,13 +6,14 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/client"
 	"github.com/G-Node/gin-repo/wire"
 )
 
 const repohost = "https://repo.gin.g-node.org"
 
-// GetRepos Get a list of a user's repositories
+// GetRepos Get a list of repositories (public or user specific)
 func GetRepos(user, token string) ([]wire.Repo, error) {
 	repocl := client.NewClient(repohost)
 	var res *http.Response
@@ -39,4 +40,26 @@ func GetRepos(user, token string) ([]wire.Repo, error) {
 	}
 
 	return repoList, nil
+}
+
+// CreateRepo Create a repository on the server
+func CreateRepo(name, description string) error {
+	repocl := client.NewClient(repohost)
+	username, token, _ := auth.LoadToken(false)
+	repocl.Token = token
+
+	repoPath := client.URLJoin(repohost, username, name)
+	println(repoPath)
+
+	return nil
+}
+
+// UploadRepo Add files to a repository and upload
+func UploadRepo(path string) error {
+	return nil
+}
+
+// DownloadRepo Download the files of a given repository
+func DownloadRepo(path string) error {
+	return nil
 }
