@@ -48,8 +48,15 @@ func CreateRepo(name, description string) error {
 	username, token, _ := auth.LoadToken(false)
 	repocl.Token = token
 
-	repoPath := client.URLJoin(repohost, username, name)
-	println(repoPath)
+	data := wire.Repo{Name: name, Description: description}
+	res, err := repocl.Post(fmt.Sprintf("/users/%s/repos", username), data)
+	if err != nil {
+		return err
+	}
+	defer client.CloseRes(res.Body)
+	if res.StatusCode != 201 {
+		return fmt.Errorf("Failed to create repository. Server returned: %s", res.Status)
+	}
 
 	return nil
 }

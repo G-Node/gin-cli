@@ -19,8 +19,7 @@ type Client struct {
 	web   *http.Client
 }
 
-// URLJoin Join parts into a valid URL
-func URLJoin(parts ...string) string {
+func urlJoin(parts ...string) string {
 	// First part must be a valid URL
 	u, err := url.Parse(parts[0])
 	if err != nil {
@@ -63,7 +62,7 @@ func (client *Client) DoLogin(username, password string) ([]byte, error) {
 
 // Get Send a GET request
 func (client *Client) Get(address string) (*http.Response, error) {
-	requrl := URLJoin(client.Host, address)
+	requrl := urlJoin(client.Host, address)
 	req, err := http.NewRequest("GET", requrl, nil)
 	if err != nil {
 		// TODO: Handle error
@@ -83,7 +82,7 @@ func (client *Client) Post(address string, data interface{}) (*http.Response, er
 	if err != nil {
 		return nil, err
 	}
-	requrl := URLJoin(client.Host, address)
+	requrl := urlJoin(client.Host, address)
 	req, _ := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", client.Token))
 	res, err := client.web.Do(req)
@@ -91,7 +90,6 @@ func (client *Client) Post(address string, data interface{}) (*http.Response, er
 		// TODO: Handle error
 	}
 	return res, err
-
 }
 
 // NewClient create new client for specific host

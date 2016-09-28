@@ -14,11 +14,14 @@ import (
 
 func createRepo(name, description interface{}) error {
 	repoName := ""
-	if name == nil || name.(string) != "" {
+	if name == nil || name.(string) == "" {
 		fmt.Print("Repository name: ")
 		repoName = ""
 		fmt.Scanln(&repoName)
+	} else {
+		repoName = name.(string)
 	}
+	// TODO: Check name validity before sending to server?
 	repoDesc := ""
 	if description != nil {
 		repoDesc = description.(string)
