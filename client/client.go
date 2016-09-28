@@ -77,6 +77,23 @@ func (client *Client) Get(address string) (*http.Response, error) {
 	return res, err
 }
 
+// Post Send a POST request
+func (client *Client) Post(address string, data interface{}) (*http.Response, error) {
+	datajson, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	requrl := URLJoin(client.Host, address)
+	req, _ := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", client.Token))
+	res, err := client.web.Do(req)
+	if err != nil {
+		// TODO: Handle error
+	}
+	return res, err
+
+}
+
 // NewClient create new client for specific host
 func NewClient(address string) *Client {
 	return &Client{Host: address, web: &http.Client{}}
