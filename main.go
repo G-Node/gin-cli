@@ -5,7 +5,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/G-Node/gin-cli/auth"

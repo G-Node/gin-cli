@@ -1,11 +1,14 @@
 package client
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 )
 
@@ -14,6 +17,20 @@ type Client struct {
 	Host  string
 	Token string
 	web   *http.Client
+}
+
+// URLJoin Join parts into a valid URL
+func URLJoin(parts ...string) string {
+	// First part must be a valid URL
+	u, err := url.Parse(parts[0])
+	if err != nil {
+		// TODO: Fail
+	}
+
+	for _, part := range parts[1:] {
+		u.Path = path.Join(u.Path, part)
+	}
+	return u.String()
 }
 
 // DoLogin Login with given username and password and store token
@@ -46,7 +63,7 @@ func (client *Client) DoLogin(username, password string) ([]byte, error) {
 
 // Get Send a GET request
 func (client *Client) Get(address string) (*http.Response, error) {
-	requrl := client.Host + address
+	requrl := URLJoin(client.Host, address)
 	req, err := http.NewRequest("GET", requrl, nil)
 	if err != nil {
 		// TODO: Handle error
