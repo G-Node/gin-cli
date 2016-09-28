@@ -162,7 +162,7 @@ func listUserRepos(userarg interface{}) error {
 
 	fmt.Printf("Repositories owned by %s\n", username)
 	for idx, r := range info {
-		fmt.Printf("%d:  %s\n", idx, r.Name)
+		fmt.Printf("%d:  %s\n", idx+1, r.Name)
 	}
 
 	return nil
@@ -172,7 +172,7 @@ func listPubRepos() error {
 	repos, err := repo.GetRepos("", "")
 	fmt.Printf("Public repositories\n")
 	for idx, repoInfo := range repos {
-		fmt.Printf("%d: %s [head: %s]\n", idx, repoInfo.Name, repoInfo.Head)
+		fmt.Printf("%d: %s [head: %s]\n", idx+1, repoInfo.Name, repoInfo.Head)
 		fmt.Printf(" - %s\n", repoInfo.Description)
 	}
 	return err
