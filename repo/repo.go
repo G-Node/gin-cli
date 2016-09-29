@@ -13,7 +13,7 @@ import (
 
 const repohost = "https://repo.gin.g-node.org"
 
-// GetRepos Get a list of repositories (public or user specific)
+// GetRepos gets a list of repositories (public or user specific)
 func GetRepos(user, token string) ([]wire.Repo, error) {
 	repocl := client.NewClient(repohost)
 	var res *http.Response
@@ -42,7 +42,7 @@ func GetRepos(user, token string) ([]wire.Repo, error) {
 	return repoList, nil
 }
 
-// CreateRepo Create a repository on the server
+// CreateRepo creates a repository on the server
 func CreateRepo(name, description string) error {
 	repocl := client.NewClient(repohost)
 	username, token, _ := auth.LoadToken(false)
@@ -61,12 +61,18 @@ func CreateRepo(name, description string) error {
 	return nil
 }
 
-// UploadRepo Add files to a repository and upload
+// ResolvePath resolves a valid repository path given a user's input.
+func ResolvePath(path string) (string, error) {
+
+	return "", nil
+}
+
+// UploadRepo adds files to a repository and upload.
 func UploadRepo(path string) error {
 	return nil
 }
 
-// DownloadRepo Download the files of a given repository
+// DownloadRepo downloads the files of a given repository.
 func DownloadRepo(path string) error {
 	return nil
 }

@@ -18,6 +18,7 @@ import (
 const authhost = "https://auth.gin.g-node.org"
 
 func storeToken(token string) error {
+	// TODO: Store token in config directory
 	err := ioutil.WriteFile("token", []byte(token), 0600)
 
 	if err != nil {
@@ -29,7 +30,7 @@ func storeToken(token string) error {
 
 // LoadToken Get the current signed in username and auth token
 func LoadToken(warn bool) (string, string, error) {
-
+	// TODO: Load token from config directory
 	tokenBytes, err := ioutil.ReadFile("token")
 	tokenInfo := gin.TokenInfo{}
 	var username, token string
