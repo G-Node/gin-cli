@@ -39,7 +39,13 @@ func upload(path interface{}) error {
 func download(path interface{}) error {
 	// Check if the current directory is a git repository.
 	// Perform a git pull.
-	// repo.DownloadRepo(path)
+	var pathstr string
+	if path == nil {
+		pathstr = ""
+	} else {
+		pathstr = path.(string)
+	}
+	repo.DownloadRepo(pathstr)
 	return fmt.Errorf("Command [download] not yet implemented.")
 }
 

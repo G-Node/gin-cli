@@ -58,13 +58,15 @@ func CreateRepo(name, description string) error {
 		return fmt.Errorf("Failed to create repository. Server returned: %s", res.Status)
 	}
 
+	// TODO: Initialise? Do a git annex init and push?
+
 	return nil
 }
 
 // ResolvePath resolves a valid repository path given a user's input.
 func ResolvePath(path string) (string, error) {
-
-	return "", nil
+	// TODO: Write the function, eh?
+	return path, nil
 }
 
 // UploadRepo adds files to a repository and upload.
@@ -74,5 +76,10 @@ func UploadRepo(path string) error {
 
 // DownloadRepo downloads the files of a given repository.
 func DownloadRepo(path string) error {
+	path, err := ResolvePath(path)
+	if err != nil {
+		return fmt.Errorf("No valid repository found for given name.")
+	}
+
 	return nil
 }
