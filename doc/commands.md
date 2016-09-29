@@ -41,7 +41,7 @@ If no file is specified, everything under the working directory is uploaded.
 This command adds all specified files (or all changes under the working directory) to the repository, commits, and pushes the changes.
 The commit message describes the changes made to the repository: file additions, deletions, and modifications.
 
-```shell
+```
 git annex add <file> ...
 git commit -m <description>
 git push
