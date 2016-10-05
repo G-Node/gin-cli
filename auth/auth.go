@@ -29,15 +29,14 @@ func LoadToken(warn bool) (string, string, error) {
 	tokenInfo := gin.TokenInfo{}
 	var username, token string
 
-	if err == nil {
-		token = string(tokenBytes)
-	} else {
+	if err != nil {
 		if warn {
 			fmt.Println("You are not logged in.")
 		}
 		return "", "", err
 	}
 
+	token = string(tokenBytes)
 	authcl := client.NewClient(authhost)
 	res, err := authcl.Get("/oauth/validate/" + token)
 	if err != nil {
