@@ -214,10 +214,10 @@ func AddKey(key string) error {
 
 	username, token, err := LoadToken(true)
 
-	if username == "" {
-		fmt.Println()
-		return fmt.Errorf("You are not logged in.")
+	if err != nil {
+		return nil
 	}
+
 	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
 	// TODO: Check err and req.StatusCode
 

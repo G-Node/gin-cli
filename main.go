@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/G-Node/gin-cli/auth"
@@ -202,7 +203,7 @@ Usage:
 	gin repos    [<username>]
 	gin info     [<username>]
 	gin keys     [-v | --verbose]
-	gin keys add
+	gin keys     --add <filename>
 	gin public
 `
 
@@ -225,8 +226,8 @@ Usage:
 	case args["info"].(bool):
 		err = printAccountInfo(args["<username>"])
 	case args["keys"].(bool):
-		if args["add"].(bool) {
-			err = addKey()
+		if args["--add"].(bool) {
+			err = addKey(args["<filename>"])
 		} else {
 			printFullKeys := false
 			if args["-v"].(bool) || args["--verbose"].(bool) {
