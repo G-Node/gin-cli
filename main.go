@@ -78,10 +78,10 @@ func printKeys(printFull bool) error {
 	}
 	fmt.Printf("You have %d key%s associated with your account.\n\n", nkeys, plural)
 	for idx, key := range keys {
-		fmt.Printf("  [%v] \"%s\"\n", idx+1, key.Description)
-		fmt.Printf("  Fingerprint: %s\n", key.Fingerprint)
+		fmt.Printf("[%v] \"%s\" ", idx+1, key.Description)
+		fmt.Printf("(Fingerprint: %s)\n", key.Fingerprint)
 		if printFull {
-			fmt.Printf("\n%s\n", key.Key)
+			fmt.Printf("--- Key ---\n%s\n", key.Key)
 		}
 	}
 
