@@ -127,6 +127,7 @@ func Login(userarg interface{}) error {
 			fmt.Println("Error: Input too long.")
 			return err
 		}
+		return err
 	}
 
 	password = string(pwbytes)
