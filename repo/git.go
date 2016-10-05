@@ -53,19 +53,11 @@ func Clone(repopath string) (*git.Repository, error) {
 		FetchOptions:         fetchopts,
 		RemoteCreateCallback: remoteCreateCB,
 	}
-	fmt.Printf("Downloading into '%s'... ", localPath)
 	repository, err := git.Clone(remotePath, localPath, &opts)
 
 	if err != nil {
-		fmt.Printf("failed!\n")
 		return nil, err
 	}
-	err = AnnexPull(localPath)
-	if err != nil {
-		fmt.Printf("failed!\n")
-		return nil, err
-	}
-	fmt.Printf("done.\n")
 
 	return repository, nil
 }
@@ -76,7 +68,7 @@ func AnnexPull(path string) error {
 	_, err := exec.Command("git", "-C", path, "annex", "sync", "--no-push", "--content").Output()
 
 	if err != nil {
-		return fmt.Errorf("Error downloading files: %q", err.Error())
+		return fmt.Errorf("Error downloading files: %s", err.Error())
 	}
 
 	return nil

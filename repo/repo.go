@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path"
 
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/client"
@@ -75,10 +76,22 @@ func UploadRepo(path string) error {
 }
 
 // DownloadRepo downloads the files of a given repository.
-func DownloadRepo(repopath string) error {
-	_, err := Clone(repopath)
+func DownloadRepo(repoPath string) error {
+	localPath := path.Base(repoPath)
+	fmt.Printf("Fetching repository '%s'... ", localPath)
+	_, err := Clone(repoPath)
 	if err != nil {
+		fmt.Printf("failed!\n")
 		return err
 	}
+	fmt.Printf("done.\n")
+
+	fmt.Printf("Downloading files... ")
+	err = AnnexPull(localPath)
+	if err != nil {
+		fmt.Printf("failed!\n")
+		return err
+	}
+	fmt.Printf("done.\n")
 	return nil
 }
