@@ -2,6 +2,7 @@ package repo
 
 import (
 	"fmt"
+	"os/exec"
 	"path"
 
 	git "github.com/libgit2/git2go"
@@ -35,7 +36,8 @@ func remoteCreateCB(repo *git.Repository, name, url string) (*git.Remote, git.Er
 
 // **************** //
 
-// Clone downloads a repository and sets the remote fetch and push urls
+// Clone downloads a repository and sets the remote fetch and push urls.
+// (git clone ...)
 func Clone(repopath string) (*git.Repository, error) {
 	remotePath := fmt.Sprintf("%s@%s:%s", user, githost, repopath)
 	localPath := path.Base(repopath)
@@ -58,7 +60,24 @@ func Clone(repopath string) (*git.Repository, error) {
 		fmt.Printf("failed!\n")
 		return nil, err
 	}
+	err = AnnexPull(localPath)
+	if err != nil {
+		fmt.Printf("failed!\n")
+		return nil, err
+	}
 	fmt.Printf("done.\n")
 
 	return repository, nil
+}
+
+// AnnexPull downloads all annexed files.
+// (git annex sync --no-push --content)
+func AnnexPull(path string) error {
+	_, err := exec.Command("git", "-C", path, "annex", "sync", "--no-push", "--content").Output()
+
+	if err != nil {
+		return fmt.Errorf("Error downloading files: %q", err.Error())
+	}
+
+	return nil
 }
