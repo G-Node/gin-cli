@@ -14,7 +14,7 @@ import (
 )
 
 func createRepo(name, description interface{}) error {
-	repoName := ""
+	var repoName string
 	if name == nil || name.(string) == "" {
 		fmt.Print("Repository name: ")
 		repoName = ""
