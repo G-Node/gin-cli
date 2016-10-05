@@ -45,8 +45,14 @@ func download(path interface{}) error {
 	} else {
 		pathstr = path.(string)
 	}
-	repo.DownloadRepo(pathstr)
-	return fmt.Errorf("Command [download] not yet implemented.")
+	if pathstr == "" {
+		return fmt.Errorf("No repository specified.")
+	}
+	err := repo.DownloadRepo(pathstr)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // condAppend Conditionally append str to b if not empty

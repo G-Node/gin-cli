@@ -7,34 +7,36 @@ import (
 	git "github.com/libgit2/git2go"
 )
 
+// TODO: Load from config
 const user = "git"
 const githost = "gin.g-node.org"
 
+// Git callbacks
+
 func credsCB(url string, username string, allowedTypes git.CredType) (git.ErrorCode, *git.Cred) {
-	println("Credentials callback")
 	_, cred := git.NewCredSshKeyFromAgent("git")
-	return 0, &cred
+	return git.ErrOk, &cred
 }
 
 func certCB(cert *git.Certificate, valid bool, hostname string) git.ErrorCode {
-	println("Certificate callback")
-	// if hostname != "gin.g-node.org" { // TODO: Read from config
-	// 	return git.ErrCertificate
-	// }
-	return 0
+	if hostname != githost {
+		return git.ErrCertificate
+	}
+	return git.ErrOk
 }
 
 func remoteCreateCB(repo *git.Repository, name, url string) (*git.Remote, git.ErrorCode) {
-	fmt.Printf("Creating remote [%s] with [%s]\n", name, url)
 	remote, err := repo.Remotes.Create(name, url)
 	if err != nil {
-		return nil, 1 // TODO: Return proper error codes
+		return nil, 1 // TODO: Return proper error codes (git.ErrorCode)
 	}
-	return remote, 0
+	return remote, git.ErrOk
 }
 
+// **************** //
+
 // Clone downloads a repository and sets the remote fetch and push urls
-func Clone(repopath string) error {
+func Clone(repopath string) (*git.Repository, error) {
 	remotePath := fmt.Sprintf("%s@%s:%s", user, githost, repopath)
 	localPath := path.Base(repopath)
 
@@ -49,16 +51,14 @@ func Clone(repopath string) error {
 		FetchOptions:         fetchopts,
 		RemoteCreateCallback: remoteCreateCB,
 	}
-	fmt.Printf("Cloning [%s] into [%s] ...\n", remotePath, localPath)
+	fmt.Printf("Downloading into '%s'... ", localPath)
 	repository, err := git.Clone(remotePath, localPath, &opts)
 
 	if err != nil {
-		println("Clone failed")
-		println("Error:", err.Error())
-		return err
+		fmt.Printf("failed!\n")
+		return nil, err
 	}
+	fmt.Printf("done.\n")
 
-	println(repository.Path())
-
-	return nil
+	return repository, nil
 }

@@ -76,7 +76,7 @@ func UploadRepo(path string) error {
 
 // DownloadRepo downloads the files of a given repository.
 func DownloadRepo(repopath string) error {
-	err := Clone(repopath)
+	_, err := Clone(repopath)
 	if err != nil {
 		return err
 	}
