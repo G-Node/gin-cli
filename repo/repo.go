@@ -75,11 +75,10 @@ func UploadRepo(path string) error {
 }
 
 // DownloadRepo downloads the files of a given repository.
-func DownloadRepo(path string) error {
-	path, err := ResolvePath(path)
+func DownloadRepo(repopath string) error {
+	err := Clone(repopath)
 	if err != nil {
-		return fmt.Errorf("No valid repository found for given name.")
+		return err
 	}
-
 	return nil
 }
