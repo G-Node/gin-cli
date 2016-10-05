@@ -19,13 +19,7 @@ const authhost = "https://auth.gin.g-node.org"
 
 func storeToken(token string) error {
 	// TODO: Store token in config directory
-	err := ioutil.WriteFile("token", []byte(token), 0600)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ioutil.WriteFile("token", []byte(token), 0600)
 }
 
 // LoadToken Get the current signed in username and auth token
