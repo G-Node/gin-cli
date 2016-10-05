@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/repo"
@@ -88,13 +89,30 @@ func printKeys(printFull bool) error {
 	return err
 }
 
-func addKey() error {
-	// TODO: Prompt user for key information
-	// TODO: Allow use to speciry pubkey file (default to ~/.ssh/id_rsa.pub ?)
-	key := ""
+func addKey(fnarg interface{}) error {
+	noargError := fmt.Errorf("Please specify a public key file.\n")
+	if fnarg == nil {
+		return noargError
+	}
 
-	err := auth.AddKey(key)
-	return err
+	filename := fnarg.(string)
+	if filename == "" {
+		return noargError
+	}
+
+	keyBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	// TODO: Accept custom description for key and simply default to filename
+	key := string(keyBytes)
+	description := strings.TrimSpace(strings.Split(key, " ")[2])
+	err = auth.AddKey(string(keyBytes), description)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("New key added '%s'\n", description)
+	return nil
 }
 
 func printAccountInfo(userarg interface{}) error {

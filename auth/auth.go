@@ -210,7 +210,7 @@ func SearchAccount(query string) ([]gin.Account, error) {
 }
 
 // AddKey Adds the given key to the current user's authorised keys
-func AddKey(key string) error {
+func AddKey(key, description string) error {
 
 	username, token, err := LoadToken(true)
 
@@ -230,7 +230,7 @@ func AddKey(key string) error {
 		return bytes.NewReader(b)
 	}
 
-	req, _ := http.NewRequest("POST", address, mkBody(key, "ll"))
+	req, _ := http.NewRequest("POST", address, mkBody(key, description))
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	authcl := http.Client{}
