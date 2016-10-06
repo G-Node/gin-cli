@@ -31,30 +31,29 @@ func createRepo(name, description interface{}) error {
 	return repo.CreateRepo(repoName, repoDesc)
 }
 
-func upload(path interface{}) error {
-	// Check if the current directory is a git repository.
-	// If it has any unstaged commits it should stage, commit, and push.
-	// repo.UploadRepo(path)
-	return fmt.Errorf("Command [upload] not yet implemented.")
+func upload(patharg interface{}) error {
+	var pathstr string
+	if patharg == nil {
+		pathstr = ""
+	} else {
+		pathstr = patharg.(string)
+	}
+	return repo.UploadRepo(pathstr)
 }
 
-func download(path interface{}) error {
+func download(patharg interface{}) error {
 	// Check if the current directory is a git repository.
 	// Perform a git pull.
 	var pathstr string
-	if path == nil {
+	if patharg == nil {
 		pathstr = ""
 	} else {
-		pathstr = path.(string)
+		pathstr = patharg.(string)
 	}
 	if pathstr == "" {
 		return fmt.Errorf("No repository specified.")
 	}
-	err := repo.DownloadRepo(pathstr)
-	if err != nil {
-		return err
-	}
-	return nil
+	return repo.DownloadRepo(pathstr)
 }
 
 // condAppend Conditionally append str to b if not empty

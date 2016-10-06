@@ -36,6 +36,31 @@ func remoteCreateCB(repo *git.Repository, name, url string) (*git.Remote, git.Er
 
 // **************** //
 
+func getRepo(startPath string) (*git.Repository, error) {
+	localRepoPath, err := git.Discover(startPath, false, nil)
+	if err != nil {
+		return nil, err
+	}
+	return git.OpenRepository(localRepoPath)
+}
+
+// AddPath adds files or directories to the index
+func AddPath(localPath string) error {
+	repo, err := getRepo(localPath)
+	if err != nil {
+		return err
+	}
+	idx, err := repo.Index()
+	if err != nil {
+		return err
+	}
+	err = idx.AddByPath(localPath)
+	if err != nil {
+		return err
+	}
+	return idx.Write()
+}
+
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
 func Clone(repopath string) (*git.Repository, error) {
@@ -64,8 +89,8 @@ func Clone(repopath string) (*git.Repository, error) {
 
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
-func AnnexPull(path string) error {
-	_, err := exec.Command("git", "-C", path, "annex", "sync", "--no-push", "--content").Output()
+func AnnexPull(localPath string) error {
+	_, err := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content").Output()
 
 	if err != nil {
 		return fmt.Errorf("Error downloading files: %s", err.Error())
