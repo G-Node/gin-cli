@@ -73,9 +73,12 @@ func UploadRepo(localPath string) error {
 		return err
 	}
 
-	// TODO: git push then annexpush
+	err = Push(localPath)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return AnnexPush(localPath)
 }
 
 // DownloadRepo downloads the files of a given repository.

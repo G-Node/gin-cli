@@ -43,6 +43,8 @@ func matchPathCB(p, mp string) int {
 
 // **************** //
 
+// Git commands
+
 func getRepo(startPath string) (*git.Repository, error) {
 	localRepoPath, err := git.Discover(startPath, false, nil)
 	if err != nil {
@@ -137,6 +139,36 @@ func Commit(localPath string, idx *git.Index) error {
 	return err
 
 }
+
+// Push pushes all local commits to theh default remote & branch
+// (git push)
+func Push(localPath string) error {
+	repository, err := git.OpenRepository(localPath)
+	if err != nil {
+		return err
+	}
+
+	origin, err := repository.Remotes.Lookup("origin")
+	if err != nil {
+		return err
+	}
+
+	rcbs := git.RemoteCallbacks{
+		CredentialsCallback:      credsCB,
+		CertificateCheckCallback: certCB,
+	}
+
+	popts := &git.PushOptions{
+		RemoteCallbacks: rcbs,
+	}
+	refspecs := []string{"refs/heads/master"}
+
+	return origin.Push(refspecs, popts)
+}
+
+// **************** //
+
+// Git annex commands
 
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
