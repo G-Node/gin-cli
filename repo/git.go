@@ -34,6 +34,10 @@ func remoteCreateCB(repo *git.Repository, name, url string) (*git.Remote, git.Er
 	return remote, git.ErrOk
 }
 
+func matchPathCB(p, mp string) int {
+	return 0
+}
+
 // **************** //
 
 func getRepo(startPath string) (*git.Repository, error) {
@@ -46,19 +50,23 @@ func getRepo(startPath string) (*git.Repository, error) {
 
 // AddPath adds files or directories to the index
 func AddPath(localPath string) error {
-	repo, err := getRepo(localPath)
-	if err != nil {
-		return err
-	}
-	idx, err := repo.Index()
-	if err != nil {
-		return err
-	}
-	err = idx.AddByPath(localPath)
-	if err != nil {
-		return err
-	}
-	return idx.Write()
+	// repo, err := getRepo(localPath)
+	// if err != nil {
+	// 	return err
+	// }
+	// idx, err := repo.Index()
+	// if err != nil {
+	// 	return err
+	// }
+	// Currently adding everything to annex
+	// Eventually will decide on what is versioned and what is annexed based on MIME type
+	// err = idx.AddAll([]string{localPath}, git.IndexAddDefault, matchPathCB)
+	// if err != nil {
+	// 	return err
+	// }
+	// return idx.Write()
+
+	return AnnexAdd(localPath)
 }
 
 // Clone downloads a repository and sets the remote fetch and push urls.
@@ -95,6 +103,16 @@ func AnnexPull(localPath string) error {
 	if err != nil {
 		return fmt.Errorf("Error downloading files: %s", err.Error())
 	}
+	return nil
+}
 
+// AnnexAdd adds a path to the annex
+// (git annex add)
+func AnnexAdd(localPath string) error {
+	_, err := exec.Command("git", "annex", "add", localPath).Output()
+
+	if err != nil {
+		return fmt.Errorf("Error adding files to repository: %s", err.Error())
+	}
 	return nil
 }
