@@ -106,7 +106,18 @@ func AnnexPull(localPath string) error {
 	return nil
 }
 
-// AnnexAdd adds a path to the annex
+// AnnexPush uploads all annexed files.
+// (git annex sync --no-pull --content)
+func AnnexPush(localPath string) error {
+	_, err := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content").Output()
+
+	if err != nil {
+		return fmt.Errorf("Error uploading files: %s", err.Error())
+	}
+	return nil
+}
+
+// AnnexAdd adds a path to the annex.
 // (git annex add)
 func AnnexAdd(localPath string) error {
 	_, err := exec.Command("git", "annex", "add", localPath).Output()
