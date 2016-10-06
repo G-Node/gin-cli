@@ -64,7 +64,18 @@ func CreateRepo(name, description string) error {
 
 // UploadRepo adds files to a repository and uploads them.
 func UploadRepo(localPath string) error {
-	return AddPath(localPath)
+	idx, err := AddPath(localPath)
+	if err != nil {
+		return err
+	}
+	err = Commit(localPath, idx)
+	if err != nil {
+		return err
+	}
+
+	// TODO: git push then annexpush
+
+	return nil
 }
 
 // DownloadRepo downloads the files of a given repository.

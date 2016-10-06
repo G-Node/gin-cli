@@ -1,9 +1,12 @@
 package repo
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"path"
+	"time"
 
 	git "github.com/libgit2/git2go"
 )
@@ -49,15 +52,15 @@ func getRepo(startPath string) (*git.Repository, error) {
 }
 
 // AddPath adds files or directories to the index
-func AddPath(localPath string) error {
-	// repo, err := getRepo(localPath)
-	// if err != nil {
-	// 	return err
-	// }
-	// idx, err := repo.Index()
-	// if err != nil {
-	// 	return err
-	// }
+func AddPath(localPath string) (*git.Index, error) {
+	repo, err := getRepo(localPath)
+	if err != nil {
+		return nil, err
+	}
+	idx, err := repo.Index()
+	if err != nil {
+		return nil, err
+	}
 	// Currently adding everything to annex
 	// Eventually will decide on what is versioned and what is annexed based on MIME type
 	// err = idx.AddAll([]string{localPath}, git.IndexAddDefault, matchPathCB)
@@ -66,7 +69,8 @@ func AddPath(localPath string) error {
 	// }
 	// return idx.Write()
 
-	return AnnexAdd(localPath)
+	err = AnnexAdd(localPath, idx)
+	return idx, err
 }
 
 // Clone downloads a repository and sets the remote fetch and push urls.
@@ -82,7 +86,7 @@ func Clone(repopath string) (*git.Repository, error) {
 	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
 	opts := git.CloneOptions{
 		Bare:                 false,
-		CheckoutBranch:       "master",
+		CheckoutBranch:       "master", // TODO: default branch
 		FetchOptions:         fetchopts,
 		RemoteCreateCallback: remoteCreateCB,
 	}
@@ -93,6 +97,45 @@ func Clone(repopath string) (*git.Repository, error) {
 	}
 
 	return repository, nil
+}
+
+// Commit performs a git commit on the currently staged objects.
+// (git commit)
+func Commit(localPath string, idx *git.Index) error {
+	signature := &git.Signature{
+		Name:  "gin",
+		Email: "gin",
+		When:  time.Now(),
+	}
+	repository, err := git.OpenRepository(localPath)
+	if err != nil {
+		return err
+	}
+	head, err := repository.Head()
+	if err != nil {
+		return err
+	}
+	headCommit, err := repository.LookupCommit(head.Target())
+	if err != nil {
+		return err
+	}
+
+	message := "uploading" // TODO: Describe changes (in message)
+	treeID, err := idx.WriteTree()
+	if err != nil {
+		return err
+	}
+	err = idx.Write()
+	if err != nil {
+		return err
+	}
+	tree, err := repository.LookupTree(treeID)
+	if err != nil {
+		return err
+	}
+	_, err = repository.CreateCommit("HEAD", signature, signature, message, tree, headCommit)
+	return err
+
 }
 
 // AnnexPull downloads all annexed files.
@@ -117,13 +160,42 @@ func AnnexPush(localPath string) error {
 	return nil
 }
 
+// AnnexAddResult ...
+type AnnexAddResult struct {
+	Command string `json:"command"`
+	File    string `json:"file"`
+	Key     string `json:"key"`
+	Success bool   `json:"success"`
+}
+
 // AnnexAdd adds a path to the annex.
 // (git annex add)
-func AnnexAdd(localPath string) error {
-	_, err := exec.Command("git", "annex", "add", localPath).Output()
+func AnnexAdd(localPath string, idx *git.Index) error {
+	// TODO: Return error if no new files are added
+	out, err := exec.Command("git", "annex", "--json", "add", localPath).Output()
 
 	if err != nil {
 		return fmt.Errorf("Error adding files to repository: %s", err.Error())
 	}
+
+	var outStruct AnnexAddResult
+	files := bytes.Split(out, []byte("\n"))
+	for _, f := range files {
+		if len(f) == 0 {
+			break
+		}
+		err := json.Unmarshal(f, &outStruct)
+		if err != nil {
+			return err
+		}
+		if !outStruct.Success {
+			return fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
+		}
+		err = idx.AddByPath(outStruct.File)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
