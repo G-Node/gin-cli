@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/G-Node/gin-cli/client"
 	"github.com/G-Node/gin-core/gin"
@@ -150,7 +149,7 @@ func Login(userarg interface{}) error {
 	}
 
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)
-	fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
+	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
 
 	return nil
 
