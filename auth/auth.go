@@ -22,6 +22,12 @@ func storeToken(token string) error {
 	return ioutil.WriteFile("token", []byte(token), 0600)
 }
 
+func noTokenWarning(warn bool) {
+	if warn {
+		fmt.Println("You are not logged in.")
+	}
+}
+
 // LoadToken Get the current signed in username and auth token
 func LoadToken(warn bool) (string, string, error) {
 	// TODO: Load token from config directory
@@ -30,10 +36,8 @@ func LoadToken(warn bool) (string, string, error) {
 	var username, token string
 
 	if err != nil {
-		if warn {
-			fmt.Println("You are not logged in.")
-		}
-		return "", "", err
+		noTokenWarning(warn)
+		return "", "", nil
 	}
 
 	token = string(tokenBytes)
@@ -55,8 +59,7 @@ func LoadToken(warn bool) (string, string, error) {
 
 	username = tokenInfo.Login
 	if username == "" && warn {
-		// Token invalid: Delete file?
-		fmt.Println("You are not logged in.")
+		noTokenWarning(warn)
 		token = ""
 	}
 	return username, token, nil
