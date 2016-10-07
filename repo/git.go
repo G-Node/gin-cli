@@ -17,12 +17,26 @@ const githost = "gin.g-node.org"
 
 // Git callbacks
 
-func credsCB(url string, username string, allowedTypes git.CredType) (git.ErrorCode, *git.Cred) {
-	_, cred := git.NewCredSshKeyFromAgent("git")
-	return git.ErrOk, &cred
+func makeCredsCB() git.CredentialsCallback {
+	// Error is returned after first attempt.
+	// attemptnum should be used to try different keys or credentials until all options are exhausted.
+	attemptnum := 0
+	return func(url string, username string, allowedTypes git.CredType) (git.ErrorCode, *git.Cred) {
+		if attemptnum > 0 {
+			return git.ErrUser, nil
+		}
+
+		res, cred := git.NewCredSshKeyFromAgent("git")
+		if res != 0 {
+			return git.ErrorCode(res), nil
+		}
+		attemptnum++
+		return git.ErrOk, &cred
+	}
 }
 
 func certCB(cert *git.Certificate, valid bool, hostname string) git.ErrorCode {
+	// TODO: Better cert check?
 	if hostname != githost {
 		return git.ErrCertificate
 	}
@@ -32,7 +46,7 @@ func certCB(cert *git.Certificate, valid bool, hostname string) git.ErrorCode {
 func remoteCreateCB(repo *git.Repository, name, url string) (*git.Remote, git.ErrorCode) {
 	remote, err := repo.Remotes.Create(name, url)
 	if err != nil {
-		return nil, 1 // TODO: Return proper error codes (git.ErrorCode)
+		return nil, git.ErrUser
 	}
 	return remote, git.ErrOk
 }
@@ -82,7 +96,7 @@ func Clone(repopath string) (*git.Repository, error) {
 	localPath := path.Base(repopath)
 
 	cbs := &git.RemoteCallbacks{
-		CredentialsCallback:      credsCB,
+		CredentialsCallback:      makeCredsCB(),
 		CertificateCheckCallback: certCB,
 	}
 	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
@@ -154,7 +168,7 @@ func Push(localPath string) error {
 	}
 
 	rcbs := git.RemoteCallbacks{
-		CredentialsCallback:      credsCB,
+		CredentialsCallback:      makeCredsCB(),
 		CertificateCheckCallback: certCB,
 	}
 

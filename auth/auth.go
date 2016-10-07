@@ -215,7 +215,7 @@ func AddKey(key, description string) error {
 
 	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
 	// TODO: Check err and req.StatusCode
-
+	// TODO: clean up key struct
 	mkBody := func(key, description string) io.Reader {
 		pw := &struct {
 			Key         string `json:"key"`
