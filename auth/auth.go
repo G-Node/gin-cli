@@ -117,7 +117,7 @@ func Login(userarg interface{}) error {
 		// read error or gopass.ErrInterrupted
 		if err == gopass.ErrInterrupted {
 			fmt.Println("Cancelled.")
-			return err
+			return nil
 		}
 		if err == gopass.ErrMaxLengthExceeded {
 			fmt.Println("Error: Input too long.")
