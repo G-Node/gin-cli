@@ -5,7 +5,9 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/repo"
@@ -13,7 +15,7 @@ import (
 )
 
 func createRepo(name, description interface{}) error {
-	repoName := ""
+	var repoName string
 	if name == nil || name.(string) == "" {
 		fmt.Print("Repository name: ")
 		repoName = ""
@@ -77,23 +79,40 @@ func printKeys(printFull bool) error {
 	}
 	fmt.Printf("You have %d key%s associated with your account.\n\n", nkeys, plural)
 	for idx, key := range keys {
-		fmt.Printf("  [%v] \"%s\"\n", idx+1, key.Description)
-		fmt.Printf("  Fingerprint: %s\n", key.Fingerprint)
+		fmt.Printf("[%v] \"%s\" ", idx+1, key.Description)
+		fmt.Printf("(Fingerprint: %s)\n", key.Fingerprint)
 		if printFull {
-			fmt.Printf("\n%s\n", key.Key)
+			fmt.Printf("--- Key ---\n%s\n", key.Key)
 		}
 	}
 
 	return err
 }
 
-func addKey() error {
-	// TODO: Prompt user for key information
-	// TODO: Allow use to speciry pubkey file (default to ~/.ssh/id_rsa.pub ?)
-	key := ""
+func addKey(fnarg interface{}) error {
+	noargError := fmt.Errorf("Please specify a public key file.\n")
+	if fnarg == nil {
+		return noargError
+	}
 
-	err := auth.AddKey(key)
-	return err
+	filename := fnarg.(string)
+	if filename == "" {
+		return noargError
+	}
+
+	keyBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	// TODO: Accept custom description for key and simply default to filename
+	key := string(keyBytes)
+	description := strings.TrimSpace(strings.Split(key, " ")[2])
+	err = auth.AddKey(string(keyBytes), description)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("New key added '%s'\n", description)
+	return nil
 }
 
 func printAccountInfo(userarg interface{}) error {
@@ -202,7 +221,7 @@ Usage:
 	gin repos    [<username>]
 	gin info     [<username>]
 	gin keys     [-v | --verbose]
-	gin keys add
+	gin keys     --add <filename>
 	gin public
 `
 
@@ -225,8 +244,8 @@ Usage:
 	case args["info"].(bool):
 		err = printAccountInfo(args["<username>"])
 	case args["keys"].(bool):
-		if args["add"].(bool) {
-			err = addKey()
+		if args["--add"].(bool) {
+			err = addKey(args["<filename>"])
 		} else {
 			printFullKeys := false
 			if args["-v"].(bool) || args["--verbose"].(bool) {

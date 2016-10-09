@@ -120,6 +120,7 @@ func Login(userarg interface{}) error {
 			fmt.Println("Error: Input too long.")
 			return err
 		}
+		return err
 	}
 
 	password = string(pwbytes)
@@ -202,14 +203,14 @@ func SearchAccount(query string) ([]gin.Account, error) {
 }
 
 // AddKey Adds the given key to the current user's authorised keys
-func AddKey(key string) error {
+func AddKey(key, description string) error {
 
 	username, token, err := LoadToken(true)
 
-	if username == "" {
-		fmt.Println()
-		return fmt.Errorf("You are not logged in.")
+	if err != nil {
+		return nil
 	}
+
 	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
 	// TODO: Check err and req.StatusCode
 
@@ -222,7 +223,7 @@ func AddKey(key string) error {
 		return bytes.NewReader(b)
 	}
 
-	req, _ := http.NewRequest("POST", address, mkBody(key, "ll"))
+	req, _ := http.NewRequest("POST", address, mkBody(key, description))
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	authcl := http.Client{}
