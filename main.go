@@ -33,9 +33,7 @@ func createRepo(name, description interface{}) error {
 
 func upload(patharg interface{}) error {
 	var pathstr string
-	if patharg == nil {
-		pathstr = ""
-	} else {
+	if patharg != nil {
 		pathstr = patharg.(string)
 	}
 	return repo.UploadRepo(pathstr)
