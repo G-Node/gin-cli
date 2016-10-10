@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/G-Node/gin-cli/client"
 	"github.com/G-Node/gin-core/gin"
@@ -22,6 +21,12 @@ func storeToken(token string) error {
 	return ioutil.WriteFile("token", []byte(token), 0600)
 }
 
+func noTokenWarning(warn bool) {
+	if warn {
+		fmt.Println("You are not logged in.")
+	}
+}
+
 // LoadToken Get the current signed in username and auth token
 func LoadToken(warn bool) (string, string, error) {
 	// TODO: Load token from config directory
@@ -30,10 +35,8 @@ func LoadToken(warn bool) (string, string, error) {
 	var username, token string
 
 	if err != nil {
-		if warn {
-			fmt.Println("You are not logged in.")
-		}
-		return "", "", err
+		noTokenWarning(warn)
+		return "", "", nil
 	}
 
 	token = string(tokenBytes)
@@ -55,8 +58,7 @@ func LoadToken(warn bool) (string, string, error) {
 
 	username = tokenInfo.Login
 	if username == "" && warn {
-		// Token invalid: Delete file?
-		fmt.Println("You are not logged in.")
+		noTokenWarning(warn)
 		token = ""
 	}
 	return username, token, nil
@@ -114,7 +116,7 @@ func Login(userarg interface{}) error {
 		// read error or gopass.ErrInterrupted
 		if err == gopass.ErrInterrupted {
 			fmt.Println("Cancelled.")
-			return err
+			return nil
 		}
 		if err == gopass.ErrMaxLengthExceeded {
 			fmt.Println("Error: Input too long.")
@@ -147,7 +149,7 @@ func Login(userarg interface{}) error {
 	}
 
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)
-	fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
+	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
 
 	return nil
 
@@ -213,7 +215,7 @@ func AddKey(key, description string) error {
 
 	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
 	// TODO: Check err and req.StatusCode
-
+	// TODO: clean up key struct
 	mkBody := func(key, description string) io.Reader {
 		pw := &struct {
 			Key         string `json:"key"`
