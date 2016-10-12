@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
+	"strconv"
 	"time"
 
+	"github.com/G-Node/gin-cli/auth"
+	"github.com/G-Node/gin-cli/util"
 	git "github.com/libgit2/git2go"
 )
 
@@ -22,11 +25,27 @@ func makeCredsCB() git.CredentialsCallback {
 	// attemptnum should be used to try different keys or credentials until all options are exhausted.
 	attemptnum := 0
 	return func(url string, username string, allowedTypes git.CredType) (git.ErrorCode, *git.Cred) {
-		if attemptnum > 0 {
+		var res int
+		var cred git.Cred
+		switch attemptnum {
+		case 0:
+			res, cred = git.NewCredSshKeyFromAgent("git")
+		case 1:
+			keys, err := util.MakeKeyPair()
+			if err != nil {
+				return git.ErrUser, nil
+			}
+			description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
+			pubkey := fmt.Sprintf("%s %s", keys.Public, description)
+			err = auth.AddKey(pubkey, description)
+			if err != nil {
+				return git.ErrUser, nil
+			}
+			res, cred = git.NewCredSshKeyFromMemory("git", keys.Public, keys.Private, "")
+		default:
 			return git.ErrUser, nil
 		}
 
-		res, cred := git.NewCredSshKeyFromAgent("git")
 		if res != 0 {
 			return git.ErrorCode(res), nil
 		}
