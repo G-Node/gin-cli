@@ -41,17 +41,15 @@ func upload(patharg interface{}) error {
 
 func download(patharg interface{}) error {
 	// Check if the current directory is a git repository.
-	// Perform a git pull.
+	// Y: Perform a git pull.
+	// N: Clone, then pull.
 	var pathstr string
 	if patharg == nil {
 		pathstr = ""
-	} else {
-		pathstr = patharg.(string)
+		// TODO: Pull and Annex Pull
 	}
-	if pathstr == "" {
-		return fmt.Errorf("No repository specified.")
-	}
-	return repo.DownloadRepo(pathstr)
+	pathstr = patharg.(string)
+	return repo.CloneRepo(pathstr)
 }
 
 // condAppend Conditionally append str to b if not empty

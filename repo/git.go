@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/G-Node/gin-cli/auth"
@@ -17,6 +20,32 @@ import (
 // TODO: Load from config
 const user = "git"
 const githost = "gin.g-node.org"
+
+func saveKeys(keys util.KeyPair) error {
+	_ = os.Remove("/tmp/priv")
+	_ = os.Remove("/tmp/pub")
+	if err := ioutil.WriteFile("/tmp/priv", []byte(keys.Private), 0600); err != nil {
+		return fmt.Errorf("Error storing private key: %s", err)
+	}
+	if err := ioutil.WriteFile("/tmp/pub", []byte(keys.Public), 0600); err != nil {
+		return fmt.Errorf("Error storing public key: %s", err)
+	}
+	return nil
+}
+
+func loadKeys() util.KeyPair {
+	privBytes, err := ioutil.ReadFile("/tmp/priv")
+	if err != nil {
+		panic(err)
+	}
+
+	pubBytes, err := ioutil.ReadFile("/tmp/pub")
+	if err != nil {
+		panic(err)
+	}
+
+	return util.KeyPair{Private: string(privBytes), Public: string(pubBytes)}
+}
 
 // Git callbacks
 
@@ -36,9 +65,13 @@ func makeCredsCB() git.CredentialsCallback {
 				return git.ErrUser, nil
 			}
 			description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
-			pubkey := fmt.Sprintf("%s %s", keys.Public, description)
+			pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(keys.Public), description)
 			err = auth.AddKey(pubkey, description)
 			if err != nil {
+				return git.ErrUser, nil
+			}
+			if err := saveKeys(*keys); err != nil {
+				fmt.Println("Error saving keys")
 				return git.ErrUser, nil
 			}
 			res, cred = git.NewCredSshKeyFromMemory("git", keys.Public, keys.Private, "")
@@ -206,7 +239,11 @@ func Push(localPath string) error {
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
 func AnnexPull(localPath string) error {
-	_, err := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content").Output()
+	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "-c", "annex.ssh-options=-i /tmp/priv", "--no-push", "--content")
+	// env := os.Environ()
+	// env = append(env, "GIT_SSH_COMMAND=/home/achilleas/tmp/cmd")
+	// cmd.Env = env
+	err := cmd.Run()
 
 	if err != nil {
 		return fmt.Errorf("Error downloading files: %s", err.Error())

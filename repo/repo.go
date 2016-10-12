@@ -81,8 +81,8 @@ func UploadRepo(localPath string) error {
 	return AnnexPush(localPath)
 }
 
-// DownloadRepo downloads the files of a given repository.
-func DownloadRepo(repoPath string) error {
+// CloneRepo downloads the files of a given repository.
+func CloneRepo(repoPath string) error {
 	localPath := path.Base(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", localPath)
 	_, err := Clone(repoPath)
