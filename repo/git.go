@@ -59,6 +59,10 @@ func (tf tempFile) FullPath() string {
 	return filepath.Join(tf.Dir, tf.Filename)
 }
 
+func (tf tempFile) SSHOptString() string {
+	return fmt.Sprintf("annex.ssh-options=-i %s", tf.FullPath())
+}
+
 // CleanUpTemp deletes the temporary directory which holds the temporary private key if it exists.
 func CleanUpTemp() {
 	privKeyFile.Delete()
@@ -263,8 +267,7 @@ func Push(localPath string) error {
 func AnnexPull(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
 	if privKeyFile.Active {
-		sshopt := fmt.Sprintf("annex.ssh-options=-i %s", privKeyFile.FullPath())
-		cmd.Args = append(cmd.Args, "-c", sshopt)
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()
 
@@ -277,7 +280,11 @@ func AnnexPull(localPath string) error {
 // AnnexPush uploads all annexed files.
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath string) error {
-	_, err := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content").Output()
+	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content")
+	if privKeyFile.Active {
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+	}
+	err := cmd.Run()
 
 	if err != nil {
 		return fmt.Errorf("Error uploading files: %s", err.Error())
