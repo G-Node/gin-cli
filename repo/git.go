@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -21,30 +22,46 @@ import (
 const user = "git"
 const githost = "gin.g-node.org"
 
-func saveKeys(keys util.KeyPair) error {
-	_ = os.Remove("/tmp/priv")
-	_ = os.Remove("/tmp/pub")
-	if err := ioutil.WriteFile("/tmp/priv", []byte(keys.Private), 0600); err != nil {
-		return fmt.Errorf("Error storing private key: %s", err)
+// Keys
+type tempFile struct {
+	Dir      string
+	Filename string
+	Active   bool
+}
+
+var privKeyFile tempFile
+
+func makeTempFile(filename string) (tempFile, error) {
+	dir, err := ioutil.TempDir("", "gin")
+	if err != nil {
+		return tempFile{}, fmt.Errorf("Error creating temporary key directory: %s", err)
 	}
-	if err := ioutil.WriteFile("/tmp/pub", []byte(keys.Public), 0600); err != nil {
-		return fmt.Errorf("Error storing public key: %s", err)
+	newfile := tempFile{
+		Dir:      dir,
+		Filename: filename,
+		Active:   true,
+	}
+	return newfile, nil
+}
+
+func (tf tempFile) Write(content string) error {
+	if err := ioutil.WriteFile(tf.FullPath(), []byte(content), 0600); err != nil {
+		return fmt.Errorf("Error writing temporary file: %s", err)
 	}
 	return nil
 }
 
-func loadKeys() util.KeyPair {
-	privBytes, err := ioutil.ReadFile("/tmp/priv")
-	if err != nil {
-		panic(err)
-	}
+func (tf tempFile) Delete() {
+	_ = os.RemoveAll(tf.Dir)
+}
 
-	pubBytes, err := ioutil.ReadFile("/tmp/pub")
-	if err != nil {
-		panic(err)
-	}
+func (tf tempFile) FullPath() string {
+	return filepath.Join(tf.Dir, tf.Filename)
+}
 
-	return util.KeyPair{Private: string(privBytes), Public: string(pubBytes)}
+// CleanUpTemp deletes the temporary directory which holds the temporary private key if it exists.
+func CleanUpTemp() {
+	privKeyFile.Delete()
 }
 
 // Git callbacks
@@ -53,6 +70,7 @@ func makeCredsCB() git.CredentialsCallback {
 	// Error is returned after first attempt.
 	// attemptnum should be used to try different keys or credentials until all options are exhausted.
 	attemptnum := 0
+
 	return func(url string, username string, allowedTypes git.CredType) (git.ErrorCode, *git.Cred) {
 		var res int
 		var cred git.Cred
@@ -60,21 +78,25 @@ func makeCredsCB() git.CredentialsCallback {
 		case 0:
 			res, cred = git.NewCredSshKeyFromAgent("git")
 		case 1:
-			keys, err := util.MakeKeyPair()
+			tempKeyPair, err := util.MakeKeyPair()
 			if err != nil {
 				return git.ErrUser, nil
 			}
 			description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
-			pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(keys.Public), description)
+			pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
 			err = auth.AddKey(pubkey, description)
 			if err != nil {
 				return git.ErrUser, nil
 			}
-			if err := saveKeys(*keys); err != nil {
-				fmt.Println("Error saving keys")
+			privKeyFile, err = makeTempFile("priv")
+			if err != nil {
 				return git.ErrUser, nil
 			}
-			res, cred = git.NewCredSshKeyFromMemory("git", keys.Public, keys.Private, "")
+			err = privKeyFile.Write(tempKeyPair.Private)
+			if err != nil {
+				return git.ErrUser, nil
+			}
+			res, cred = git.NewCredSshKeyFromMemory("git", tempKeyPair.Public, tempKeyPair.Private, "")
 		default:
 			return git.ErrUser, nil
 		}
@@ -239,10 +261,11 @@ func Push(localPath string) error {
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
 func AnnexPull(localPath string) error {
-	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "-c", "annex.ssh-options=-i /tmp/priv", "--no-push", "--content")
-	// env := os.Environ()
-	// env = append(env, "GIT_SSH_COMMAND=/home/achilleas/tmp/cmd")
-	// cmd.Env = env
+	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
+	if privKeyFile.Active {
+		sshopt := fmt.Sprintf("annex.ssh-options=-i %s", privKeyFile.FullPath())
+		cmd.Args = append(cmd.Args, "-c", sshopt)
+	}
 	err := cmd.Run()
 
 	if err != nil {
