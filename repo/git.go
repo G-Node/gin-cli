@@ -71,8 +71,7 @@ func CleanUpTemp() {
 // Git callbacks
 
 func makeCredsCB() git.CredentialsCallback {
-	// Error is returned after first attempt.
-	// attemptnum should be used to try different keys or credentials until all options are exhausted.
+	// attemptnum is used to determine which authentication method to use each time.
 	attemptnum := 0
 
 	return func(url string, username string, allowedTypes git.CredType) (git.ErrorCode, *git.Cred) {
@@ -139,7 +138,7 @@ func matchPathCB(p, mp string) int {
 
 // IsRepo checks whether a given path is a git repository.
 func IsRepo(path string) bool {
-	err := getRepo(path)
+	_, err := getRepo(path)
 	if err != nil {
 		return false
 	}
@@ -245,6 +244,32 @@ func Commit(localPath string, idx *git.Index) error {
 // (git pull)
 func Pull() error {
 	repository, err := git.OpenRepository(".")
+	if err != nil {
+		return err
+	}
+
+	origin, err := repository.Remotes.Lookup("origin")
+	if err != nil {
+		return err
+	}
+
+	// Fetch
+	cbs := &git.RemoteCallbacks{
+		CredentialsCallback:      makeCredsCB(),
+		CertificateCheckCallback: certCB,
+	}
+	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
+
+	refspecs := []string{"refs/remotes/origin/master"}
+	err = origin.Fetch(refspecs, fetchopts, "")
+	if err != nil {
+		return err
+	}
+
+	// TODO: Merge
+	// see https://gist.github.com/sithembiso/d890d3f751029a73f2c5
+
+	return nil
 }
 
 // Push pushes all local commits to the default remote & branch
@@ -269,7 +294,6 @@ func Push(localPath string) error {
 		RemoteCallbacks: rcbs,
 	}
 	refspecs := []string{"refs/heads/master"}
-
 	return origin.Push(refspecs, popts)
 }
 

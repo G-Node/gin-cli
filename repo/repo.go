@@ -85,11 +85,10 @@ func UploadRepo(localPath string) error {
 }
 
 // DownloadRepo downloads the files in an already checked out repository.
-func DownloadRepo(repoPath string) error {
+func DownloadRepo() error {
 	defer CleanUpTemp()
-
-	localPath := path.Base(repoPath)
-
+	// Fetch and Merge
+	return Pull()
 }
 
 // CloneRepo downloads the files of a given repository.

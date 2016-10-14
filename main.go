@@ -40,21 +40,18 @@ func upload(patharg interface{}) error {
 }
 
 func download(patharg interface{}) error {
-	// Check if the current directory is a git repository.
-	// Y: Perform a git pull.
-	// N: Clone, then pull.
-	if repo.IsRepo(".") {
-		if patharg != nil {
-			// TODO: File specified. Download specified file(s) only.
-		}
-	}
 	var pathstr string
-	if patharg == nil {
-		pathstr = ""
-		// TODO: Pull and Annex Pull
+	if patharg != nil {
+		pathstr = patharg.(string)
+		return repo.CloneRepo(pathstr)
 	}
-	pathstr = patharg.(string)
-	return repo.CloneRepo(pathstr)
+
+	// No repo specified -- attempting to pull in cwd
+	if repo.IsRepo(".") {
+		return repo.DownloadRepo()
+	}
+
+	return fmt.Errorf("Current directory is not a repository.")
 }
 
 // condAppend Conditionally append str to b if not empty
