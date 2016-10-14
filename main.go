@@ -41,23 +41,21 @@ func upload(patharg interface{}) error {
 
 func download(patharg interface{}) error {
 	// Check if the current directory is a git repository.
-	// Perform a git pull.
+	// Y: Perform a git pull.
+	// N: Clone, then pull.
 	var pathstr string
 	if patharg == nil {
 		pathstr = ""
-	} else {
-		pathstr = patharg.(string)
+		// TODO: Pull and Annex Pull
 	}
-	if pathstr == "" {
-		return fmt.Errorf("No repository specified.")
-	}
-	return repo.DownloadRepo(pathstr)
+	pathstr = patharg.(string)
+	return repo.CloneRepo(pathstr)
 }
 
 // condAppend Conditionally append str to b if not empty
 func condAppend(b *bytes.Buffer, str *string) {
 	if str != nil && *str != "" {
-		b.WriteString(*str + " ")
+		_, _ = b.WriteString(*str + " ")
 	}
 }
 
@@ -143,10 +141,10 @@ func printAccountInfo(userarg interface{}) error {
 
 	var outBuffer bytes.Buffer
 
-	outBuffer.WriteString(fmt.Sprintf("User [%s]\nName: %s\n", info.Login, fullnameBuffer.String()))
+	_, _ = outBuffer.WriteString(fmt.Sprintf("User [%s]\nName: %s\n", info.Login, fullnameBuffer.String()))
 
 	if info.Email != nil && info.Email.Email != "" {
-		outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email.Email))
+		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email.Email))
 		// TODO: Display public status if current user == info.Login
 	}
 
@@ -160,7 +158,7 @@ func printAccountInfo(userarg interface{}) error {
 		condAppend(&affiliationBuffer, &affiliation.Country)
 
 		if affiliationBuffer.Len() > 0 {
-			outBuffer.WriteString(fmt.Sprintf("Affiliation: %s\n", affiliationBuffer.String()))
+			_, _ = outBuffer.WriteString(fmt.Sprintf("Affiliation: %s\n", affiliationBuffer.String()))
 		}
 	}
 

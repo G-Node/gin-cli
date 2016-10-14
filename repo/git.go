@@ -4,10 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/G-Node/gin-cli/auth"
+	"github.com/G-Node/gin-cli/util"
 	git "github.com/libgit2/git2go"
 )
 
@@ -15,18 +22,89 @@ import (
 const user = "git"
 const githost = "gin.g-node.org"
 
+// Keys
+type tempFile struct {
+	Dir      string
+	Filename string
+	Active   bool
+}
+
+var privKeyFile tempFile
+
+func makeTempFile(filename string) (tempFile, error) {
+	dir, err := ioutil.TempDir("", "gin")
+	if err != nil {
+		return tempFile{}, fmt.Errorf("Error creating temporary key directory: %s", err)
+	}
+	newfile := tempFile{
+		Dir:      dir,
+		Filename: filename,
+		Active:   true,
+	}
+	return newfile, nil
+}
+
+func (tf tempFile) Write(content string) error {
+	if err := ioutil.WriteFile(tf.FullPath(), []byte(content), 0600); err != nil {
+		return fmt.Errorf("Error writing temporary file: %s", err)
+	}
+	return nil
+}
+
+func (tf tempFile) Delete() {
+	_ = os.RemoveAll(tf.Dir)
+}
+
+func (tf tempFile) FullPath() string {
+	return filepath.Join(tf.Dir, tf.Filename)
+}
+
+func (tf tempFile) SSHOptString() string {
+	return fmt.Sprintf("annex.ssh-options=-i %s", tf.FullPath())
+}
+
+// CleanUpTemp deletes the temporary directory which holds the temporary private key if it exists.
+func CleanUpTemp() {
+	privKeyFile.Delete()
+}
+
 // Git callbacks
 
 func makeCredsCB() git.CredentialsCallback {
 	// Error is returned after first attempt.
 	// attemptnum should be used to try different keys or credentials until all options are exhausted.
 	attemptnum := 0
+
 	return func(url string, username string, allowedTypes git.CredType) (git.ErrorCode, *git.Cred) {
-		if attemptnum > 0 {
+		var res int
+		var cred git.Cred
+		switch attemptnum {
+		case 0:
+			res, cred = git.NewCredSshKeyFromAgent("git")
+		case 1:
+			tempKeyPair, err := util.MakeKeyPair()
+			if err != nil {
+				return git.ErrUser, nil
+			}
+			description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
+			pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
+			err = auth.AddKey(pubkey, description)
+			if err != nil {
+				return git.ErrUser, nil
+			}
+			privKeyFile, err = makeTempFile("priv")
+			if err != nil {
+				return git.ErrUser, nil
+			}
+			err = privKeyFile.Write(tempKeyPair.Private)
+			if err != nil {
+				return git.ErrUser, nil
+			}
+			res, cred = git.NewCredSshKeyFromMemory("git", tempKeyPair.Public, tempKeyPair.Private, "")
+		default:
 			return git.ErrUser, nil
 		}
 
-		res, cred := git.NewCredSshKeyFromAgent("git")
 		if res != 0 {
 			return git.ErrorCode(res), nil
 		}
@@ -187,7 +265,11 @@ func Push(localPath string) error {
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
 func AnnexPull(localPath string) error {
-	_, err := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content").Output()
+	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
+	if privKeyFile.Active {
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+	}
+	err := cmd.Run()
 
 	if err != nil {
 		return fmt.Errorf("Error downloading files: %s", err.Error())
@@ -198,7 +280,11 @@ func AnnexPull(localPath string) error {
 // AnnexPush uploads all annexed files.
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath string) error {
-	_, err := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content").Output()
+	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content")
+	if privKeyFile.Active {
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+	}
+	err := cmd.Run()
 
 	if err != nil {
 		return fmt.Errorf("Error uploading files: %s", err.Error())

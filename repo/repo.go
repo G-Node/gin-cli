@@ -64,10 +64,13 @@ func CreateRepo(name, description string) error {
 
 // UploadRepo adds files to a repository and uploads them.
 func UploadRepo(localPath string) error {
+	defer CleanUpTemp()
+
 	idx, err := AddPath(localPath)
 	if err != nil {
 		return err
 	}
+
 	err = Commit(localPath, idx)
 	if err != nil {
 		return err
@@ -81,8 +84,10 @@ func UploadRepo(localPath string) error {
 	return AnnexPush(localPath)
 }
 
-// DownloadRepo downloads the files of a given repository.
-func DownloadRepo(repoPath string) error {
+// CloneRepo downloads the files of a given repository.
+func CloneRepo(repoPath string) error {
+	defer CleanUpTemp()
+
 	localPath := path.Base(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", localPath)
 	_, err := Clone(repoPath)

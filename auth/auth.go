@@ -8,8 +8,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path/filepath"
 
 	"github.com/G-Node/gin-cli/client"
+	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-core/gin"
 	"github.com/howeyc/gopass"
 )
@@ -17,8 +19,8 @@ import (
 const authhost = "https://auth.gin.g-node.org"
 
 func storeToken(token string) error {
-	// TODO: Store token in config directory
-	return ioutil.WriteFile("token", []byte(token), 0600)
+	tokenfile := filepath.Join(util.ConfigPath(), "token")
+	return ioutil.WriteFile(tokenfile, []byte(token), 0600)
 }
 
 func noTokenWarning(warn bool) {
@@ -29,8 +31,8 @@ func noTokenWarning(warn bool) {
 
 // LoadToken Get the current signed in username and auth token
 func LoadToken(warn bool) (string, string, error) {
-	// TODO: Load token from config directory
-	tokenBytes, err := ioutil.ReadFile("token")
+	tokenfile := filepath.Join(util.ConfigPath(), "token")
+	tokenBytes, err := ioutil.ReadFile(tokenfile)
 	tokenInfo := gin.TokenInfo{}
 	var username, token string
 
