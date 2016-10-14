@@ -25,9 +25,9 @@ func ConfigPath() (path string) {
 
 	if xdghome != "" {
 		path = filepath.Join(xdghome, suffix)
+	} else {
+		path = filepath.Join(homedir, ".config", suffix)
 	}
-
-	path = filepath.Join(homedir, ".config", suffix)
 	makePath(path)
 	return path
 }
