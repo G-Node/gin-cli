@@ -137,6 +137,15 @@ func matchPathCB(p, mp string) int {
 
 // Git commands
 
+// IsRepo checks whether a given path is a git repository.
+func IsRepo(path string) bool {
+	err := getRepo(path)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 func getRepo(startPath string) (*git.Repository, error) {
 	localRepoPath, err := git.Discover(startPath, false, nil)
 	if err != nil {
@@ -232,7 +241,13 @@ func Commit(localPath string, idx *git.Index) error {
 
 }
 
-// Push pushes all local commits to theh default remote & branch
+// Pull pulls all remote commits from the default remote & branch
+// (git pull)
+func Pull() error {
+	repository, err := git.OpenRepository(".")
+}
+
+// Push pushes all local commits to the default remote & branch
 // (git push)
 func Push(localPath string) error {
 	repository, err := git.OpenRepository(localPath)

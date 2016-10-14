@@ -43,6 +43,11 @@ func download(patharg interface{}) error {
 	// Check if the current directory is a git repository.
 	// Y: Perform a git pull.
 	// N: Clone, then pull.
+	if repo.IsRepo(".") {
+		if patharg != nil {
+			// TODO: File specified. Download specified file(s) only.
+		}
+	}
 	var pathstr string
 	if patharg == nil {
 		pathstr = ""
