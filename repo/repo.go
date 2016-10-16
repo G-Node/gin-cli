@@ -87,8 +87,15 @@ func UploadRepo(localPath string) error {
 // DownloadRepo downloads the files in an already checked out repository.
 func DownloadRepo() error {
 	defer CleanUpTemp()
-	// Fetch and Merge
-	return Pull()
+	// git pull
+	err := Pull()
+	if err != nil {
+		return err
+	}
+
+	// git annex pull
+	return AnnexPull(".")
+
 }
 
 // CloneRepo downloads the files of a given repository.

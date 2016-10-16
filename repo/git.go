@@ -260,14 +260,90 @@ func Pull() error {
 	}
 	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
 
-	refspecs := []string{"refs/remotes/origin/master"}
-	err = origin.Fetch(refspecs, fetchopts, "")
+	err = origin.Fetch([]string{}, fetchopts, "")
 	if err != nil {
 		return err
 	}
 
-	// TODO: Merge
-	// see https://gist.github.com/sithembiso/d890d3f751029a73f2c5
+	// Merge
+	remoteBranch, err := repository.References.Lookup("refs/remotes/origin/master")
+	if err != nil {
+		return err
+	}
+
+	annotatedCommit, err := repository.AnnotatedCommitFromRef(remoteBranch)
+	if err != nil {
+		return err
+	}
+
+	mergeHeads := make([]*git.AnnotatedCommit, 1)
+	mergeHeads[0] = annotatedCommit
+	analysis, _, err := repository.MergeAnalysis(mergeHeads)
+	if err != nil {
+		return err
+	}
+
+	if analysis&git.MergeAnalysisUpToDate != 0 {
+		// Nothing to do
+		return nil
+	} else if analysis&git.MergeAnalysisNormal != 0 {
+		// Merge changes
+		if err := repository.Merge([]*git.AnnotatedCommit{annotatedCommit}, nil, nil); err != nil {
+			return err
+		}
+
+		// Check for conflicts
+		index, err := repository.Index()
+		if err != nil {
+			return err
+		}
+
+		if index.HasConflicts() {
+			return fmt.Errorf("Merge conflicts encountered.") // TODO: Automatically resolve?
+		}
+
+		// Create merge commit
+		signature, err := repository.DefaultSignature() // TODO: Signature should use username and email if public on gin-auth
+		if err != nil {
+			return err
+		}
+
+		treeID, err := index.WriteTree()
+		if err != nil {
+			return err
+		}
+
+		tree, err := repository.LookupTree(treeID)
+		if err != nil {
+			return err
+		}
+
+		head, err := repository.Head()
+		if err != nil {
+			return err
+		}
+
+		localCommit, err := repository.LookupCommit(head.Target())
+		if err != nil {
+			return err
+		}
+
+		remoteCommit, err := repository.LookupCommit(remoteBranch.Target())
+		if err != nil {
+			return err
+		}
+
+		_, err = repository.CreateCommit("HEAD", signature, signature, "", tree, localCommit, remoteCommit)
+		if err != nil {
+			return err
+		}
+
+		err = repository.StateCleanup()
+		if err != nil {
+			return err
+		}
+
+	}
 
 	return nil
 }
