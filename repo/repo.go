@@ -43,7 +43,7 @@ func GetRepos(user, token string) ([]wire.Repo, error) {
 	return repoList, nil
 }
 
-// CreateRepo creates a repository on the server
+// CreateRepo creates a repository on the server.
 func CreateRepo(name, description string) error {
 	repocl := client.NewClient(repohost)
 	username, token, _ := auth.LoadToken(false)
@@ -82,6 +82,20 @@ func UploadRepo(localPath string) error {
 	}
 
 	return AnnexPush(localPath)
+}
+
+// DownloadRepo downloads the files in an already checked out repository.
+func DownloadRepo() error {
+	defer CleanUpTemp()
+	// git pull
+	err := Pull()
+	if err != nil {
+		return err
+	}
+
+	// git annex pull
+	return AnnexPull(".")
+
 }
 
 // CloneRepo downloads the files of a given repository.

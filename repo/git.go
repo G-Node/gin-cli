@@ -71,8 +71,7 @@ func CleanUpTemp() {
 // Git callbacks
 
 func makeCredsCB() git.CredentialsCallback {
-	// Error is returned after first attempt.
-	// attemptnum should be used to try different keys or credentials until all options are exhausted.
+	// attemptnum is used to determine which authentication method to use each time.
 	attemptnum := 0
 
 	return func(url string, username string, allowedTypes git.CredType) (git.ErrorCode, *git.Cred) {
@@ -136,6 +135,15 @@ func matchPathCB(p, mp string) int {
 // **************** //
 
 // Git commands
+
+// IsRepo checks whether a given path is a git repository.
+func IsRepo(path string) bool {
+	_, err := getRepo(path)
+	if err != nil {
+		return false
+	}
+	return true
+}
 
 func getRepo(startPath string) (*git.Repository, error) {
 	localRepoPath, err := git.Discover(startPath, false, nil)
@@ -232,7 +240,115 @@ func Commit(localPath string, idx *git.Index) error {
 
 }
 
-// Push pushes all local commits to theh default remote & branch
+// Pull pulls all remote commits from the default remote & branch
+// (git pull)
+func Pull() error {
+	repository, err := git.OpenRepository(".")
+	if err != nil {
+		return err
+	}
+
+	origin, err := repository.Remotes.Lookup("origin")
+	if err != nil {
+		return err
+	}
+
+	// Fetch
+	cbs := &git.RemoteCallbacks{
+		CredentialsCallback:      makeCredsCB(),
+		CertificateCheckCallback: certCB,
+	}
+	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
+
+	err = origin.Fetch([]string{}, fetchopts, "")
+	if err != nil {
+		return err
+	}
+
+	// Merge
+	remoteBranch, err := repository.References.Lookup("refs/remotes/origin/master")
+	if err != nil {
+		return err
+	}
+
+	annotatedCommit, err := repository.AnnotatedCommitFromRef(remoteBranch)
+	if err != nil {
+		return err
+	}
+
+	mergeHeads := make([]*git.AnnotatedCommit, 1)
+	mergeHeads[0] = annotatedCommit
+	analysis, _, err := repository.MergeAnalysis(mergeHeads)
+	if err != nil {
+		return err
+	}
+
+	if analysis&git.MergeAnalysisUpToDate != 0 {
+		// Nothing to do
+		return nil
+	} else if analysis&git.MergeAnalysisNormal != 0 {
+		// Merge changes
+		if err := repository.Merge([]*git.AnnotatedCommit{annotatedCommit}, nil, nil); err != nil {
+			return err
+		}
+
+		// Check for conflicts
+		index, err := repository.Index()
+		if err != nil {
+			return err
+		}
+
+		if index.HasConflicts() {
+			return fmt.Errorf("Merge conflicts encountered.") // TODO: Automatically resolve?
+		}
+
+		// Create merge commit
+		signature, err := repository.DefaultSignature() // TODO: Signature should use username and email if public on gin-auth
+		if err != nil {
+			return err
+		}
+
+		treeID, err := index.WriteTree()
+		if err != nil {
+			return err
+		}
+
+		tree, err := repository.LookupTree(treeID)
+		if err != nil {
+			return err
+		}
+
+		head, err := repository.Head()
+		if err != nil {
+			return err
+		}
+
+		localCommit, err := repository.LookupCommit(head.Target())
+		if err != nil {
+			return err
+		}
+
+		remoteCommit, err := repository.LookupCommit(remoteBranch.Target())
+		if err != nil {
+			return err
+		}
+
+		_, err = repository.CreateCommit("HEAD", signature, signature, "", tree, localCommit, remoteCommit)
+		if err != nil {
+			return err
+		}
+
+		err = repository.StateCleanup()
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+// Push pushes all local commits to the default remote & branch
 // (git push)
 func Push(localPath string) error {
 	repository, err := git.OpenRepository(localPath)
@@ -254,7 +370,6 @@ func Push(localPath string) error {
 		RemoteCallbacks: rcbs,
 	}
 	refspecs := []string{"refs/heads/master"}
-
 	return origin.Push(refspecs, popts)
 }
 
