@@ -31,20 +31,24 @@ type tempFile struct {
 
 var privKeyFile tempFile
 
-func makeTempFile(filename string) tempFile {
+func makeTempFile(filename string) (tempFile, error) {
 	dir, err := ioutil.TempDir("", "gin")
-	util.CheckErrorMsg(err, fmt.Sprintf("Error creating temporary key directory."))
+	if err != nil {
+		return tempFile{}, fmt.Errorf("Error creating temporary key directory: %s", err)
+	}
 	newfile := tempFile{
 		Dir:      dir,
 		Filename: filename,
 		Active:   true,
 	}
-	return newfile
+	return newfile, nil
 }
 
-func (tf tempFile) Write(content string) {
-	err := ioutil.WriteFile(tf.FullPath(), []byte(content), 0600)
-	util.CheckErrorMsg(err, "Error writing temporary file.")
+func (tf tempFile) Write(content string) error {
+	if err := ioutil.WriteFile(tf.FullPath(), []byte(content), 0600); err != nil {
+		return fmt.Errorf("Error writing temporary file: %s", err)
+	}
+	return nil
 }
 
 func (tf tempFile) Delete() {
@@ -77,14 +81,24 @@ func makeCredsCB() git.CredentialsCallback {
 		case 0:
 			res, cred = git.NewCredSshKeyFromAgent("git")
 		case 1:
-			tempKeyPair := util.MakeKeyPair()
+			tempKeyPair, err := util.MakeKeyPair()
+			if err != nil {
+				return git.ErrUser, nil
+			}
 			description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
 			pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
-			err := auth.AddKey(pubkey, description)
-			util.CheckError(err)
-			privKeyFile = makeTempFile("priv")
-			privKeyFile.Write(tempKeyPair.Private)
-			util.CheckError(err)
+			err = auth.AddKey(pubkey, description)
+			if err != nil {
+				return git.ErrUser, nil
+			}
+			privKeyFile, err = makeTempFile("priv")
+			if err != nil {
+				return git.ErrUser, nil
+			}
+			err = privKeyFile.Write(tempKeyPair.Private)
+			if err != nil {
+				return git.ErrUser, nil
+			}
 			res, cred = git.NewCredSshKeyFromMemory("git", tempKeyPair.Public, tempKeyPair.Private, "")
 		default:
 			return git.ErrUser, nil
@@ -131,19 +145,24 @@ func IsRepo(path string) bool {
 	return true
 }
 
-func getRepo(startPath string) *git.Repository {
+func getRepo(startPath string) (*git.Repository, error) {
 	localRepoPath, err := git.Discover(startPath, false, nil)
-	util.CheckError(err)
-	repo, err := git.OpenRepository(localRepoPath)
-	util.CheckError(err)
-	return repo
+	if err != nil {
+		return nil, err
+	}
+	return git.OpenRepository(localRepoPath)
 }
 
 // AddPath adds files or directories to the index
-func AddPath(localPath string) *git.Index {
-	repo := getRepo(localPath)
+func AddPath(localPath string) (*git.Index, error) {
+	repo, err := getRepo(localPath)
+	if err != nil {
+		return nil, err
+	}
 	idx, err := repo.Index()
-	util.CheckError(err)
+	if err != nil {
+		return nil, err
+	}
 	// Currently adding everything to annex
 	// Eventually will decide on what is versioned and what is annexed based on MIME type
 	// err = idx.AddAll([]string{localPath}, git.IndexAddDefault, matchPathCB)
@@ -152,13 +171,13 @@ func AddPath(localPath string) *git.Index {
 	// }
 	// return idx.Write()
 
-	AnnexAdd(localPath, idx)
-	return idx
+	err = AnnexAdd(localPath, idx)
+	return idx, err
 }
 
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
-func Clone(repopath string) *git.Repository {
+func Clone(repopath string) (*git.Repository, error) {
 	remotePath := fmt.Sprintf("%s@%s:%s", user, githost, repopath)
 	localPath := path.Base(repopath)
 
@@ -174,45 +193,65 @@ func Clone(repopath string) *git.Repository {
 		RemoteCreateCallback: remoteCreateCB,
 	}
 	repository, err := git.Clone(remotePath, localPath, &opts)
-	util.CheckError(err)
-	return repository
+
+	if err != nil {
+		return nil, err
+	}
+
+	return repository, nil
 }
 
 // Commit performs a git commit on the currently staged objects.
 // (git commit)
-func Commit(localPath string, idx *git.Index) {
+func Commit(localPath string, idx *git.Index) error {
 	signature := &git.Signature{
 		Name:  "gin",
 		Email: "gin",
 		When:  time.Now(),
 	}
 	repository, err := git.OpenRepository(localPath)
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 	head, err := repository.Head()
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 	headCommit, err := repository.LookupCommit(head.Target())
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	message := "uploading" // TODO: Describe changes (in message)
 	treeID, err := idx.WriteTree()
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 	err = idx.Write()
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 	tree, err := repository.LookupTree(treeID)
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 	_, err = repository.CreateCommit("HEAD", signature, signature, message, tree, headCommit)
-	util.CheckError(err)
+	return err
 
 }
 
 // Pull pulls all remote commits from the default remote & branch
 // (git pull)
-func Pull() {
+func Pull() error {
 	repository, err := git.OpenRepository(".")
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	origin, err := repository.Remotes.Lookup("origin")
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	// Fetch
 	cbs := &git.RemoteCallbacks{
@@ -222,72 +261,105 @@ func Pull() {
 	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
 
 	err = origin.Fetch([]string{}, fetchopts, "")
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	// Merge
 	remoteBranch, err := repository.References.Lookup("refs/remotes/origin/master")
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	annotatedCommit, err := repository.AnnotatedCommitFromRef(remoteBranch)
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	mergeHeads := make([]*git.AnnotatedCommit, 1)
 	mergeHeads[0] = annotatedCommit
 	analysis, _, err := repository.MergeAnalysis(mergeHeads)
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	if analysis&git.MergeAnalysisUpToDate != 0 {
 		// Nothing to do
-		return
+		return nil
 	} else if analysis&git.MergeAnalysisNormal != 0 {
 		// Merge changes
-		err := repository.Merge([]*git.AnnotatedCommit{annotatedCommit}, nil, nil)
-		util.CheckError(err)
+		if err := repository.Merge([]*git.AnnotatedCommit{annotatedCommit}, nil, nil); err != nil {
+			return err
+		}
 
 		// Check for conflicts
 		index, err := repository.Index()
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 
 		if index.HasConflicts() {
-			util.CheckError(fmt.Errorf("Merge conflicts encountered.")) // TODO: Automatically resolve?
+			return fmt.Errorf("Merge conflicts encountered.") // TODO: Automatically resolve?
 		}
 
 		// Create merge commit
 		signature, err := repository.DefaultSignature() // TODO: Signature should use username and email if public on gin-auth
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 
 		treeID, err := index.WriteTree()
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 
 		tree, err := repository.LookupTree(treeID)
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 
 		head, err := repository.Head()
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 
 		localCommit, err := repository.LookupCommit(head.Target())
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 
 		remoteCommit, err := repository.LookupCommit(remoteBranch.Target())
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 
 		_, err = repository.CreateCommit("HEAD", signature, signature, "", tree, localCommit, remoteCommit)
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 
 		err = repository.StateCleanup()
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 
 	}
+
+	return nil
 }
 
 // Push pushes all local commits to the default remote & branch
 // (git push)
-func Push(localPath string) {
+func Push(localPath string) error {
 	repository, err := git.OpenRepository(localPath)
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	origin, err := repository.Remotes.Lookup("origin")
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	rcbs := git.RemoteCallbacks{
 		CredentialsCallback:      makeCredsCB(),
@@ -298,8 +370,7 @@ func Push(localPath string) {
 		RemoteCallbacks: rcbs,
 	}
 	refspecs := []string{"refs/heads/master"}
-	err = origin.Push(refspecs, popts)
-	util.CheckError(err)
+	return origin.Push(refspecs, popts)
 }
 
 // **************** //
@@ -308,24 +379,32 @@ func Push(localPath string) {
 
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
-func AnnexPull(localPath string) {
+func AnnexPull(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()
-	util.CheckErrorMsg(err, "Error downloading files.")
+
+	if err != nil {
+		return fmt.Errorf("Error downloading files: %s", err.Error())
+	}
+	return nil
 }
 
 // AnnexPush uploads all annexed files.
 // (git annex sync --no-pull --content)
-func AnnexPush(localPath string) {
+func AnnexPush(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content")
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()
-	util.CheckErrorMsg(err, "Error uploading files.")
+
+	if err != nil {
+		return fmt.Errorf("Error uploading files: %s", err.Error())
+	}
+	return nil
 }
 
 // AnnexAddResult ...
@@ -338,11 +417,13 @@ type AnnexAddResult struct {
 
 // AnnexAdd adds a path to the annex.
 // (git annex add)
-func AnnexAdd(localPath string, idx *git.Index) {
+func AnnexAdd(localPath string, idx *git.Index) error {
 	// TODO: Return error if no new files are added
 	out, err := exec.Command("git", "annex", "--json", "add", localPath).Output()
 
-	util.CheckErrorMsg(err, "Error adding files to repository.")
+	if err != nil {
+		return fmt.Errorf("Error adding files to repository: %s", err.Error())
+	}
 
 	var outStruct AnnexAddResult
 	files := bytes.Split(out, []byte("\n"))
@@ -351,11 +432,17 @@ func AnnexAdd(localPath string, idx *git.Index) {
 			break
 		}
 		err := json.Unmarshal(f, &outStruct)
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 		if !outStruct.Success {
-			util.Die(fmt.Sprintf("Error adding files to repository: Failed to add %s", outStruct.File))
+			return fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
 		}
 		err = idx.AddByPath(outStruct.File)
-		util.CheckError(err)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }

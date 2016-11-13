@@ -28,8 +28,7 @@ func createRepo(name, description interface{}) {
 	if description != nil {
 		repoDesc = description.(string)
 	}
-	err := repo.CreateRepo(repoName, repoDesc)
-	util.CheckError(err)
+	repo.CreateRepo(repoName, repoDesc)
 }
 
 func upload(patharg interface{}) {
@@ -37,22 +36,19 @@ func upload(patharg interface{}) {
 	if patharg != nil {
 		pathstr = patharg.(string)
 	}
-	err := repo.UploadRepo(pathstr)
-	util.CheckError(err)
+	repo.UploadRepo(pathstr)
 }
 
 func download(patharg interface{}) {
 	var pathstr string
 	if patharg != nil {
 		pathstr = patharg.(string)
-		err := repo.CloneRepo(pathstr)
-		util.CheckError(err)
+		repo.CloneRepo(pathstr)
 	}
 
 	// No repo specified -- attempting to pull in cwd
 	if repo.IsRepo(".") {
-		err := repo.DownloadRepo()
-		util.CheckError(err)
+		repo.DownloadRepo()
 	}
 
 	util.CheckError(fmt.Errorf("Current directory is not a repository."))
@@ -67,8 +63,7 @@ func condAppend(b *bytes.Buffer, str *string) {
 
 func printKeys(printFull bool) {
 
-	keys, err := auth.GetUserKeys()
-	util.CheckError(err)
+	keys := auth.GetUserKeys()
 	nkeys := len(keys)
 	var plural string
 	if nkeys == 1 {
@@ -124,8 +119,7 @@ func printAccountInfo(userarg interface{}) {
 		fmt.Scanln(&username)
 	}
 
-	info, err := auth.RequestAccount(username, token)
-	util.CheckError(err)
+	info := auth.RequestAccount(username, token)
 
 	var fullnameBuffer bytes.Buffer
 
@@ -174,8 +168,7 @@ func listUserRepos(userarg interface{}) {
 		username = userarg.(string)
 	}
 
-	info, err := repo.GetRepos(username, token)
-	util.CheckError(err)
+	info := repo.GetRepos(username, token)
 
 	fmt.Printf("Repositories owned by %s\n", username)
 	for idx, r := range info {
@@ -184,13 +177,12 @@ func listUserRepos(userarg interface{}) {
 }
 
 func listPubRepos() {
-	repos, err := repo.GetRepos("", "")
+	repos := repo.GetRepos("", "")
 	fmt.Printf("Public repositories\n")
 	for idx, repoInfo := range repos {
 		fmt.Printf("%d: %s [head: %s]\n", idx+1, repoInfo.Name, repoInfo.Head)
 		fmt.Printf(" - %s\n", repoInfo.Description)
 	}
-	util.CheckError(err)
 }
 
 func main() {
