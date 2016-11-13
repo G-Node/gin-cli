@@ -46,7 +46,7 @@ func GetRepos(user, token string) ([]wire.Repo, error) {
 // CreateRepo creates a repository on the server.
 func CreateRepo(name, description string) error {
 	repocl := client.NewClient(repohost)
-	username, token, _ := auth.LoadToken(false)
+	username, token := auth.LoadToken(false)
 	repocl.Token = token
 
 	data := wire.Repo{Name: name, Description: description}
@@ -63,60 +63,34 @@ func CreateRepo(name, description string) error {
 }
 
 // UploadRepo adds files to a repository and uploads them.
-func UploadRepo(localPath string) error {
+func UploadRepo(localPath string) {
 	defer CleanUpTemp()
 
-	idx, err := AddPath(localPath)
-	if err != nil {
-		return err
-	}
-
-	err = Commit(localPath, idx)
-	if err != nil {
-		return err
-	}
-
-	err = Push(localPath)
-	if err != nil {
-		return err
-	}
-
-	return AnnexPush(localPath)
+	idx := AddPath(localPath)
+	Commit(localPath, idx)
+	Push(localPath)
+	AnnexPush(localPath)
 }
 
 // DownloadRepo downloads the files in an already checked out repository.
-func DownloadRepo() error {
+func DownloadRepo() {
 	defer CleanUpTemp()
 	// git pull
-	err := Pull()
-	if err != nil {
-		return err
-	}
-
+	Pull()
 	// git annex pull
-	return AnnexPull(".")
-
+	AnnexPull(".")
 }
 
 // CloneRepo downloads the files of a given repository.
-func CloneRepo(repoPath string) error {
+func CloneRepo(repoPath string) {
 	defer CleanUpTemp()
 
 	localPath := path.Base(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", localPath)
-	_, err := Clone(repoPath)
-	if err != nil {
-		fmt.Printf("failed!\n")
-		return err
-	}
+	Clone(repoPath)
 	fmt.Printf("done.\n")
 
 	fmt.Printf("Downloading files... ")
-	err = AnnexPull(localPath)
-	if err != nil {
-		fmt.Printf("failed!\n")
-		return err
-	}
+	AnnexPull(localPath)
 	fmt.Printf("done.\n")
-	return nil
 }
