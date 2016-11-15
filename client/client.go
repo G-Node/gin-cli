@@ -61,16 +61,25 @@ func (client *Client) DoLogin(username, password string) ([]byte, error) {
 // Get Send a GET request
 func (client *Client) Get(address string) (*http.Response, error) {
 	requrl := urlJoin(client.Host, address)
-	req, _ := http.NewRequest("GET", requrl, nil)
+	req, err := http.NewRequest("GET", requrl, nil)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", client.Token))
 	return client.web.Do(req)
 }
 
 // Post Send a POST request
 func (client *Client) Post(address string, data interface{}) (*http.Response, error) {
-	datajson, _ := json.Marshal(data)
+	datajson, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
 	requrl := urlJoin(client.Host, address)
-	req, _ := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
+	req, err := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", client.Token))
 	return client.web.Do(req)
 }

@@ -44,6 +44,7 @@ func GetRepos(user, token string) []wire.Repo {
 func CreateRepo(name, description string) {
 	repocl := client.NewClient(repohost)
 	username, token, err := auth.LoadToken(false)
+	util.CheckErrorMsg(err, "[Create repository] This action requires login.")
 	repocl.Token = token
 
 	data := wire.Repo{Name: name, Description: description}
@@ -61,18 +62,23 @@ func UploadRepo(localPath string) {
 
 	idx, err := AddPath(localPath)
 	util.CheckError(err)
-	Commit(localPath, idx)
-	Push(localPath)
-	AnnexPush(localPath)
+	err = Commit(localPath, idx)
+	util.CheckError(err)
+	err = Push(localPath)
+	util.CheckError(err)
+	err = AnnexPush(localPath)
+	util.CheckError(err)
 }
 
 // DownloadRepo downloads the files in an already checked out repository.
 func DownloadRepo() {
 	defer CleanUpTemp()
 	// git pull
-	Pull()
+	err := Pull()
+	util.CheckError(err)
 	// git annex pull
-	AnnexPull(".")
+	err = AnnexPull(".")
+	util.CheckError(err)
 }
 
 // CloneRepo downloads the files of a given repository.
@@ -81,10 +87,12 @@ func CloneRepo(repoPath string) {
 
 	localPath := path.Base(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", localPath)
-	Clone(repoPath)
+	_, err := Clone(repoPath)
+	util.CheckError(err)
 	fmt.Printf("done.\n")
 
 	fmt.Printf("Downloading files... ")
-	AnnexPull(localPath)
+	err = AnnexPull(localPath)
+	util.CheckError(err)
 	fmt.Printf("done.\n")
 }
