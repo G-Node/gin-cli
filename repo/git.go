@@ -187,8 +187,8 @@ func Clone(repopath string) (*git.Repository, error) {
 	}
 	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
 	opts := git.CloneOptions{
-		Bare:                 false,
-		CheckoutBranch:       "master", // TODO: default branch
+		Bare: false,
+		// CheckoutBranch:       "master", // TODO: default branch
 		FetchOptions:         fetchopts,
 		RemoteCreateCallback: remoteCreateCB,
 	}
