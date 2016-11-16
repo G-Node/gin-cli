@@ -214,12 +214,15 @@ func Commit(localPath string, idx *git.Index) error {
 		return err
 	}
 	head, err := repository.Head()
+	var headCommit *git.Commit
 	if err != nil {
-		return err
-	}
-	headCommit, err := repository.LookupCommit(head.Target())
-	if err != nil {
-		return err
+		// Head commit not found. Root commit?
+		head = nil
+	} else {
+		headCommit, err = repository.LookupCommit(head.Target())
+		if err != nil {
+			return err
+		}
 	}
 
 	message := "uploading" // TODO: Describe changes (in message)
@@ -235,9 +238,12 @@ func Commit(localPath string, idx *git.Index) error {
 	if err != nil {
 		return err
 	}
-	_, err = repository.CreateCommit("HEAD", signature, signature, message, tree, headCommit)
+	if headCommit == nil {
+		_, err = repository.CreateCommit("HEAD", signature, signature, message, tree)
+	} else {
+		_, err = repository.CreateCommit("HEAD", signature, signature, message, tree, headCommit)
+	}
 	return err
-
 }
 
 // Pull pulls all remote commits from the default remote & branch
