@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 
 	"github.com/G-Node/gin-cli/client"
@@ -38,14 +39,14 @@ func LoadToken(warn bool) (string, string, error) {
 
 	if err != nil {
 		noTokenWarning(warn)
-		return "", "", nil
+		return "", "", err
 	}
 
 	token = string(tokenBytes)
 	authcl := client.NewClient(authhost)
 	res, err := authcl.Get("/oauth/validate/" + token)
 	if err != nil {
-		fmt.Println("[Auth error] Error communicating with server.")
+		fmt.Fprintln(os.Stderr, "[Auth error] Error communicating with server.")
 		return "", "", err
 	}
 
@@ -67,37 +68,31 @@ func LoadToken(warn bool) (string, string, error) {
 }
 
 // GetUserKeys Load token and request an slice of the user's keys
-func GetUserKeys() ([]gin.SSHKey, error) {
+func GetUserKeys() []gin.SSHKey {
 	username, token, err := LoadToken(true)
-	if err != nil {
-		return nil, err
-	}
-	if token == "" {
-		return nil, fmt.Errorf("This command requires login.")
-	}
+	util.CheckErrorMsg(err, "This command requires login.")
 
 	authcl := client.NewClient(authhost)
 	authcl.Token = token
 
 	res, err := authcl.Get(fmt.Sprintf("/api/accounts/%s/keys", username))
-
-	if err != nil {
-		return nil, fmt.Errorf("Request for keys returned error: %s", err)
-	} else if res.StatusCode != 200 {
-		return nil, fmt.Errorf("[Keys request error] Server returned: %s", res.Status)
+	util.CheckErrorMsg(err, "Request for keys returned error.")
+	if res.StatusCode != 200 {
+		util.Die(fmt.Sprintf("[Keys request error] Server returned: %s", res.Status))
 	}
 
 	defer client.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
+	util.CheckError(err)
 	var keys []gin.SSHKey
 	err = json.Unmarshal(b, &keys)
-
-	return keys, nil
+	util.CheckError(err)
+	return keys
 }
 
 // Login Request credentials, perform login, and store token
-func Login(userarg interface{}) error {
+func Login(userarg interface{}) {
 
 	var username, password string
 
@@ -117,74 +112,57 @@ func Login(userarg interface{}) error {
 	if err != nil {
 		// read error or gopass.ErrInterrupted
 		if err == gopass.ErrInterrupted {
-			fmt.Println("Cancelled.")
-			return nil
+			util.Die("Cancelled.")
 		}
 		if err == gopass.ErrMaxLengthExceeded {
-			fmt.Println("Error: Input too long.")
-			return err
+			util.Die("[Error] Input too long.")
 		}
-		return err
+		util.Die(err.Error())
 	}
 
 	password = string(pwbytes)
 
 	if password == "" {
-		fmt.Println("No password provided. Aborting.")
-		return err
+		util.Die("No password provided. Aborting.")
 	}
 
 	authcl := client.NewClient(authhost)
 	b, err := authcl.DoLogin(username, password)
+	util.CheckError(err)
+
 	var authresp gin.TokenResponse
 	err = json.Unmarshal(b, &authresp)
-
-	if err != nil {
-		return err
-	}
+	util.CheckError(err)
 
 	err = storeToken(authresp.AccessToken)
-
-	if err != nil {
-		// Login success but unable to store token in file. Print error.
-		return err
-	}
-
+	util.CheckErrorMsg(err, "[Error] Login failed while storing token.")
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)
 	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
-
-	return nil
-
 }
 
 // RequestAccount requests a specific account by name
-func RequestAccount(name, token string) (gin.Account, error) {
+func RequestAccount(name, token string) gin.Account {
 	var acc gin.Account
 
 	authcl := client.NewClient(authhost)
 	authcl.Token = token
 	res, err := authcl.Get("/api/accounts/" + name)
+	util.CheckErrorMsg(err, "[Account retrieval] Request failed.")
 
-	if err != nil {
-		fmt.Printf("[Error] Request failed: %s\n", err)
-		return acc, err
-	} else if res.StatusCode != 200 {
-		return acc, fmt.Errorf("[Account search error] Server returned: %s", res.Status)
+	if res.StatusCode != 200 {
+		util.Die(fmt.Sprintf("[Account retrieval] Failed. Server returned: %s", res.Status))
 	}
 
 	defer client.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
-
 	err = json.Unmarshal(b, &acc)
-	if err != nil {
-		return acc, err
-	}
-	return acc, nil
+	util.CheckError(err)
+	return acc
 }
 
 // SearchAccount Search for account
-func SearchAccount(query string) ([]gin.Account, error) {
+func SearchAccount(query string) []gin.Account {
 	var results []gin.Account
 
 	params := url.Values{}
@@ -192,29 +170,22 @@ func SearchAccount(query string) ([]gin.Account, error) {
 	url := fmt.Sprintf("%s/api/accounts?%s", authhost, params.Encode())
 	authcl := client.NewClient(authhost)
 	res, err := authcl.Get(url)
+	util.CheckErrorMsg(err, "[Account search] Request failed.")
 
-	if err != nil {
-		return results, err
-	} else if res.StatusCode != 200 {
-		return results, fmt.Errorf("[Account search error] Server returned: %s", res.Status)
+	if res.StatusCode != 200 {
+		util.Die(fmt.Sprintf("[Account search] Failed. Server returned: %s", res.Status))
 	}
 
 	body, _ := ioutil.ReadAll(res.Body)
 
 	err = json.Unmarshal(body, &results)
-
-	return results, nil
+	util.CheckError(err)
+	return results
 }
 
 // AddKey Adds the given key to the current user's authorised keys
 func AddKey(key, description string) error {
-
 	username, token, err := LoadToken(true)
-
-	if err != nil {
-		return nil
-	}
-
 	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
 	// TODO: Check err and req.StatusCode
 	// TODO: clean up key struct

@@ -138,7 +138,7 @@ func matchPathCB(p, mp string) int {
 
 // IsRepo checks whether a given path is a git repository.
 func IsRepo(path string) bool {
-	_, err := getRepo(path)
+	_, err := git.Discover(path, false, nil)
 	if err != nil {
 		return false
 	}

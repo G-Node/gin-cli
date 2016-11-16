@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"path"
 	"strings"
+
+	"github.com/G-Node/gin-cli/util"
 )
 
 // Client struct for making requests
@@ -22,9 +24,7 @@ type Client struct {
 func urlJoin(parts ...string) string {
 	// First part must be a valid URL
 	u, err := url.Parse(parts[0])
-	if err != nil {
-		// TODO: Fail
-	}
+	util.CheckErrorMsg(err, "Bad URL in urlJoin")
 
 	for _, part := range parts[1:] {
 		u.Path = path.Join(u.Path, part)
@@ -55,9 +55,7 @@ func (client *Client) DoLogin(username, password string) ([]byte, error) {
 	}
 
 	defer CloseRes(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-	return b, err
+	return ioutil.ReadAll(res.Body)
 }
 
 // Get Send a GET request
@@ -65,15 +63,10 @@ func (client *Client) Get(address string) (*http.Response, error) {
 	requrl := urlJoin(client.Host, address)
 	req, err := http.NewRequest("GET", requrl, nil)
 	if err != nil {
-		// TODO: Handle error
+		return nil, err
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", client.Token))
-	res, err := client.web.Do(req)
-	if err != nil {
-		// TODO: Handle error
-		return res, err
-	}
-	return res, err
+	return client.web.Do(req)
 }
 
 // Post Send a POST request
@@ -83,13 +76,12 @@ func (client *Client) Post(address string, data interface{}) (*http.Response, er
 		return nil, err
 	}
 	requrl := urlJoin(client.Host, address)
-	req, _ := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", client.Token))
-	res, err := client.web.Do(req)
+	req, err := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
 	if err != nil {
-		// TODO: Handle error
+		return nil, err
 	}
-	return res, err
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", client.Token))
+	return client.web.Do(req)
 }
 
 // NewClient create new client for specific host
@@ -100,7 +92,5 @@ func NewClient(address string) *Client {
 // CloseRes Close result buffer
 func CloseRes(b io.ReadCloser) {
 	err := b.Close()
-	if err != nil {
-		fmt.Println("Error during cleanup:", err)
-	}
+	util.CheckErrorMsg(err, "Error during cleanup.")
 }
