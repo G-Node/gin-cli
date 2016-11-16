@@ -377,6 +377,16 @@ func Push(localPath string) error {
 
 // Git annex commands
 
+// AnnexInit initialises the repository for annex
+// (git annex init)
+func AnnexInit(localPath string) error {
+	err := exec.Command("git", "-C", localPath, "annex", "init").Run()
+	if err != nil {
+		return fmt.Errorf("Repository annex initialisation failed.")
+	}
+	return nil
+}
+
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
 func AnnexPull(localPath string) error {

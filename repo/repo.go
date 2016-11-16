@@ -91,6 +91,11 @@ func CloneRepo(repoPath string) {
 	util.CheckError(err)
 	fmt.Printf("done.\n")
 
+	// git annex init the clone
+	err = AnnexInit(localPath)
+	util.CheckError(err)
+
+	// TODO: Do not try to download files if repo is empty
 	fmt.Printf("Downloading files... ")
 	err = AnnexPull(localPath)
 	util.CheckError(err)
