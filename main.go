@@ -41,16 +41,11 @@ func getRepo(repoarg interface{}) {
 	}
 }
 
-func upload(patharg interface{}) {
-	var pathstr string
-	if patharg != nil {
-		pathstr = patharg.(string)
-	}
-	repo.UploadRepo(pathstr)
+func upload() {
+	repo.UploadRepo(".")
 }
 
-func download(patharg interface{}) {
-	// TODO: If path is specified, do `git annex get`
+func download() {
 	if repo.IsRepo(".") {
 		repo.DownloadRepo()
 	} else {
@@ -197,8 +192,8 @@ Usage:
 	gin login    [<username>]
 	gin create   [<name>] [-d <description>]
 	gin get      [<repository>]
-	gin upload   [<path>]
-	gin download [<path>]
+	gin upload
+	gin download
 	gin repos    [<username>]
 	gin info     [<username>]
 	gin keys     [-v | --verbose]
@@ -216,9 +211,9 @@ Usage:
 	case args["get"].(bool):
 		getRepo(args["<repository>"])
 	case args["upload"].(bool):
-		upload(args["<path>"])
+		upload()
 	case args["download"].(bool):
-		download(args["<path>"])
+		download()
 	case args["info"].(bool):
 		printAccountInfo(args["<username>"])
 	case args["keys"].(bool):
