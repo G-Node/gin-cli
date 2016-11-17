@@ -163,14 +163,11 @@ func AddPath(localPath string) (*git.Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Currently adding everything to annex
-	// Eventually will decide on what is versioned and what is annexed based on MIME type
 	// err = idx.AddAll([]string{localPath}, git.IndexAddDefault, matchPathCB)
 	// if err != nil {
-	// 	return err
+	// 	return nil, err
 	// }
-	// return idx.Write()
-
+	// return idx, idx.Write()
 	err = AnnexAdd(localPath, idx)
 	return idx, err
 }
@@ -386,17 +383,25 @@ func Push(localPath string) error {
 // AnnexInit initialises the repository for annex
 // (git annex init)
 func AnnexInit(localPath string) error {
-	err := exec.Command("git", "-C", localPath, "annex", "init").Run()
+	initError := fmt.Errorf("Repository annex initialisation failed.")
+	err := exec.Command("git", "-C", localPath, "annex", "init", "--version=6").Run()
 	if err != nil {
-		return fmt.Errorf("Repository annex initialisation failed.")
+		return initError
+	}
+
+	err = exec.Command("git", "-C", localPath, "config", "annex.addunlocked", "true").Run()
+	if err != nil {
+		return initError
 	}
 	return nil
 }
 
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
+// (git annex get --all)
 func AnnexPull(localPath string) error {
-	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
+	// cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
+	cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
@@ -454,10 +459,10 @@ func AnnexAdd(localPath string, idx *git.Index) error {
 		if !outStruct.Success {
 			return fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
 		}
-		err = idx.AddByPath(outStruct.File)
-		if err != nil {
-			return err
-		}
+		// err = idx.AddByPath(outStruct.File)
+		// if err != nil {
+		// 	return err
+		// }
 	}
 
 	return nil
