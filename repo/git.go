@@ -393,6 +393,20 @@ func AnnexInit(localPath string) error {
 	if err != nil {
 		return initError
 	}
+
+	// list of extensions that are added to git (not annex)
+	// TODO: Read from file
+	gitexts := [...]string{"md", "rst", "txt", "c", "cpp", "h", "hpp", "py", "go"}
+	includes := make([]string, len(gitexts))
+	for idx, ext := range gitexts {
+		includes[idx] = fmt.Sprintf("include=*.%s", ext)
+	}
+	sizethreshold := "10M"
+	lfvalue := fmt.Sprintf("largerthan=%s and not (%s)", sizethreshold, strings.Join(includes, " or "))
+	err = exec.Command("git", "-C", localPath, "config", "annex.largefiles", lfvalue).Run()
+	if err != nil {
+		return initError
+	}
 	return nil
 }
 
