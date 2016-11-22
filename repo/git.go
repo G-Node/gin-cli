@@ -163,11 +163,6 @@ func AddPath(localPath string) (*git.Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	// err = idx.AddAll([]string{localPath}, git.IndexAddDefault, matchPathCB)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return idx, idx.Write()
 	err = AnnexAdd(localPath, idx)
 	return idx, err
 }
@@ -473,10 +468,6 @@ func AnnexAdd(localPath string, idx *git.Index) error {
 		if !outStruct.Success {
 			return fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
 		}
-		// err = idx.AddByPath(outStruct.File)
-		// if err != nil {
-		// 	return err
-		// }
 	}
 
 	return nil

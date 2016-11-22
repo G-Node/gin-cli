@@ -62,10 +62,6 @@ func UploadRepo(localPath string) {
 
 	_, err := AddPath(localPath)
 	util.CheckError(err)
-	// err = Commit(localPath, idx)
-	// util.CheckError(err)
-	// err = Push(localPath)
-	// util.CheckError(err)
 	err = AnnexPush(localPath)
 	util.CheckError(err)
 }
@@ -73,10 +69,6 @@ func UploadRepo(localPath string) {
 // DownloadRepo downloads the files in an already checked out repository.
 func DownloadRepo() {
 	defer CleanUpTemp()
-	// git pull
-	// err := Pull()
-	// util.CheckError(err)
-	// git annex pull
 	err := AnnexPull(".")
 	util.CheckError(err)
 }
