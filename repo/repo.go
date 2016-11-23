@@ -60,11 +60,7 @@ func CreateRepo(name, description string) {
 func UploadRepo(localPath string) {
 	defer CleanUpTemp()
 
-	idx, err := AddPath(localPath)
-	util.CheckError(err)
-	err = Commit(localPath, idx)
-	util.CheckError(err)
-	err = Push(localPath)
+	_, err := AddPath(localPath)
 	util.CheckError(err)
 	err = AnnexPush(localPath)
 	util.CheckError(err)
@@ -73,11 +69,7 @@ func UploadRepo(localPath string) {
 // DownloadRepo downloads the files in an already checked out repository.
 func DownloadRepo() {
 	defer CleanUpTemp()
-	// git pull
-	err := Pull()
-	util.CheckError(err)
-	// git annex pull
-	err = AnnexPull(".")
+	err := AnnexPull(".")
 	util.CheckError(err)
 }
 
@@ -88,9 +80,13 @@ func CloneRepo(repoPath string) {
 	localPath := path.Base(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", localPath)
 	_, err := Clone(repoPath)
-	util.CheckError(err)
 	fmt.Printf("done.\n")
 
+	// git annex init the clone and set defaults
+	err = AnnexInit(localPath)
+	util.CheckError(err)
+
+	// TODO: Do not try to download files if repo is empty
 	fmt.Printf("Downloading files... ")
 	err = AnnexPull(localPath)
 	util.CheckError(err)

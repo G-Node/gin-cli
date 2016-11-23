@@ -31,27 +31,26 @@ func createRepo(name, description interface{}) {
 	repo.CreateRepo(repoName, repoDesc)
 }
 
-func upload(patharg interface{}) {
-	var pathstr string
-	if patharg != nil {
-		pathstr = patharg.(string)
+func getRepo(repoarg interface{}) {
+	var repostr string
+	if repoarg != nil {
+		repostr = repoarg.(string)
+		repo.CloneRepo(repostr)
+	} else {
+		util.Die("No repository specified.")
 	}
-	repo.UploadRepo(pathstr)
 }
 
-func download(patharg interface{}) {
-	var pathstr string
-	if patharg != nil {
-		pathstr = patharg.(string)
-		repo.CloneRepo(pathstr)
-	}
+func upload() {
+	repo.UploadRepo(".")
+}
 
-	// No repo specified -- attempting to pull in cwd
+func download() {
 	if repo.IsRepo(".") {
 		repo.DownloadRepo()
+	} else {
+		util.Die("Current directory is not a repository.")
 	}
-
-	util.CheckError(fmt.Errorf("Current directory is not a repository."))
 }
 
 // condAppend Conditionally append str to b if not empty
@@ -192,8 +191,9 @@ GIN command line client
 Usage:
 	gin login    [<username>]
 	gin create   [<name>] [-d <description>]
-	gin upload   [<path>]
-	gin download [<path>]
+	gin get      [<repository>]
+	gin upload
+	gin download
 	gin repos    [<username>]
 	gin info     [<username>]
 	gin keys     [-v | --verbose]
@@ -208,10 +208,12 @@ Usage:
 		auth.Login(args["<username>"])
 	case args["create"].(bool):
 		createRepo(args["<name>"], args["<description>"])
+	case args["get"].(bool):
+		getRepo(args["<repository>"])
 	case args["upload"].(bool):
-		upload(args["<path>"])
+		upload()
 	case args["download"].(bool):
-		download(args["<path>"])
+		download()
 	case args["info"].(bool):
 		printAccountInfo(args["<username>"])
 	case args["keys"].(bool):
