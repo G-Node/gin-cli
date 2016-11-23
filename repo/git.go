@@ -409,7 +409,6 @@ func AnnexInit(localPath string) error {
 // (git annex sync --no-push --content)
 // (git annex get --all)
 func AnnexPull(localPath string) error {
-	// cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
 	cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
