@@ -6,15 +6,15 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/repo"
+	"github.com/G-Node/gin-cli/util"
 	"github.com/docopt/docopt-go"
 )
 
-func createRepo(name, description interface{}) error {
+func createRepo(name, description interface{}) {
 	var repoName string
 	if name == nil || name.(string) == "" {
 		fmt.Print("Repository name: ")
@@ -28,30 +28,29 @@ func createRepo(name, description interface{}) error {
 	if description != nil {
 		repoDesc = description.(string)
 	}
-	return repo.CreateRepo(repoName, repoDesc)
+	repo.CreateRepo(repoName, repoDesc)
 }
 
-func upload(patharg interface{}) error {
-	var pathstr string
-	if patharg != nil {
-		pathstr = patharg.(string)
+func getRepo(repoarg interface{}) {
+	var repostr string
+	if repoarg != nil {
+		repostr = repoarg.(string)
+		repo.CloneRepo(repostr)
+	} else {
+		util.Die("No repository specified.")
 	}
-	return repo.UploadRepo(pathstr)
 }
 
-func download(patharg interface{}) error {
-	var pathstr string
-	if patharg != nil {
-		pathstr = patharg.(string)
-		return repo.CloneRepo(pathstr)
-	}
+func upload() {
+	repo.UploadRepo(".")
+}
 
-	// No repo specified -- attempting to pull in cwd
+func download() {
 	if repo.IsRepo(".") {
-		return repo.DownloadRepo()
+		repo.DownloadRepo()
+	} else {
+		util.Die("Current directory is not a repository.")
 	}
-
-	return fmt.Errorf("Current directory is not a repository.")
 }
 
 // condAppend Conditionally append str to b if not empty
@@ -61,12 +60,9 @@ func condAppend(b *bytes.Buffer, str *string) {
 	}
 }
 
-func printKeys(printFull bool) error {
+func printKeys(printFull bool) {
 
-	keys, err := auth.GetUserKeys()
-	if err != nil {
-		return err
-	}
+	keys := auth.GetUserKeys()
 	nkeys := len(keys)
 	var plural string
 	if nkeys == 1 {
@@ -82,37 +78,30 @@ func printKeys(printFull bool) error {
 			fmt.Printf("--- Key ---\n%s\n", key.Key)
 		}
 	}
-
-	return err
 }
 
-func addKey(fnarg interface{}) error {
+func addKey(fnarg interface{}) {
 	noargError := fmt.Errorf("Please specify a public key file.\n")
 	if fnarg == nil {
-		return noargError
+		util.CheckError(noargError)
 	}
 
 	filename := fnarg.(string)
 	if filename == "" {
-		return noargError
+		util.CheckError(noargError)
 	}
 
 	keyBytes, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return err
-	}
+	util.CheckError(err)
 	// TODO: Accept custom description for key and simply default to filename
 	key := string(keyBytes)
 	description := strings.TrimSpace(strings.Split(key, " ")[2])
 	err = auth.AddKey(string(keyBytes), description)
-	if err != nil {
-		return err
-	}
+	util.CheckError(err)
 	fmt.Printf("New key added '%s'\n", description)
-	return nil
 }
 
-func printAccountInfo(userarg interface{}) error {
+func printAccountInfo(userarg interface{}) {
 	var username string
 	currentUser, token, _ := auth.LoadToken(true)
 
@@ -129,10 +118,7 @@ func printAccountInfo(userarg interface{}) error {
 		fmt.Scanln(&username)
 	}
 
-	info, err := auth.RequestAccount(username, token)
-	if err != nil {
-		return err
-	}
+	info := auth.RequestAccount(username, token)
 
 	var fullnameBuffer bytes.Buffer
 
@@ -165,16 +151,14 @@ func printAccountInfo(userarg interface{}) error {
 	}
 
 	fmt.Println(outBuffer.String())
-
-	return nil
 }
 
-func listUserRepos(userarg interface{}) error {
+func listUserRepos(userarg interface{}) {
 	var username string
 	currentUser, token, _ := auth.LoadToken(false)
 
 	if currentUser == "" {
-		return fmt.Errorf("This command requires login.")
+		util.CheckError(fmt.Errorf("This command requires login."))
 	}
 
 	if userarg == nil {
@@ -183,27 +167,21 @@ func listUserRepos(userarg interface{}) error {
 		username = userarg.(string)
 	}
 
-	info, err := repo.GetRepos(username, token)
-	if err != nil {
-		return err
-	}
+	info := repo.GetRepos(username, token)
 
 	fmt.Printf("Repositories owned by %s\n", username)
 	for idx, r := range info {
 		fmt.Printf("%d:  %s\n", idx+1, r.Name)
 	}
-
-	return nil
 }
 
-func listPubRepos() error {
-	repos, err := repo.GetRepos("", "")
+func listPubRepos() {
+	repos := repo.GetRepos("", "")
 	fmt.Printf("Public repositories\n")
 	for idx, repoInfo := range repos {
 		fmt.Printf("%d: %s [head: %s]\n", idx+1, repoInfo.Name, repoInfo.Head)
 		fmt.Printf(" - %s\n", repoInfo.Description)
 	}
-	return err
 }
 
 func main() {
@@ -213,8 +191,9 @@ GIN command line client
 Usage:
 	gin login    [<username>]
 	gin create   [<name>] [-d <description>]
-	gin upload   [<path>]
-	gin download [<path>]
+	gin get      [<repopath>]
+	gin upload
+	gin download
 	gin repos    [<username>]
 	gin info     [<username>]
 	gin keys     [-v | --verbose]
@@ -224,40 +203,32 @@ Usage:
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
 
-	var err error
-
 	switch {
 	case args["login"].(bool):
-		err = auth.Login(args["<username>"])
-		if err != nil {
-			fmt.Println("Authentication failed!")
-		}
+		auth.Login(args["<username>"])
 	case args["create"].(bool):
-		err = createRepo(args["<name>"], args["<description>"])
+		createRepo(args["<name>"], args["<description>"])
+	case args["get"].(bool):
+		getRepo(args["<repopath>"])
 	case args["upload"].(bool):
-		err = upload(args["<path>"])
+		upload()
 	case args["download"].(bool):
-		err = download(args["<path>"])
+		download()
 	case args["info"].(bool):
-		err = printAccountInfo(args["<username>"])
+		printAccountInfo(args["<username>"])
 	case args["keys"].(bool):
 		if args["--add"].(bool) {
-			err = addKey(args["<filename>"])
+			addKey(args["<filename>"])
 		} else {
 			printFullKeys := false
 			if args["-v"].(bool) || args["--verbose"].(bool) {
 				printFullKeys = true
 			}
-			err = printKeys(printFullKeys)
+			printKeys(printFullKeys)
 		}
 	case args["repos"].(bool):
-		err = listUserRepos(args["<username>"])
+		listUserRepos(args["<username>"])
 	case args["public"].(bool):
-		err = listPubRepos()
+		listPubRepos()
 	}
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
 }

@@ -138,7 +138,7 @@ func matchPathCB(p, mp string) int {
 
 // IsRepo checks whether a given path is a git repository.
 func IsRepo(path string) bool {
-	_, err := getRepo(path)
+	_, err := git.Discover(path, false, nil)
 	if err != nil {
 		return false
 	}
@@ -163,14 +163,6 @@ func AddPath(localPath string) (*git.Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Currently adding everything to annex
-	// Eventually will decide on what is versioned and what is annexed based on MIME type
-	// err = idx.AddAll([]string{localPath}, git.IndexAddDefault, matchPathCB)
-	// if err != nil {
-	// 	return err
-	// }
-	// return idx.Write()
-
 	err = AnnexAdd(localPath, idx)
 	return idx, err
 }
@@ -187,8 +179,8 @@ func Clone(repopath string) (*git.Repository, error) {
 	}
 	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
 	opts := git.CloneOptions{
-		Bare:                 false,
-		CheckoutBranch:       "master", // TODO: default branch
+		Bare: false,
+		// CheckoutBranch:       "master", // TODO: default branch
 		FetchOptions:         fetchopts,
 		RemoteCreateCallback: remoteCreateCB,
 	}
@@ -214,12 +206,15 @@ func Commit(localPath string, idx *git.Index) error {
 		return err
 	}
 	head, err := repository.Head()
+	var headCommit *git.Commit
 	if err != nil {
-		return err
-	}
-	headCommit, err := repository.LookupCommit(head.Target())
-	if err != nil {
-		return err
+		// Head commit not found. Root commit?
+		head = nil
+	} else {
+		headCommit, err = repository.LookupCommit(head.Target())
+		if err != nil {
+			return err
+		}
 	}
 
 	message := "uploading" // TODO: Describe changes (in message)
@@ -235,9 +230,12 @@ func Commit(localPath string, idx *git.Index) error {
 	if err != nil {
 		return err
 	}
-	_, err = repository.CreateCommit("HEAD", signature, signature, message, tree, headCommit)
+	if headCommit == nil {
+		_, err = repository.CreateCommit("HEAD", signature, signature, message, tree)
+	} else {
+		_, err = repository.CreateCommit("HEAD", signature, signature, message, tree, headCommit)
+	}
 	return err
-
 }
 
 // Pull pulls all remote commits from the default remote & branch
@@ -377,10 +375,41 @@ func Push(localPath string) error {
 
 // Git annex commands
 
+// AnnexInit initialises the repository for annex
+// (git annex init)
+func AnnexInit(localPath string) error {
+	initError := fmt.Errorf("Repository annex initialisation failed.")
+	err := exec.Command("git", "-C", localPath, "annex", "init", "--version=6").Run()
+	if err != nil {
+		return initError
+	}
+
+	err = exec.Command("git", "-C", localPath, "config", "annex.addunlocked", "true").Run()
+	if err != nil {
+		return initError
+	}
+
+	// list of extensions that are added to git (not annex)
+	// TODO: Read from file
+	gitexts := [...]string{"md", "rst", "txt", "c", "cpp", "h", "hpp", "py", "go"}
+	includes := make([]string, len(gitexts))
+	for idx, ext := range gitexts {
+		includes[idx] = fmt.Sprintf("include=*.%s", ext)
+	}
+	sizethreshold := "10M"
+	lfvalue := fmt.Sprintf("largerthan=%s and not (%s)", sizethreshold, strings.Join(includes, " or "))
+	err = exec.Command("git", "-C", localPath, "config", "annex.largefiles", lfvalue).Run()
+	if err != nil {
+		return initError
+	}
+	return nil
+}
+
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
+// (git annex get --all)
 func AnnexPull(localPath string) error {
-	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
+	cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
@@ -437,10 +466,6 @@ func AnnexAdd(localPath string, idx *git.Index) error {
 		}
 		if !outStruct.Success {
 			return fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
-		}
-		err = idx.AddByPath(outStruct.File)
-		if err != nil {
-			return err
 		}
 	}
 
