@@ -80,6 +80,7 @@ func CloneRepo(repoPath string) {
 	localPath := path.Base(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", localPath)
 	_, err := Clone(repoPath)
+	util.CheckError(err)
 	fmt.Printf("done.\n")
 
 	// git annex init the clone and set defaults
