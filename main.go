@@ -191,7 +191,7 @@ GIN command line client
 Usage:
 	gin login    [<username>]
 	gin create   [<name>] [-d <description>]
-	gin get      [<repository>]
+	gin get      [<repopath>]
 	gin upload
 	gin download
 	gin repos    [<username>]
@@ -209,7 +209,7 @@ Usage:
 	case args["create"].(bool):
 		createRepo(args["<name>"], args["<description>"])
 	case args["get"].(bool):
-		getRepo(args["<repository>"])
+		getRepo(args["<repopath>"])
 	case args["upload"].(bool):
 		upload()
 	case args["download"].(bool):
