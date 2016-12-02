@@ -1,12 +1,9 @@
 package auth
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -18,6 +15,13 @@ import (
 )
 
 const authhost = "https://auth.gin.g-node.org"
+
+// NewKey is used for adding new public keys to gin-auth
+type NewKey struct {
+	Key         string `json:"key"`
+	Description string `json:"description"`
+	Temporary   bool   `json:"temporary"`
+}
 
 func storeToken(token string) error {
 	tokenfile := filepath.Join(util.ConfigPath(), "token")
@@ -184,33 +188,20 @@ func SearchAccount(query string) []gin.Account {
 }
 
 // AddKey Adds the given key to the current user's authorised keys
-func AddKey(key, description string) error {
+func AddKey(key, description string, temp bool) error {
 	username, token, err := LoadToken(true)
-	address := fmt.Sprintf("%s/api/accounts/%s/keys", authhost, username)
-	// TODO: Check err and req.StatusCode
-	// TODO: clean up key struct
-	mkBody := func(key, description string) io.Reader {
-		pw := &struct {
-			Key         string `json:"key"`
-			Description string `json:"description"`
-		}{key, description}
-		b, _ := json.Marshal(pw)
-		return bytes.NewReader(b)
+	util.CheckErrorMsg(err, "This command requires login.")
+
+	authcl := client.NewClient(authhost)
+	address := fmt.Sprintf("/api/accounts/%s/keys", username)
+	data := NewKey{Key: key, Description: description, Temporary: temp}
+	authcl.Token = token
+	res, err := authcl.Post(address, data)
+
+	util.CheckErrorMsg(err, "[Add key] Request failed.")
+	if res.StatusCode != 200 {
+		util.Die(fmt.Sprintf("[Add key] Failed. Server returned %s", res.Status))
 	}
-
-	req, _ := http.NewRequest("POST", address, mkBody(key, description))
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	authcl := http.Client{}
-	res, err := authcl.Do(req)
-
-	if err != nil {
-		return fmt.Errorf("Error: %s", err)
-	} else if res.StatusCode != 200 {
-		return fmt.Errorf("[Add key error] Server returned: %s", res.Status)
-	}
-
 	client.CloseRes(res.Body)
 	return nil
-
 }

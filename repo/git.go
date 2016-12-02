@@ -87,7 +87,7 @@ func makeCredsCB() git.CredentialsCallback {
 			}
 			description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
 			pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
-			err = auth.AddKey(pubkey, description)
+			err = auth.AddKey(pubkey, description, true)
 			if err != nil {
 				return git.ErrUser, nil
 			}

@@ -96,7 +96,7 @@ func addKey(fnarg interface{}) {
 	// TODO: Accept custom description for key and simply default to filename
 	key := string(keyBytes)
 	description := strings.TrimSpace(strings.Split(key, " ")[2])
-	err = auth.AddKey(string(keyBytes), description)
+	err = auth.AddKey(string(keyBytes), description, false)
 	util.CheckError(err)
 	fmt.Printf("New key added '%s'\n", description)
 }
