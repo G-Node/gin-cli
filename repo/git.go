@@ -29,7 +29,34 @@ type tempFile struct {
 	Active   bool
 }
 
+// Temporary (SSH key) file handling
+
 var privKeyFile tempFile
+
+// MakeTempKeyPair create a temporary key pair and stores it in a temporary directory.
+// It also sets the global tempFile for use by the annex commands. The key pair is
+// returned directly.
+func MakeTempKeyPair() (*util.KeyPair, error) {
+	tempKeyPair, err := util.MakeKeyPair()
+	if err != nil {
+		return tempKeyPair, err
+	}
+	description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
+	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
+	err = auth.AddKey(pubkey, description, true)
+	if err != nil {
+		return tempKeyPair, err
+	}
+	privKeyFile, err = makeTempFile("priv")
+	if err != nil {
+		return tempKeyPair, err
+	}
+	err = privKeyFile.Write(tempKeyPair.Private)
+	if err != nil {
+		return tempKeyPair, err
+	}
+	return tempKeyPair, nil
+}
 
 func makeTempFile(filename string) (tempFile, error) {
 	dir, err := ioutil.TempDir("", "gin")
@@ -81,21 +108,7 @@ func makeCredsCB() git.CredentialsCallback {
 		case 0:
 			res, cred = git.NewCredSshKeyFromAgent("git")
 		case 1:
-			tempKeyPair, err := util.MakeKeyPair()
-			if err != nil {
-				return git.ErrUser, nil
-			}
-			description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
-			pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
-			err = auth.AddKey(pubkey, description, true)
-			if err != nil {
-				return git.ErrUser, nil
-			}
-			privKeyFile, err = makeTempFile("priv")
-			if err != nil {
-				return git.ErrUser, nil
-			}
-			err = privKeyFile.Write(tempKeyPair.Private)
+			tempKeyPair, err := MakeTempKeyPair()
 			if err != nil {
 				return git.ErrUser, nil
 			}
