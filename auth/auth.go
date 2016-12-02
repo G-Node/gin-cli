@@ -167,9 +167,9 @@ func SearchAccount(query string) []gin.Account {
 
 	params := url.Values{}
 	params.Add("q", query)
-	url := fmt.Sprintf("%s/api/accounts?%s", authhost, params.Encode())
 	authcl := client.NewClient(authhost)
-	res, err := authcl.Get(url)
+	address := fmt.Sprintf("/api/accounts?%s", params.Encode())
+	res, err := authcl.Get(address)
 	util.CheckErrorMsg(err, "[Account search] Request failed.")
 
 	if res.StatusCode != 200 {
