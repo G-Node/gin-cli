@@ -379,7 +379,11 @@ func Push(localPath string) error {
 // (git annex init)
 func AnnexInit(localPath string) error {
 	initError := fmt.Errorf("Repository annex initialisation failed.")
-	err := exec.Command("git", "-C", localPath, "annex", "init", "--version=6").Run()
+	cmd := exec.Command("git", "-C", localPath, "annex", "init", "--version=6")
+	if privKeyFile.Active {
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+	}
+	err := cmd.Run()
 	if err != nil {
 		return initError
 	}
