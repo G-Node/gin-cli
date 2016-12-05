@@ -33,7 +33,7 @@ type tempFile struct {
 
 var privKeyFile tempFile
 
-// MakeTempKeyPair create a temporary key pair and stores it in a temporary directory.
+// MakeTempKeyPair creates a temporary key pair and stores it in a temporary directory.
 // It also sets the global tempFile for use by the annex commands. The key pair is
 // returned directly.
 func MakeTempKeyPair() (*util.KeyPair, error) {

@@ -187,7 +187,7 @@ func SearchAccount(query string) []gin.Account {
 	return results
 }
 
-// AddKey Adds the given key to the current user's authorised keys
+// AddKey adds the given key to the current user's authorised keys
 func AddKey(key, description string, temp bool) error {
 	username, token, err := LoadToken(true)
 	util.CheckErrorMsg(err, "This command requires login.")
