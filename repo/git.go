@@ -36,11 +36,13 @@ func setupTempKeyPair() (*util.KeyPair, error) {
 	}
 
 	privKeyFile, err = util.SaveTempKeyFile(tempKeyPair.Private)
+	if err != nil {
+		return nil, err
+	}
 
 	description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
 	err = auth.AddKey(pubkey, description, true)
-
 	if err != nil {
 		return nil, err
 	}
