@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/G-Node/gin-cli/client"
 	"github.com/G-Node/gin-cli/util"
@@ -69,6 +71,21 @@ func LoadToken(warn bool) (string, string, error) {
 		token = ""
 	}
 	return username, token, nil
+}
+
+// Client is a client interface to the auth server. Embeds client.Client.
+type Client struct {
+	*client.Client
+}
+
+// NewClient returns a new client for the auth server.
+func NewClient() *Client {
+	serverURL := authhost
+	return &Client{client.NewClient(serverURL)}
+}
+
+// DoLogin performs a login with the given username and password and
+func (authcl *Client) DoLogin(username, password string) ([]byte, error) {
 }
 
 // GetUserKeys Load token and request an slice of the user's keys
@@ -192,7 +209,6 @@ func AddKey(key, description string, temp bool) error {
 	username, token, err := LoadToken(true)
 	util.CheckErrorMsg(err, "This command requires login.")
 
-	authcl := client.NewClient(authhost)
 	address := fmt.Sprintf("/api/accounts/%s/keys", username)
 	data := NewKey{Key: key, Description: description, Temporary: temp}
 	authcl.Token = token

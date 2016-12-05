@@ -42,7 +42,8 @@ func setupTempKeyPair() (*util.KeyPair, error) {
 
 	description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
-	err = auth.AddKey(pubkey, description, true)
+	authcl := auth.NewClient()
+	err = authcl.AddKey(pubkey, description, true)
 	if err != nil {
 		return nil, err
 	}

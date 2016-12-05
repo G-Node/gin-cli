@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
-	"strings"
 
 	"github.com/G-Node/gin-cli/util"
 )
@@ -32,33 +30,8 @@ func urlJoin(parts ...string) string {
 	return u.String()
 }
 
-// DoLogin Login with given username and password and store token
-func (client *Client) DoLogin(username, password string) ([]byte, error) {
-	params := url.Values{}
-	params.Add("scope", "repo-read repo-write account-read account-write")
-	params.Add("username", username)
-	params.Add("password", password)
-	params.Add("grant_type", "password")
-	params.Add("client_id", "gin-cli")
-	params.Add("client_secret", "97196a1c-silly-biscuit3-d161ea15a676")
-
-	address := fmt.Sprintf("%s/oauth/token", client.Host)
-
-	req, _ := http.NewRequest("POST", address, strings.NewReader(params.Encode()))
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	res, err := client.web.Do(req)
-
-	if err != nil {
-		return nil, err
-	} else if res.StatusCode != 200 {
-		return nil, fmt.Errorf("[Login error] %s", res.Status)
-	}
-
-	defer CloseRes(res.Body)
-	return ioutil.ReadAll(res.Body)
-}
-
-// Get Send a GET request
+// Get sends a GET request to address.
+// The address is appended to the client host, so it should be specified without a host prefix.
 func (client *Client) Get(address string) (*http.Response, error) {
 	requrl := urlJoin(client.Host, address)
 	req, err := http.NewRequest("GET", requrl, nil)
@@ -69,7 +42,8 @@ func (client *Client) Get(address string) (*http.Response, error) {
 	return client.web.Do(req)
 }
 
-// Post Send a POST request
+// Post sends a POST request to address with the provided data.
+// The address is appended to the client host, so it should be specified without a host prefix.
 func (client *Client) Post(address string, data interface{}) (*http.Response, error) {
 	datajson, err := json.Marshal(data)
 	if err != nil {
@@ -84,12 +58,12 @@ func (client *Client) Post(address string, data interface{}) (*http.Response, er
 	return client.web.Do(req)
 }
 
-// NewClient create new client for specific host
+// NewClient creates a new client for a given host.
 func NewClient(address string) *Client {
 	return &Client{Host: address, web: &http.Client{}}
 }
 
-// CloseRes Close result buffer
+// CloseRes closes a given result buffer (for use with defer).
 func CloseRes(b io.ReadCloser) {
 	err := b.Close()
 	util.CheckErrorMsg(err, "Error during cleanup.")
