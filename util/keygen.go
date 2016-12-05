@@ -6,6 +6,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -14,6 +17,12 @@ import (
 type KeyPair struct {
 	Private string
 	Public  string
+}
+
+// TempFile holds the absolute path and filename of a temporary private key.
+type TempFile struct {
+	Dir      string
+	Filename string
 }
 
 // MakeKeyPair generates and returns a private-public key pair.
@@ -40,4 +49,52 @@ func MakeKeyPair() (*KeyPair, error) {
 	pubStr := string(ssh.MarshalAuthorizedKey(pubkey))
 
 	return &KeyPair{privStr, pubStr}, nil
+}
+
+// Temporary key file handling
+
+// SaveTempKeyFile stores a given private key to a temporary file.
+// Returns a TempFile struct which contains the absolute path and filename.
+func SaveTempKeyFile(key string) (*TempFile, error) {
+	dir, err := ioutil.TempDir("", "gin")
+	if err != nil {
+		return nil, fmt.Errorf("Error creating temporary key directory: %s", err)
+	}
+	newfile := TempFile{
+		Dir:      dir,
+		Filename: "priv",
+	}
+	if err != nil {
+		return nil, err
+	}
+	err = newfile.Write(key)
+	if err != nil {
+		return nil, err
+	}
+	return &newfile, nil
+
+}
+
+// Write a string to the temporary file.
+func (tf TempFile) Write(content string) error {
+	if err := ioutil.WriteFile(tf.FullPath(), []byte(content), 0600); err != nil {
+		return fmt.Errorf("Error writing temporary file: %s", err)
+	}
+	return nil
+}
+
+// Delete the temporary file and its diirectory.
+func (tf TempFile) Delete() {
+	_ = os.RemoveAll(tf.Dir)
+}
+
+// FullPath returns the full path to the temporary file.
+func (tf TempFile) FullPath() string {
+	return filepath.Join(tf.Dir, tf.Filename)
+}
+
+// SSHOptString returns a formatted string that can be used in git-annex commands that should
+// make use of the temporary private key.
+func (tf TempFile) SSHOptString() string {
+	return fmt.Sprintf("annex.ssh-options=-i %s", tf.FullPath())
 }

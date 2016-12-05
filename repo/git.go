@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -23,71 +20,31 @@ const user = "git"
 const githost = "gin.g-node.org"
 
 // Keys
-type tempFile struct {
-	Dir      string
-	Filename string
-	Active   bool
-}
 
 // Temporary (SSH key) file handling
 
-var privKeyFile tempFile
+var privKeyFile *util.TempFile
 
-// MakeTempKeyPair creates a temporary key pair and stores it in a temporary directory.
-// It also sets the global tempFile for use by the annex commands. The key pair is
-// returned directly.
-func MakeTempKeyPair() (*util.KeyPair, error) {
+// setupTempKeyPair creates a temporary key pair, stores it in a temporary directory,
+// and adds it to the logged in user's account on the auth server (as a temporary key).
+// It also sets the global tempFile for use by the annex commands.
+// The key pair is returned.
+func setupTempKeyPair() (*util.KeyPair, error) {
 	tempKeyPair, err := util.MakeKeyPair()
 	if err != nil {
-		return tempKeyPair, err
+		return nil, err
 	}
+
+	privKeyFile, err = util.SaveTempKeyFile(tempKeyPair.Private)
+
 	description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
 	err = auth.AddKey(pubkey, description, true)
+
 	if err != nil {
-		return tempKeyPair, err
-	}
-	privKeyFile, err = makeTempFile("priv")
-	if err != nil {
-		return tempKeyPair, err
-	}
-	err = privKeyFile.Write(tempKeyPair.Private)
-	if err != nil {
-		return tempKeyPair, err
+		return nil, err
 	}
 	return tempKeyPair, nil
-}
-
-func makeTempFile(filename string) (tempFile, error) {
-	dir, err := ioutil.TempDir("", "gin")
-	if err != nil {
-		return tempFile{}, fmt.Errorf("Error creating temporary key directory: %s", err)
-	}
-	newfile := tempFile{
-		Dir:      dir,
-		Filename: filename,
-		Active:   true,
-	}
-	return newfile, nil
-}
-
-func (tf tempFile) Write(content string) error {
-	if err := ioutil.WriteFile(tf.FullPath(), []byte(content), 0600); err != nil {
-		return fmt.Errorf("Error writing temporary file: %s", err)
-	}
-	return nil
-}
-
-func (tf tempFile) Delete() {
-	_ = os.RemoveAll(tf.Dir)
-}
-
-func (tf tempFile) FullPath() string {
-	return filepath.Join(tf.Dir, tf.Filename)
-}
-
-func (tf tempFile) SSHOptString() string {
-	return fmt.Sprintf("annex.ssh-options=-i %s", tf.FullPath())
 }
 
 // CleanUpTemp deletes the temporary directory which holds the temporary private key if it exists.
@@ -108,7 +65,7 @@ func makeCredsCB() git.CredentialsCallback {
 		case 0:
 			res, cred = git.NewCredSshKeyFromAgent("git")
 		case 1:
-			tempKeyPair, err := MakeTempKeyPair()
+			tempKeyPair, err := setupTempKeyPair()
 			if err != nil {
 				return git.ErrUser, nil
 			}
@@ -393,7 +350,7 @@ func Push(localPath string) error {
 func AnnexInit(localPath string) error {
 	initError := fmt.Errorf("Repository annex initialisation failed.")
 	cmd := exec.Command("git", "-C", localPath, "annex", "init", "--version=6")
-	if privKeyFile.Active {
+	if privKeyFile != nil {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()
@@ -427,7 +384,7 @@ func AnnexInit(localPath string) error {
 // (git annex get --all)
 func AnnexPull(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
-	if privKeyFile.Active {
+	if privKeyFile != nil {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()
@@ -442,7 +399,7 @@ func AnnexPull(localPath string) error {
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content")
-	if privKeyFile.Active {
+	if privKeyFile != nil {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()
