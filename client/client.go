@@ -39,8 +39,8 @@ func (client *Client) DoLogin(username, password string) ([]byte, error) {
 	params.Add("username", username)
 	params.Add("password", password)
 	params.Add("grant_type", "password")
-	params.Add("client_id", "gin")
-	params.Add("client_secret", "secret")
+	params.Add("client_id", "gin-cli")
+	params.Add("client_secret", "97196a1c-silly-biscuit3-d161ea15a676")
 
 	address := fmt.Sprintf("%s/oauth/token", client.Host)
 

@@ -62,6 +62,11 @@ func UploadRepo(localPath string) {
 
 	_, err := AddPath(localPath)
 	util.CheckError(err)
+
+	// since no git command is called, we need to explicitly create temporary keys
+	_, err = setupTempKeyPair()
+	util.CheckError(err)
+
 	err = AnnexPush(localPath)
 	util.CheckError(err)
 }
