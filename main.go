@@ -4,15 +4,91 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/repo"
 	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/web"
+	"github.com/G-Node/gin-core/gin"
 	"github.com/docopt/docopt-go"
+	"github.com/howeyc/gopass"
 )
+
+// TODO: Load from config
+const authhost = "https://auth.gin.g-node.org"
+const repohost = "https://repo.gin.g-node.org"
+const githost = "gin.g-node.org"
+const gituser = "git"
+
+// Login Request credentials, perform login, and store token
+func login(userarg interface{}) {
+
+	var username, password string
+
+	if userarg == nil {
+		// prompt for login
+		fmt.Print("Login: ")
+		fmt.Scanln(&username)
+	} else {
+		username = userarg.(string)
+	}
+
+	// prompt for password
+	password = ""
+	fmt.Print("Password: ")
+	pwbytes, err := gopass.GetPasswdMasked()
+	fmt.Println()
+	if err != nil {
+		// read error or gopass.ErrInterrupted
+		if err == gopass.ErrInterrupted {
+			util.Die("Cancelled.")
+		}
+		if err == gopass.ErrMaxLengthExceeded {
+			util.Die("[Error] Input too long.")
+		}
+		util.Die(err.Error())
+	}
+
+	password = string(pwbytes)
+
+	if password == "" {
+		util.Die("No password provided. Aborting.")
+	}
+
+	params := gin.LoginRequest{
+		Scope:        "repo-read repo-write account-read account-write",
+		Username:     username,
+		Password:     password,
+		GrantType:    "password",
+		ClientID:     "gin-cli",
+		ClientSecret: "97196a1c-silly-biscuit3-d161ea15a676",
+	}
+
+	authcl := auth.NewClient(authhost)
+	res, err := authcl.Post("/oauth/token", params)
+	util.CheckError(err)
+
+	defer web.CloseRes(res.Body)
+
+	b, err := ioutil.ReadAll(res.Body)
+	util.CheckError(err)
+
+	var authresp gin.TokenResponse
+	err = json.Unmarshal(b, &authresp)
+	util.CheckError(err)
+
+	tokenfile := filepath.Join(util.ConfigPath(), "token")
+	err = ioutil.WriteFile(tokenfile, []byte(authresp.AccessToken), 0600)
+	// util.CheckErrorMsg(err, "[Error] Login failed while storing token.")
+	util.CheckError(err)
+	fmt.Printf("[Login success] You are now logged in as %s\n", username)
+	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
+}
 
 func createRepo(name, description interface{}) {
 	var repoName string
@@ -205,7 +281,7 @@ Usage:
 
 	switch {
 	case args["login"].(bool):
-		auth.Login(args["<username>"])
+		login(args["<username>"])
 	case args["create"].(bool):
 		createRepo(args["<name>"], args["<description>"])
 	case args["get"].(bool):
