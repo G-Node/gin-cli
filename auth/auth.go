@@ -5,15 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
-	"path/filepath"
 
-	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
-	"github.com/howeyc/gopass"
 )
-
-const authhost = "https://auth.gin.g-node.org"
 
 // Client is a client interface to the auth server. Embeds web.Client.
 type Client struct {
@@ -21,9 +16,8 @@ type Client struct {
 }
 
 // NewClient returns a new client for the auth server.
-func NewClient() *Client {
-	serverURL := authhost
-	return &Client{web.NewClient(serverURL)}
+func NewClient(host string) *Client {
+	return &Client{web.NewClient(host)}
 }
 
 // NewKey is used for adding new public keys to gin-auth
@@ -67,11 +61,10 @@ func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 }
 
 // RequestAccount requests a specific account by name
-func (authcl Client) RequestAccount(name, token string) (gin.Account, error) {
+func (authcl Client) RequestAccount(name string) (gin.Account, error) {
 	var acc gin.Account
 
 	// authcl := client.NewClient(authhost)
-	authcl.Token = token
 	res, err := authcl.Get("/api/accounts/" + name)
 	// util.CheckErrorMsg(err, "[Account retrieval] Request failed.")
 	if err != nil {
