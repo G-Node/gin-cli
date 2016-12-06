@@ -25,7 +25,7 @@ const repohost = "https://repo.gin.g-node.org"
 const githost = "gin.g-node.org"
 const gituser = "git"
 
-// Login Request credentials, perform login, and store token
+// login requests credentials, performs login with auth server, and stores the token.
 func login(userarg interface{}) {
 
 	var username, password string
@@ -104,26 +104,40 @@ func createRepo(name, description interface{}) {
 	if description != nil {
 		repoDesc = description.(string)
 	}
-	repo.CreateRepo(repoName, repoDesc)
+	repocl := repo.NewClient(repohost)
+	err := repocl.CreateRepo(repoName, repoDesc)
+	util.CheckError(err)
 }
 
 func getRepo(repoarg interface{}) {
 	var repostr string
 	if repoarg != nil {
 		repostr = repoarg.(string)
-		repo.CloneRepo(repostr)
+		repocl := repo.NewClient(repohost)
+		repocl.GitUser = gituser
+		repocl.GitHost = githost
+		repocl.KeyHost = authhost
+		err := repocl.CloneRepo(repostr)
+		util.CheckError(err)
 	} else {
 		util.Die("No repository specified.")
 	}
 }
 
 func upload() {
-	repo.UploadRepo(".")
+	repocl := repo.NewClient(repohost)
+	err := repocl.UploadRepo(".")
+	util.CheckError(err)
 }
 
 func download() {
+	repocl := repo.NewClient(repohost)
+	repocl.GitUser = gituser
+	repocl.GitHost = githost
+	repocl.KeyHost = authhost
 	if repo.IsRepo(".") {
-		repo.DownloadRepo()
+		err := repocl.DownloadRepo()
+		util.CheckError(err)
 	} else {
 		util.Die("Current directory is not a repository.")
 	}
@@ -138,7 +152,10 @@ func condAppend(b *bytes.Buffer, str *string) {
 
 func printKeys(printFull bool) {
 
-	keys := auth.GetUserKeys()
+	authcl := auth.NewClient(authhost)
+	keys, err := authcl.GetUserKeys()
+	util.CheckError(err)
+
 	nkeys := len(keys)
 	var plural string
 	if nkeys == 1 {
@@ -172,17 +189,21 @@ func addKey(fnarg interface{}) {
 	// TODO: Accept custom description for key and simply default to filename
 	key := string(keyBytes)
 	description := strings.TrimSpace(strings.Split(key, " ")[2])
-	err = auth.AddKey(string(keyBytes), description, false)
+
+	authcl := auth.NewClient(authhost)
+	err = authcl.AddKey(string(keyBytes), description, false)
 	util.CheckError(err)
 	fmt.Printf("New key added '%s'\n", description)
 }
 
 func printAccountInfo(userarg interface{}) {
 	var username string
-	currentUser, token, _ := auth.LoadToken(true)
+
+	authcl := auth.NewClient(authhost)
+	_ = authcl.LoadToken()
 
 	if userarg == nil {
-		username = currentUser
+		username = authcl.Username
 	} else {
 		username = userarg.(string)
 	}
@@ -194,7 +215,8 @@ func printAccountInfo(userarg interface{}) {
 		fmt.Scanln(&username)
 	}
 
-	info := auth.RequestAccount(username, token)
+	info, err := authcl.RequestAccount(username)
+	util.CheckError(err)
 
 	var fullnameBuffer bytes.Buffer
 
@@ -231,19 +253,20 @@ func printAccountInfo(userarg interface{}) {
 
 func listUserRepos(userarg interface{}) {
 	var username string
-	currentUser, token, _ := auth.LoadToken(false)
+	authcl := auth.NewClient(authhost)
+	err := authcl.LoadToken()
 
-	if currentUser == "" {
-		util.CheckError(fmt.Errorf("This command requires login."))
-	}
+	util.CheckErrorMsg(err, "This command requires login.")
 
 	if userarg == nil {
-		username = currentUser
+		username = authcl.Username
 	} else {
 		username = userarg.(string)
 	}
 
-	info := repo.GetRepos(username, token)
+	repocl := repo.NewClient(repohost)
+	info, err := repocl.GetRepos(username)
+	util.CheckError(err)
 
 	fmt.Printf("Repositories owned by %s\n", username)
 	for idx, r := range info {
@@ -252,7 +275,10 @@ func listUserRepos(userarg interface{}) {
 }
 
 func listPubRepos() {
-	repos := repo.GetRepos("", "")
+	repocl := repo.NewClient(repohost)
+	repos, err := repocl.GetRepos("")
+	util.CheckError(err)
+
 	fmt.Printf("Public repositories\n")
 	for idx, repoInfo := range repos {
 		fmt.Printf("%d: %s [head: %s]\n", idx+1, repoInfo.Name, repoInfo.Head)
