@@ -72,6 +72,9 @@ func login(userarg interface{}) {
 	authcl := auth.NewClient(authhost)
 	res, err := authcl.Post("/oauth/token", params)
 	util.CheckError(err)
+	if res.StatusCode != 200 {
+		util.Die(fmt.Sprintf("[Login] Failed. Server returned %s", res.Status))
+	}
 
 	defer web.CloseRes(res.Body)
 
