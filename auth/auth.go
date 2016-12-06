@@ -33,43 +33,6 @@ type NewKey struct {
 	Temporary   bool   `json:"temporary"`
 }
 
-// LoadToken loads the auth token from the token file, checks it against the auth server,
-// and sets the token and username in the auth struct.
-func (authcl *Client) LoadToken() error {
-	tokenfile := filepath.Join(util.ConfigPath(), "token")
-	tokenBytes, err := ioutil.ReadFile(tokenfile)
-	tokenInfo := gin.TokenInfo{}
-
-	if err != nil {
-		return err
-	}
-
-	token := string(tokenBytes)
-	// authcl := client.NewClient(authhost)
-	res, err := authcl.Get("/oauth/validate/" + token)
-	if err != nil {
-		// fmt.Fprintln(os.Stderr, "[Auth error] Error communicating with server.")
-		return err
-	}
-
-	defer client.CloseRes(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(b, &tokenInfo)
-
-	username := tokenInfo.Login
-	if username == "" {
-		return fmt.Errorf("[Auth error] You are not logged in")
-	}
-	authcl.Username = username
-	authcl.Token = token
-	return nil
-}
-
 // GetUserKeys Load token and request an slice of the user's keys
 func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 	var keys []gin.SSHKey
