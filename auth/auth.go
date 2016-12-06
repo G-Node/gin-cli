@@ -7,23 +7,23 @@ import (
 	"net/url"
 	"path/filepath"
 
-	"github.com/G-Node/gin-cli/client"
 	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
 	"github.com/howeyc/gopass"
 )
 
 const authhost = "https://auth.gin.g-node.org"
 
-// Client is a client interface to the auth server. Embeds client.Client.
+// Client is a client interface to the auth server. Embeds web.Client.
 type Client struct {
-	*client.Client
+	*web.Client
 }
 
 // NewClient returns a new client for the auth server.
 func NewClient() *Client {
 	serverURL := authhost
-	return &Client{client.NewClient(serverURL)}
+	return &Client{web.NewClient(serverURL)}
 }
 
 // NewKey is used for adding new public keys to gin-auth
@@ -54,7 +54,7 @@ func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 		return keys, fmt.Errorf("[Keys request error] Server returned: %s", res.Status)
 	}
 
-	defer client.CloseRes(res.Body)
+	defer web.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 	util.CheckError(err)
@@ -119,7 +119,7 @@ func (authcl *Client) Login(userarg interface{}) error {
 	// 	return nil, fmt.Errorf("[Login error] %s", res.Status)
 	// }
 
-	defer client.CloseRes(res.Body)
+	defer web.CloseRes(res.Body)
 	// authcl := client.NewClient(authhost)
 	// b, err := authcl.DoLogin(username, password)
 
@@ -154,7 +154,7 @@ func (authcl Client) RequestAccount(name, token string) gin.Account {
 		util.Die(fmt.Sprintf("[Account retrieval] Failed. Server returned: %s", res.Status))
 	}
 
-	defer client.CloseRes(res.Body)
+	defer web.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 	err = json.Unmarshal(b, &acc)
@@ -197,6 +197,6 @@ func AddKey(key, description string, temp bool) error {
 	if res.StatusCode != 200 {
 		util.Die(fmt.Sprintf("[Add key] Failed. Server returned %s", res.Status))
 	}
-	client.CloseRes(res.Body)
+	web.CloseRes(res.Body)
 	return nil
 }

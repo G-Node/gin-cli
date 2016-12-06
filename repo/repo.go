@@ -7,9 +7,8 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/G-Node/gin-cli/auth"
-	"github.com/G-Node/gin-cli/client"
 	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-repo/wire"
 )
 
@@ -17,7 +16,7 @@ const repohost = "https://repo.gin.g-node.org"
 
 // GetRepos gets a list of repositories (public or user specific)
 func GetRepos(user, token string) []wire.Repo {
-	repocl := client.NewClient(repohost)
+	repocl := web.NewClient(repohost)
 	var res *http.Response
 	var err error
 	if user == "" {
@@ -32,7 +31,7 @@ func GetRepos(user, token string) []wire.Repo {
 		util.Die(fmt.Sprintf("[Repository request] Failed. Server returned: %s", res.Status))
 	}
 
-	defer client.CloseRes(res.Body)
+	defer web.CloseRes(res.Body)
 	b, err := ioutil.ReadAll(res.Body)
 	var repoList []wire.Repo
 	err = json.Unmarshal(b, &repoList)
@@ -42,18 +41,17 @@ func GetRepos(user, token string) []wire.Repo {
 
 // CreateRepo creates a repository on the server.
 func CreateRepo(name, description string) {
-	repocl := client.NewClient(repohost)
-	username, token, err := auth.LoadToken(false)
+	repocl := web.NewClient(repohost)
+	err := repocl.LoadToken()
 	util.CheckErrorMsg(err, "[Create repository] This action requires login.")
-	repocl.Token = token
 
 	data := wire.Repo{Name: name, Description: description}
-	res, err := repocl.Post(fmt.Sprintf("/users/%s/repos", username), data)
+	res, err := repocl.Post(fmt.Sprintf("/users/%s/repos", repocl.Username), data)
 	util.CheckErrorMsg(err, "[Create repository] Request failed.")
 	if res.StatusCode != 201 {
 		util.Die(fmt.Sprintf("[Create repository] Failed. Server returned %s", res.Status))
 	}
-	client.CloseRes(res.Body)
+	web.CloseRes(res.Body)
 }
 
 // UploadRepo adds files to a repository and uploads them.
