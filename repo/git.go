@@ -169,6 +169,7 @@ func Clone(repopath string) (*git.Repository, error) {
 // Commit performs a git commit on the currently staged objects.
 // (git commit)
 func Commit(localPath string, idx *git.Index) error {
+	// TODO: Construct signature based on user config
 	signature := &git.Signature{
 		Name:  "gin",
 		Email: "gin",
