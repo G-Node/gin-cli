@@ -14,9 +14,10 @@ import (
 
 // Client struct for making requests
 type Client struct {
-	Host  string
-	Token string
-	web   *http.Client
+	Host     string
+	Token    string
+	Username string
+	web      *http.Client
 }
 
 func urlJoin(parts ...string) string {

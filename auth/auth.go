@@ -4,11 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/G-Node/gin-cli/client"
 	"github.com/G-Node/gin-cli/util"
@@ -17,61 +14,6 @@ import (
 )
 
 const authhost = "https://auth.gin.g-node.org"
-
-// NewKey is used for adding new public keys to gin-auth
-type NewKey struct {
-	Key         string `json:"key"`
-	Description string `json:"description"`
-	Temporary   bool   `json:"temporary"`
-}
-
-func storeToken(token string) error {
-	tokenfile := filepath.Join(util.ConfigPath(), "token")
-	return ioutil.WriteFile(tokenfile, []byte(token), 0600)
-}
-
-func noTokenWarning(warn bool) {
-	if warn {
-		fmt.Println("You are not logged in.")
-	}
-}
-
-// LoadToken Get the current signed in username and auth token
-func LoadToken(warn bool) (string, string, error) {
-	tokenfile := filepath.Join(util.ConfigPath(), "token")
-	tokenBytes, err := ioutil.ReadFile(tokenfile)
-	tokenInfo := gin.TokenInfo{}
-	var username, token string
-
-	if err != nil {
-		noTokenWarning(warn)
-		return "", "", err
-	}
-
-	token = string(tokenBytes)
-	authcl := client.NewClient(authhost)
-	res, err := authcl.Get("/oauth/validate/" + token)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "[Auth error] Error communicating with server.")
-		return "", "", err
-	}
-
-	defer client.CloseRes(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return "", "", err
-	}
-
-	err = json.Unmarshal(b, &tokenInfo)
-
-	username = tokenInfo.Login
-	if username == "" && warn {
-		noTokenWarning(warn)
-		token = ""
-	}
-	return username, token, nil
-}
 
 // Client is a client interface to the auth server. Embeds client.Client.
 type Client struct {
@@ -84,36 +26,82 @@ func NewClient() *Client {
 	return &Client{client.NewClient(serverURL)}
 }
 
-// DoLogin performs a login with the given username and password and
-func (authcl *Client) DoLogin(username, password string) ([]byte, error) {
+// NewKey is used for adding new public keys to gin-auth
+type NewKey struct {
+	Key         string `json:"key"`
+	Description string `json:"description"`
+	Temporary   bool   `json:"temporary"`
+}
+
+// LoadToken loads the auth token from the token file, checks it against the auth server,
+// and sets the token and username in the auth struct.
+func (authcl *Client) LoadToken() error {
+	tokenfile := filepath.Join(util.ConfigPath(), "token")
+	tokenBytes, err := ioutil.ReadFile(tokenfile)
+	tokenInfo := gin.TokenInfo{}
+
+	if err != nil {
+		return err
+	}
+
+	token := string(tokenBytes)
+	// authcl := client.NewClient(authhost)
+	res, err := authcl.Get("/oauth/validate/" + token)
+	if err != nil {
+		// fmt.Fprintln(os.Stderr, "[Auth error] Error communicating with server.")
+		return err
+	}
+
+	defer client.CloseRes(res.Body)
+
+	b, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(b, &tokenInfo)
+
+	username := tokenInfo.Login
+	if username == "" {
+		return fmt.Errorf("[Auth error] You are not logged in")
+	}
+	authcl.Username = username
+	authcl.Token = token
+	return nil
 }
 
 // GetUserKeys Load token and request an slice of the user's keys
-func GetUserKeys() []gin.SSHKey {
-	username, token, err := LoadToken(true)
-	util.CheckErrorMsg(err, "This command requires login.")
+func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
+	var keys []gin.SSHKey
+	err := authcl.LoadToken()
+	// util.CheckErrorMsg(err, "This command requires login.")
+	if err != nil {
+		return keys, fmt.Errorf("This command requires login")
+	}
 
-	authcl := client.NewClient(authhost)
-	authcl.Token = token
+	// authcl := client.NewClient(authhost)
+	// authcl.Token = token
 
-	res, err := authcl.Get(fmt.Sprintf("/api/accounts/%s/keys", username))
-	util.CheckErrorMsg(err, "Request for keys returned error.")
-	if res.StatusCode != 200 {
-		util.Die(fmt.Sprintf("[Keys request error] Server returned: %s", res.Status))
+	res, err := authcl.Get(fmt.Sprintf("/api/accounts/%s/keys", authcl.Username))
+	// util.CheckErrorMsg(err, "Request for keys returned error.")
+	if err != nil {
+		return keys, fmt.Errorf("Request for keys returned error")
+	} else if res.StatusCode != 200 {
+		// util.Die(fmt.Sprintf("[Keys request error] Server returned: %s", res.Status))
+		return keys, fmt.Errorf("[Keys request error] Server returned: %s", res.Status)
 	}
 
 	defer client.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 	util.CheckError(err)
-	var keys []gin.SSHKey
 	err = json.Unmarshal(b, &keys)
 	util.CheckError(err)
-	return keys
+	return keys, nil
 }
 
 // Login Request credentials, perform login, and store token
-func Login(userarg interface{}) {
+func (authcl *Client) Login(userarg interface{}) error {
 
 	var username, password string
 
@@ -147,25 +135,54 @@ func Login(userarg interface{}) {
 		util.Die("No password provided. Aborting.")
 	}
 
-	authcl := client.NewClient(authhost)
-	b, err := authcl.DoLogin(username, password)
+	params := gin.LoginRequest{
+		Scope:        "repo-read repo-write account-read account-write",
+		Username:     username,
+		Password:     password,
+		GrantType:    "password",
+		ClientID:     "gin-cli",
+		ClientSecret: "97196a1c-silly-biscuit3-d161ea15a676",
+	}
+
+	res, err := authcl.Post("/oauth/token", params)
+	util.CheckError(err)
+	// req, _ := http.NewRequest("POST", "/oauth/token", strings.NewReader(params.Encode()))
+	// req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	// res, err := client.web.Do(req)
+
+	// if err != nil {
+	// 	return nil, err
+	// } else if res.StatusCode != 200 {
+	// 	return nil, fmt.Errorf("[Login error] %s", res.Status)
+	// }
+
+	defer client.CloseRes(res.Body)
+	// authcl := client.NewClient(authhost)
+	// b, err := authcl.DoLogin(username, password)
+
+	b, err := ioutil.ReadAll(res.Body)
 	util.CheckError(err)
 
 	var authresp gin.TokenResponse
 	err = json.Unmarshal(b, &authresp)
 	util.CheckError(err)
 
-	err = storeToken(authresp.AccessToken)
-	util.CheckErrorMsg(err, "[Error] Login failed while storing token.")
+	tokenfile := filepath.Join(util.ConfigPath(), "token")
+	err = ioutil.WriteFile(tokenfile, []byte(authresp.AccessToken), 0600)
+	// util.CheckErrorMsg(err, "[Error] Login failed while storing token.")
+	if err != nil {
+		return err
+	}
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)
 	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
+	return nil
 }
 
 // RequestAccount requests a specific account by name
-func RequestAccount(name, token string) gin.Account {
+func (authcl Client) RequestAccount(name, token string) gin.Account {
 	var acc gin.Account
 
-	authcl := client.NewClient(authhost)
+	// authcl := client.NewClient(authhost)
 	authcl.Token = token
 	res, err := authcl.Get("/api/accounts/" + name)
 	util.CheckErrorMsg(err, "[Account retrieval] Request failed.")
@@ -183,12 +200,12 @@ func RequestAccount(name, token string) gin.Account {
 }
 
 // SearchAccount Search for account
-func SearchAccount(query string) []gin.Account {
+func (authcl Client) SearchAccount(query string) []gin.Account {
 	var results []gin.Account
 
 	params := url.Values{}
 	params.Add("q", query)
-	authcl := client.NewClient(authhost)
+	// authcl := client.NewClient(authhost)
 	address := fmt.Sprintf("/api/accounts?%s", params.Encode())
 	res, err := authcl.Get(address)
 	util.CheckErrorMsg(err, "[Account search] Request failed.")
@@ -209,9 +226,8 @@ func AddKey(key, description string, temp bool) error {
 	username, token, err := LoadToken(true)
 	util.CheckErrorMsg(err, "This command requires login.")
 
-	address := fmt.Sprintf("/api/accounts/%s/keys", username)
+	address := fmt.Sprintf("/api/accounts/%s/keys", authcl.Username)
 	data := NewKey{Key: key, Description: description, Temporary: temp}
-	authcl.Token = token
 	res, err := authcl.Post(address, data)
 
 	util.CheckErrorMsg(err, "[Add key] Request failed.")
