@@ -57,14 +57,19 @@ func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 	defer web.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
-	util.CheckError(err)
+	// util.CheckError(err)
+	if err != nil {
+		return keys, err
+	}
 	err = json.Unmarshal(b, &keys)
-	util.CheckError(err)
-	return keys, nil
+	// util.CheckError(err)
+	return keys, err
 }
 
 // Login Request credentials, perform login, and store token
 func (authcl *Client) Login(userarg interface{}) error {
+
+	// TODO: Move most of this function outside the auth package
 
 	var username, password string
 
@@ -108,27 +113,22 @@ func (authcl *Client) Login(userarg interface{}) error {
 	}
 
 	res, err := authcl.Post("/oauth/token", params)
-	util.CheckError(err)
-	// req, _ := http.NewRequest("POST", "/oauth/token", strings.NewReader(params.Encode()))
-	// req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	// res, err := client.web.Do(req)
-
-	// if err != nil {
-	// 	return nil, err
-	// } else if res.StatusCode != 200 {
-	// 	return nil, fmt.Errorf("[Login error] %s", res.Status)
-	// }
+	if err != nil {
+		return err
+	}
 
 	defer web.CloseRes(res.Body)
-	// authcl := client.NewClient(authhost)
-	// b, err := authcl.DoLogin(username, password)
 
 	b, err := ioutil.ReadAll(res.Body)
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	var authresp gin.TokenResponse
 	err = json.Unmarshal(b, &authresp)
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	tokenfile := filepath.Join(util.ConfigPath(), "token")
 	err = ioutil.WriteFile(tokenfile, []byte(authresp.AccessToken), 0600)
@@ -142,46 +142,51 @@ func (authcl *Client) Login(userarg interface{}) error {
 }
 
 // RequestAccount requests a specific account by name
-func (authcl Client) RequestAccount(name, token string) gin.Account {
+func (authcl Client) RequestAccount(name, token string) (gin.Account, error) {
 	var acc gin.Account
 
 	// authcl := client.NewClient(authhost)
 	authcl.Token = token
 	res, err := authcl.Get("/api/accounts/" + name)
-	util.CheckErrorMsg(err, "[Account retrieval] Request failed.")
-
-	if res.StatusCode != 200 {
-		util.Die(fmt.Sprintf("[Account retrieval] Failed. Server returned: %s", res.Status))
+	// util.CheckErrorMsg(err, "[Account retrieval] Request failed.")
+	if err != nil {
+		return acc, err
+	} else if res.StatusCode != 200 {
+		// util.Die(fmt.Sprintf("[Account retrieval] Failed. Server returned: %s", res.Status))
+		return acc, fmt.Errorf("[Account retrieval] Failed. Server returned %s", res.Status)
 	}
 
 	defer web.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 	err = json.Unmarshal(b, &acc)
-	util.CheckError(err)
-	return acc
+	return acc, err
 }
 
 // SearchAccount Search for account
-func (authcl Client) SearchAccount(query string) []gin.Account {
-	var results []gin.Account
+func (authcl Client) SearchAccount(query string) ([]gin.Account, error) {
+	var accs []gin.Account
 
 	params := url.Values{}
 	params.Add("q", query)
 	// authcl := client.NewClient(authhost)
 	address := fmt.Sprintf("/api/accounts?%s", params.Encode())
 	res, err := authcl.Get(address)
-	util.CheckErrorMsg(err, "[Account search] Request failed.")
-
-	if res.StatusCode != 200 {
-		util.Die(fmt.Sprintf("[Account search] Failed. Server returned: %s", res.Status))
+	// util.CheckErrorMsg(err, "[Account search] Request failed.")
+	if err != nil {
+		return accs, err
+	} else if res.StatusCode != 200 {
+		// util.Die(fmt.Sprintf("[Account search] Failed. Server returned: %s", res.Status))
+		return accs, fmt.Errorf("[Account search] Failed. Server returned: %s", res.Status)
 	}
 
-	body, _ := ioutil.ReadAll(res.Body)
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return accs, err
+	}
 
-	err = json.Unmarshal(body, &results)
-	util.CheckError(err)
-	return results
+	err = json.Unmarshal(body, &accs)
+	return accs, err
 }
 
 // AddKey adds the given key to the current user's authorised keys
@@ -193,9 +198,12 @@ func AddKey(key, description string, temp bool) error {
 	data := NewKey{Key: key, Description: description, Temporary: temp}
 	res, err := authcl.Post(address, data)
 
-	util.CheckErrorMsg(err, "[Add key] Request failed.")
-	if res.StatusCode != 200 {
-		util.Die(fmt.Sprintf("[Add key] Failed. Server returned %s", res.Status))
+	// util.CheckErrorMsg(err, "[Add key] Request failed.")
+	if err != nil {
+		return err
+	} else if res.StatusCode != 200 {
+		// util.Die(fmt.Sprintf("[Add key] Failed. Server returned %s", res.Status))
+		return fmt.Errorf("[Add key] Failed. Server returned %s", res.Status)
 	}
 	web.CloseRes(res.Body)
 	return nil
