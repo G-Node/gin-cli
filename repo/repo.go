@@ -11,21 +11,21 @@ import (
 	"github.com/G-Node/gin-repo/wire"
 )
 
-const repohost = "https://repo.gin.g-node.org"
-
 // Client is a client interface to the repo server. Embeds web.Client.
 type Client struct {
 	*web.Client
+	KeyHost string
+	GitHost string
+	GitUser string
 }
 
-// NewClient returns a new client for the auth server.
-func NewClient() *Client {
-	serverURL := repohost
-	return &Client{web.NewClient(serverURL)}
+// NewClient returns a new client for the repo server.
+func NewClient(host string) *Client {
+	return &Client{Client: web.NewClient(host)}
 }
 
 // GetRepos gets a list of repositories (public or user specific)
-func (repocl *Client) GetRepos(user, token string) ([]wire.Repo, error) {
+func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	var repoList []wire.Repo
 	var res *http.Response
 	var err error
@@ -33,7 +33,10 @@ func (repocl *Client) GetRepos(user, token string) ([]wire.Repo, error) {
 	if user == "" {
 		res, err = repocl.Get("/repos/public")
 	} else {
-		repocl.Token = token
+		err = repocl.LoadToken()
+		if err != nil {
+			return repoList, err
+		}
 		res, err = repocl.Get(fmt.Sprintf("/users/%s/repos", user))
 	}
 
@@ -103,7 +106,7 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 
 	localPath := path.Base(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", localPath)
-	_, err := Clone(repoPath)
+	_, err := repocl.Clone(repoPath)
 	if err != nil {
 		return err
 	}

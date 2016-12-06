@@ -15,10 +15,6 @@ import (
 	git "github.com/libgit2/git2go"
 )
 
-// TODO: Load from config
-const user = "git"
-const githost = "gin.g-node.org"
-
 // Keys
 
 // Temporary (SSH key) file handling
@@ -42,7 +38,7 @@ func setupTempKeyPair() (*util.KeyPair, error) {
 
 	description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
-	authcl := auth.NewClient()
+	authcl := auth.NewClient(repocl.KeyHost)
 	err = authcl.AddKey(pubkey, description, true)
 	if err != nil {
 		return nil, err
@@ -57,7 +53,7 @@ func CleanUpTemp() {
 
 // Git callbacks
 
-func makeCredsCB() git.CredentialsCallback {
+func (repocl *Client) makeCredsCB() git.CredentialsCallback {
 	// attemptnum is used to determine which authentication method to use each time.
 	attemptnum := 0
 
@@ -66,13 +62,13 @@ func makeCredsCB() git.CredentialsCallback {
 		var cred git.Cred
 		switch attemptnum {
 		case 0:
-			res, cred = git.NewCredSshKeyFromAgent("git")
+			res, cred = git.NewCredSshKeyFromAgent(repocl.GitUser)
 		case 1:
 			tempKeyPair, err := setupTempKeyPair()
 			if err != nil {
 				return git.ErrUser, nil
 			}
-			res, cred = git.NewCredSshKeyFromMemory("git", tempKeyPair.Public, tempKeyPair.Private, "")
+			res, cred = git.NewCredSshKeyFromMemory(repocl.GitUser, tempKeyPair.Public, tempKeyPair.Private, "")
 		default:
 			return git.ErrUser, nil
 		}
@@ -85,9 +81,9 @@ func makeCredsCB() git.CredentialsCallback {
 	}
 }
 
-func certCB(cert *git.Certificate, valid bool, hostname string) git.ErrorCode {
+func (repocl *Client) certCB(cert *git.Certificate, valid bool, hostname string) git.ErrorCode {
 	// TODO: Better cert check?
-	if hostname != githost {
+	if hostname != repocl.GitHost {
 		return git.ErrCertificate
 	}
 	return git.ErrOk
@@ -142,13 +138,13 @@ func AddPath(localPath string) (*git.Index, error) {
 
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
-func Clone(repopath string) (*git.Repository, error) {
-	remotePath := fmt.Sprintf("%s@%s:%s", user, githost, repopath)
+func (repocl *Client) Clone(repopath string) (*git.Repository, error) {
+	remotePath := fmt.Sprintf("%s@%s:%s", repocl.GitUser, repocl.GitHost, repopath)
 	localPath := path.Base(repopath)
 
 	cbs := &git.RemoteCallbacks{
-		CredentialsCallback:      makeCredsCB(),
-		CertificateCheckCallback: certCB,
+		CredentialsCallback:      repocl.makeCredsCB(),
+		CertificateCheckCallback: repocl.certCB,
 	}
 	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
 	opts := git.CloneOptions{
@@ -168,7 +164,7 @@ func Clone(repopath string) (*git.Repository, error) {
 
 // Commit performs a git commit on the currently staged objects.
 // (git commit)
-func Commit(localPath string, idx *git.Index) error {
+func (repocl *Client) Commit(localPath string, idx *git.Index) error {
 	// TODO: Construct signature based on user config
 	signature := &git.Signature{
 		Name:  "gin",
@@ -214,7 +210,7 @@ func Commit(localPath string, idx *git.Index) error {
 
 // Pull pulls all remote commits from the default remote & branch
 // (git pull)
-func Pull() error {
+func (repocl *Client) Pull() error {
 	repository, err := git.OpenRepository(".")
 	if err != nil {
 		return err
@@ -227,8 +223,8 @@ func Pull() error {
 
 	// Fetch
 	cbs := &git.RemoteCallbacks{
-		CredentialsCallback:      makeCredsCB(),
-		CertificateCheckCallback: certCB,
+		CredentialsCallback:      repocl.makeCredsCB(),
+		CertificateCheckCallback: repocl.certCB,
 	}
 	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
 
@@ -322,7 +318,7 @@ func Pull() error {
 
 // Push pushes all local commits to the default remote & branch
 // (git push)
-func Push(localPath string) error {
+func (repocl *Client) Push(localPath string) error {
 	repository, err := git.OpenRepository(localPath)
 	if err != nil {
 		return err
@@ -334,8 +330,8 @@ func Push(localPath string) error {
 	}
 
 	rcbs := git.RemoteCallbacks{
-		CredentialsCallback:      makeCredsCB(),
-		CertificateCheckCallback: certCB,
+		CredentialsCallback:      repocl.makeCredsCB(),
+		CertificateCheckCallback: repocl.certCB,
 	}
 
 	popts := &git.PushOptions{
