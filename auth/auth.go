@@ -27,7 +27,7 @@ type NewKey struct {
 	Temporary   bool   `json:"temporary"`
 }
 
-// GetUserKeys Load token and request an slice of the user's keys
+// GetUserKeys fetches the public keys that the user has added to the auth server.
 func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 	var keys []gin.SSHKey
 	err := authcl.LoadToken()
@@ -60,7 +60,7 @@ func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 	return keys, err
 }
 
-// RequestAccount requests a specific account by name
+// RequestAccount requests a specific account by name.
 func (authcl Client) RequestAccount(name string) (gin.Account, error) {
 	var acc gin.Account
 
@@ -81,7 +81,7 @@ func (authcl Client) RequestAccount(name string) (gin.Account, error) {
 	return acc, err
 }
 
-// SearchAccount Search for account
+// SearchAccount retrieves a list of accounts that match the query string.
 func (authcl Client) SearchAccount(query string) ([]gin.Account, error) {
 	var accs []gin.Account
 
