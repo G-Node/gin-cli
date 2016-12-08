@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/url"
 
+	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
 )
@@ -28,7 +29,7 @@ type NewKey struct {
 }
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
-func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
+func (authcl Client) GetUserKeys() ([]gin.SSHKey, error) {
 	var keys []gin.SSHKey
 	err := authcl.LoadToken()
 	// util.CheckErrorMsg(err, "This command requires login.")
@@ -125,4 +126,43 @@ func AddKey(key, description string, temp bool) error {
 	}
 	web.CloseRes(res.Body)
 	return nil
+}
+
+// Login performs a user login and returns the access token.
+func (authcl Client) Login(username, password, clientID, clientSecret string) (string, error) {
+	// The struct below will be used when we switch token request to using json post data on auth
+	// See https://github.com/G-Node/gin-auth/issues/112
+	// params := gin.LoginRequest{
+	// 	Scope:        "repo-read repo-write account-read account-write",
+	// 	Username:     username,
+	// 	Password:     password,
+	// 	GrantType:    "password",
+	// 	ClientID:     clientID,
+	// 	ClientSecret: clientSecret,
+	// }
+	params := url.Values{}
+	params.Add("scope", "repo-read repo-write account-read account-write")
+	params.Add("username", username)
+	params.Add("password", password)
+	params.Add("grant_type", "password")
+	params.Add("client_id", clientID)
+	params.Add("client_secret", clientSecret)
+
+	res, err := authcl.PostForm("/oauth/token", params)
+	if err != nil {
+		return "", err
+	} else if res.StatusCode != 200 {
+		return "", fmt.Errorf("[Login] Failed. Server returned %s", res.Status)
+	}
+
+	defer web.CloseRes(res.Body)
+
+	b, err := ioutil.ReadAll(res.Body)
+	util.CheckError(err)
+
+	var authresp gin.TokenResponse
+	err = json.Unmarshal(b, &authresp)
+	util.CheckError(err)
+
+	return authresp.AccessToken, nil
 }

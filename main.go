@@ -4,7 +4,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -13,8 +12,6 @@ import (
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/repo"
 	"github.com/G-Node/gin-cli/util"
-	"github.com/G-Node/gin-cli/web"
-	"github.com/G-Node/gin-core/gin"
 	"github.com/docopt/docopt-go"
 	"github.com/howeyc/gopass"
 )
@@ -60,33 +57,12 @@ func login(userarg interface{}) {
 		util.Die("No password provided. Aborting.")
 	}
 
-	params := gin.LoginRequest{
-		Scope:        "repo-read repo-write account-read account-write",
-		Username:     username,
-		Password:     password,
-		GrantType:    "password",
-		ClientID:     "gin-cli",
-		ClientSecret: "97196a1c-silly-biscuit3-d161ea15a676",
-	}
-
 	authcl := auth.NewClient(authhost)
-	res, err := authcl.Post("/oauth/token", params)
-	util.CheckError(err)
-	if res.StatusCode != 200 {
-		util.Die(fmt.Sprintf("[Login] Failed. Server returned %s", res.Status))
-	}
-
-	defer web.CloseRes(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-	util.CheckError(err)
-
-	var authresp gin.TokenResponse
-	err = json.Unmarshal(b, &authresp)
+	token, err := authcl.Login(username, password, "gin-cli", "97196a1c-silly-biscuit3-d161ea15a676")
 	util.CheckError(err)
 
 	tokenfile := filepath.Join(util.ConfigPath(), "token")
-	err = ioutil.WriteFile(tokenfile, []byte(authresp.AccessToken), 0600)
+	err = ioutil.WriteFile(tokenfile, []byte(token), 0600)
 	// util.CheckErrorMsg(err, "[Error] Login failed while storing token.")
 	util.CheckError(err)
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)

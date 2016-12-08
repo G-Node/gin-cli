@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-core/gin"
@@ -59,6 +60,20 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 		return nil, err
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+	return cl.web.Do(req)
+}
+
+// PostForm sends a POST request to address with the provided data.
+// The address is appended to the client host, so it should be specified without the host prefix.
+// Unlike the Post method, the data in this case is sent as x-www-form-urlencoded.
+func (cl *Client) PostForm(address string, data url.Values) (*http.Response, error) {
+
+	requrl := urlJoin(cl.Host, address)
+	req, err := http.NewRequest("POST", requrl, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	return cl.web.Do(req)
 }
 
