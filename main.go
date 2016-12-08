@@ -90,21 +90,23 @@ func createRepo(name, description interface{}) {
 
 func getRepo(repoarg interface{}) {
 	var repostr string
-	if repoarg != nil {
-		repostr = repoarg.(string)
-		repocl := repo.NewClient(repohost)
-		repocl.GitUser = gituser
-		repocl.GitHost = githost
-		repocl.KeyHost = authhost
-		err := repocl.CloneRepo(repostr)
-		util.CheckError(err)
-	} else {
-		util.Die("No repository specified.")
+	if repoarg == nil {
+		util.Die("No repository specified")
 	}
+	repostr = repoarg.(string)
+	repocl := repo.NewClient(repohost)
+	repocl.GitUser = gituser
+	repocl.GitHost = githost
+	repocl.KeyHost = authhost
+	err := repocl.CloneRepo(repostr)
+	util.CheckError(err)
 }
 
 func upload() {
 	repocl := repo.NewClient(repohost)
+	repocl.GitUser = gituser
+	repocl.GitHost = githost
+	repocl.KeyHost = authhost
 	err := repocl.UploadRepo(".")
 	util.CheckError(err)
 }
