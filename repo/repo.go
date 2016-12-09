@@ -94,9 +94,12 @@ func (repocl *Client) UploadRepo(localPath string) error {
 }
 
 // DownloadRepo downloads the files in an already checked out repository.
-func (repocl *Client) DownloadRepo() error {
+func (repocl *Client) DownloadRepo(localPath string) error {
 	defer CleanUpTemp()
-	err := AnnexPull(".")
+
+	// Perform a git connection to check credentials
+	err := repocl.Connect(localPath, false)
+	err = AnnexPull(localPath)
 	return err
 }
 

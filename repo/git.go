@@ -136,6 +136,37 @@ func AddPath(localPath string) (*git.Index, error) {
 	return idx, err
 }
 
+// Connect opens a connection to the git server. This is used to validate credentials
+// and generate temporary keys on demand, without performing a git operation.
+func (repocl *Client) Connect(localPath string, push bool) error {
+	var dir git.ConnectDirection
+	if push {
+		dir = git.ConnectDirectionPush
+	} else {
+		dir = git.ConnectDirectionFetch
+	}
+
+	cbs := &git.RemoteCallbacks{
+		CredentialsCallback:      repocl.makeCredsCB(),
+		CertificateCheckCallback: repocl.certCB,
+	}
+
+	var headers []string
+
+	repository, err := git.OpenRepository(localPath)
+	if err != nil {
+		return err
+	}
+
+	origin, err := repository.Remotes.Lookup("origin")
+	if err != nil {
+		return err
+	}
+
+	// return remote.Connect(dir, cbs, headers)
+	return origin.Connect(dir, cbs, headers)
+}
+
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
 func (repocl *Client) Clone(repopath string) (*git.Repository, error) {
@@ -210,8 +241,8 @@ func (repocl *Client) Commit(localPath string, idx *git.Index) error {
 
 // Pull pulls all remote commits from the default remote & branch
 // (git pull)
-func (repocl *Client) Pull() error {
-	repository, err := git.OpenRepository(".")
+func (repocl *Client) Pull(localPath string) error {
+	repository, err := git.OpenRepository(localPath)
 	if err != nil {
 		return err
 	}

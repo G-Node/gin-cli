@@ -109,16 +109,15 @@ func upload() {
 }
 
 func download() {
+	if !repo.IsRepo(".") {
+		util.Die("Current directory is not a repository.")
+	}
 	repocl := repo.NewClient(repohost)
 	repocl.GitUser = gituser
 	repocl.GitHost = githost
 	repocl.KeyHost = authhost
-	if repo.IsRepo(".") {
-		err := repocl.DownloadRepo()
-		util.CheckError(err)
-	} else {
-		util.Die("Current directory is not a repository.")
-	}
+	err := repocl.DownloadRepo(".")
+	util.CheckError(err)
 }
 
 // condAppend Conditionally append str to b if not empty
