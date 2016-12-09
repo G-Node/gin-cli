@@ -29,7 +29,7 @@ type NewKey struct {
 }
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
-func (authcl Client) GetUserKeys() ([]gin.SSHKey, error) {
+func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 	var keys []gin.SSHKey
 	err := authcl.LoadToken()
 	// util.CheckErrorMsg(err, "This command requires login.")
@@ -62,7 +62,7 @@ func (authcl Client) GetUserKeys() ([]gin.SSHKey, error) {
 }
 
 // RequestAccount requests a specific account by name.
-func (authcl Client) RequestAccount(name string) (gin.Account, error) {
+func (authcl *Client) RequestAccount(name string) (gin.Account, error) {
 	var acc gin.Account
 
 	// authcl := client.NewClient(authhost)
@@ -83,7 +83,7 @@ func (authcl Client) RequestAccount(name string) (gin.Account, error) {
 }
 
 // SearchAccount retrieves a list of accounts that match the query string.
-func (authcl Client) SearchAccount(query string) ([]gin.Account, error) {
+func (authcl *Client) SearchAccount(query string) ([]gin.Account, error) {
 	var accs []gin.Account
 
 	params := url.Values{}
@@ -128,8 +128,8 @@ func AddKey(key, description string, temp bool) error {
 	return nil
 }
 
-// Login performs a user login and returns the access token.
-func (authcl Client) Login(username, password, clientID, clientSecret string) (string, error) {
+// Login requests a token from the auth server and stores the username and token to file.
+func (authcl *Client) Login(username, password, clientID, clientSecret string) error {
 	// The struct below will be used when we switch token request to using json post data on auth
 	// See https://github.com/G-Node/gin-auth/issues/112
 	// params := gin.LoginRequest{
@@ -150,9 +150,9 @@ func (authcl Client) Login(username, password, clientID, clientSecret string) (s
 
 	res, err := authcl.PostForm("/oauth/token", params)
 	if err != nil {
-		return "", err
+		return err
 	} else if res.StatusCode != 200 {
-		return "", fmt.Errorf("[Login] Failed. Server returned %s", res.Status)
+		return fmt.Errorf("[Login] Failed. Server returned %s", res.Status)
 	}
 
 	defer web.CloseRes(res.Body)
@@ -164,5 +164,8 @@ func (authcl Client) Login(username, password, clientID, clientSecret string) (s
 	err = json.Unmarshal(b, &authresp)
 	util.CheckError(err)
 
-	return authresp.AccessToken, nil
+	authcl.Username = username
+	authcl.Token = authresp.AccessToken
+
+	return authcl.StoreToken()
 }

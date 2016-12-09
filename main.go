@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 	"strings"
 
 	"github.com/G-Node/gin-cli/auth"
@@ -58,12 +57,7 @@ func login(userarg interface{}) {
 	}
 
 	authcl := auth.NewClient(authhost)
-	token, err := authcl.Login(username, password, "gin-cli", "97196a1c-silly-biscuit3-d161ea15a676")
-	util.CheckError(err)
-
-	tokenfile := filepath.Join(util.ConfigPath(), "token")
-	err = ioutil.WriteFile(tokenfile, []byte(token), 0600)
-	// util.CheckErrorMsg(err, "[Error] Login failed while storing token.")
+	err = authcl.Login(username, password, "gin-cli", "97196a1c-silly-biscuit3-d161ea15a676")
 	util.CheckError(err)
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)
 	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
@@ -84,6 +78,9 @@ func createRepo(name, description interface{}) {
 		repoDesc = description.(string)
 	}
 	repocl := repo.NewClient(repohost)
+	repocl.GitUser = gituser
+	repocl.GitHost = githost
+	repocl.KeyHost = authhost
 	err := repocl.CreateRepo(repoName, repoDesc)
 	util.CheckError(err)
 }

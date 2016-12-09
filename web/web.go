@@ -2,26 +2,31 @@ package web
 
 import (
 	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
-	"github.com/G-Node/gin-core/gin"
 )
+
+// UserToken struct for username and token
+type UserToken struct {
+	Username string
+	Token    string
+}
 
 // Client struct for making requests
 type Client struct {
-	Host     string
-	Token    string
-	Username string
-	web      *http.Client
+	Host string
+	UserToken
+	web *http.Client
 }
 
 func urlJoin(parts ...string) string {
@@ -82,44 +87,41 @@ func NewClient(address string) *Client {
 	return &Client{Host: address, web: &http.Client{}}
 }
 
-// LoadToken loads the auth token from the token file, checks it against the auth server,
-// and sets the token and username in the auth struct.
-func (cl *Client) LoadToken() error {
-	tokenfile := filepath.Join(util.ConfigPath(), "token")
-	tokenBytes, err := ioutil.ReadFile(tokenfile)
-	tokenInfo := gin.TokenInfo{}
+// LoadToken reads the username and auth token from the token file and sets the
+// values in the struct.
+func (ut *UserToken) LoadToken() error {
+	filepath := filepath.Join(util.ConfigPath(), "token")
+	file, err := os.Open(filepath)
+	if err != nil {
+		return fmt.Errorf("Error loading user token")
+	}
 
+	decoder := gob.NewDecoder(file)
+	err = decoder.Decode(ut)
 	if err != nil {
 		return err
 	}
-
-	token := string(tokenBytes)
-	res, err := cl.Get("/oauth/validate/" + token)
-	if err != nil {
-		// fmt.Fprintln(os.Stderr, "[Auth error] Error communicating with server.")
-		return err
-	}
-
-	defer CloseRes(res.Body)
-
-	b, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(b, &tokenInfo)
-
-	username := tokenInfo.Login
-	if username == "" {
-		return fmt.Errorf("[Auth error] You are not logged in")
-	}
-	cl.Username = username
-	cl.Token = token
-	return nil
+	return file.Close()
 }
 
 // CloseRes closes a given result buffer (for use with defer).
 func CloseRes(b io.ReadCloser) {
 	err := b.Close()
 	util.CheckErrorMsg(err, "Error during cleanup.")
+}
+
+// StoreToken saves the username and auth token to the token file.
+func (ut *UserToken) StoreToken() error {
+	filepath := filepath.Join(util.ConfigPath(), "token")
+	file, err := os.Create(filepath)
+	if err != nil {
+		return fmt.Errorf("Error saving user token.")
+	}
+
+	encoder := gob.NewEncoder(file)
+	err = encoder.Encode(ut)
+	if err != nil {
+		return err
+	}
+	return file.Close()
 }
