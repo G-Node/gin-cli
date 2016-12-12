@@ -19,19 +19,12 @@ import (
 
 // Temporary (SSH key) file handling
 
-var privKeyFile *util.TempFile
+var privKeyFile util.TempFile
 
-// setupTempKeyPair creates a temporary key pair, stores it in a temporary directory,
-// and adds it to the logged in user's account on the auth server (as a temporary key).
-// It also sets the global tempFile for use by the annex commands.
-// The key pair is returned.
-func setupTempKeyPair() (*util.KeyPair, error) {
+// MakeTempKeyPair creates a temporary key pair and stores it in a temporary directory.
+// It also sets the global tempFile for use by the annex commands. The key pair is returned directly.
+func (repocl *Client) MakeTempKeyPair() (*util.KeyPair, error) {
 	tempKeyPair, err := util.MakeKeyPair()
-	if err != nil {
-		return nil, err
-	}
-
-	privKeyFile, err = util.SaveTempKeyFile(tempKeyPair.Private)
 	if err != nil {
 		return nil, err
 	}
@@ -41,14 +34,29 @@ func setupTempKeyPair() (*util.KeyPair, error) {
 	authcl := auth.NewClient(repocl.KeyHost)
 	err = authcl.AddKey(pubkey, description, true)
 	if err != nil {
-		return nil, err
+		return tempKeyPair, err
 	}
+
+	privKeyFile, err = util.MakeTempFile("priv")
+	if err != nil {
+		return tempKeyPair, err
+	}
+
+	err = privKeyFile.Write(tempKeyPair.Private)
+	if err != nil {
+		return tempKeyPair, err
+	}
+
+	privKeyFile.Active = true
+
 	return tempKeyPair, nil
 }
 
 // CleanUpTemp deletes the temporary directory which holds the temporary private key if it exists.
 func CleanUpTemp() {
-	privKeyFile.Delete()
+	if privKeyFile.Active {
+		privKeyFile.Delete()
+	}
 }
 
 // Git callbacks
@@ -64,7 +72,7 @@ func (repocl *Client) makeCredsCB() git.CredentialsCallback {
 		case 0:
 			res, cred = git.NewCredSshKeyFromAgent(repocl.GitUser)
 		case 1:
-			tempKeyPair, err := setupTempKeyPair()
+			tempKeyPair, err := repocl.MakeTempKeyPair()
 			if err != nil {
 				return git.ErrUser, nil
 			}
@@ -163,7 +171,6 @@ func (repocl *Client) Connect(localPath string, push bool) error {
 		return err
 	}
 
-	// return remote.Connect(dir, cbs, headers)
 	return origin.Connect(dir, cbs, headers)
 }
 
@@ -381,7 +388,7 @@ func (repocl *Client) Push(localPath string) error {
 func AnnexInit(localPath string) error {
 	initError := fmt.Errorf("Repository annex initialisation failed.")
 	cmd := exec.Command("git", "-C", localPath, "annex", "init", "--version=6")
-	if privKeyFile != nil {
+	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()
@@ -415,7 +422,7 @@ func AnnexInit(localPath string) error {
 // (git annex get --all)
 func AnnexPull(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
-	if privKeyFile != nil {
+	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()
@@ -430,7 +437,7 @@ func AnnexPull(localPath string) error {
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content")
-	if privKeyFile != nil {
+	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()

@@ -23,6 +23,7 @@ type KeyPair struct {
 type TempFile struct {
 	Dir      string
 	Filename string
+	Active   bool
 }
 
 // MakeKeyPair generates and returns a private-public key pair.
@@ -52,6 +53,18 @@ func MakeKeyPair() (*KeyPair, error) {
 }
 
 // Temporary key file handling
+
+// MakeTempFile creates a temporary file for storing temporary private keys.
+// A TempFile struct is returned which holds the location and name of the new file.
+func MakeTempFile(filename string) (TempFile, error) {
+	dir, err := ioutil.TempDir("", "gin")
+	if err != nil {
+		return TempFile{}, fmt.Errorf("Error creating temporary key directory: %s", err.Error())
+	}
+
+	newfile := TempFile{Dir: dir, Filename: filename}
+	return newfile, nil
+}
 
 // SaveTempKeyFile stores a given private key to a temporary file.
 // Returns a TempFile struct which contains the absolute path and filename.
@@ -86,6 +99,7 @@ func (tf TempFile) Write(content string) error {
 // Delete the temporary file and its diirectory.
 func (tf TempFile) Delete() {
 	_ = os.RemoveAll(tf.Dir)
+	tf.Active = false
 }
 
 // FullPath returns the full path to the temporary file.

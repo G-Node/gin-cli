@@ -40,7 +40,6 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 		res, err = repocl.Get(fmt.Sprintf("/users/%s/repos", user))
 	}
 
-	// util.CheckErrorMsg(err, "[Repository request] Request failed.")
 	if err != nil {
 		return repoList, err
 	} else if res.StatusCode != 200 {
@@ -66,10 +65,8 @@ func (repocl *Client) CreateRepo(name, description string) error {
 	data := wire.Repo{Name: name, Description: description}
 	res, err := repocl.Post(fmt.Sprintf("/users/%s/repos", repocl.Username), data)
 	if err != nil {
-		// util.CheckErrorMsg(err, "[Create repository] Request failed.")
 		return err
 	} else if res.StatusCode != 201 {
-		// util.Die(fmt.Sprintf("[Create repository] Failed. Server returned %s", res.Status))
 		return fmt.Errorf("[Create repository] Failed. Server returned %s", res.Status)
 	}
 	web.CloseRes(res.Body)
@@ -85,9 +82,10 @@ func (repocl *Client) UploadRepo(localPath string) error {
 		return err
 	}
 
-	// since no git command is called, we need to explicitly create temporary keys
-	_, err = setupTempKeyPair()
-	util.CheckError(err)
+	err = repocl.Connect(localPath, true)
+	if err != nil {
+		return err
+	}
 
 	err = AnnexPush(localPath)
 	return err

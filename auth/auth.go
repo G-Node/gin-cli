@@ -32,20 +32,14 @@ type NewKey struct {
 func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 	var keys []gin.SSHKey
 	err := authcl.LoadToken()
-	// util.CheckErrorMsg(err, "This command requires login.")
 	if err != nil {
 		return keys, fmt.Errorf("This command requires login")
 	}
 
-	// authcl := client.NewClient(authhost)
-	// authcl.Token = token
-
 	res, err := authcl.Get(fmt.Sprintf("/api/accounts/%s/keys", authcl.Username))
-	// util.CheckErrorMsg(err, "Request for keys returned error.")
 	if err != nil {
 		return keys, fmt.Errorf("Request for keys returned error")
 	} else if res.StatusCode != 200 {
-		// util.Die(fmt.Sprintf("[Keys request error] Server returned: %s", res.Status))
 		return keys, fmt.Errorf("[Keys request error] Server returned: %s", res.Status)
 	}
 
@@ -108,20 +102,20 @@ func (authcl *Client) SearchAccount(query string) ([]gin.Account, error) {
 	return accs, err
 }
 
-// AddKey adds the given key to the current user's authorised keys
-func AddKey(key, description string, temp bool) error {
-	username, token, err := LoadToken(true)
-	util.CheckErrorMsg(err, "This command requires login.")
+// AddKey adds the given key to the current user's authorised keys.
+func (authcl *Client) AddKey(key, description string, temp bool) error {
+	err := authcl.LoadToken()
+	if err != nil {
+		return err
+	}
 
 	address := fmt.Sprintf("/api/accounts/%s/keys", authcl.Username)
 	data := NewKey{Key: key, Description: description, Temporary: temp}
 	res, err := authcl.Post(address, data)
 
-	// util.CheckErrorMsg(err, "[Add key] Request failed.")
 	if err != nil {
 		return err
 	} else if res.StatusCode != 200 {
-		// util.Die(fmt.Sprintf("[Add key] Failed. Server returned %s", res.Status))
 		return fmt.Errorf("[Add key] Failed. Server returned %s", res.Status)
 	}
 	web.CloseRes(res.Body)
