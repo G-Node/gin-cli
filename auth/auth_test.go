@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
 )
 
@@ -21,6 +22,13 @@ func TestMain(m *testing.M) {
 	err = os.Setenv("XDG_CONFIG_HOME", tmpdir)
 	if err != nil {
 		fmt.Fprint(os.Stderr, "Error setting XDG_CONFIG_HOME environment variable for tests.")
+		os.Exit(1)
+	}
+
+	userToken := web.UserToken{Username: "alice", Token: "some_sort_of_token"}
+	err = userToken.StoreToken()
+	if err != nil {
+		fmt.Fprint(os.Stderr, "Error storing token file for tests.")
 		os.Exit(1)
 	}
 
@@ -92,7 +100,6 @@ func TestRequestAccount(t *testing.T) {
 }
 
 func getKeysHandler(w http.ResponseWriter, r *http.Request) {
-	println(r.URL.Path)
 	aliceKeys := `[{"url":"test_server/api/keys?fingerprint=fingerprint_one","fingerprint":"fingerprint_one","key":"ssh-rsa SSHKEY12344567 name@host","description":"name@host","login":"alice","account_url":"test_server/api/accounts/alice","created_at":"2016-12-12T18:11:54.131134+01:00","updated_at":"2016-12-12T18:11:54.131134+01:00"},{"url":"test_server/api/keys?fingerprint=fingerprint_two","fingerprint":"fingerprint_two","key":"ssh-rsa SSHKEYTHESECONDONE name@host","description":"name@host_2","login":"alice","account_url":"test_server/api/accounts/alice","created_at":"2016-12-12T18:11:54.131134+01:00","updated_at":"2016-12-12T18:11:54.131134+01:00"}]`
 	if r.URL.Path == "/api/accounts/alice/keys" {
 		fmt.Fprint(w, aliceKeys)
@@ -120,6 +127,9 @@ func TestRequestKeys(t *testing.T) {
 	respOK := keys[0].Key == "ssh-rsa SSHKEY12344567 name@host" &&
 		keys[0].Description == "name@host" && keys[0].Login == "alice" &&
 		keys[0].Fingerprint == "fingerprint_one"
+	respOK = respOK && keys[1].Key == "ssh-rsa SSHKEYTHESECONDONE name@host" &&
+		keys[1].Description == "name@host_2" && keys[1].Login == "alice" &&
+		keys[1].Fingerprint == "fingerprint_two"
 
 	if !respOK {
 		t.Error("[Key retrieval] Test failed. Response does not match expected values.")
