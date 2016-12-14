@@ -119,7 +119,6 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 		return err
 	}
 
-	// TODO: Do not try to download files if repo is empty
 	fmt.Printf("Downloading files... ")
 	err = AnnexPull(localPath)
 	if err != nil {

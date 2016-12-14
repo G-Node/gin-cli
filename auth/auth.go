@@ -46,12 +46,10 @@ func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 	defer web.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
-	// util.CheckError(err)
 	if err != nil {
 		return keys, err
 	}
 	err = json.Unmarshal(b, &keys)
-	// util.CheckError(err)
 	return keys, err
 }
 
@@ -59,13 +57,10 @@ func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 func (authcl *Client) RequestAccount(name string) (gin.Account, error) {
 	var acc gin.Account
 
-	// authcl := client.NewClient(authhost)
 	res, err := authcl.Get("/api/accounts/" + name)
-	// util.CheckErrorMsg(err, "[Account retrieval] Request failed.")
 	if err != nil {
 		return acc, err
 	} else if res.StatusCode != 200 {
-		// util.Die(fmt.Sprintf("[Account retrieval] Failed. Server returned: %s", res.Status))
 		return acc, fmt.Errorf("[Account retrieval] Failed. Server returned %s", res.Status)
 	}
 
@@ -82,14 +77,11 @@ func (authcl *Client) SearchAccount(query string) ([]gin.Account, error) {
 
 	params := url.Values{}
 	params.Add("q", query)
-	// authcl := client.NewClient(authhost)
 	address := fmt.Sprintf("/api/accounts?%s", params.Encode())
 	res, err := authcl.Get(address)
-	// util.CheckErrorMsg(err, "[Account search] Request failed.")
 	if err != nil {
 		return accs, err
 	} else if res.StatusCode != 200 {
-		// util.Die(fmt.Sprintf("[Account search] Failed. Server returned: %s", res.Status))
 		return accs, fmt.Errorf("[Account search] Failed. Server returned: %s", res.Status)
 	}
 
