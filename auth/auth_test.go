@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/G-Node/gin-cli/web"
@@ -105,7 +107,7 @@ func getKeysHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/api/accounts/alice/keys" {
 		fmt.Fprint(w, aliceKeys)
 	} else if r.URL.Path == "/api/accounts/errorinducer/keys" {
-		http.Error(w, "Server returned error", 500)
+		http.Error(w, "Server returned error", http.StatusInternalServerError)
 	} else if r.URL.Path == "/api/accounts/badresponse/keys" {
 		fmt.Fprint(w, "not_json_response")
 	} else {
@@ -230,5 +232,61 @@ func TestRequestKeys(t *testing.T) {
 
 	if len(keys) != 0 {
 		t.Errorf("[Key retrieval] Request with bad server returned non-empty key slice. [%d items]", len(keys))
+	}
+}
+
+func addKeyHandler(w http.ResponseWriter, r *http.Request) {
+	match, _ := regexp.MatchString("/api/accounts/[a-zA-Z]+/keys", r.URL.Path)
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error in request handler for AddKey test")
+	}
+
+	newKey := &gin.SSHKey{}
+	if match {
+		err := json.Unmarshal(b, newKey)
+		if err != nil {
+			http.Error(w, "Bad data", http.StatusBadRequest)
+		}
+		w.WriteHeader(http.StatusAccepted)
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func TestAddKey(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(addKeyHandler))
+	defer ts.Close()
+
+	authcl := NewClient(ts.URL)
+	aliceToken := web.UserToken{Username: "alice", Token: "some_sort_of_token"}
+	err := aliceToken.StoreToken()
+	if err != nil {
+		t.Error("[Key retrieval] Error storing token for alice.")
+	}
+
+	err = authcl.AddKey("KEY123", "a test key", false)
+	if err != nil {
+		t.Errorf("[Add key] Function returned error: %s", err.Error())
+	}
+
+	authcl = NewClient("")
+	err = authcl.AddKey("", "", false)
+	if err == nil {
+		t.Error("[Add key] Request with bad server succeeded when it should have failed.")
+	}
+
+	oldconf := os.Getenv("XDG_CONFIG_HOME")
+	err = os.Setenv("XDG_CONFIG_HOME", "")
+	if err != nil {
+		t.Error("Error setting XDG_CONFIG_HOME to empty string.")
+	}
+	err = authcl.AddKey("", "", false)
+	if err == nil {
+		t.Error("[Add key] Request without login succeeded when it should have failed.")
+	}
+	err = os.Setenv("XDG_CONFIG_HOME", oldconf)
+	if err != nil {
+		t.Errorf("Error resetting XDG_CONFIG_HOME after no login test.")
 	}
 }
