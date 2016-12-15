@@ -95,19 +95,10 @@ func (ut *UserToken) LoadToken() error {
 	if err != nil {
 		return fmt.Errorf("Error loading user token")
 	}
+	defer closeFile(file)
 
 	decoder := gob.NewDecoder(file)
-	err = decoder.Decode(ut)
-	if err != nil {
-		return err
-	}
-	return file.Close()
-}
-
-// CloseRes closes a given result buffer (for use with defer).
-func CloseRes(b io.ReadCloser) {
-	err := b.Close()
-	util.CheckErrorMsg(err, "Error during cleanup.")
+	return decoder.Decode(ut)
 }
 
 // StoreToken saves the username and auth token to the token file.
@@ -117,11 +108,18 @@ func (ut *UserToken) StoreToken() error {
 	if err != nil {
 		return fmt.Errorf("Error saving user token.")
 	}
+	defer closeFile(file)
 
 	encoder := gob.NewEncoder(file)
-	err = encoder.Encode(ut)
-	if err != nil {
-		return err
-	}
-	return file.Close()
+	return encoder.Encode(ut)
+}
+
+// CloseRes closes a given result buffer (for use with defer).
+func CloseRes(b io.ReadCloser) {
+	err := b.Close()
+	util.CheckErrorMsg(err, "Error during cleanup.")
+}
+
+func closeFile(f *os.File) {
+	_ = f.Close()
 }
