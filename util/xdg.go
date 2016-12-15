@@ -20,6 +20,7 @@ func makePath(path string) {
 
 // ConfigPath returns the configuration path where configuration files should be stored.
 func ConfigPath() (path string) {
+	// TODO: OS dependent paths
 	xdghome := os.Getenv("XDG_CONFIG_HOME")
 	homedir := os.Getenv("HOME")
 

@@ -33,9 +33,7 @@ func TestMain(m *testing.M) {
 	}
 
 	res := m.Run()
-
 	_ = os.RemoveAll(tmpdir)
-
 	os.Exit(res)
 }
 
@@ -62,7 +60,7 @@ func TestRequestAccount(t *testing.T) {
 	acc, err := authcl.RequestAccount("alice")
 
 	if err != nil {
-		t.Error(fmt.Printf("[Account lookup: alice] Request returned error [%s] when it should have succeeded.", err.Error()))
+		t.Errorf("[Account lookup: alice] Request returned error [%s] when it should have succeeded.", err.Error())
 	}
 
 	respOK := acc.Login == "alice" && acc.UUID == "alice_test_uuid" && acc.Title == nil &&
@@ -76,7 +74,7 @@ func TestRequestAccount(t *testing.T) {
 	acc, err = authcl.RequestAccount("alicewithaffil")
 
 	if err != nil {
-		t.Error(fmt.Printf("[Account lookup: alicewithaffil] Request returned error [%s] when it should have succeeded.", err.Error()))
+		t.Errorf("[Account lookup: alicewithaffil] Request returned error [%s] when it should have succeeded.", err.Error())
 	}
 
 	affil := acc.Affiliation
@@ -95,7 +93,7 @@ func TestRequestAccount(t *testing.T) {
 
 	var emptyAcc gin.Account
 	if acc != emptyAcc {
-		t.Error(fmt.Printf("[Account lookup] Non existent account request returned non-empty account info. [%+v]", acc))
+		t.Errorf("[Account lookup] Non existent account request returned non-empty account info. [%+v]", acc)
 	}
 }
 
@@ -103,6 +101,8 @@ func getKeysHandler(w http.ResponseWriter, r *http.Request) {
 	aliceKeys := `[{"url":"test_server/api/keys?fingerprint=fingerprint_one","fingerprint":"fingerprint_one","key":"ssh-rsa SSHKEY12344567 name@host","description":"name@host","login":"alice","account_url":"test_server/api/accounts/alice","created_at":"2016-12-12T18:11:54.131134+01:00","updated_at":"2016-12-12T18:11:54.131134+01:00"},{"url":"test_server/api/keys?fingerprint=fingerprint_two","fingerprint":"fingerprint_two","key":"ssh-rsa SSHKEYTHESECONDONE name@host","description":"name@host_2","login":"alice","account_url":"test_server/api/accounts/alice","created_at":"2016-12-12T18:11:54.131134+01:00","updated_at":"2016-12-12T18:11:54.131134+01:00"}]`
 	if r.URL.Path == "/api/accounts/alice/keys" {
 		fmt.Fprint(w, aliceKeys)
+	} else {
+		w.WriteHeader(http.StatusNotFound)
 	}
 }
 
@@ -111,16 +111,16 @@ func TestRequestKeys(t *testing.T) {
 	defer ts.Close()
 
 	authcl := NewClient(ts.URL)
-	authcl.Username = "alice"
 
+	// alice with 2 keys
 	keys, err := authcl.GetUserKeys()
 	if err != nil {
-		t.Error(fmt.Printf("[Key retrieval] Request returned error [%s] when it should have succeeded.", err.Error()))
+		t.Errorf("[Key retrieval] Request returned error [%s] when it should have succeeded.", err.Error())
 	}
 
 	nkeys := 2
 	if len(keys) != nkeys {
-		t.Errorf(fmt.Sprintf("[Key retrieval] Expected %d keys. Got %d.", nkeys, len(keys)))
+		t.Errorf("[Key retrieval] Expected %d keys. Got %d.", nkeys, len(keys))
 		t.FailNow()
 	}
 

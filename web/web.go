@@ -64,6 +64,7 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
+	// TODO: Don't set Authorization if Token is empty
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
 	return cl.web.Do(req)
 }
