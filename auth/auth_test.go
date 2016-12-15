@@ -25,20 +25,12 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	userToken := web.UserToken{Username: "alice", Token: "some_sort_of_token"}
-	err = userToken.StoreToken()
-	if err != nil {
-		fmt.Fprint(os.Stderr, "Error storing token file for tests.")
-		os.Exit(1)
-	}
-
 	res := m.Run()
 	_ = os.RemoveAll(tmpdir)
 	os.Exit(res)
 }
 
 func getAccountHandler(w http.ResponseWriter, r *http.Request) {
-
 	aliceInfo := `{"url":"test_server/api/accounts/alice","uuid":"alice_test_uuid","login":"alice","title":null,"first_name":"Alice","middle_name":null,"last_name":"Goodwill",%s"created_at":"2016-11-10T12:26:04.57208Z","updated_at":"2016-11-10T12:26:04.57208+01:00"}`
 	aliceAffil := `"affiliation":{"institute":"The Institute","department":"Some department","city":"Munich","country":"Germany","is_public":true},`
 	if r.URL.Path == "/api/accounts/alice" {
@@ -101,6 +93,10 @@ func getKeysHandler(w http.ResponseWriter, r *http.Request) {
 	aliceKeys := `[{"url":"test_server/api/keys?fingerprint=fingerprint_one","fingerprint":"fingerprint_one","key":"ssh-rsa SSHKEY12344567 name@host","description":"name@host","login":"alice","account_url":"test_server/api/accounts/alice","created_at":"2016-12-12T18:11:54.131134+01:00","updated_at":"2016-12-12T18:11:54.131134+01:00"},{"url":"test_server/api/keys?fingerprint=fingerprint_two","fingerprint":"fingerprint_two","key":"ssh-rsa SSHKEYTHESECONDONE name@host","description":"name@host_2","login":"alice","account_url":"test_server/api/accounts/alice","created_at":"2016-12-12T18:11:54.131134+01:00","updated_at":"2016-12-12T18:11:54.131134+01:00"}]`
 	if r.URL.Path == "/api/accounts/alice/keys" {
 		fmt.Fprint(w, aliceKeys)
+	} else if r.URL.Path == "/api/accounts/errorinducer/keys" {
+		http.Error(w, "Server returned error", 500)
+	} else if r.URL.Path == "/api/accounts/badresponse/keys" {
+		fmt.Fprint(w, "not_json_response")
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -113,6 +109,12 @@ func TestRequestKeys(t *testing.T) {
 	authcl := NewClient(ts.URL)
 
 	// alice with 2 keys
+	aliceToken := web.UserToken{Username: "alice", Token: "some_sort_of_token"}
+	err := aliceToken.StoreToken()
+	if err != nil {
+		t.Error("[Key retrieval] Error storing token for alice.")
+	}
+
 	keys, err := authcl.GetUserKeys()
 	if err != nil {
 		t.Errorf("[Key retrieval] Request returned error [%s] when it should have succeeded.", err.Error())
@@ -135,4 +137,87 @@ func TestRequestKeys(t *testing.T) {
 		t.Error("[Key retrieval] Test failed. Response does not match expected values.")
 	}
 
+	// non-existent user
+	nexuser := web.UserToken{Username: "I do not exist", Token: "some_sort_of_token"}
+	err = nexuser.StoreToken()
+	if err != nil {
+		t.Error("[Key retrieval] Error storing token for non existent account test.")
+	}
+
+	keys, err = authcl.GetUserKeys()
+	if err == nil {
+		t.Error("[Key retrieval] Non existent account request succeeded when it should have failed.")
+	}
+
+	if len(keys) != 0 {
+		t.Errorf("[Key retrieval] Non existent user key request returned non-empty key slice. [%d items]", len(keys))
+	}
+
+	// error inducing request
+	errorUser := web.UserToken{Username: "errorinducer", Token: "some_sort_of_token"}
+	err = errorUser.StoreToken()
+	if err != nil {
+		t.Error("[Key retrieval] Error storing token for error test.")
+	}
+
+	keys, err = authcl.GetUserKeys()
+	if err == nil {
+		t.Error("[Key retrieval] Request succeeded when it should have failed.")
+	}
+
+	if len(keys) != 0 {
+		t.Errorf("[Key retrieval] Bad request returned non-empty key slice. [%d items]", len(keys))
+	}
+
+	// bad response
+	badResponseUser := web.UserToken{Username: "badresponse", Token: "some_sort_of_token"}
+	err = badResponseUser.StoreToken()
+	if err != nil {
+		t.Error("[Key retrieval] Error storing token for bad response test.")
+	}
+
+	keys, err = authcl.GetUserKeys()
+	if err == nil {
+		t.Error("[Key retrieval] Request succeeded when it should have failed.")
+	}
+
+	if len(keys) != 0 {
+		t.Errorf("[Key retrieval] Bad request returned non-empty key slice. [%d items]", len(keys))
+	}
+
+	// not logged in
+	oldconf := os.Getenv("XDG_CONFIG_HOME")
+	err = os.Setenv("XDG_CONFIG_HOME", "")
+	if err != nil {
+		t.Error("Error setting XDG_CONFIG_HOME to empty string.")
+	}
+	keys, err = authcl.GetUserKeys()
+	if err == nil {
+		t.Error("[Key retrieval] Request without login succeeded when it should have failed.")
+	}
+
+	if len(keys) != 0 {
+		t.Errorf("[Key retrieval] Request without login returned non-empty key slice. [%d items]", len(keys))
+	}
+
+	err = os.Setenv("XDG_CONFIG_HOME", oldconf)
+	if err != nil {
+		t.Errorf("Error resetting XDG_CONFIG_HOME after no login test.")
+	}
+
+	// server error
+	authcl = NewClient("")
+	nullToken := web.UserToken{Username: "", Token: ""}
+	err = nullToken.StoreToken()
+	if err != nil {
+		t.Error("[Key retrieval] Error storing null token.")
+	}
+	keys, err = authcl.GetUserKeys()
+	if err == nil {
+		t.Error("[Key retrieval] Request with bad server succeeded when it should have failed.")
+	}
+
+	if len(keys) != 0 {
+		t.Errorf("[Key retrieval] Request with bad server returned non-empty key slice. [%d items]", len(keys))
+	}
 }
