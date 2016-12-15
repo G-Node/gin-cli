@@ -87,6 +87,17 @@ func TestRequestAccount(t *testing.T) {
 	if acc != emptyAcc {
 		t.Errorf("[Account lookup] Non existent account request returned non-empty account info. [%+v]", acc)
 	}
+
+	// server error
+	authcl = NewClient("")
+	acc, err = authcl.RequestAccount("server is broken")
+	if err == nil {
+		t.Error("[Account lookup] Request succeeded when it should have failed.")
+	}
+
+	if acc != emptyAcc {
+		t.Errorf("[Account lookup] Bad request returned non-empty account info. [%+v]", acc)
+	}
 }
 
 func getKeysHandler(w http.ResponseWriter, r *http.Request) {
