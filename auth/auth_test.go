@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"regexp"
+	"path/filepath"
 	"testing"
 
 	"github.com/G-Node/gin-cli/web"
@@ -200,7 +200,7 @@ func TestRequestKeys(t *testing.T) {
 
 	// not logged in
 	oldconf := os.Getenv("XDG_CONFIG_HOME")
-	err = os.Setenv("XDG_CONFIG_HOME", "")
+	err = os.Setenv("XDG_CONFIG_HOME", filepath.Join(oldconf, "wrongdir"))
 	if err != nil {
 		t.Error("Error setting XDG_CONFIG_HOME to empty string.")
 	}
@@ -236,19 +236,22 @@ func TestRequestKeys(t *testing.T) {
 }
 
 func addKeyHandler(w http.ResponseWriter, r *http.Request) {
-	match, _ := regexp.MatchString("/api/accounts/[a-zA-Z]+/keys", r.URL.Path)
+	goodURL := "/api/accounts/alice/keys"
+	noauthURL := "/api/accounts/bob/keys"
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error in request handler for AddKey test")
 	}
 
 	newKey := &gin.SSHKey{}
-	if match {
+	if r.URL.Path == goodURL {
 		err := json.Unmarshal(b, newKey)
 		if err != nil {
 			http.Error(w, "Bad data", http.StatusBadRequest)
 		}
-		w.WriteHeader(http.StatusAccepted)
+		w.WriteHeader(http.StatusOK)
+	} else if r.URL.Path == noauthURL {
+		w.WriteHeader(http.StatusUnauthorized)
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -270,14 +273,8 @@ func TestAddKey(t *testing.T) {
 		t.Errorf("[Add key] Function returned error: %s", err.Error())
 	}
 
-	authcl = NewClient("")
-	err = authcl.AddKey("", "", false)
-	if err == nil {
-		t.Error("[Add key] Request with bad server succeeded when it should have failed.")
-	}
-
 	oldconf := os.Getenv("XDG_CONFIG_HOME")
-	err = os.Setenv("XDG_CONFIG_HOME", "")
+	err = os.Setenv("XDG_CONFIG_HOME", filepath.Join(oldconf, "wrongdir"))
 	if err != nil {
 		t.Error("Error setting XDG_CONFIG_HOME to empty string.")
 	}
@@ -289,4 +286,22 @@ func TestAddKey(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error resetting XDG_CONFIG_HOME after no login test.")
 	}
+
+	bobToken := web.UserToken{Username: "bob", Token: "Whatever"}
+	err = bobToken.StoreToken()
+	if err != nil {
+		t.Error("Error storing token for bob.")
+	}
+
+	err = authcl.AddKey("", "", true)
+	if err == nil {
+		t.Error("[Add key] Request with no auth succeeded when it should have failed.")
+	}
+
+	authcl = NewClient("")
+	err = authcl.AddKey("", "", false)
+	if err == nil {
+		t.Error("[Add key] Request with bad server succeeded when it should have failed.")
+	}
+
 }
