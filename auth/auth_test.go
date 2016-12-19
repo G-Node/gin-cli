@@ -303,5 +303,74 @@ func TestAddKey(t *testing.T) {
 	if err == nil {
 		t.Error("[Add key] Request with bad server succeeded when it should have failed.")
 	}
+}
 
+func searchAccountHandler(w http.ResponseWriter, r *http.Request) {
+	goodURL := "/api/accounts?q=alice"
+	resp := `[{"url":"test_server/api/accounts/alice","uuid":"alice_uuid","login":"alice","title":null,"first_name":"Alice","middle_name":null,"last_name":"Goodwill","created_at":"2016-11-10T12:26:04.57208Z","updated_at":"2016-12-15T11:28:28.439154+01:00"},{"url":"test_server/api/accounts/alice2","uuid":"alice2_uuid","login":"alice2","title":"Second","first_name":"Alice","middle_name":"Two","last_name":"Goodwill","created_at":"2016-11-10T12:26:04.57208Z","updated_at":"2016-12-15T11:28:28.439154+01:00"}]`
+
+	errorURL := "/api/accounts?q=errorurl"
+
+	if r.URL.Path == goodURL {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, resp)
+	} else if r.URL.Path == errorURL {
+		http.Error(w, "Server returned error", http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "[]")
+	}
+}
+
+func TestSearchAccount(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(searchAccountHandler))
+	defer ts.Close()
+
+	authcl := NewClient(ts.URL)
+	accs, err := authcl.SearchAccount("alice")
+	if err != nil {
+		t.Errorf("[Search account] Function returned error: %s", err.Error())
+	}
+
+	naccs := 2
+	if len(accs) != naccs {
+		t.Errorf("[Search account] Expected %d keys. Got %d.", naccs, len(accs))
+	}
+
+	respOK := accs[0].Login == "alice" && accs[0].UUID == "alice_uuid" && accs[0].Title == nil &&
+		accs[0].FirstName == "Alice" && accs[0].MiddleName == nil && accs[0].LastName == "Goodwill"
+	respOK = respOK && accs[1].Login == "alice2" && accs[1].UUID == "alice2_uuid" && *accs[1].Title == "Second" &&
+		accs[1].FirstName == "Alice" && *accs[1].MiddleName == "Two" && accs[1].LastName == "Goodwill"
+
+	if !respOK {
+		t.Error("[Search account] Test failed. Response does not match expected values.")
+	}
+
+	accs, err = authcl.SearchAccount("NO SUCH USER")
+	if err != nil {
+		t.Error("[Search account] Non existent account search returned error.")
+	}
+
+	if len(accs) != 0 {
+		t.Errorf("[Search account] Non existent account search returned non-empty account info. [%+v]", accs)
+	}
+
+	accs, err = authcl.SearchAccount("errorurl")
+	if err == nil {
+		t.Error("[Search account] Request succeeded when it should have failed.")
+	}
+
+	if len(accs) != 0 {
+		t.Errorf("[Search account] Error request returned non-empty account info. [%+v]", accs)
+	}
+
+	authcl = NewClient("")
+	accs, err = authcl.SearchAccount("Doesn't matter")
+	if err == nil {
+		t.Error("[Search account] Bad server account search succeeded when it should have failed.")
+	}
+
+	if len(accs) != 0 {
+		t.Errorf("[Search account] Bad server account search returned non-empty account info. [%+v]", accs)
+	}
 }
