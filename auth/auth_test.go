@@ -408,4 +408,15 @@ func TestLogin(t *testing.T) {
 		t.Errorf("[Login] Request returned error: %s", err.Error())
 	}
 
+	err = authcl.Login("alice", "alicebadpw", "clientid", "clientsecret")
+	if err == nil {
+		t.Errorf("[Login] Request succeeded when it should have failed.")
+	}
+
+	authcl = NewClient("")
+	err = authcl.Login("alice", "alicepw", "clientid", "clientsecret")
+	if err == nil {
+		t.Errorf("[Login] Request succeeded when it should have failed.")
+	}
+
 }
