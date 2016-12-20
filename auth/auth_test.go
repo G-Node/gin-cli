@@ -378,6 +378,7 @@ func TestSearchAccount(t *testing.T) {
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	goodURL := "/oauth/token"
 	goodFormData := `client_id=clientid&client_secret=clientsecret&grant_type=password&password=alicepw&scope=repo-read+repo-write+account-read+account-write&username=alice`
+	brokenFormData := `client_id=clientid&client_secret=clientsecret&grant_type=password&password=BREAK&scope=repo-read+repo-write+account-read+account-write&username=BREAK`
 	resp := `{"token_type":"Bearer","scope":"account-read account-write repo-read repo-write","access_token":"THETOKEN","refresh_token":null}`
 	badAuthResp := `{"code":401,"error":"Unauthorized","message":"Wront username or password","reasons":null}`
 	err := r.ParseForm()
@@ -389,12 +390,15 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		if r.Form.Encode() == goodFormData {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprint(w, resp)
+		} else if r.Form.Encode() == brokenFormData {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "not_json_response")
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
 			fmt.Fprint(w, badAuthResp)
 		}
 	} else {
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusNotFound)
 	}
 }
 
@@ -403,16 +407,25 @@ func TestLogin(t *testing.T) {
 	defer ts.Close()
 
 	authcl := NewClient(ts.URL)
+	// proper login
 	err := authcl.Login("alice", "alicepw", "clientid", "clientsecret")
 	if err != nil {
 		t.Errorf("[Login] Request returned error: %s", err.Error())
 	}
 
+	// bad password
 	err = authcl.Login("alice", "alicebadpw", "clientid", "clientsecret")
 	if err == nil {
 		t.Errorf("[Login] Request succeeded when it should have failed.")
 	}
 
+	// broken response from server (invalid data)
+	err = authcl.Login("BREAK", "BREAK", "clientid", "clientsecret")
+	if err == nil {
+		t.Errorf("[Login] Request succeeded when it should have failed.")
+	}
+
+	// bad client configuration (invalid server)
 	authcl = NewClient("")
 	err = authcl.Login("alice", "alicepw", "clientid", "clientsecret")
 	if err == nil {
