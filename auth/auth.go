@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/url"
 
-	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
 )
@@ -144,11 +143,15 @@ func (authcl *Client) Login(username, password, clientID, clientSecret string) e
 	defer web.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	var authresp gin.TokenResponse
 	err = json.Unmarshal(b, &authresp)
-	util.CheckError(err)
+	if err != nil {
+		return err
+	}
 
 	authcl.Username = username
 	authcl.Token = authresp.AccessToken
