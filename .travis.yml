@@ -5,7 +5,7 @@ sudo: required
 
 go:
  - 1.7
- # - tip
+ - tip
 
 before_install:
   - sudo apt-get update
