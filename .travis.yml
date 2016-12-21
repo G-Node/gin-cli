@@ -23,7 +23,7 @@ install:
  - go get github.com/mattn/goveralls
  - go get golang.org/x/tools/cmd/cover
  # go path fork workaround
- - mkdir $GOPATH/src/github.com/G-Node && ln -s $GOPATH/src/github.com/achilleas-k/gin-cli $GOPATH/src/github.com/G-Node/gin-cli
+ # - mkdir $GOPATH/src/github.com/G-Node && ln -s $GOPATH/src/github.com/achilleas-k/gin-cli $GOPATH/src/github.com/G-Node/gin-cli
  - go get ./...
 
 script:
