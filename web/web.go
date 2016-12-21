@@ -48,7 +48,9 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+	if cl.Token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+	}
 	return cl.web.Do(req)
 }
 
@@ -64,8 +66,10 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Don't set Authorization if Token is empty
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+
+	if cl.Token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+	}
 	return cl.web.Do(req)
 }
 
