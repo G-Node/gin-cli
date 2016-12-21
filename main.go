@@ -228,38 +228,25 @@ func printAccountInfo(userarg interface{}) {
 	fmt.Println(outBuffer.String())
 }
 
-func listUserRepos(userarg interface{}) {
+func listRepos(userarg interface{}) {
 	var username string
-	authcl := auth.NewClient(authhost)
-	err := authcl.LoadToken()
-
-	util.CheckErrorMsg(err, "This command requires login.")
+	repocl := repo.NewClient(repohost)
 
 	if userarg == nil {
-		username = authcl.Username
+		username = ""
 	} else {
 		username = userarg.(string)
 	}
-
-	repocl := repo.NewClient(repohost)
-	info, err := repocl.GetRepos(username)
+	repos, err := repocl.GetRepos(username)
 	util.CheckError(err)
 
-	fmt.Printf("Repositories owned by %s\n", username)
-	for idx, r := range info {
-		fmt.Printf("%d:  %s\n", idx+1, r.Name)
-	}
-}
-
-func listPubRepos() {
-	repocl := repo.NewClient(repohost)
-	repos, err := repocl.GetRepos("")
-	util.CheckError(err)
-
-	fmt.Printf("Public repositories\n")
 	for idx, repoInfo := range repos {
-		fmt.Printf("%d: %s [head: %s]\n", idx+1, repoInfo.Name, repoInfo.Head)
-		fmt.Printf(" - %s\n", repoInfo.Description)
+		fmt.Printf("%d: %s/%s\n", idx+1, repoInfo.Owner, repoInfo.Name)
+		fmt.Printf("Description: %s\n", strings.Trim(repoInfo.Description, "\n"))
+		if repoInfo.Public {
+			fmt.Println("[This repository is public]")
+		}
+		fmt.Println()
 	}
 }
 
@@ -277,7 +264,6 @@ Usage:
 	gin info     [<username>]
 	gin keys     [-v | --verbose]
 	gin keys     --add <filename>
-	gin public
 `
 
 	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
@@ -306,8 +292,6 @@ Usage:
 			printKeys(printFullKeys)
 		}
 	case args["repos"].(bool):
-		listUserRepos(args["<username>"])
-	case args["public"].(bool):
-		listPubRepos()
+		listRepos(args["<username>"])
 	}
 }

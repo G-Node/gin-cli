@@ -32,16 +32,19 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 
 	if user == "" {
 		res, err = repocl.Get("/repos/public")
+		fmt.Print("Listing all public repositories\n\n")
 	} else {
 		err = repocl.LoadToken()
 		if err != nil {
-			return repoList, err
+			fmt.Print("You are not logged in - Showing public repositories\n\n")
 		}
 		res, err = repocl.Get(fmt.Sprintf("/users/%s/repos", user))
 	}
 
 	if err != nil {
 		return repoList, err
+	} else if res.StatusCode == 404 {
+		return repoList, fmt.Errorf("Server returned empty result. Either user does not exist or has no accessible repositories.")
 	} else if res.StatusCode != 200 {
 		return repoList, fmt.Errorf("[Repository request] Failed. Server returned: %s", res.Status)
 	}
