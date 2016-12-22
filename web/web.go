@@ -119,6 +119,12 @@ func (ut *UserToken) StoreToken() error {
 	return encoder.Encode(ut)
 }
 
+// DeleteToken deletes the token file if it exists. It essentially logs out the user.
+func DeleteToken() {
+	filepath := filepath.Join(util.ConfigPath(), "token")
+	_ = os.Remove(filepath)
+}
+
 // CloseRes closes a given result buffer (for use with defer).
 func CloseRes(b io.ReadCloser) {
 	err := b.Close()
