@@ -95,7 +95,11 @@ func NewClient(address string) *Client {
 // LoadToken reads the username and auth token from the token file and sets the
 // values in the struct.
 func (ut *UserToken) LoadToken() error {
-	filepath := filepath.Join(util.ConfigPath(), "token")
+	path, err := util.ConfigPath(false)
+	if err != nil {
+		return fmt.Errorf("Could not read token: Error accessing config directory.")
+	}
+	filepath := filepath.Join(path, "token")
 	file, err := os.Open(filepath)
 	if err != nil {
 		return fmt.Errorf("Error loading user token")
@@ -108,7 +112,11 @@ func (ut *UserToken) LoadToken() error {
 
 // StoreToken saves the username and auth token to the token file.
 func (ut *UserToken) StoreToken() error {
-	filepath := filepath.Join(util.ConfigPath(), "token")
+	path, err := util.ConfigPath(true)
+	if err != nil {
+		return fmt.Errorf("Could not save token: Error creating or accessing config directory.")
+	}
+	filepath := filepath.Join(path, "token")
 	file, err := os.Create(filepath)
 	if err != nil {
 		return fmt.Errorf("Error saving user token.")
@@ -120,9 +128,13 @@ func (ut *UserToken) StoreToken() error {
 }
 
 // DeleteToken deletes the token file if it exists. It essentially logs out the user.
-func DeleteToken() {
-	filepath := filepath.Join(util.ConfigPath(), "token")
-	_ = os.Remove(filepath)
+func DeleteToken() error {
+	path, err := util.ConfigPath(false)
+	if err != nil {
+		return fmt.Errorf("Could not delete token: Error accessing config directory.")
+	}
+	filepath := filepath.Join(path, "token")
+	return os.Remove(filepath)
 }
 
 // CloseRes closes a given result buffer (for use with defer).
