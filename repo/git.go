@@ -15,48 +15,53 @@ import (
 	git "github.com/libgit2/git2go"
 )
 
-// TODO: Load from config
-const user = "git"
-const githost = "gin.g-node.org"
-
 // Keys
 
 // Temporary (SSH key) file handling
 
-var privKeyFile *util.TempFile
+var privKeyFile util.TempFile
 
-// setupTempKeyPair creates a temporary key pair, stores it in a temporary directory,
-// and adds it to the logged in user's account on the auth server (as a temporary key).
-// It also sets the global tempFile for use by the annex commands.
-// The key pair is returned.
-func setupTempKeyPair() (*util.KeyPair, error) {
+// MakeTempKeyPair creates a temporary key pair and stores it in a temporary directory.
+// It also sets the global tempFile for use by the annex commands. The key pair is returned directly.
+func (repocl *Client) MakeTempKeyPair() (*util.KeyPair, error) {
 	tempKeyPair, err := util.MakeKeyPair()
-	if err != nil {
-		return nil, err
-	}
-
-	privKeyFile, err = util.SaveTempKeyFile(tempKeyPair.Private)
 	if err != nil {
 		return nil, err
 	}
 
 	description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
-	err = auth.AddKey(pubkey, description, true)
+	authcl := auth.NewClient(repocl.KeyHost)
+	err = authcl.AddKey(pubkey, description, true)
 	if err != nil {
-		return nil, err
+		return tempKeyPair, err
 	}
+
+	privKeyFile, err = util.MakeTempFile("priv")
+	if err != nil {
+		return tempKeyPair, err
+	}
+
+	err = privKeyFile.Write(tempKeyPair.Private)
+	if err != nil {
+		return tempKeyPair, err
+	}
+
+	privKeyFile.Active = true
+
 	return tempKeyPair, nil
 }
 
 // CleanUpTemp deletes the temporary directory which holds the temporary private key if it exists.
 func CleanUpTemp() {
-	privKeyFile.Delete()
+	if privKeyFile.Active {
+		privKeyFile.Delete()
+	}
 }
 
 // Git callbacks
 
-func makeCredsCB() git.CredentialsCallback {
+func (repocl *Client) makeCredsCB() git.CredentialsCallback {
 	// attemptnum is used to determine which authentication method to use each time.
 	attemptnum := 0
 
@@ -65,13 +70,13 @@ func makeCredsCB() git.CredentialsCallback {
 		var cred git.Cred
 		switch attemptnum {
 		case 0:
-			res, cred = git.NewCredSshKeyFromAgent("git")
+			res, cred = git.NewCredSshKeyFromAgent(repocl.GitUser)
 		case 1:
-			tempKeyPair, err := setupTempKeyPair()
+			tempKeyPair, err := repocl.MakeTempKeyPair()
 			if err != nil {
 				return git.ErrUser, nil
 			}
-			res, cred = git.NewCredSshKeyFromMemory("git", tempKeyPair.Public, tempKeyPair.Private, "")
+			res, cred = git.NewCredSshKeyFromMemory(repocl.GitUser, tempKeyPair.Public, tempKeyPair.Private, "")
 		default:
 			return git.ErrUser, nil
 		}
@@ -84,9 +89,9 @@ func makeCredsCB() git.CredentialsCallback {
 	}
 }
 
-func certCB(cert *git.Certificate, valid bool, hostname string) git.ErrorCode {
+func (repocl *Client) certCB(cert *git.Certificate, valid bool, hostname string) git.ErrorCode {
 	// TODO: Better cert check?
-	if hostname != githost {
+	if hostname != repocl.GitHost {
 		return git.ErrCertificate
 	}
 	return git.ErrOk
@@ -139,15 +144,45 @@ func AddPath(localPath string) (*git.Index, error) {
 	return idx, err
 }
 
+// Connect opens a connection to the git server. This is used to validate credentials
+// and generate temporary keys on demand, without performing a git operation.
+func (repocl *Client) Connect(localPath string, push bool) error {
+	var dir git.ConnectDirection
+	if push {
+		dir = git.ConnectDirectionPush
+	} else {
+		dir = git.ConnectDirectionFetch
+	}
+
+	cbs := &git.RemoteCallbacks{
+		CredentialsCallback:      repocl.makeCredsCB(),
+		CertificateCheckCallback: repocl.certCB,
+	}
+
+	var headers []string
+
+	repository, err := git.OpenRepository(localPath)
+	if err != nil {
+		return err
+	}
+
+	origin, err := repository.Remotes.Lookup("origin")
+	if err != nil {
+		return err
+	}
+
+	return origin.Connect(dir, cbs, headers)
+}
+
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
-func Clone(repopath string) (*git.Repository, error) {
-	remotePath := fmt.Sprintf("%s@%s:%s", user, githost, repopath)
+func (repocl *Client) Clone(repopath string) (*git.Repository, error) {
+	remotePath := fmt.Sprintf("%s@%s:%s", repocl.GitUser, repocl.GitHost, repopath)
 	localPath := path.Base(repopath)
 
 	cbs := &git.RemoteCallbacks{
-		CredentialsCallback:      makeCredsCB(),
-		CertificateCheckCallback: certCB,
+		CredentialsCallback:      repocl.makeCredsCB(),
+		CertificateCheckCallback: repocl.certCB,
 	}
 	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
 	opts := git.CloneOptions{
@@ -167,7 +202,8 @@ func Clone(repopath string) (*git.Repository, error) {
 
 // Commit performs a git commit on the currently staged objects.
 // (git commit)
-func Commit(localPath string, idx *git.Index) error {
+func (repocl *Client) Commit(localPath string, idx *git.Index) error {
+	// TODO: Construct signature based on user config
 	signature := &git.Signature{
 		Name:  "gin",
 		Email: "gin",
@@ -212,8 +248,8 @@ func Commit(localPath string, idx *git.Index) error {
 
 // Pull pulls all remote commits from the default remote & branch
 // (git pull)
-func Pull() error {
-	repository, err := git.OpenRepository(".")
+func (repocl *Client) Pull(localPath string) error {
+	repository, err := git.OpenRepository(localPath)
 	if err != nil {
 		return err
 	}
@@ -225,8 +261,8 @@ func Pull() error {
 
 	// Fetch
 	cbs := &git.RemoteCallbacks{
-		CredentialsCallback:      makeCredsCB(),
-		CertificateCheckCallback: certCB,
+		CredentialsCallback:      repocl.makeCredsCB(),
+		CertificateCheckCallback: repocl.certCB,
 	}
 	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
 
@@ -320,7 +356,7 @@ func Pull() error {
 
 // Push pushes all local commits to the default remote & branch
 // (git push)
-func Push(localPath string) error {
+func (repocl *Client) Push(localPath string) error {
 	repository, err := git.OpenRepository(localPath)
 	if err != nil {
 		return err
@@ -332,8 +368,8 @@ func Push(localPath string) error {
 	}
 
 	rcbs := git.RemoteCallbacks{
-		CredentialsCallback:      makeCredsCB(),
-		CertificateCheckCallback: certCB,
+		CredentialsCallback:      repocl.makeCredsCB(),
+		CertificateCheckCallback: repocl.certCB,
 	}
 
 	popts := &git.PushOptions{
@@ -352,7 +388,7 @@ func Push(localPath string) error {
 func AnnexInit(localPath string) error {
 	initError := fmt.Errorf("Repository annex initialisation failed.")
 	cmd := exec.Command("git", "-C", localPath, "annex", "init", "--version=6")
-	if privKeyFile != nil {
+	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()
@@ -386,7 +422,7 @@ func AnnexInit(localPath string) error {
 // (git annex get --all)
 func AnnexPull(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
-	if privKeyFile != nil {
+	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()
@@ -401,7 +437,7 @@ func AnnexPull(localPath string) error {
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content")
-	if privKeyFile != nil {
+	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	err := cmd.Run()

@@ -1,0 +1,125 @@
+package web
+
+import (
+	"bytes"
+	"encoding/gob"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+
+	"github.com/G-Node/gin-cli/util"
+)
+
+// UserToken struct for username and token
+type UserToken struct {
+	Username string
+	Token    string
+}
+
+// Client struct for making requests
+type Client struct {
+	Host string
+	UserToken
+	web *http.Client
+}
+
+func urlJoin(parts ...string) string {
+	// First part must be a valid URL
+	u, err := url.Parse(parts[0])
+	util.CheckErrorMsg(err, "Bad URL in urlJoin")
+
+	for _, part := range parts[1:] {
+		u.Path = path.Join(u.Path, part)
+	}
+	return u.String()
+}
+
+// Get sends a GET request to address.
+// The address is appended to the client host, so it should be specified without a host prefix.
+func (cl *Client) Get(address string) (*http.Response, error) {
+	requrl := urlJoin(cl.Host, address)
+	req, err := http.NewRequest("GET", requrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+	return cl.web.Do(req)
+}
+
+// Post sends a POST request to address with the provided data.
+// The address is appended to the client host, so it should be specified without a host prefix.
+func (cl *Client) Post(address string, data interface{}) (*http.Response, error) {
+	datajson, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	requrl := urlJoin(cl.Host, address)
+	req, err := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+	return cl.web.Do(req)
+}
+
+// PostForm sends a POST request to address with the provided data.
+// The address is appended to the client host, so it should be specified without the host prefix.
+// Unlike the Post method, the data in this case is sent as x-www-form-urlencoded.
+func (cl *Client) PostForm(address string, data url.Values) (*http.Response, error) {
+
+	requrl := urlJoin(cl.Host, address)
+	req, err := http.NewRequest("POST", requrl, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	return cl.web.Do(req)
+}
+
+// NewClient creates a new client for a given host.
+func NewClient(address string) *Client {
+	return &Client{Host: address, web: &http.Client{}}
+}
+
+// LoadToken reads the username and auth token from the token file and sets the
+// values in the struct.
+func (ut *UserToken) LoadToken() error {
+	filepath := filepath.Join(util.ConfigPath(), "token")
+	file, err := os.Open(filepath)
+	if err != nil {
+		return fmt.Errorf("Error loading user token")
+	}
+	defer closeFile(file)
+
+	decoder := gob.NewDecoder(file)
+	return decoder.Decode(ut)
+}
+
+// StoreToken saves the username and auth token to the token file.
+func (ut *UserToken) StoreToken() error {
+	filepath := filepath.Join(util.ConfigPath(), "token")
+	file, err := os.Create(filepath)
+	if err != nil {
+		return fmt.Errorf("Error saving user token.")
+	}
+	defer closeFile(file)
+
+	encoder := gob.NewEncoder(file)
+	return encoder.Encode(ut)
+}
+
+// CloseRes closes a given result buffer (for use with defer).
+func CloseRes(b io.ReadCloser) {
+	err := b.Close()
+	util.CheckErrorMsg(err, "Error during cleanup.")
+}
+
+func closeFile(f *os.File) {
+	_ = f.Close()
+}
