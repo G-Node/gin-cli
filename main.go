@@ -11,6 +11,7 @@ import (
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/repo"
 	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/web"
 	"github.com/docopt/docopt-go"
 	"github.com/howeyc/gopass"
 )
@@ -61,6 +62,17 @@ func login(userarg interface{}) {
 	util.CheckError(err)
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)
 	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
+}
+
+func logout() {
+	authcl := auth.NewClient("") // host configuration unnecessary
+	err := authcl.LoadToken()
+	if err != nil {
+		util.Die("You are not logged in.")
+	}
+
+	err = web.DeleteToken()
+	util.CheckErrorMsg(err, "Error deleting user token.")
 }
 
 func createRepo(name, description interface{}) {
@@ -128,7 +140,6 @@ func condAppend(b *bytes.Buffer, str *string) {
 }
 
 func printKeys(printFull bool) {
-
 	authcl := auth.NewClient(authhost)
 	keys, err := authcl.GetUserKeys()
 	util.CheckError(err)
@@ -256,6 +267,7 @@ GIN command line client
 
 Usage:
 	gin login    [<username>]
+	gin logout
 	gin create   [<name>] [-d <description>]
 	gin get      [<repopath>]
 	gin upload
@@ -293,5 +305,7 @@ Usage:
 		}
 	case args["repos"].(bool):
 		listRepos(args["<username>"])
+	case args["logout"].(bool):
+		logout()
 	}
 }
