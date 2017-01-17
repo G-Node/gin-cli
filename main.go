@@ -16,6 +16,30 @@ import (
 	"github.com/howeyc/gopass"
 )
 
+const usage = `
+GIN command line client
+
+Usage: gin [--version] <command> [<args>...]
+
+Options:
+	-h --help    This help screen
+	--version    Client version
+
+Commands:
+	gin login    [<username>]
+	gin logout
+	gin create   [<name>] [<description>]
+	gin get      [<repopath>]
+	gin upload
+	gin download
+	gin repos    [<username>]
+	gin info     [<username>]
+	gin keys     [-v | --verbose]
+	gin keys     --add <filename>
+
+Command help:
+`
+
 // TODO: Load from config
 const authhost = "https://auth.gin.g-node.org"
 const repohost = "https://repo.gin.g-node.org"
@@ -23,16 +47,18 @@ const githost = "gin.g-node.org"
 const gituser = "git"
 
 // login requests credentials, performs login with auth server, and stores the token.
-func login(userarg interface{}) {
+func login(args []string) {
+	var username string
+	var password string
 
-	var username, password string
-
-	if userarg == nil {
+	if len(args) == 0 {
 		// prompt for login
 		fmt.Print("Login: ")
 		fmt.Scanln(&username)
+	} else if len(args) > 1 {
+		util.Die(usage)
 	} else {
-		username = userarg.(string)
+		username = args[0]
 	}
 
 	// prompt for password
@@ -64,7 +90,10 @@ func login(userarg interface{}) {
 	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
 }
 
-func logout() {
+func logout(args []string) {
+	if len(args) > 0 {
+		util.Die(usage)
+	}
 	authcl := auth.NewClient("") // host configuration unnecessary
 	err := authcl.LoadToken()
 	if err != nil {
@@ -75,20 +104,21 @@ func logout() {
 	util.CheckErrorMsg(err, "Error deleting user token.")
 }
 
-func createRepo(name, description interface{}) {
-	var repoName string
-	if name == nil || name.(string) == "" {
+func createRepo(args []string) {
+	var repoName, repoDesc string
+
+	if len(args) == 0 {
 		fmt.Print("Repository name: ")
-		repoName = ""
 		fmt.Scanln(&repoName)
+	} else if len(args) > 2 {
+		util.Die(usage)
 	} else {
-		repoName = name.(string)
+		repoName = args[0]
+		if len(args) == 2 {
+			repoDesc = args[1]
+		}
 	}
 	// TODO: Check name validity before sending to server?
-	repoDesc := ""
-	if description != nil {
-		repoDesc = description.(string)
-	}
 	repocl := repo.NewClient(repohost)
 	repocl.GitUser = gituser
 	repocl.GitHost = githost
@@ -97,12 +127,13 @@ func createRepo(name, description interface{}) {
 	util.CheckError(err)
 }
 
-func getRepo(repoarg interface{}) {
+func getRepo(args []string) {
 	var repostr string
-	if repoarg == nil {
-		util.Die("No repository specified")
+	if len(args) != 1 {
+		util.Die(usage)
+	} else {
+		repostr = args[0]
 	}
-	repostr = repoarg.(string)
 	repocl := repo.NewClient(repohost)
 	repocl.GitUser = gituser
 	repocl.GitHost = githost
@@ -111,7 +142,10 @@ func getRepo(repoarg interface{}) {
 	util.CheckError(err)
 }
 
-func upload() {
+func upload(args []string) {
+	if len(args) > 0 {
+		util.Die(usage)
+	}
 	repocl := repo.NewClient(repohost)
 	repocl.GitUser = gituser
 	repocl.GitHost = githost
@@ -120,7 +154,10 @@ func upload() {
 	util.CheckError(err)
 }
 
-func download() {
+func download(args []string) {
+	if len(args) > 0 {
+		util.Die(usage)
+	}
 	if !repo.IsRepo(".") {
 		util.Die("Current directory is not a repository.")
 	}
@@ -139,7 +176,26 @@ func condAppend(b *bytes.Buffer, str *string) {
 	}
 }
 
-func printKeys(printFull bool) {
+func keys(args []string) {
+	if len(args) > 0 && args[0] == "--add" {
+		addKey(args)
+	} else {
+		printKeys(args)
+	}
+}
+
+func printKeys(args []string) {
+	printFull := false
+	if len(args) > 1 {
+		util.Die(usage)
+	} else if len(args) == 1 {
+		if args[0] == "-v" || args[0] == "--verbose" {
+			printFull = true
+		} else {
+			util.Die(usage)
+		}
+	}
+
 	authcl := auth.NewClient(authhost)
 	keys, err := authcl.GetUserKeys()
 	util.CheckError(err)
@@ -161,16 +217,12 @@ func printKeys(printFull bool) {
 	}
 }
 
-func addKey(fnarg interface{}) {
-	noargError := fmt.Errorf("Please specify a public key file.\n")
-	if fnarg == nil {
-		util.CheckError(noargError)
+func addKey(args []string) {
+	if len(args) != 2 {
+		util.Die(usage)
 	}
 
-	filename := fnarg.(string)
-	if filename == "" {
-		util.CheckError(noargError)
-	}
+	filename := args[1]
 
 	keyBytes, err := ioutil.ReadFile(filename)
 	util.CheckError(err)
@@ -184,16 +236,16 @@ func addKey(fnarg interface{}) {
 	fmt.Printf("New key added '%s'\n", description)
 }
 
-func printAccountInfo(userarg interface{}) {
+func printAccountInfo(args []string) {
 	var username string
 
 	authcl := auth.NewClient(authhost)
 	_ = authcl.LoadToken()
 
-	if userarg == nil {
+	if len(args) == 0 {
 		username = authcl.Username
 	} else {
-		username = userarg.(string)
+		username = args[0]
 	}
 
 	if username == "" {
@@ -262,50 +314,31 @@ func listRepos(userarg interface{}) {
 }
 
 func main() {
-	usage := `
-GIN command line client
 
-Usage:
-	gin login    [<username>]
-	gin logout
-	gin create   [<name>] [-d <description>]
-	gin get      [<repopath>]
-	gin upload
-	gin download
-	gin repos    [<username>]
-	gin info     [<username>]
-	gin keys     [-v | --verbose]
-	gin keys     --add <filename>
-`
+	args, _ := docopt.Parse(usage, nil, true, "GIN command line client v0.1", true)
+	command := args["<command>"].(string)
+	cmdArgs := args["<args>"].([]string)
 
-	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
-
-	switch {
-	case args["login"].(bool):
-		login(args["<username>"])
-	case args["create"].(bool):
-		createRepo(args["<name>"], args["<description>"])
-	case args["get"].(bool):
-		getRepo(args["<repopath>"])
-	case args["upload"].(bool):
-		upload()
-	case args["download"].(bool):
-		download()
-	case args["info"].(bool):
-		printAccountInfo(args["<username>"])
-	case args["keys"].(bool):
-		if args["--add"].(bool) {
-			addKey(args["<filename>"])
-		} else {
-			printFullKeys := false
-			if args["-v"].(bool) || args["--verbose"].(bool) {
-				printFullKeys = true
-			}
-			printKeys(printFullKeys)
-		}
-	case args["repos"].(bool):
-		listRepos(args["<username>"])
-	case args["logout"].(bool):
-		logout()
+	switch command {
+	case "login":
+		login(cmdArgs)
+	case "create":
+		createRepo(cmdArgs)
+	case "get":
+		getRepo(cmdArgs)
+	case "upload":
+		upload(cmdArgs)
+	case "download":
+		download(cmdArgs)
+	case "info":
+		printAccountInfo(cmdArgs)
+	case "keys":
+		keys(cmdArgs)
+	case "repos":
+		listRepos(cmdArgs)
+	case "logout":
+		logout(cmdArgs)
+	default:
+		util.Die(usage)
 	}
 }
