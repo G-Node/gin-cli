@@ -22,22 +22,83 @@ GIN command line client
 Usage: gin [--version] <command> [<args>...]
 
 Options:
-	-h --help    This help screen
-	--version    Client version
+    -h --help    This help screen
+    --version    Client version
 
 Commands:
-	gin login    [<username>]
-	gin logout
-	gin create   [<name>] [<description>]
-	gin get      [<repopath>]
-	gin upload
-	gin download
-	gin repos    [<username>]
-	gin info     [<username>]
-	gin keys     [-v | --verbose]
-	gin keys     --add <filename>
+    gin login    [<username>]
+    gin logout
+    gin create   [<name>] [<description>]
+    gin get      <repopath>
+    gin upload
+    gin download
+    gin repos    [<username>]
+    gin info     [<username>]
+    gin keys     [-v | --verbose]
+    gin keys     --add <filename>
 
 Command help:
+
+    login        Login to the GIN services
+
+                 If no <username> is specified on the command line, you will be
+                 prompted for it. The login command always prompts for a
+                 password.
+
+
+    logout       Logout of the GIN services
+
+
+    create       Create a new repository on the GIN server
+
+                 If no <name> is provided, you will be prompted for one.
+                 A repository <description> can only be specified on the
+                 command line after the <name>.
+
+
+    get          Download a remote repository to a new directory
+
+                 The repository path <repopath> must be specified on the
+                 command line. A repository  path is the owner's username,
+                 followed by a / and the repository name (e.g., user/datarepo).
+
+
+    upload       Upload local changes to the remote repository
+
+                 The upload command should be run from inside the directory of
+                 an existing repository.
+
+
+    download     Download remote changes to the local repository
+
+                 The download command should be run from inside the directory
+                 of an existing repository.
+
+
+    repos        List accessible repositories
+
+                 Without any argument, lists all the publicly accessible
+                 repositories on the GIN server.
+                 If a <username> is specified, this command will list the
+                 specified user's publicly accessible repositories.
+                 If you are logged in, it will also list any repositories
+                 owned by the user that you have access to.
+
+    info         Print user information
+
+                 Without argument, print the information of the currently
+                 logged in user or, if you are not logged in, prompt for a
+                 username to look up.
+                 If a <username> is specified, print the user's information.
+
+
+    keys         List or add SSH keys
+
+                 By default will list the keys (description and fingerprint)
+                 associated with the logged in user. The verbose flag will also
+                 print the full public keys.
+                 To add a new key, use the --add option and specify a pub key
+                 <filename>.
 `
 
 // TODO: Load from config
