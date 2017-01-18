@@ -19,10 +19,13 @@ func makePath(path string) error {
 }
 
 // ConfigPath returns the configuration path where configuration files should be stored.
-func ConfigPath(create bool) (path string, err error) {
+func ConfigPath(create bool) (string, error) {
 	// TODO: OS dependent paths
 	xdghome := os.Getenv("XDG_CONFIG_HOME")
 	homedir := os.Getenv("HOME")
+
+	var path string
+	var err error
 
 	if xdghome != "" {
 		path = filepath.Join(xdghome, suffix)
