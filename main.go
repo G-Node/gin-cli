@@ -54,6 +54,7 @@ Command help:
                  If no <name> is provided, you will be prompted for one.
                  A repository <description> can only be specified on the
                  command line after the <name>.
+                 Login required. 
 
 
     get          Download a remote repository to a new directory
@@ -62,6 +63,7 @@ Command help:
                  command line. A repository path is the owner's username,
                  followed by a "/" and the repository name
                  (e.g., peter/eegdata).
+                 Login required.
 
 
     upload       Upload local repository changes to the remote repository
@@ -88,6 +90,7 @@ Command help:
                  If you are logged in, it will also list any repositories
                  owned by the user that you have access to.
 
+
     info         Print user information
 
                  Without argument, print the information of the currently
@@ -103,6 +106,7 @@ Command help:
                  print the full public keys.
                  To add a new key, use the --add option and specify a pub key
                  <filename>.
+                 Login required.
 `
 
 // TODO: Load from config
