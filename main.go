@@ -59,17 +59,18 @@ Command help:
     get          Download a remote repository to a new directory
 
                  The repository path <repopath> must be specified on the
-                 command line. A repository  path is the owner's username,
-                 followed by a / and the repository name (e.g., user/datarepo).
+                 command line. A repository path is the owner's username,
+                 followed by a "/" and the repository name
+                 (e.g., peter/eegdata).
 
 
-    upload       Upload local changes to the remote repository
+    upload       Upload local repository changes to the remote repository
 
                  The upload command should be run from inside the directory of
                  an existing repository.
 
 
-    download     Download remote changes to the local repository
+    download     Download remote repository changes to the local repository
 
                  The download command should be run from inside the directory
                  of an existing repository.
