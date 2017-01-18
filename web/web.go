@@ -48,7 +48,9 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+	if cl.Token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+	}
 	return cl.web.Do(req)
 }
 
@@ -64,8 +66,10 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Don't set Authorization if Token is empty
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+
+	if cl.Token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+	}
 	return cl.web.Do(req)
 }
 
@@ -91,7 +95,11 @@ func NewClient(address string) *Client {
 // LoadToken reads the username and auth token from the token file and sets the
 // values in the struct.
 func (ut *UserToken) LoadToken() error {
-	filepath := filepath.Join(util.ConfigPath(), "token")
+	path, err := util.ConfigPath(false)
+	if err != nil {
+		return fmt.Errorf("Could not read token: Error accessing config directory.")
+	}
+	filepath := filepath.Join(path, "token")
 	file, err := os.Open(filepath)
 	if err != nil {
 		return fmt.Errorf("Error loading user token")
@@ -104,7 +112,11 @@ func (ut *UserToken) LoadToken() error {
 
 // StoreToken saves the username and auth token to the token file.
 func (ut *UserToken) StoreToken() error {
-	filepath := filepath.Join(util.ConfigPath(), "token")
+	path, err := util.ConfigPath(true)
+	if err != nil {
+		return fmt.Errorf("Could not save token: Error creating or accessing config directory.")
+	}
+	filepath := filepath.Join(path, "token")
 	file, err := os.Create(filepath)
 	if err != nil {
 		return fmt.Errorf("Error saving user token.")
@@ -113,6 +125,16 @@ func (ut *UserToken) StoreToken() error {
 
 	encoder := gob.NewEncoder(file)
 	return encoder.Encode(ut)
+}
+
+// DeleteToken deletes the token file if it exists. It essentially logs out the user.
+func DeleteToken() error {
+	path, err := util.ConfigPath(false)
+	if err != nil {
+		return fmt.Errorf("Could not delete token: Error accessing config directory.")
+	}
+	filepath := filepath.Join(path, "token")
+	return os.Remove(filepath)
 }
 
 // CloseRes closes a given result buffer (for use with defer).

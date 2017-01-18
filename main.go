@@ -11,9 +11,103 @@ import (
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/repo"
 	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/web"
 	"github.com/docopt/docopt-go"
 	"github.com/howeyc/gopass"
 )
+
+const usage = `
+GIN command line client
+
+Usage: gin [--version] <command> [<args>...]
+
+Options:
+    -h --help    This help screen
+    --version    Client version
+
+Commands:
+    gin login    [<username>]
+    gin logout
+    gin create   [<name>] [<description>]
+    gin get      <repopath>
+    gin upload
+    gin download
+    gin repos    [<username>]
+    gin info     [<username>]
+    gin keys     [-v | --verbose]
+    gin keys     --add <filename>
+
+Command help:
+
+    login        Login to the GIN services
+
+                 If no <username> is specified on the command line, you will be
+                 prompted for it. The login command always prompts for a
+                 password.
+
+
+    logout       Logout of the GIN services
+
+
+    create       Create a new repository on the GIN server
+
+                 If no <name> is provided, you will be prompted for one.
+                 A repository <description> can only be specified on the
+                 command line after the <name>.
+                 Login required. 
+
+
+    get          Download a remote repository to a new directory
+
+                 The repository path <repopath> must be specified on the
+                 command line. A repository path is the owner's username,
+                 followed by a "/" and the repository name
+                 (e.g., peter/eegdata).
+                 Login required.
+
+
+    upload       Upload local repository changes to the remote repository
+
+                 Uploads any changes made on the local data to the GIN server.
+                 The upload command should be run from inside the directory of
+                 an existing repository.
+
+
+    download     Download remote repository changes to the local repository
+
+                 Downloads any changes made to the data on the server to the
+                 local data directory.
+                 The download command should be run from inside the directory
+                 of an existing repository.
+
+
+    repos        List accessible repositories
+
+                 Without any argument, lists all the publicly accessible
+                 repositories on the GIN server.
+                 If a <username> is specified, this command will list the
+                 specified user's publicly accessible repositories.
+                 If you are logged in, it will also list any repositories
+                 owned by the user that you have access to.
+
+
+    info         Print user information
+
+                 Without argument, print the information of the currently
+                 logged in user or, if you are not logged in, prompt for a
+                 username to look up.
+                 If a <username> is specified, print the user's information.
+
+
+    keys         List or add SSH keys
+
+                 By default will list the keys (description and fingerprint)
+                 associated with the logged in user. The verbose flag will also
+                 print the full public keys.
+                 To add a new key, use the --add option and specify a pub key
+                 <filename>.
+                 Login required.
+`
 
 // TODO: Load from config
 const authhost = "https://auth.gin.g-node.org"
@@ -22,16 +116,18 @@ const githost = "gin.g-node.org"
 const gituser = "git"
 
 // login requests credentials, performs login with auth server, and stores the token.
-func login(userarg interface{}) {
+func login(args []string) {
+	var username string
+	var password string
 
-	var username, password string
-
-	if userarg == nil {
+	if len(args) == 0 {
 		// prompt for login
 		fmt.Print("Login: ")
 		fmt.Scanln(&username)
+	} else if len(args) > 1 {
+		util.Die(usage)
 	} else {
-		username = userarg.(string)
+		username = args[0]
 	}
 
 	// prompt for password
@@ -63,20 +159,35 @@ func login(userarg interface{}) {
 	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
 }
 
-func createRepo(name, description interface{}) {
-	var repoName string
-	if name == nil || name.(string) == "" {
+func logout(args []string) {
+	if len(args) > 0 {
+		util.Die(usage)
+	}
+	authcl := auth.NewClient("") // host configuration unnecessary
+	err := authcl.LoadToken()
+	if err != nil {
+		util.Die("You are not logged in.")
+	}
+
+	err = web.DeleteToken()
+	util.CheckErrorMsg(err, "Error deleting user token.")
+}
+
+func createRepo(args []string) {
+	var repoName, repoDesc string
+
+	if len(args) == 0 {
 		fmt.Print("Repository name: ")
-		repoName = ""
 		fmt.Scanln(&repoName)
+	} else if len(args) > 2 {
+		util.Die(usage)
 	} else {
-		repoName = name.(string)
+		repoName = args[0]
+		if len(args) == 2 {
+			repoDesc = args[1]
+		}
 	}
 	// TODO: Check name validity before sending to server?
-	repoDesc := ""
-	if description != nil {
-		repoDesc = description.(string)
-	}
 	repocl := repo.NewClient(repohost)
 	repocl.GitUser = gituser
 	repocl.GitHost = githost
@@ -85,12 +196,13 @@ func createRepo(name, description interface{}) {
 	util.CheckError(err)
 }
 
-func getRepo(repoarg interface{}) {
+func getRepo(args []string) {
 	var repostr string
-	if repoarg == nil {
-		util.Die("No repository specified")
+	if len(args) != 1 {
+		util.Die(usage)
+	} else {
+		repostr = args[0]
 	}
-	repostr = repoarg.(string)
 	repocl := repo.NewClient(repohost)
 	repocl.GitUser = gituser
 	repocl.GitHost = githost
@@ -99,7 +211,10 @@ func getRepo(repoarg interface{}) {
 	util.CheckError(err)
 }
 
-func upload() {
+func upload(args []string) {
+	if len(args) > 0 {
+		util.Die(usage)
+	}
 	repocl := repo.NewClient(repohost)
 	repocl.GitUser = gituser
 	repocl.GitHost = githost
@@ -108,7 +223,10 @@ func upload() {
 	util.CheckError(err)
 }
 
-func download() {
+func download(args []string) {
+	if len(args) > 0 {
+		util.Die(usage)
+	}
 	if !repo.IsRepo(".") {
 		util.Die("Current directory is not a repository.")
 	}
@@ -127,7 +245,25 @@ func condAppend(b *bytes.Buffer, str *string) {
 	}
 }
 
-func printKeys(printFull bool) {
+func keys(args []string) {
+	if len(args) > 0 && args[0] == "--add" {
+		addKey(args)
+	} else {
+		printKeys(args)
+	}
+}
+
+func printKeys(args []string) {
+	printFull := false
+	if len(args) > 1 {
+		util.Die(usage)
+	} else if len(args) == 1 {
+		if args[0] == "-v" || args[0] == "--verbose" {
+			printFull = true
+		} else {
+			util.Die(usage)
+		}
+	}
 
 	authcl := auth.NewClient(authhost)
 	keys, err := authcl.GetUserKeys()
@@ -150,16 +286,12 @@ func printKeys(printFull bool) {
 	}
 }
 
-func addKey(fnarg interface{}) {
-	noargError := fmt.Errorf("Please specify a public key file.\n")
-	if fnarg == nil {
-		util.CheckError(noargError)
+func addKey(args []string) {
+	if len(args) != 2 {
+		util.Die(usage)
 	}
 
-	filename := fnarg.(string)
-	if filename == "" {
-		util.CheckError(noargError)
-	}
+	filename := args[1]
 
 	keyBytes, err := ioutil.ReadFile(filename)
 	util.CheckError(err)
@@ -173,16 +305,16 @@ func addKey(fnarg interface{}) {
 	fmt.Printf("New key added '%s'\n", description)
 }
 
-func printAccountInfo(userarg interface{}) {
+func printAccountInfo(args []string) {
 	var username string
 
 	authcl := auth.NewClient(authhost)
 	_ = authcl.LoadToken()
 
-	if userarg == nil {
+	if len(args) == 0 {
 		username = authcl.Username
 	} else {
-		username = userarg.(string)
+		username = args[0]
 	}
 
 	if username == "" {
@@ -228,86 +360,57 @@ func printAccountInfo(userarg interface{}) {
 	fmt.Println(outBuffer.String())
 }
 
-func listUserRepos(userarg interface{}) {
+func listRepos(args []string) {
+	if len(args) > 1 {
+		util.Die(usage)
+	}
 	var username string
-	authcl := auth.NewClient(authhost)
-	err := authcl.LoadToken()
+	repocl := repo.NewClient(repohost)
 
-	util.CheckErrorMsg(err, "This command requires login.")
-
-	if userarg == nil {
-		username = authcl.Username
+	if len(args) == 0 {
+		username = ""
 	} else {
-		username = userarg.(string)
+		username = args[0]
 	}
-
-	repocl := repo.NewClient(repohost)
-	info, err := repocl.GetRepos(username)
+	repos, err := repocl.GetRepos(username)
 	util.CheckError(err)
 
-	fmt.Printf("Repositories owned by %s\n", username)
-	for idx, r := range info {
-		fmt.Printf("%d:  %s\n", idx+1, r.Name)
-	}
-}
-
-func listPubRepos() {
-	repocl := repo.NewClient(repohost)
-	repos, err := repocl.GetRepos("")
-	util.CheckError(err)
-
-	fmt.Printf("Public repositories\n")
 	for idx, repoInfo := range repos {
-		fmt.Printf("%d: %s [head: %s]\n", idx+1, repoInfo.Name, repoInfo.Head)
-		fmt.Printf(" - %s\n", repoInfo.Description)
+		fmt.Printf("%d: %s/%s\n", idx+1, repoInfo.Owner, repoInfo.Name)
+		fmt.Printf("Description: %s\n", strings.Trim(repoInfo.Description, "\n"))
+		if repoInfo.Public {
+			fmt.Println("[This repository is public]")
+		}
+		fmt.Println()
 	}
 }
 
 func main() {
-	usage := `
-GIN command line client
 
-Usage:
-	gin login    [<username>]
-	gin create   [<name>] [-d <description>]
-	gin get      [<repopath>]
-	gin upload
-	gin download
-	gin repos    [<username>]
-	gin info     [<username>]
-	gin keys     [-v | --verbose]
-	gin keys     --add <filename>
-	gin public
-`
+	args, _ := docopt.Parse(usage, nil, true, "GIN command line client v0.1", true)
+	command := args["<command>"].(string)
+	cmdArgs := args["<args>"].([]string)
 
-	args, _ := docopt.Parse(usage, nil, true, "gin cli 0.0", false)
-
-	switch {
-	case args["login"].(bool):
-		login(args["<username>"])
-	case args["create"].(bool):
-		createRepo(args["<name>"], args["<description>"])
-	case args["get"].(bool):
-		getRepo(args["<repopath>"])
-	case args["upload"].(bool):
-		upload()
-	case args["download"].(bool):
-		download()
-	case args["info"].(bool):
-		printAccountInfo(args["<username>"])
-	case args["keys"].(bool):
-		if args["--add"].(bool) {
-			addKey(args["<filename>"])
-		} else {
-			printFullKeys := false
-			if args["-v"].(bool) || args["--verbose"].(bool) {
-				printFullKeys = true
-			}
-			printKeys(printFullKeys)
-		}
-	case args["repos"].(bool):
-		listUserRepos(args["<username>"])
-	case args["public"].(bool):
-		listPubRepos()
+	switch command {
+	case "login":
+		login(cmdArgs)
+	case "create":
+		createRepo(cmdArgs)
+	case "get":
+		getRepo(cmdArgs)
+	case "upload":
+		upload(cmdArgs)
+	case "download":
+		download(cmdArgs)
+	case "info":
+		printAccountInfo(cmdArgs)
+	case "keys":
+		keys(cmdArgs)
+	case "repos":
+		listRepos(cmdArgs)
+	case "logout":
+		logout(cmdArgs)
+	default:
+		util.Die(usage)
 	}
 }

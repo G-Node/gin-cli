@@ -10,16 +10,16 @@ import (
 
 var suffix = "gin"
 
-func makePath(path string) {
+func makePath(path string) error {
 	err := os.MkdirAll(path, 0777)
 	if err != nil {
-		fmt.Printf("Error accessing directory %s\n", path)
-		panic(err)
+		return fmt.Errorf("Error accessing directory %s\n", path)
 	}
+	return nil
 }
 
 // ConfigPath returns the configuration path where configuration files should be stored.
-func ConfigPath() (path string) {
+func ConfigPath(create bool) (path string, err error) {
 	// TODO: OS dependent paths
 	xdghome := os.Getenv("XDG_CONFIG_HOME")
 	homedir := os.Getenv("HOME")
@@ -29,6 +29,11 @@ func ConfigPath() (path string) {
 	} else {
 		path = filepath.Join(homedir, ".config", suffix)
 	}
-	makePath(path)
-	return path
+	if create {
+		err = makePath(path)
+		if err != nil {
+			return "", err
+		}
+	}
+	return path, err
 }
