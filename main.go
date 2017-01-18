@@ -360,14 +360,17 @@ func printAccountInfo(args []string) {
 	fmt.Println(outBuffer.String())
 }
 
-func listRepos(userarg interface{}) {
+func listRepos(args []string) {
+	if len(args) > 1 {
+		util.Die(usage)
+	}
 	var username string
 	repocl := repo.NewClient(repohost)
 
-	if userarg == nil {
+	if len(args) == 0 {
 		username = ""
 	} else {
-		username = userarg.(string)
+		username = args[0]
 	}
 	repos, err := repocl.GetRepos(username)
 	util.CheckError(err)
