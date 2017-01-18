@@ -54,7 +54,7 @@ Command help:
                  If no <name> is provided, you will be prompted for one.
                  A repository <description> can only be specified on the
                  command line after the <name>.
-                 Login required. 
+                 Login required.
 
 
     get          Download a remote repository to a new directory

@@ -433,6 +433,21 @@ func AnnexPull(localPath string) error {
 	return nil
 }
 
+// AnnexSync synchronises the local repository with the remote.
+// (git annex sync --content)
+func AnnexSync(localPath string) error {
+	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--content")
+	if privKeyFile.Active {
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+	}
+	err := cmd.Run()
+
+	if err != nil {
+		return fmt.Errorf("Error synchronising files: %s", err.Error())
+	}
+	return nil
+}
+
 // AnnexPush uploads all annexed files.
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath string) error {
