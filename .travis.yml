@@ -22,9 +22,14 @@ install:
  # coveralls
  - go get github.com/mattn/goveralls
  - go get golang.org/x/tools/cmd/cover
- # go path fork workaround
- # - mkdir $GOPATH/src/github.com/G-Node && ln -s $GOPATH/src/github.com/achilleas-k/gin-cli $GOPATH/src/github.com/G-Node/gin-cli
- - go get ./...
+ # dependencies
+ - go get github.com/docopt/docopt-go
+ - go get github.com/howeyc/gopass
+ - go get golang.org/x/crypto/ssh
+ - go get github.com/G-node/gin-core 
+ - go get github.com/G-Node/gin-repo
+ - go get github.com/libgit2/git2go 
+ - go get golang.org/x/crypto
 
 script:
  - go vet ./...
