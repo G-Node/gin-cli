@@ -66,12 +66,15 @@ Command help:
 
     upload       Upload local repository changes to the remote repository
 
+                 Uploads any changes made on the local data to the GIN server.
                  The upload command should be run from inside the directory of
                  an existing repository.
 
 
     download     Download remote repository changes to the local repository
 
+                 Downloads any changes made to the data on the server to the
+                 local data directory.
                  The download command should be run from inside the directory
                  of an existing repository.
 
