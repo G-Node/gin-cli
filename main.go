@@ -36,7 +36,9 @@ Commands:
     gin info     [<username>]
     gin keys     [-v | --verbose]
     gin keys     --add <filename>
+`
 
+const cmdUsage = `
 Command help:
 
     login        Login to the GIN services
@@ -386,8 +388,8 @@ func listRepos(args []string) {
 }
 
 func main() {
-
-	args, _ := docopt.Parse(usage, nil, true, "GIN command line client v0.1", true)
+	fullUsage := usage + "\n" + cmdUsage
+	args, _ := docopt.Parse(fullUsage, nil, true, "GIN command line client v0.1", true)
 	command := args["<command>"].(string)
 	cmdArgs := args["<args>"].([]string)
 
