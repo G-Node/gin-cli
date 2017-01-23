@@ -12,7 +12,7 @@ import (
 
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/util"
-	git "github.com/libgit2/git2go"
+	git "gopkg.in/libgit2/git2go.v24"
 )
 
 // Keys
