@@ -35,6 +35,7 @@ script:
   - find -iname "*test.go" -execdir [ ! -e covprof.part ] \; -execdir go test -v -covermode=count -coverprofile=covprof.part \;
 
 after_success:
+  - if [ $TRAVIS_GO_VERSION == "tip" ]; then exit 0; di
   # collect all coverage profiles
   - "echo \"mode: count\" > profile.cov"
   - "grep -h -v -F \"mode: count\" --include=covprof.part -r . >> profile.cov"
