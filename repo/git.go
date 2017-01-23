@@ -132,6 +132,7 @@ func getRepo(startPath string) (*git.Repository, error) {
 
 // AddPath adds files or directories to the index
 func AddPath(localPath string) (*git.Index, error) {
+	println("Adding files")
 	repo, err := getRepo(localPath)
 	if err != nil {
 		return nil, err
@@ -141,6 +142,12 @@ func AddPath(localPath string) (*git.Index, error) {
 		return nil, err
 	}
 	err = AnnexAdd(localPath, idx)
+	var i uint
+	println("Adding paths")
+	for i = 0; i < idx.EntryCount(); i++ {
+		ie, _ := idx.EntryByIndex(i)
+		println(i, ie.Path)
+	}
 	return idx, err
 }
 
@@ -414,6 +421,14 @@ func AnnexInit(localPath string) error {
 	if err != nil {
 		return initError
 	}
+	err = exec.Command("git", "-C", localPath, "config", "annex.backends", "WORM").Run()
+	if err != nil {
+		return initError
+	}
+	err = exec.Command("git", "-C", localPath, "config", "annex.thin", "true").Run()
+	if err != nil {
+		return initError
+	}
 	return nil
 }
 
@@ -452,9 +467,11 @@ func AnnexSync(localPath string) error {
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content")
+	println("Performing push")
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
+	println("CMD: ", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {

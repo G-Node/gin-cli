@@ -79,16 +79,19 @@ func (repocl *Client) CreateRepo(name, description string) error {
 // UploadRepo adds files to a repository and uploads them.
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
+	println("Running UploadRepo")
 
 	_, err := AddPath(localPath)
 	if err != nil {
 		return err
 	}
 
+	println("Checking connection")
 	err = repocl.Connect(localPath, true)
 	if err != nil {
 		return err
 	}
+	println("ok")
 
 	err = AnnexPush(localPath)
 	return err
