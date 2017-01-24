@@ -29,6 +29,8 @@ install:
   - go get github.com/howeyc/gopass
   - go get golang.org/x/crypto/ssh
   - go get gopkg.in/libgit2/git2go.v24
+  # import path fix for forks
+  - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -s $srcdir ${GOPATH}/src/github.com/G-Node/gin-cli; fi
 
 script:
   - go vet ./...
