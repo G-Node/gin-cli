@@ -17,7 +17,7 @@ install:
   - go get github.com/GeertJohan/fgt
   # libgit2 from sauce
   - srcdir=$(pwd)
-  - wget -O libgit2.tar.gz -o /dev/null https://github.com/libgit2/libgit2/archive/v0.24.5.tar.gz && tar xzf libgit2.tar.gz && cd libgit2-0.24.5 && mkdir build && cd build && cmake .. && sudo cmake --build . --target install
+  - wget -O libgit2.tar.gz -o /dev/null https://github.com/libgit2/libgit2/archive/v0.24.6.tar.gz && tar xzf libgit2.tar.gz && cd libgit2-0.24.6 && mkdir build && cd build && cmake .. && sudo cmake --build . --target install && sudo ldconfig
   - cd $srcdir
   # coveralls
   - go get github.com/mattn/goveralls
@@ -28,13 +28,14 @@ install:
   - go get github.com/docopt/docopt-go
   - go get github.com/howeyc/gopass
   - go get golang.org/x/crypto/ssh
-  - go get github.com/libgit2/git2go
+  - go get gopkg.in/libgit2/git2go.v24
 
 script:
   - go vet ./...
   - find -iname "*test.go" -execdir [ ! -e covprof.part ] \; -execdir go test -v -covermode=count -coverprofile=covprof.part \;
 
 after_success:
+  - if [ $TRAVIS_GO_VERSION == "tip" ]; then exit 0; di
   # collect all coverage profiles
   - "echo \"mode: count\" > profile.cov"
   - "grep -h -v -F \"mode: count\" --include=covprof.part -r . >> profile.cov"
