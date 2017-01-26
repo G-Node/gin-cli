@@ -132,23 +132,17 @@ func getRepo(startPath string) (*git.Repository, error) {
 
 // AddPath adds files or directories to the index
 func AddPath(localPath string) (*git.Index, error) {
-	println("Adding files")
-	repo, err := getRepo(localPath)
-	if err != nil {
-		return nil, err
-	}
-	idx, err := repo.Index()
-	if err != nil {
-		return nil, err
-	}
-	err = AnnexAdd(localPath, idx)
-	var i uint
-	println("Adding paths")
-	for i = 0; i < idx.EntryCount(); i++ {
-		ie, _ := idx.EntryByIndex(i)
-		println(i, ie.Path)
-	}
-	return idx, err
+	// repo, err := getRepo(localPath)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// idx, err := repo.Index()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	err := AnnexAdd(localPath)
+	// return idx, err
+	return nil, err
 }
 
 // Connect opens a connection to the git server. This is used to validate credentials
