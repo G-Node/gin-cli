@@ -430,14 +430,15 @@ func AnnexInit(localPath string) error {
 // (git annex sync --no-push --content)
 // (git annex get --all)
 func AnnexPull(localPath string) error {
-	cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
+	// cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
+	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
-	err := cmd.Run()
+	out, err := cmd.Output()
 
 	if err != nil {
-		return fmt.Errorf("Error downloading files: %s", err.Error())
+		return fmt.Errorf("Error downloading files: %s", out)
 	}
 	return nil
 }
@@ -484,7 +485,7 @@ type AnnexAddResult struct {
 
 // AnnexAdd adds a path to the annex.
 // (git annex add)
-func AnnexAdd(localPath string, idx *git.Index) error {
+func AnnexAdd(localPath string) error {
 	// TODO: Return error if no new files are added
 	out, err := exec.Command("git", "annex", "--json", "add", localPath).Output()
 
@@ -494,7 +495,8 @@ func AnnexAdd(localPath string, idx *git.Index) error {
 
 	var outStruct AnnexAddResult
 	files := bytes.Split(out, []byte("\n"))
-	for _, f := range files {
+	fmt.Println("Annex adding files")
+	for i, f := range files {
 		if len(f) == 0 {
 			break
 		}
@@ -505,6 +507,7 @@ func AnnexAdd(localPath string, idx *git.Index) error {
 		if !outStruct.Success {
 			return fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
 		}
+		fmt.Printf("%d: %s\n", i, outStruct.File)
 	}
 
 	return nil
