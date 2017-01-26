@@ -162,7 +162,7 @@ func (repocl *Client) Connect(localPath string, push bool) error {
 
 	var headers []string
 
-	repository, err := git.OpenRepository(localPath)
+	repository, err := getRepo(localPath)
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (repocl *Client) Commit(localPath string, idx *git.Index) error {
 		Email: "gin",
 		When:  time.Now(),
 	}
-	repository, err := git.OpenRepository(localPath)
+	repository, err := getRepo(localPath)
 	if err != nil {
 		return err
 	}
@@ -250,7 +250,7 @@ func (repocl *Client) Commit(localPath string, idx *git.Index) error {
 // Pull pulls all remote commits from the default remote & branch
 // (git pull)
 func (repocl *Client) Pull(localPath string) error {
-	repository, err := git.OpenRepository(localPath)
+	repository, err := getRepo(localPath)
 	if err != nil {
 		return err
 	}
@@ -358,7 +358,7 @@ func (repocl *Client) Pull(localPath string) error {
 // Push pushes all local commits to the default remote & branch
 // (git push)
 func (repocl *Client) Push(localPath string) error {
-	repository, err := git.OpenRepository(localPath)
+	repository, err := getRepo(localPath)
 	if err != nil {
 		return err
 	}
