@@ -131,7 +131,7 @@ func getRepo(startPath string) (*git.Repository, error) {
 }
 
 // AddPath adds files or directories to the index
-func AddPath(localPath string) (*git.Index, error) {
+func AddPath(localPath string) ([]string, error) {
 	// repo, err := getRepo(localPath)
 	// if err != nil {
 	// 	return nil, err
@@ -140,9 +140,9 @@ func AddPath(localPath string) (*git.Index, error) {
 	// if err != nil {
 	// 	return nil, err
 	// }
-	err := AnnexAdd(localPath)
+	// addedItems, err := AnnexAdd(localPath)
 	// return idx, err
-	return nil, err
+	return AnnexAdd(localPath)
 }
 
 // Connect opens a connection to the git server. This is used to validate credentials
@@ -460,8 +460,8 @@ func AnnexSync(localPath string) error {
 
 // AnnexPush uploads all annexed files.
 // (git annex sync --no-pull --content)
-func AnnexPush(localPath string) error {
-	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content")
+func AnnexPush(localPath, commitMsg string) error {
+	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg))
 	println("Performing push")
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
@@ -485,30 +485,33 @@ type AnnexAddResult struct {
 
 // AnnexAdd adds a path to the annex.
 // (git annex add)
-func AnnexAdd(localPath string) error {
+func AnnexAdd(localPath string) ([]string, error) {
 	// TODO: Return error if no new files are added
+	fmt.Println("Performing git annex add")
 	out, err := exec.Command("git", "annex", "--json", "add", localPath).Output()
 
 	if err != nil {
-		return fmt.Errorf("Error adding files to repository: %s", err.Error())
+		return nil, fmt.Errorf("Error adding files to repository: %s", err.Error())
 	}
 
 	var outStruct AnnexAddResult
 	files := bytes.Split(out, []byte("\n"))
 	fmt.Println("Annex adding files")
+	added := make([]string, 0, len(files))
 	for i, f := range files {
 		if len(f) == 0 {
-			break
+			continue
 		}
 		err := json.Unmarshal(f, &outStruct)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !outStruct.Success {
-			return fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
+			return nil, fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
 		}
+		added = append(added, outStruct.File)
 		fmt.Printf("%d: %s\n", i, outStruct.File)
 	}
 
-	return nil
+	return added, nil
 }

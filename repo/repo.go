@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-repo/wire"
@@ -80,17 +81,25 @@ func (repocl *Client) CreateRepo(name, description string) error {
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
 
-	_, err := AddPath(localPath)
+	added, err := AddPath(localPath)
 	if err != nil {
 		return err
 	}
 
+	if len(added) == 0 {
+		// Nothing to upload
+		return nil
+		// Should this be an error? Probably not
+		// return fmt.Errorf("Nothing to do")
+	}
 	err = repocl.Connect(localPath, true)
 	if err != nil {
 		return err
 	}
 
-	err = AnnexPush(localPath)
+	changes := fmt.Sprintf("gin upload\n\n%s", strings.Join(added, "\n"))
+	println("Changes:", changes)
+	err = AnnexPush(localPath, changes)
 	return err
 }
 
