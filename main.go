@@ -341,8 +341,11 @@ func printAccountInfo(args []string) {
 	_, _ = outBuffer.WriteString(fmt.Sprintf("User [%s]\nName: %s\n", info.Login, fullnameBuffer.String()))
 
 	if info.Email != nil && info.Email.Email != "" {
-		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email.Email))
-		// TODO: Display public status if current user == info.Login
+		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s", info.Email.Email))
+		if info.Email.IsPublic && info.Login == authcl.Username {
+			_, _ = outBuffer.WriteString(fmt.Sprintf(" (publicly visible)"))
+		}
+		_, _ = outBuffer.WriteString(fmt.Sprintf("\n"))
 	}
 
 	if info.Affiliation != nil {
@@ -355,7 +358,11 @@ func printAccountInfo(args []string) {
 		condAppend(&affiliationBuffer, &affiliation.Country)
 
 		if affiliationBuffer.Len() > 0 {
-			_, _ = outBuffer.WriteString(fmt.Sprintf("Affiliation: %s\n", affiliationBuffer.String()))
+			_, _ = outBuffer.WriteString(fmt.Sprintf("Affiliation: %s", affiliationBuffer.String()))
+			if info.Affiliation.IsPublic && info.Login == authcl.Username {
+				_, _ = outBuffer.WriteString(fmt.Sprintf(" (publicly visible)"))
+			}
+			_, _ = outBuffer.WriteString(fmt.Sprintf("\n"))
 		}
 	}
 
