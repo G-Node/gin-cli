@@ -110,6 +110,7 @@ func (repocl *Client) UploadRepo(localPath string) error {
 	// 	fmt.Printf("%d: %s\n", idx, e)
 	// }
 
+	PrintChanges()
 	err = repocl.Connect(localPath, true)
 	if err != nil {
 		return err

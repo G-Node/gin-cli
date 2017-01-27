@@ -513,7 +513,6 @@ func AnnexAdd(localPath string) ([]string, error) {
 		// fmt.Printf("%d: %s\n", i, outStruct.File)
 	}
 
-	PrintChanges()
 	return added, nil
 }
 
@@ -542,7 +541,8 @@ func repoIndexPaths(localPath string) ([]string, error) {
 
 // PrintChanges ...
 func PrintChanges() {
-	// TODO: Nicer status strings for the (WT) bunch?
+	// TODO: Use git annex status instead
+	util.Die("CHANGE THIS FUNCTION")
 	statusStrings := map[git.Status]string{
 		git.StatusCurrent:         "Current",
 		git.StatusIndexNew:        "A",
@@ -560,7 +560,6 @@ func PrintChanges() {
 	}
 
 	repo, _ := getRepo(".")
-	// for _, p := range paths {
 	statusOpts := git.StatusOptions{
 		Show:     git.StatusShowIndexOnly,
 		Flags:    git.StatusOptIncludeUntracked | git.StatusOptRenamesHeadToIndex,
@@ -571,12 +570,15 @@ func PrintChanges() {
 	for i := 0; i < count; i++ {
 		entry, _ := status.ByIndex(i)
 		status := entry.Status
+
 		diffDelta := entry.HeadToIndex
-		statusLine := fmt.Sprintf("[%s] %s (%dB)", statusStrings[status], diffDelta.OldFile.Path, diffDelta.OldFile.Size)
+		statusLine := fmt.Sprintf("[%s]", statusStrings[status])
 		if diffDelta.OldFile.Path != diffDelta.NewFile.Path {
-			statusLine = fmt.Sprintf("%s -> %s (%dB)", statusLine, diffDelta.NewFile.Path, diffDelta.NewFile.Size)
+			statusLine = fmt.Sprintf("%s %s (%s) ->", statusLine, diffDelta.OldFile.Path, util.DataSize(diffDelta.OldFile.Size))
 		}
+		statusLine = fmt.Sprintf("%s %s (%s)", statusLine, diffDelta.NewFile.Path, util.DataSize(diffDelta.NewFile.Size))
 		fmt.Println(statusLine)
+
 	}
 	status.Free()
 }
