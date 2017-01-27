@@ -394,6 +394,10 @@ func listRepos(args []string) {
 	}
 }
 
+func tree(args []string) {
+	repo.PrintChanges(nil)
+}
+
 func main() {
 	fullUsage := usage + "\n" + cmdUsage
 	args, _ := docopt.Parse(fullUsage, nil, true, "GIN command line client v0.1", true)
@@ -419,6 +423,8 @@ func main() {
 		listRepos(cmdArgs)
 	case "logout":
 		logout(cmdArgs)
+	case "status":
+		tree(cmdArgs)
 	default:
 		util.Die(usage)
 	}
