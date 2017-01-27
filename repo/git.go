@@ -513,7 +513,7 @@ func AnnexAdd(localPath string) ([]string, error) {
 		// fmt.Printf("%d: %s\n", i, outStruct.File)
 	}
 
-	PrintChanges(added)
+	PrintChanges()
 	return added, nil
 }
 
@@ -541,14 +541,14 @@ func repoIndexPaths(localPath string) ([]string, error) {
 }
 
 // PrintChanges ...
-func PrintChanges(paths []string) {
+func PrintChanges() {
 	// TODO: Nicer status strings for the (WT) bunch?
 	statusStrings := map[git.Status]string{
 		git.StatusCurrent:         "Current",
-		git.StatusIndexNew:        "A", // "New",
-		git.StatusIndexModified:   "M", // "Modified",
-		git.StatusIndexDeleted:    "D", // "Deleted",
-		git.StatusIndexRenamed:    "Renamed",
+		git.StatusIndexNew:        "A",
+		git.StatusIndexModified:   "M",
+		git.StatusIndexDeleted:    "D",
+		git.StatusIndexRenamed:    "R",
 		git.StatusIndexTypeChange: "TypeChange",
 		git.StatusWtNew:           "New (WT)",
 		git.StatusWtModified:      "Modified (WT)",
@@ -571,7 +571,12 @@ func PrintChanges(paths []string) {
 	for i := 0; i < count; i++ {
 		entry, _ := status.ByIndex(i)
 		status := entry.Status
-		fmt.Printf("%s %s\n", statusStrings[status], "")
+		diffDelta := entry.HeadToIndex
+		statusLine := fmt.Sprintf("[%s] %s (%dB)", statusStrings[status], diffDelta.OldFile.Path, diffDelta.OldFile.Size)
+		if diffDelta.OldFile.Path != diffDelta.NewFile.Path {
+			statusLine = fmt.Sprintf("%s -> %s (%dB)", statusLine, diffDelta.NewFile.Path, diffDelta.NewFile.Size)
+		}
+		fmt.Println(statusLine)
 	}
 	status.Free()
 }
