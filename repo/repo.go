@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-repo/wire"
 )
@@ -81,6 +82,14 @@ func (repocl *Client) CreateRepo(name, description string) error {
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
 
+	// oldEntries, err := repoIndexPaths(localPath)
+	// if err != nil {
+	// 	return err
+	// }
+	// for idx, e := range oldEntries {
+	// 	fmt.Printf("%d: %s\n", idx, e)
+	// }
+
 	added, err := AddPath(localPath)
 	if err != nil {
 		return err
@@ -92,13 +101,29 @@ func (repocl *Client) UploadRepo(localPath string) error {
 		// Should this be an error? Probably not
 		// return fmt.Errorf("Nothing to do")
 	}
+
+	// newEntries, err := repoIndexPaths(localPath)
+	// if err != nil {
+	// 	return err
+	// }
+	// for idx, e := range newEntries {
+	// 	fmt.Printf("%d: %s\n", idx, e)
+	// }
+
 	err = repocl.Connect(localPath, true)
 	if err != nil {
 		return err
 	}
 
+	for idx, fname := range added {
+		if util.PathExists(fname) {
+			added[idx] = fmt.Sprintf("+ %s", fname)
+		} else {
+			added[idx] = fmt.Sprintf("- %s", fname)
+		}
+	}
 	changes := fmt.Sprintf("gin upload\n\n%s", strings.Join(added, "\n"))
-	println("Changes:", changes)
+	// println("Changes:", changes)
 	err = AnnexPush(localPath, changes)
 	return err
 }

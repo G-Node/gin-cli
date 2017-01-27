@@ -496,9 +496,9 @@ func AnnexAdd(localPath string) ([]string, error) {
 
 	var outStruct AnnexAddResult
 	files := bytes.Split(out, []byte("\n"))
-	fmt.Println("Annex adding files")
+	// fmt.Println("Annex adding files")
 	added := make([]string, 0, len(files))
-	for i, f := range files {
+	for _, f := range files {
 		if len(f) == 0 {
 			continue
 		}
@@ -510,8 +510,68 @@ func AnnexAdd(localPath string) ([]string, error) {
 			return nil, fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
 		}
 		added = append(added, outStruct.File)
-		fmt.Printf("%d: %s\n", i, outStruct.File)
+		// fmt.Printf("%d: %s\n", i, outStruct.File)
 	}
 
+	PrintChanges(added)
 	return added, nil
+}
+
+func repoIndexPaths(localPath string) ([]string, error) {
+	repo, err := getRepo(localPath)
+	if err != nil {
+		return nil, err
+	}
+
+	index, err := repo.Index()
+	if err != nil {
+		return nil, err
+	}
+
+	entries := make([]string, index.EntryCount())
+	for idx := uint(0); idx < index.EntryCount(); idx++ {
+		entry, err := index.EntryByIndex(idx)
+		if err != nil {
+			return nil, err
+		}
+		entries[idx] = entry.Path
+	}
+
+	return entries, nil
+}
+
+// PrintChanges ...
+func PrintChanges(paths []string) {
+	// TODO: Nicer status strings for the (WT) bunch?
+	statusStrings := map[git.Status]string{
+		git.StatusCurrent:         "Current",
+		git.StatusIndexNew:        "A", // "New",
+		git.StatusIndexModified:   "M", // "Modified",
+		git.StatusIndexDeleted:    "D", // "Deleted",
+		git.StatusIndexRenamed:    "Renamed",
+		git.StatusIndexTypeChange: "TypeChange",
+		git.StatusWtNew:           "New (WT)",
+		git.StatusWtModified:      "Modified (WT)",
+		git.StatusWtDeleted:       "Deleted (WT)",
+		git.StatusWtTypeChange:    "TypeChange (WT)",
+		git.StatusWtRenamed:       "Renamed (WT)",
+		git.StatusIgnored:         "Ignored",
+		git.StatusConflicted:      "Conflicted",
+	}
+
+	repo, _ := getRepo(".")
+	// for _, p := range paths {
+	statusOpts := git.StatusOptions{
+		Show:     git.StatusShowIndexOnly,
+		Flags:    git.StatusOptIncludeUntracked | git.StatusOptRenamesHeadToIndex,
+		Pathspec: nil,
+	}
+	status, _ := repo.StatusList(&statusOpts)
+	count, _ := status.EntryCount()
+	for i := 0; i < count; i++ {
+		entry, _ := status.ByIndex(i)
+		status := entry.Status
+		fmt.Printf("%s %s\n", statusStrings[status], "")
+	}
+	status.Free()
 }
