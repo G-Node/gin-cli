@@ -488,14 +488,19 @@ type AnnexAddResult struct {
 func AnnexAdd(localPath string) ([]string, error) {
 	// TODO: Return error if no new files are added
 	fmt.Println("Performing git annex add")
-	out, err := exec.Command("git", "annex", "--json", "add", localPath).Output()
+	cmd := exec.Command("git", "annex", "--json", "add", localPath)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
 
 	if err != nil {
-		return nil, fmt.Errorf("Error adding files to repository: %s", err.Error())
+		return nil, fmt.Errorf("Error adding files to repository: %s", stderr.String())
 	}
 
 	var outStruct AnnexAddResult
-	files := bytes.Split(out, []byte("\n"))
+	files := bytes.Split(out.Bytes(), []byte("\n"))
 	// fmt.Println("Annex adding files")
 	added := make([]string, 0, len(files))
 	for _, f := range files {
