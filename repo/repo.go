@@ -94,13 +94,14 @@ func (repocl *Client) UploadRepo(localPath string) error {
 	if err != nil {
 		return err
 	}
+	println("DONE")
 
-	if len(added) == 0 {
-		// Nothing to upload
-		return nil
-		// Should this be an error? Probably not
-		// return fmt.Errorf("Nothing to do")
-	}
+	// if len(added) == 0 {
+	// Nothing to upload
+	// return nil
+	// Should this be an error? Probably not
+	// return fmt.Errorf("Nothing to do")
+	// }
 
 	// newEntries, err := repoIndexPaths(localPath)
 	// if err != nil {
@@ -110,12 +111,16 @@ func (repocl *Client) UploadRepo(localPath string) error {
 	// 	fmt.Printf("%d: %s\n", idx, e)
 	// }
 
-	PrintChanges()
+	err = PrintChanges(localPath)
+	if err != nil {
+		return err
+	}
 	err = repocl.Connect(localPath, true)
 	if err != nil {
 		return err
 	}
 
+	// Use changes list from PrintChanges function
 	for idx, fname := range added {
 		if util.PathExists(fname) {
 			added[idx] = fmt.Sprintf("+ %s", fname)

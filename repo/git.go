@@ -544,46 +544,56 @@ func repoIndexPaths(localPath string) ([]string, error) {
 	return entries, nil
 }
 
+// AnnexStatusResult ...
+type AnnexStatusResult struct {
+	Status string `json:"status"`
+	File   string `json:"file"`
+}
+
 // PrintChanges ...
-func PrintChanges() {
-	// TODO: Use git annex status instead
-	util.Die("CHANGE THIS FUNCTION")
-	statusStrings := map[git.Status]string{
-		git.StatusCurrent:         "Current",
-		git.StatusIndexNew:        "A",
-		git.StatusIndexModified:   "M",
-		git.StatusIndexDeleted:    "D",
-		git.StatusIndexRenamed:    "R",
-		git.StatusIndexTypeChange: "TypeChange",
-		git.StatusWtNew:           "New (WT)",
-		git.StatusWtModified:      "Modified (WT)",
-		git.StatusWtDeleted:       "Deleted (WT)",
-		git.StatusWtTypeChange:    "TypeChange (WT)",
-		git.StatusWtRenamed:       "Renamed (WT)",
-		git.StatusIgnored:         "Ignored",
-		git.StatusConflicted:      "Conflicted",
+func PrintChanges(localPath string) error {
+	cmd := exec.Command("git", "-C", localPath, "annex", "status", "--json")
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	if err != nil {
+		return fmt.Errorf("Error retrieving file status: %s", stderr.String())
 	}
 
-	repo, _ := getRepo(".")
-	statusOpts := git.StatusOptions{
-		Show:     git.StatusShowIndexOnly,
-		Flags:    git.StatusOptIncludeUntracked | git.StatusOptRenamesHeadToIndex,
-		Pathspec: nil,
-	}
-	status, _ := repo.StatusList(&statusOpts)
-	count, _ := status.EntryCount()
-	for i := 0; i < count; i++ {
-		entry, _ := status.ByIndex(i)
-		status := entry.Status
+	var outStruct AnnexStatusResult
+	println(out.String())
+	files := bytes.Split(out.Bytes(), []byte("\n"))
 
-		diffDelta := entry.HeadToIndex
-		statusLine := fmt.Sprintf("[%s]", statusStrings[status])
-		if diffDelta.OldFile.Path != diffDelta.NewFile.Path {
-			statusLine = fmt.Sprintf("%s %s (%s) ->", statusLine, diffDelta.OldFile.Path, util.DataSize(diffDelta.OldFile.Size))
+	statusmap := make(map[string][]string)
+	for _, f := range files {
+		if len(f) == 0 {
+			continue
 		}
-		statusLine = fmt.Sprintf("%s %s (%s)", statusLine, diffDelta.NewFile.Path, util.DataSize(diffDelta.NewFile.Size))
-		fmt.Println(statusLine)
-
+		err := json.Unmarshal(f, &outStruct)
+		if err != nil {
+			return err
+		}
+		statusmap[outStruct.Status] = append(statusmap[outStruct.Status], outStruct.File)
 	}
-	status.Free()
+	printFileList("New files", statusmap["A"])
+	printFileList("Modified files", statusmap["M"])
+	printFileList("Deleted files", statusmap["D"])
+	printFileList("Type modified files", statusmap["T"])
+	printFileList("Untracked files ", statusmap["?"])
+
+	return nil
+}
+
+func printFileList(header string, fnames []string) {
+	if len(fnames) == 0 {
+		return
+	}
+	fmt.Println(header)
+	for idx, name := range fnames {
+		fmt.Printf("%d: %s\n", idx, name)
+	}
+	fmt.Println()
 }
