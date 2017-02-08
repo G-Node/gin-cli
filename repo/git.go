@@ -462,15 +462,18 @@ func AnnexSync(localPath string) error {
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath, commitMsg string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg))
-	println("Performing push")
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
 	println("CMD: ", strings.Join(cmd.Args, " "))
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	err := cmd.Run()
 
 	if err != nil {
-		return fmt.Errorf("Error uploading files: %s", err.Error())
+		return fmt.Errorf("Error uploading files: %s", stderr.String())
 	}
 	return nil
 }
