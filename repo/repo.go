@@ -6,9 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
-	"strings"
 
-	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-repo/wire"
 )
@@ -82,36 +80,18 @@ func (repocl *Client) CreateRepo(name, description string) error {
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
 
-	// oldEntries, err := repoIndexPaths(localPath)
-	// if err != nil {
-	// 	return err
-	// }
-	// for idx, e := range oldEntries {
-	// 	fmt.Printf("%d: %s\n", idx, e)
-	// }
-
 	added, err := AddPath(localPath)
 	if err != nil {
 		return err
 	}
-	println("DONE")
 
-	// if len(added) == 0 {
-	// Nothing to upload
-	// return nil
-	// Should this be an error? Probably not
-	// return fmt.Errorf("Nothing to do")
-	// }
+	if len(added) == 0 {
+		return fmt.Errorf("No changes to upload")
+	}
 
-	// newEntries, err := repoIndexPaths(localPath)
-	// if err != nil {
-	// 	return err
-	// }
-	// for idx, e := range newEntries {
-	// 	fmt.Printf("%d: %s\n", idx, e)
-	// }
-
-	err = PrintChanges(localPath)
+	changes, err := DescribeChanges(localPath)
+	// add header commit line
+	changes = fmt.Sprintf("gin upload\n\n%s", changes)
 	if err != nil {
 		return err
 	}
@@ -120,16 +100,8 @@ func (repocl *Client) UploadRepo(localPath string) error {
 		return err
 	}
 
-	// Use changes list from PrintChanges function
-	for idx, fname := range added {
-		if util.PathExists(fname) {
-			added[idx] = fmt.Sprintf("+ %s", fname)
-		} else {
-			added[idx] = fmt.Sprintf("- %s", fname)
-		}
-	}
-	changes := fmt.Sprintf("gin upload\n\n%s", strings.Join(added, "\n"))
-	// println("Changes:", changes)
+	// fmt.Println(changes)
+
 	err = AnnexPush(localPath, changes)
 	return err
 }

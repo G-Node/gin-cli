@@ -132,16 +132,6 @@ func getRepo(startPath string) (*git.Repository, error) {
 
 // AddPath adds files or directories to the index
 func AddPath(localPath string) ([]string, error) {
-	// repo, err := getRepo(localPath)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// idx, err := repo.Index()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// addedItems, err := AnnexAdd(localPath)
-	// return idx, err
 	return AnnexAdd(localPath)
 }
 
@@ -226,7 +216,7 @@ func (repocl *Client) Commit(localPath string, idx *git.Index) error {
 		}
 	}
 
-	message := "uploading" // TODO: Describe changes (in message)
+	message := "uploading"
 	treeID, err := idx.WriteTree()
 	if err != nil {
 		return err
@@ -465,7 +455,6 @@ func AnnexPush(localPath, commitMsg string) error {
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
 	}
-	println("CMD: ", strings.Join(cmd.Args, " "))
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -489,8 +478,6 @@ type AnnexAddResult struct {
 // AnnexAdd adds a path to the annex.
 // (git annex add)
 func AnnexAdd(localPath string) ([]string, error) {
-	// TODO: Return error if no new files are added
-	fmt.Println("Performing git annex add")
 	cmd := exec.Command("git", "annex", "--json", "add", localPath)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -504,7 +491,6 @@ func AnnexAdd(localPath string) ([]string, error) {
 
 	var outStruct AnnexAddResult
 	files := bytes.Split(out.Bytes(), []byte("\n"))
-	// fmt.Println("Annex adding files")
 	added := make([]string, 0, len(files))
 	for _, f := range files {
 		if len(f) == 0 {
@@ -518,7 +504,6 @@ func AnnexAdd(localPath string) ([]string, error) {
 			return nil, fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
 		}
 		added = append(added, outStruct.File)
-		// fmt.Printf("%d: %s\n", i, outStruct.File)
 	}
 
 	return added, nil
@@ -553,8 +538,10 @@ type AnnexStatusResult struct {
 	File   string `json:"file"`
 }
 
-// PrintChanges ...
-func PrintChanges(localPath string) error {
+// DescribeChanges returns a string which describes the status of the files in the working tree
+// with respect to git annex. The resulting message can be used to inform the user of changes
+// that are about to be uploaded and as a long commit message.
+func DescribeChanges(localPath string) (string, error) {
 	cmd := exec.Command("git", "-C", localPath, "annex", "status", "--json")
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -563,11 +550,10 @@ func PrintChanges(localPath string) error {
 	err := cmd.Run()
 
 	if err != nil {
-		return fmt.Errorf("Error retrieving file status: %s", stderr.String())
+		return "", fmt.Errorf("Error retrieving file status: %s", stderr.String())
 	}
 
 	var outStruct AnnexStatusResult
-	println(out.String())
 	files := bytes.Split(out.Bytes(), []byte("\n"))
 
 	statusmap := make(map[string][]string)
@@ -577,26 +563,29 @@ func PrintChanges(localPath string) error {
 		}
 		err := json.Unmarshal(f, &outStruct)
 		if err != nil {
-			return err
+			return "", err
 		}
 		statusmap[outStruct.Status] = append(statusmap[outStruct.Status], outStruct.File)
 	}
-	printFileList("New files", statusmap["A"])
-	printFileList("Modified files", statusmap["M"])
-	printFileList("Deleted files", statusmap["D"])
-	printFileList("Type modified files", statusmap["T"])
-	printFileList("Untracked files ", statusmap["?"])
 
-	return nil
+	var changeList string
+	changeList += makeFileList("New files", statusmap["A"])
+	changeList += makeFileList("Modified files", statusmap["M"])
+	changeList += makeFileList("Deleted files", statusmap["D"])
+	changeList += makeFileList("Type modified files", statusmap["T"])
+	changeList += makeFileList("Untracked files ", statusmap["?"])
+
+	return changeList, nil
 }
 
-func printFileList(header string, fnames []string) {
+func makeFileList(header string, fnames []string) (list string) {
 	if len(fnames) == 0 {
 		return
 	}
-	fmt.Println(header)
+	list += fmt.Sprint(header) + "\n"
 	for idx, name := range fnames {
-		fmt.Printf("%d: %s\n", idx, name)
+		list += fmt.Sprintf("  %d: %s\n", idx, name)
 	}
-	fmt.Println()
+	list += "\n"
+	return
 }
