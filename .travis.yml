@@ -12,8 +12,6 @@ before_install:
   - sudo apt-get install git-annex
 
 install:
-  # import path fix for forks
-  - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -s $srcdir ${GOPATH}/src/github.com/G-Node/gin-cli; fi
   # tools
   - go get github.com/golang/lint/golint
   - go get github.com/GeertJohan/fgt
@@ -21,11 +19,19 @@ install:
   - srcdir=$(pwd)
   - wget -O libgit2.tar.gz -o /dev/null https://github.com/libgit2/libgit2/archive/v0.24.6.tar.gz && tar xzf libgit2.tar.gz && cd libgit2-0.24.6 && mkdir build && cd build && cmake .. && sudo cmake --build . --target install && sudo ldconfig
   - cd $srcdir
-  # gin-cli deps
-  - go get -v ./...
   # coveralls
   - go get github.com/mattn/goveralls
   - go get golang.org/x/tools/cmd/cover
+  # dependencies
+  - go get github.com/docopt/docopt-go
+  - go get github.com/howeyc/gopass
+  - go get golang.org/x/crypto/ssh
+  - go get github.com/G-Node/gin-core/gin
+  - go get github.com/G-Node/gin-repo/wire
+  - go get gopkg.in/libgit2/git2go.v24
+  - go get golang.org/x/crypto/ssh
+  # import path symlink for forks
+  - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -s $srcdir ${GOPATH}/src/github.com/G-Node/gin-cli; fi
 
 script:
   - go vet ./...
