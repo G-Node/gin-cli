@@ -80,7 +80,7 @@ func (repocl *Client) CreateRepo(name, description string) error {
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
 
-	added, err := AddPath(localPath)
+	added, err := AnnexAdd(localPath)
 	if err != nil {
 		return err
 	}
