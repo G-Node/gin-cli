@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/util"
-	git "gopkg.in/libgit2/git2go.v24"
 )
 
 // Keys
@@ -64,56 +63,6 @@ func CleanUpTemp() {
 	}
 }
 
-// Git callbacks
-
-func (repocl *Client) makeCredsCB() git.CredentialsCallback {
-	// attemptnum is used to determine which authentication method to use each time.
-	attemptnum := 0
-
-	return func(url string, username string, allowedTypes git.CredType) (git.ErrorCode, *git.Cred) {
-		var res int
-		var cred git.Cred
-		switch attemptnum {
-		case 0:
-			res, cred = git.NewCredSshKeyFromAgent(repocl.GitUser)
-		case 1:
-			tempKeyPair, err := repocl.MakeTempKeyPair()
-			if err != nil {
-				return git.ErrUser, nil
-			}
-			res, cred = git.NewCredSshKeyFromMemory(repocl.GitUser, tempKeyPair.Public, tempKeyPair.Private, "")
-		default:
-			return git.ErrUser, nil
-		}
-
-		if res != 0 {
-			return git.ErrorCode(res), nil
-		}
-		attemptnum++
-		return git.ErrOk, &cred
-	}
-}
-
-func (repocl *Client) certCB(cert *git.Certificate, valid bool, hostname string) git.ErrorCode {
-	// TODO: Better cert check?
-	if hostname != repocl.GitHost {
-		return git.ErrCertificate
-	}
-	return git.ErrOk
-}
-
-func remoteCreateCB(repo *git.Repository, name, url string) (*git.Remote, git.ErrorCode) {
-	remote, err := repo.Remotes.Create(name, url)
-	if err != nil {
-		return nil, git.ErrUser
-	}
-	return remote, git.ErrOk
-}
-
-func matchPathCB(p, mp string) int {
-	return 0
-}
-
 // **************** //
 
 // Git commands
@@ -127,12 +76,25 @@ func IsRepo(path string) bool {
 	return true
 }
 
+func publicKeyFile(file string) ssh.AuthMethod {
+	buffer, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil
+	}
+
+	key, err := ssh.ParsePrivateKey(buffer)
+	if err != nil {
+		return nil
+	}
+	return ssh.PublicKeys(key)
+}
+
 // Connect opens a connection to the git server. This is used to validate credentials
 // and generate temporary keys on demand, without performing a git operation.
 func (repocl *Client) Connect(localPath string, push bool) error {
 	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to connect to auth agent:% s", err.Error())
 	}
 
 	agent := ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers)
@@ -145,14 +107,40 @@ func (repocl *Client) Connect(localPath string, push bool) error {
 	}
 
 	connection, err := ssh.Dial("tcp", "gin.g-node.org:22", sshConfig)
-	defer connection.Close()
-	if err != nil {
-		fmt.Printf("Failed to dial: %s\n", err.Error())
-		os.Exit(1)
+	if err != nil && strings.Contains(err.Error(), "unable to authenticate") {
+		_, err := repocl.MakeTempKeyPair()
+		if err != nil {
+			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
+		}
+		// try again
+		println("Trying again")
+		// key, err := ssh.ParseRawPrivateKey([]byte(keyPair.Private))
+		// if err != nil {
+		// 	return fmt.Errorf("Error reading temporary key: %s", err.Error())
+		// }
+		// println(key.(string))
+		// sign, err := ssh.NewSignerFromKey(key)
+		// if err != nil {
+		// 	return fmt.Errorf("Error preparing temporary key: %s", err.Error())
+		// }
+		sshConfig = &ssh.ClientConfig{
+			User: "git",
+			Auth: []ssh.AuthMethod{
+				// ssh.PublicKeys(sign),
+				publicKeyFile(privKeyFile.FullPath()),
+			},
+		}
+		connection, err = ssh.Dial("tcp", "gin.g-node.org:22", sshConfig)
 	}
+
+	if err != nil {
+		return fmt.Errorf("Failed to dial: %s\n", err.Error())
+	}
+	defer connection.Close()
+
 	session, err := connection.NewSession()
 	if err != nil {
-		fmt.Printf("Failed to create session: %s", err.Error())
+		return fmt.Errorf("Failed to create session: %s", err.Error())
 	}
 	defer session.Close()
 	return nil
@@ -160,28 +148,9 @@ func (repocl *Client) Connect(localPath string, push bool) error {
 
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
-func (repocl *Client) Clone(repopath string) (*git.Repository, error) {
+func (repocl *Client) Clone(repopath string) error {
 	remotePath := fmt.Sprintf("%s@%s:%s", repocl.GitUser, repocl.GitHost, repopath)
-	localPath := path.Base(repopath)
-
-	cbs := &git.RemoteCallbacks{
-		CredentialsCallback:      repocl.makeCredsCB(),
-		CertificateCheckCallback: repocl.certCB,
-	}
-	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
-	opts := git.CloneOptions{
-		Bare: false,
-		// CheckoutBranch:       "master", // TODO: default branch
-		FetchOptions:         fetchopts,
-		RemoteCreateCallback: remoteCreateCB,
-	}
-	repository, err := git.Clone(remotePath, localPath, &opts)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return repository, nil
+	return exec.Command("git", "clone", remotePath).Run()
 }
 
 // **************** //

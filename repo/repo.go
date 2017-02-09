@@ -80,6 +80,11 @@ func (repocl *Client) CreateRepo(name, description string) error {
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
 
+	err := repocl.Connect(localPath, true)
+	if err != nil {
+		return err
+	}
+
 	added, err := AnnexAdd(localPath)
 	if err != nil {
 		return err
@@ -92,10 +97,6 @@ func (repocl *Client) UploadRepo(localPath string) error {
 	changes, err := DescribeChanges(localPath)
 	// add header commit line
 	changes = fmt.Sprintf("gin upload\n\n%s", changes)
-	if err != nil {
-		return err
-	}
-	err = repocl.Connect(localPath, true)
 	if err != nil {
 		return err
 	}
@@ -122,7 +123,7 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 
 	localPath := path.Base(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", localPath)
-	_, err := repocl.Clone(repoPath)
+	err := repocl.Clone(repoPath)
 	if err != nil {
 		return err
 	}
