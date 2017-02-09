@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
+	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/util"
@@ -115,49 +120,42 @@ func matchPathCB(p, mp string) int {
 
 // IsRepo checks whether a given path is a git repository.
 func IsRepo(path string) bool {
-	_, err := git.Discover(path, false, nil)
+	err := exec.Command("git", "status").Run()
 	if err != nil {
 		return false
 	}
 	return true
 }
 
-func getRepo(startPath string) (*git.Repository, error) {
-	localRepoPath, err := git.Discover(startPath, false, nil)
-	if err != nil {
-		return nil, err
-	}
-	return git.OpenRepository(localRepoPath)
-}
-
 // Connect opens a connection to the git server. This is used to validate credentials
 // and generate temporary keys on demand, without performing a git operation.
 func (repocl *Client) Connect(localPath string, push bool) error {
-	var dir git.ConnectDirection
-	if push {
-		dir = git.ConnectDirectionPush
-	} else {
-		dir = git.ConnectDirectionFetch
-	}
-
-	cbs := &git.RemoteCallbacks{
-		CredentialsCallback:      repocl.makeCredsCB(),
-		CertificateCheckCallback: repocl.certCB,
-	}
-
-	var headers []string
-
-	repository, err := getRepo(localPath)
+	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
 		return err
 	}
 
-	origin, err := repository.Remotes.Lookup("origin")
-	if err != nil {
-		return err
+	agent := ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers)
+
+	sshConfig := &ssh.ClientConfig{
+		User: "git",
+		Auth: []ssh.AuthMethod{
+			agent,
+		},
 	}
 
-	return origin.Connect(dir, cbs, headers)
+	connection, err := ssh.Dial("tcp", "gin.g-node.org:22", sshConfig)
+	defer connection.Close()
+	if err != nil {
+		fmt.Printf("Failed to dial: %s\n", err.Error())
+		os.Exit(1)
+	}
+	session, err := connection.NewSession()
+	if err != nil {
+		fmt.Printf("Failed to create session: %s", err.Error())
+	}
+	defer session.Close()
+	return nil
 }
 
 // Clone downloads a repository and sets the remote fetch and push urls.
@@ -325,29 +323,6 @@ func AnnexAdd(localPath string) ([]string, error) {
 	return added, nil
 }
 
-func repoIndexPaths(localPath string) ([]string, error) {
-	repo, err := getRepo(localPath)
-	if err != nil {
-		return nil, err
-	}
-
-	index, err := repo.Index()
-	if err != nil {
-		return nil, err
-	}
-
-	entries := make([]string, index.EntryCount())
-	for idx := uint(0); idx < index.EntryCount(); idx++ {
-		entry, err := index.EntryByIndex(idx)
-		if err != nil {
-			return nil, err
-		}
-		entries[idx] = entry.Path
-	}
-
-	return entries, nil
-}
-
 // AnnexStatusResult ...
 type AnnexStatusResult struct {
 	Status string `json:"status"`
@@ -400,7 +375,7 @@ func makeFileList(header string, fnames []string) (list string) {
 	}
 	list += fmt.Sprint(header) + "\n"
 	for idx, name := range fnames {
-		list += fmt.Sprintf("  %d: %s\n", idx, name)
+		list += fmt.Sprintf("  %d: %s\n", idx+1, name)
 	}
 	list += "\n"
 	return
