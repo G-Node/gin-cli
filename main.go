@@ -36,7 +36,9 @@ Commands:
     gin info     [<username>]
     gin keys     [-v | --verbose]
     gin keys     --add <filename>
+`
 
+const cmdUsage = `
 Command help:
 
     login        Login to the GIN services
@@ -54,7 +56,7 @@ Command help:
                  If no <name> is provided, you will be prompted for one.
                  A repository <description> can only be specified on the
                  command line after the <name>.
-                 Login required. 
+                 Login required.
 
 
     get          Download a remote repository to a new directory
@@ -339,8 +341,11 @@ func printAccountInfo(args []string) {
 	_, _ = outBuffer.WriteString(fmt.Sprintf("User [%s]\nName: %s\n", info.Login, fullnameBuffer.String()))
 
 	if info.Email != nil && info.Email.Email != "" {
-		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email.Email))
-		// TODO: Display public status if current user == info.Login
+		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s", info.Email.Email))
+		if info.Email.IsPublic && info.Login == authcl.Username {
+			_, _ = outBuffer.WriteString(fmt.Sprintf(" (publicly visible)"))
+		}
+		_, _ = outBuffer.WriteString(fmt.Sprintf("\n"))
 	}
 
 	if info.Affiliation != nil {
@@ -353,7 +358,11 @@ func printAccountInfo(args []string) {
 		condAppend(&affiliationBuffer, &affiliation.Country)
 
 		if affiliationBuffer.Len() > 0 {
-			_, _ = outBuffer.WriteString(fmt.Sprintf("Affiliation: %s\n", affiliationBuffer.String()))
+			_, _ = outBuffer.WriteString(fmt.Sprintf("Affiliation: %s", affiliationBuffer.String()))
+			if info.Affiliation.IsPublic && info.Login == authcl.Username {
+				_, _ = outBuffer.WriteString(fmt.Sprintf(" (publicly visible)"))
+			}
+			_, _ = outBuffer.WriteString(fmt.Sprintf("\n"))
 		}
 	}
 
@@ -386,8 +395,8 @@ func listRepos(args []string) {
 }
 
 func main() {
-
-	args, _ := docopt.Parse(usage, nil, true, "GIN command line client v0.1", true)
+	fullUsage := usage + "\n" + cmdUsage
+	args, _ := docopt.Parse(fullUsage, nil, true, "GIN command line client v0.1", true)
 	command := args["<command>"].(string)
 	cmdArgs := args["<args>"].([]string)
 

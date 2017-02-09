@@ -80,17 +80,29 @@ func (repocl *Client) CreateRepo(name, description string) error {
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
 
-	_, err := AddPath(localPath)
+	added, err := AddPath(localPath)
 	if err != nil {
 		return err
 	}
 
+	if len(added) == 0 {
+		return fmt.Errorf("No changes to upload")
+	}
+
+	changes, err := DescribeChanges(localPath)
+	// add header commit line
+	changes = fmt.Sprintf("gin upload\n\n%s", changes)
+	if err != nil {
+		return err
+	}
 	err = repocl.Connect(localPath, true)
 	if err != nil {
 		return err
 	}
 
-	err = AnnexPush(localPath)
+	// fmt.Println(changes)
+
+	err = AnnexPush(localPath, changes)
 	return err
 }
 
