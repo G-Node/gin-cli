@@ -108,35 +108,19 @@ func (repocl *Client) Connect(localPath string, push bool) error {
 
 	connection, err := ssh.Dial("tcp", "gin.g-node.org:22", sshConfig)
 	if err != nil && strings.Contains(err.Error(), "unable to authenticate") {
-		_, err := repocl.MakeTempKeyPair()
+		_, err = repocl.MakeTempKeyPair()
 		if err != nil {
 			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
 		}
-		// try again
-		println("Trying again")
-		// key, err := ssh.ParseRawPrivateKey([]byte(keyPair.Private))
-		// if err != nil {
-		// 	return fmt.Errorf("Error reading temporary key: %s", err.Error())
-		// }
-		// println(key.(string))
-		// sign, err := ssh.NewSignerFromKey(key)
-		// if err != nil {
-		// 	return fmt.Errorf("Error preparing temporary key: %s", err.Error())
-		// }
-		sshConfig = &ssh.ClientConfig{
-			User: "git",
-			Auth: []ssh.AuthMethod{
-				// ssh.PublicKeys(sign),
-				publicKeyFile(privKeyFile.FullPath()),
-			},
-		}
-		connection, err = ssh.Dial("tcp", "gin.g-node.org:22", sshConfig)
+		return nil
 	}
+	// TODO: Attempt connection again after temp key is set up
+
+	defer connection.Close()
 
 	if err != nil {
 		return fmt.Errorf("Failed to dial: %s\n", err.Error())
 	}
-	defer connection.Close()
 
 	session, err := connection.NewSession()
 	if err != nil {
