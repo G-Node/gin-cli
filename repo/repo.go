@@ -80,7 +80,7 @@ func (repocl *Client) CreateRepo(name, description string) error {
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
 
-	err := repocl.Connect(localPath, true)
+	err := repocl.Connect()
 	if err != nil {
 		return err
 	}
@@ -111,8 +111,10 @@ func (repocl *Client) UploadRepo(localPath string) error {
 func (repocl *Client) DownloadRepo(localPath string) error {
 	defer CleanUpTemp()
 
-	// Perform a git connection to check credentials
-	err := repocl.Connect(localPath, false)
+	err := repocl.Connect()
+	if err != nil {
+		return err
+	}
 	err = AnnexPull(localPath)
 	return err
 }
@@ -121,9 +123,14 @@ func (repocl *Client) DownloadRepo(localPath string) error {
 func (repocl *Client) CloneRepo(repoPath string) error {
 	defer CleanUpTemp()
 
+	err := repocl.Connect()
+	if err != nil {
+		return err
+	}
+
 	localPath := path.Base(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", localPath)
-	err := repocl.Clone(repoPath)
+	err = repocl.Clone(repoPath)
 	if err != nil {
 		return err
 	}

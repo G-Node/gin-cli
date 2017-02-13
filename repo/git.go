@@ -91,7 +91,7 @@ func publicKeyFile(file string) ssh.AuthMethod {
 
 // Connect opens a connection to the git server. This is used to validate credentials
 // and generate temporary keys on demand, without performing a git operation.
-func (repocl *Client) Connect(localPath string, push bool) error {
+func (repocl *Client) Connect() error {
 	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
 		return fmt.Errorf("Failed to connect to auth agent:% s", err.Error())
