@@ -114,7 +114,7 @@ Command help:
 // TODO: Load from config
 const authhost = "https://auth.gin.g-node.org"
 const repohost = "https://repo.gin.g-node.org"
-const githost = "gin.g-node.org"
+const githost = "gin.g-node.org:22"
 const gituser = "git"
 
 // login requests credentials, performs login with auth server, and stores the token.

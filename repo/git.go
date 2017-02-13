@@ -100,13 +100,13 @@ func (repocl *Client) Connect(localPath string, push bool) error {
 	agent := ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers)
 
 	sshConfig := &ssh.ClientConfig{
-		User: "git",
+		User: repocl.GitUser,
 		Auth: []ssh.AuthMethod{
 			agent,
 		},
 	}
 
-	connection, err := ssh.Dial("tcp", "gin.g-node.org:22", sshConfig)
+	connection, err := ssh.Dial("tcp", repocl.GitHost, sshConfig)
 	if err != nil && strings.Contains(err.Error(), "unable to authenticate") {
 		_, err = repocl.MakeTempKeyPair()
 		if err != nil {
