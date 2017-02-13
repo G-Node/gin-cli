@@ -133,8 +133,24 @@ func (repocl *Client) Connect() error {
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
 func (repocl *Client) Clone(repopath string) error {
-	remotePath := fmt.Sprintf("%s@%s:%s", repocl.GitUser, repocl.GitHost, repopath)
-	return exec.Command("git", "clone", remotePath).Run()
+	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repopath)
+	var cmd *exec.Cmd
+	if privKeyFile.Active {
+		cmd = exec.Command("git", "-c", privKeyFile.GitSSHOpt())
+	} else {
+		cmd = exec.Command("git")
+	}
+	cmd.Args = append(cmd.Args, "clone", remotePath)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println()
+		return fmt.Errorf("Error retrieving repository: %s", stderr.String())
+	}
+	return nil
 }
 
 // **************** //
@@ -147,7 +163,7 @@ func AnnexInit(localPath string) error {
 	initError := fmt.Errorf("Repository annex initialisation failed.")
 	cmd := exec.Command("git", "-C", localPath, "annex", "init", "--version=6")
 	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
 	err := cmd.Run()
 	if err != nil {
@@ -190,7 +206,7 @@ func AnnexPull(localPath string) error {
 	// cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
 	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
 	out, err := cmd.Output()
 
@@ -205,7 +221,7 @@ func AnnexPull(localPath string) error {
 func AnnexSync(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--content")
 	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
 	err := cmd.Run()
 
@@ -220,7 +236,7 @@ func AnnexSync(localPath string) error {
 func AnnexPush(localPath, commitMsg string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg))
 	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
 	var out bytes.Buffer
 	var stderr bytes.Buffer

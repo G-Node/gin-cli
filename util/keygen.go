@@ -107,8 +107,14 @@ func (tf TempFile) FullPath() string {
 	return filepath.Join(tf.Dir, tf.Filename)
 }
 
-// SSHOptString returns a formatted string that can be used in git-annex commands that should
+// AnnexSSHOpt returns a formatted string that can be used in git-annex commands that should
 // make use of the temporary private key.
-func (tf TempFile) SSHOptString() string {
+func (tf TempFile) AnnexSSHOpt() string {
 	return fmt.Sprintf("annex.ssh-options=-i %s", tf.FullPath())
+}
+
+// GitSSHOpt returns a formatted string that can be used in git commands tht should make
+// use of the temporary private key.
+func (tf TempFile) GitSSHOpt() string {
+	return fmt.Sprintf("core.sshCommand=ssh -i %s", tf.FullPath())
 }
