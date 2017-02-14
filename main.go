@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/repo"
@@ -292,6 +294,11 @@ func addKey(args []string) {
 	if len(args) != 2 {
 		util.Die(usage)
 	}
+	authcl := auth.NewClient(authhost)
+	err := authcl.LoadToken()
+	if err != nil {
+		util.Die("This command requires login.")
+	}
 
 	filename := args[1]
 
@@ -299,9 +306,14 @@ func addKey(args []string) {
 	util.CheckError(err)
 	// TODO: Accept custom description for key and simply default to filename
 	key := string(keyBytes)
-	description := strings.TrimSpace(strings.Split(key, " ")[2])
+	strSlice := strings.Split(key, " ")
+	var description string
+	if len(strSlice) > 2 {
+		description = strings.TrimSpace(strSlice[2])
+	} else {
+		description = fmt.Sprintf("%s@%s", authcl.Username, strconv.FormatInt(time.Now().Unix(), 10))
+	}
 
-	authcl := auth.NewClient(authhost)
 	err = authcl.AddKey(string(keyBytes), description, false)
 	util.CheckError(err)
 	fmt.Printf("New key added '%s'\n", description)
