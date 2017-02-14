@@ -201,9 +201,7 @@ func AnnexInit(localPath string) error {
 
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
-// (git annex get --all)
 func AnnexPull(localPath string) error {
-	// cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
@@ -290,6 +288,54 @@ func AnnexAdd(localPath string) ([]string, error) {
 	}
 
 	return added, nil
+}
+
+type AnnexWhereisResult struct {
+	File      string   `json:"file"`
+	Command   string   `json:"command"`
+	Note      string   `json:"note"`
+	Success   bool     `json:"success"`
+	Untrusted []string `json:"untrusted"`
+	Whereis   []struct {
+		Here        bool     `json:"here"`
+		UUID        string   `json:"uuid"`
+		URLs        []string `json:"urls"`
+		Description string   `json:"description"`
+	}
+	Key string `json:"key"`
+}
+
+// AnnexWhereis returns information about annexed files in the repository
+// (git annex find)
+func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
+	cmd := exec.Command("git", "-C", localPath, "annex", "whereis", "--json")
+	if privKeyFile.Active {
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
+	}
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	if err != nil {
+		return nil, fmt.Errorf("Error getting file status from server: %s", stderr.String())
+	}
+
+	resultsJSON := bytes.Split(out.Bytes(), []byte("\n"))
+	results := make([]AnnexWhereisResult, 0, len(resultsJSON))
+	var res AnnexWhereisResult
+	for _, resJSON := range resultsJSON {
+		if len(resJSON) == 0 {
+			continue
+		}
+		err := json.Unmarshal(resJSON, &res)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, res)
+	}
+	return results, nil
 }
 
 // AnnexStatusResult ...

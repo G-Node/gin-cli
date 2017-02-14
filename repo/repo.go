@@ -142,6 +142,14 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 		return err
 	}
 
+	annexFiles, err := AnnexWhereis(localPath)
+	if err != nil {
+		return err
+	}
+	if len(annexFiles) == 0 {
+		return nil
+	}
+
 	fmt.Printf("Downloading files... ")
 	err = AnnexPull(localPath)
 	if err != nil {
