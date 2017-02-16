@@ -91,10 +91,19 @@ func publicKeyFile(file string) ssh.AuthMethod {
 
 // Connect opens a connection to the git server. This is used to validate credentials
 // and generate temporary keys on demand, without performing a git operation.
+// On Unix systems, the function will attempt to use the system's SSH agent.
+// If no agent is running or the keys offered by the agent are not valid for the server,
+// a temporary key pair is generated, the public key is uploaded to the auth server,
+// and the private key is stored internally, to be used for subsequent functions.
 func (repocl *Client) Connect() error {
 	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
-		return fmt.Errorf("Failed to connect to auth agent:% s", err.Error())
+		// No agent running - use temp keys
+		_, err = repocl.MakeTempKeyPair()
+		if err != nil {
+			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
+		}
+		return nil
 	}
 
 	agent := ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers)
@@ -108,6 +117,7 @@ func (repocl *Client) Connect() error {
 
 	connection, err := ssh.Dial("tcp", repocl.GitHost, sshConfig)
 	if err != nil && strings.Contains(err.Error(), "unable to authenticate") {
+		// Agent key authentication failed - use temp keys
 		_, err = repocl.MakeTempKeyPair()
 		if err != nil {
 			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
@@ -116,11 +126,11 @@ func (repocl *Client) Connect() error {
 	}
 	// TODO: Attempt connection again after temp key is set up
 
-	defer connection.Close()
-
 	if err != nil {
+		// Connection error (other than "unable to auth")
 		return fmt.Errorf("Failed to dial: %s\n", err.Error())
 	}
+	defer connection.Close()
 
 	session, err := connection.NewSession()
 	if err != nil {
