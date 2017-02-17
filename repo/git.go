@@ -4,15 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"os"
 	"os/exec"
-	"path"
 	"strconv"
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
+
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/util"
-	git "gopkg.in/libgit2/git2go.v24"
 )
 
 // Keys
@@ -59,315 +63,104 @@ func CleanUpTemp() {
 	}
 }
 
-// Git callbacks
-
-func (repocl *Client) makeCredsCB() git.CredentialsCallback {
-	// attemptnum is used to determine which authentication method to use each time.
-	attemptnum := 0
-
-	return func(url string, username string, allowedTypes git.CredType) (git.ErrorCode, *git.Cred) {
-		var res int
-		var cred git.Cred
-		switch attemptnum {
-		case 0:
-			res, cred = git.NewCredSshKeyFromAgent(repocl.GitUser)
-		case 1:
-			tempKeyPair, err := repocl.MakeTempKeyPair()
-			if err != nil {
-				return git.ErrUser, nil
-			}
-			res, cred = git.NewCredSshKeyFromMemory(repocl.GitUser, tempKeyPair.Public, tempKeyPair.Private, "")
-		default:
-			return git.ErrUser, nil
-		}
-
-		if res != 0 {
-			return git.ErrorCode(res), nil
-		}
-		attemptnum++
-		return git.ErrOk, &cred
-	}
-}
-
-func (repocl *Client) certCB(cert *git.Certificate, valid bool, hostname string) git.ErrorCode {
-	// TODO: Better cert check?
-	if hostname != repocl.GitHost {
-		return git.ErrCertificate
-	}
-	return git.ErrOk
-}
-
-func remoteCreateCB(repo *git.Repository, name, url string) (*git.Remote, git.ErrorCode) {
-	remote, err := repo.Remotes.Create(name, url)
-	if err != nil {
-		return nil, git.ErrUser
-	}
-	return remote, git.ErrOk
-}
-
-func matchPathCB(p, mp string) int {
-	return 0
-}
-
 // **************** //
 
 // Git commands
 
 // IsRepo checks whether a given path is a git repository.
 func IsRepo(path string) bool {
-	_, err := git.Discover(path, false, nil)
+	err := exec.Command("git", "status").Run()
 	if err != nil {
 		return false
 	}
 	return true
 }
 
-func getRepo(startPath string) (*git.Repository, error) {
-	localRepoPath, err := git.Discover(startPath, false, nil)
+func publicKeyFile(file string) ssh.AuthMethod {
+	buffer, err := ioutil.ReadFile(file)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	return git.OpenRepository(localRepoPath)
-}
 
-// AddPath adds files or directories to the index
-func AddPath(localPath string) ([]string, error) {
-	return AnnexAdd(localPath)
+	key, err := ssh.ParsePrivateKey(buffer)
+	if err != nil {
+		return nil
+	}
+	return ssh.PublicKeys(key)
 }
 
 // Connect opens a connection to the git server. This is used to validate credentials
 // and generate temporary keys on demand, without performing a git operation.
-func (repocl *Client) Connect(localPath string, push bool) error {
-	var dir git.ConnectDirection
-	if push {
-		dir = git.ConnectDirectionPush
-	} else {
-		dir = git.ConnectDirectionFetch
-	}
-
-	cbs := &git.RemoteCallbacks{
-		CredentialsCallback:      repocl.makeCredsCB(),
-		CertificateCheckCallback: repocl.certCB,
-	}
-
-	var headers []string
-
-	repository, err := getRepo(localPath)
+// On Unix systems, the function will attempt to use the system's SSH agent.
+// If no agent is running or the keys offered by the agent are not valid for the server,
+// a temporary key pair is generated, the public key is uploaded to the auth server,
+// and the private key is stored internally, to be used for subsequent functions.
+func (repocl *Client) Connect() error {
+	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
-		return err
+		// No agent running - use temp keys
+		_, err = repocl.MakeTempKeyPair()
+		if err != nil {
+			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
+		}
+		return nil
 	}
 
-	origin, err := repository.Remotes.Lookup("origin")
+	agent := ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers)
+
+	sshConfig := &ssh.ClientConfig{
+		User: repocl.GitUser,
+		Auth: []ssh.AuthMethod{
+			agent,
+		},
+	}
+
+	connection, err := ssh.Dial("tcp", repocl.GitHost, sshConfig)
+	if err != nil && strings.Contains(err.Error(), "unable to authenticate") {
+		// Agent key authentication failed - use temp keys
+		_, err = repocl.MakeTempKeyPair()
+		if err != nil {
+			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
+		}
+		return nil
+	}
+	// TODO: Attempt connection again after temp key is set up
+
 	if err != nil {
-		return err
+		// Connection error (other than "unable to auth")
+		return fmt.Errorf("Failed to dial: %s\n", err.Error())
 	}
+	defer connection.Close()
 
-	return origin.Connect(dir, cbs, headers)
+	session, err := connection.NewSession()
+	if err != nil {
+		return fmt.Errorf("Failed to create session: %s", err.Error())
+	}
+	defer session.Close()
+	return nil
 }
 
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
-func (repocl *Client) Clone(repopath string) (*git.Repository, error) {
-	remotePath := fmt.Sprintf("%s@%s:%s", repocl.GitUser, repocl.GitHost, repopath)
-	localPath := path.Base(repopath)
-
-	cbs := &git.RemoteCallbacks{
-		CredentialsCallback:      repocl.makeCredsCB(),
-		CertificateCheckCallback: repocl.certCB,
-	}
-	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
-	opts := git.CloneOptions{
-		Bare: false,
-		// CheckoutBranch:       "master", // TODO: default branch
-		FetchOptions:         fetchopts,
-		RemoteCreateCallback: remoteCreateCB,
-	}
-	repository, err := git.Clone(remotePath, localPath, &opts)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return repository, nil
-}
-
-// Commit performs a git commit on the currently staged objects.
-// (git commit)
-func (repocl *Client) Commit(localPath string, idx *git.Index) error {
-	// TODO: Construct signature based on user config
-	signature := &git.Signature{
-		Name:  "gin",
-		Email: "gin",
-		When:  time.Now(),
-	}
-	repository, err := getRepo(localPath)
-	if err != nil {
-		return err
-	}
-	head, err := repository.Head()
-	var headCommit *git.Commit
-	if err != nil {
-		// Head commit not found. Root commit?
-		head = nil
+func (repocl *Client) Clone(repopath string) error {
+	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repopath)
+	var cmd *exec.Cmd
+	if privKeyFile.Active {
+		cmd = exec.Command("git", "-c", privKeyFile.GitSSHOpt())
 	} else {
-		headCommit, err = repository.LookupCommit(head.Target())
-		if err != nil {
-			return err
-		}
+		cmd = exec.Command("git")
 	}
-
-	message := "uploading"
-	treeID, err := idx.WriteTree()
+	cmd.Args = append(cmd.Args, "clone", remotePath)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
 	if err != nil {
-		return err
+		fmt.Println()
+		return fmt.Errorf("Error retrieving repository: %s", stderr.String())
 	}
-	err = idx.Write()
-	if err != nil {
-		return err
-	}
-	tree, err := repository.LookupTree(treeID)
-	if err != nil {
-		return err
-	}
-	if headCommit == nil {
-		_, err = repository.CreateCommit("HEAD", signature, signature, message, tree)
-	} else {
-		_, err = repository.CreateCommit("HEAD", signature, signature, message, tree, headCommit)
-	}
-	return err
-}
-
-// Pull pulls all remote commits from the default remote & branch
-// (git pull)
-func (repocl *Client) Pull(localPath string) error {
-	repository, err := getRepo(localPath)
-	if err != nil {
-		return err
-	}
-
-	origin, err := repository.Remotes.Lookup("origin")
-	if err != nil {
-		return err
-	}
-
-	// Fetch
-	cbs := &git.RemoteCallbacks{
-		CredentialsCallback:      repocl.makeCredsCB(),
-		CertificateCheckCallback: repocl.certCB,
-	}
-	fetchopts := &git.FetchOptions{RemoteCallbacks: *cbs}
-
-	err = origin.Fetch([]string{}, fetchopts, "")
-	if err != nil {
-		return err
-	}
-
-	// Merge
-	remoteBranch, err := repository.References.Lookup("refs/remotes/origin/master")
-	if err != nil {
-		return err
-	}
-
-	annotatedCommit, err := repository.AnnotatedCommitFromRef(remoteBranch)
-	if err != nil {
-		return err
-	}
-
-	mergeHeads := make([]*git.AnnotatedCommit, 1)
-	mergeHeads[0] = annotatedCommit
-	analysis, _, err := repository.MergeAnalysis(mergeHeads)
-	if err != nil {
-		return err
-	}
-
-	if analysis&git.MergeAnalysisUpToDate != 0 {
-		// Nothing to do
-		return nil
-	} else if analysis&git.MergeAnalysisNormal != 0 {
-		// Merge changes
-		if err := repository.Merge([]*git.AnnotatedCommit{annotatedCommit}, nil, nil); err != nil {
-			return err
-		}
-
-		// Check for conflicts
-		index, err := repository.Index()
-		if err != nil {
-			return err
-		}
-
-		if index.HasConflicts() {
-			return fmt.Errorf("Merge conflicts encountered.") // TODO: Automatically resolve?
-		}
-
-		// Create merge commit
-		signature, err := repository.DefaultSignature() // TODO: Signature should use username and email if public on gin-auth
-		if err != nil {
-			return err
-		}
-
-		treeID, err := index.WriteTree()
-		if err != nil {
-			return err
-		}
-
-		tree, err := repository.LookupTree(treeID)
-		if err != nil {
-			return err
-		}
-
-		head, err := repository.Head()
-		if err != nil {
-			return err
-		}
-
-		localCommit, err := repository.LookupCommit(head.Target())
-		if err != nil {
-			return err
-		}
-
-		remoteCommit, err := repository.LookupCommit(remoteBranch.Target())
-		if err != nil {
-			return err
-		}
-
-		_, err = repository.CreateCommit("HEAD", signature, signature, "", tree, localCommit, remoteCommit)
-		if err != nil {
-			return err
-		}
-
-		err = repository.StateCleanup()
-		if err != nil {
-			return err
-		}
-
-	}
-
 	return nil
-}
-
-// Push pushes all local commits to the default remote & branch
-// (git push)
-func (repocl *Client) Push(localPath string) error {
-	repository, err := getRepo(localPath)
-	if err != nil {
-		return err
-	}
-
-	origin, err := repository.Remotes.Lookup("origin")
-	if err != nil {
-		return err
-	}
-
-	rcbs := git.RemoteCallbacks{
-		CredentialsCallback:      repocl.makeCredsCB(),
-		CertificateCheckCallback: repocl.certCB,
-	}
-
-	popts := &git.PushOptions{
-		RemoteCallbacks: rcbs,
-	}
-	refspecs := []string{"refs/heads/master"}
-	return origin.Push(refspecs, popts)
 }
 
 // **************** //
@@ -380,7 +173,7 @@ func AnnexInit(localPath string) error {
 	initError := fmt.Errorf("Repository annex initialisation failed.")
 	cmd := exec.Command("git", "-C", localPath, "annex", "init", "--version=6")
 	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
 	err := cmd.Run()
 	if err != nil {
@@ -418,12 +211,10 @@ func AnnexInit(localPath string) error {
 
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
-// (git annex get --all)
 func AnnexPull(localPath string) error {
-	// cmd := exec.Command("git", "-C", localPath, "annex", "get", "--all")
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
 	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
 	out, err := cmd.Output()
 
@@ -438,7 +229,7 @@ func AnnexPull(localPath string) error {
 func AnnexSync(localPath string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--content")
 	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
 	err := cmd.Run()
 
@@ -453,7 +244,7 @@ func AnnexSync(localPath string) error {
 func AnnexPush(localPath, commitMsg string) error {
 	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg))
 	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.SSHOptString())
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -509,27 +300,52 @@ func AnnexAdd(localPath string) ([]string, error) {
 	return added, nil
 }
 
-func repoIndexPaths(localPath string) ([]string, error) {
-	repo, err := getRepo(localPath)
+type AnnexWhereisResult struct {
+	File      string   `json:"file"`
+	Command   string   `json:"command"`
+	Note      string   `json:"note"`
+	Success   bool     `json:"success"`
+	Untrusted []string `json:"untrusted"`
+	Whereis   []struct {
+		Here        bool     `json:"here"`
+		UUID        string   `json:"uuid"`
+		URLs        []string `json:"urls"`
+		Description string   `json:"description"`
+	}
+	Key string `json:"key"`
+}
+
+// AnnexWhereis returns information about annexed files in the repository
+// (git annex find)
+func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
+	cmd := exec.Command("git", "-C", localPath, "annex", "whereis", "--json")
+	if privKeyFile.Active {
+		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
+	}
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error getting file status from server: %s", stderr.String())
 	}
 
-	index, err := repo.Index()
-	if err != nil {
-		return nil, err
-	}
-
-	entries := make([]string, index.EntryCount())
-	for idx := uint(0); idx < index.EntryCount(); idx++ {
-		entry, err := index.EntryByIndex(idx)
+	resultsJSON := bytes.Split(out.Bytes(), []byte("\n"))
+	results := make([]AnnexWhereisResult, 0, len(resultsJSON))
+	var res AnnexWhereisResult
+	for _, resJSON := range resultsJSON {
+		if len(resJSON) == 0 {
+			continue
+		}
+		err := json.Unmarshal(resJSON, &res)
 		if err != nil {
 			return nil, err
 		}
-		entries[idx] = entry.Path
+		results = append(results, res)
 	}
-
-	return entries, nil
+	return results, nil
 }
 
 // AnnexStatusResult ...
@@ -584,7 +400,7 @@ func makeFileList(header string, fnames []string) (list string) {
 	}
 	list += fmt.Sprint(header) + "\n"
 	for idx, name := range fnames {
-		list += fmt.Sprintf("  %d: %s\n", idx, name)
+		list += fmt.Sprintf("  %d: %s\n", idx+1, name)
 	}
 	list += "\n"
 	return

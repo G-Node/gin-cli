@@ -80,7 +80,12 @@ func (repocl *Client) CreateRepo(name, description string) error {
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
 
-	added, err := AddPath(localPath)
+	err := repocl.Connect()
+	if err != nil {
+		return err
+	}
+
+	added, err := AnnexAdd(localPath)
 	if err != nil {
 		return err
 	}
@@ -95,10 +100,6 @@ func (repocl *Client) UploadRepo(localPath string) error {
 	if err != nil {
 		return err
 	}
-	err = repocl.Connect(localPath, true)
-	if err != nil {
-		return err
-	}
 
 	// fmt.Println(changes)
 
@@ -110,8 +111,10 @@ func (repocl *Client) UploadRepo(localPath string) error {
 func (repocl *Client) DownloadRepo(localPath string) error {
 	defer CleanUpTemp()
 
-	// Perform a git connection to check credentials
-	err := repocl.Connect(localPath, false)
+	err := repocl.Connect()
+	if err != nil {
+		return err
+	}
 	err = AnnexPull(localPath)
 	return err
 }
@@ -120,9 +123,14 @@ func (repocl *Client) DownloadRepo(localPath string) error {
 func (repocl *Client) CloneRepo(repoPath string) error {
 	defer CleanUpTemp()
 
+	err := repocl.Connect()
+	if err != nil {
+		return err
+	}
+
 	localPath := path.Base(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", localPath)
-	_, err := repocl.Clone(repoPath)
+	err = repocl.Clone(repoPath)
 	if err != nil {
 		return err
 	}
@@ -132,6 +140,14 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 	err = AnnexInit(localPath)
 	if err != nil {
 		return err
+	}
+
+	annexFiles, err := AnnexWhereis(localPath)
+	if err != nil {
+		return err
+	}
+	if len(annexFiles) == 0 {
+		return nil
 	}
 
 	fmt.Printf("Downloading files... ")

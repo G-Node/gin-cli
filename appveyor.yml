@@ -1,0 +1,50 @@
+version: '{build}'
+os: Windows Server 2012 R2
+
+clone_folder: c:\gopath\src\github.com\G-Node\gin-cli
+
+environment:
+  GOPATH: c:\gopath
+  # GO15VENDOREXPERIMENT: 1
+
+  matrix:
+    - GENERATOR: "Visual Studio 11"
+      ARCH: 32
+    - GENERATOR: "Visual Studio 11 Win64"
+      ARCH: 64
+    - GENERATOR: "MSYS Makefiles"
+      ARCH: i686 # this is for 32-bit MinGW-w64
+    - GENERATOR: "MSYS Makefiles"
+      ARCH: 64
+
+install:
+  # go stuff
+  - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
+  - go version
+  - go env
+  - go get -u github.com/golang/lint/golint
+
+build_script:
+  # cd to project necessary?
+  - cd %clone_folder%
+  # download deps
+  - go get github.com/docopt/docopt-go
+  - go get github.com/howeyc/gopass
+  - go get golang.org/x/crypto/ssh
+  - go get github.com/G-Node/gin-core/gin
+  - go get github.com/G-Node/gin-repo/wire
+  - go get golang.org/x/crypto/ssh
+  - go vet ./...
+  - gofmt -s -l .
+  - golint github.com/G-Node/gin-cli...
+  - go test -v ./...
+
+# to disable automatic tests
+test: off
+
+# to disable deployment
+deploy: off
+
+# Uncomment on_finish block to enable RDP
+# on_finish:
+#   - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
