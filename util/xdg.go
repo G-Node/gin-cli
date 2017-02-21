@@ -37,3 +37,31 @@ func ConfigPath(create bool) (string, error) {
 	}
 	return path, err
 }
+
+// DataPath returns the data path where gin data files (such as transaction logs) should be stored.
+func DataPath(create bool) (string, error) {
+	// TODO: Handle Windows paths
+	var path string
+	var err error
+
+	xdgdata := os.Getenv("XDG_DATA_HOME")
+	if xdgdata != "" {
+		path = filepath.Join(xdgdata, suffix)
+	} else {
+		usr, err := user.Current()
+		if err != nil {
+			return "", fmt.Errorf("Error getting user home dir")
+		}
+		homedir := usr.HomeDir
+		path = filepath.Join(homedir, ".local/share", suffix)
+	}
+
+	if create {
+		err = os.MkdirAll(path, 0777)
+		if err != nil {
+			return "", fmt.Errorf("Error creating directory %s", path)
+		}
+	}
+
+	return path, err
+}
