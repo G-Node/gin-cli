@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"strings"
 
+	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
 )
@@ -155,6 +157,8 @@ func (authcl *Client) Login(username, password, clientID, clientSecret string) e
 
 	authcl.Username = username
 	authcl.Token = authresp.AccessToken
+	util.LogWriteLine(fmt.Sprintf("Login successful. Username: %s", username))
+	util.LogWriteLine(fmt.Sprintf("Permissions granted: %s\n", strings.Replace(authresp.Scope, " ", ", ", -1)))
 
 	return authcl.StoreToken()
 }

@@ -17,7 +17,7 @@ func Die(msg string) {
 // returning errors up the stack when all that needs to be done is to stop execution.
 func CheckError(err error) {
 	if err != nil {
-		// TODO: Print error to log
+		LogWriteLine(err.Error())
 		Die(err.Error())
 	}
 }
@@ -26,7 +26,7 @@ func CheckError(err error) {
 // Before exiting, the given msg string is printed to stderr.
 func CheckErrorMsg(err error, msg string) {
 	if err != nil {
-		// TODO: Print actual error to log
+		LogWriteLine(fmt.Sprintf("The following error occured:\n%sExiting with message: %s", err.Error(), msg))
 		Die(msg)
 	}
 }

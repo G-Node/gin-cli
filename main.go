@@ -160,7 +160,6 @@ func login(args []string) {
 	err = authcl.Login(username, password, "gin-cli", "97196a1c-silly-biscuit3-d161ea15a676")
 	util.CheckError(err)
 	fmt.Printf("[Login success] You are now logged in as %s\n", username)
-	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
 }
 
 func logout(args []string) {
@@ -175,6 +174,7 @@ func logout(args []string) {
 
 	err = web.DeleteToken()
 	util.CheckErrorMsg(err, "Error deleting user token.")
+	util.LogWriteLine("Logged out. Token deleted.")
 }
 
 func createRepo(args []string) {
@@ -411,6 +411,10 @@ func main() {
 	args, _ := docopt.Parse(fullUsage, nil, true, "GIN command line client v0.1", true)
 	command := args["<command>"].(string)
 	cmdArgs := args["<args>"].([]string)
+
+	err := util.LogInit()
+	util.CheckError(err)
+	defer util.LogClose()
 
 	switch command {
 	case "login":
