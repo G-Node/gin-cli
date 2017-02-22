@@ -7,37 +7,45 @@ import (
 	"path"
 )
 
-// LogFile embeds log.Logger for writing out to a log file and also provides other convenience functions.
-type LogFile struct {
-	File *os.File
-	*log.Logger
-}
+var logfile *os.File
+var logger *log.Logger
 
-// LogInit initialises the log file.
-func LogInit() (*LogFile, error) {
+// LogInit initialises the log file and logger.
+func LogInit() error {
 	dataPath, err := DataPath(true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// TODO: Log rotation
 	fullPath := path.Join(dataPath, "gin.log")
-	file, err := os.OpenFile(fullPath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+	logfile, err = os.OpenFile(fullPath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating file %s", fullPath)
+		return fmt.Errorf("Error creating file %s", fullPath)
 	}
 
 	flags := log.Ldate | log.Ltime | log.LUTC
-	logger := log.New(file, "", flags)
+	logger = log.New(logfile, "", flags)
 
-	lf := LogFile{
-		File:   file,
-		Logger: logger,
-	}
-	return &lf, nil
+	return nil
 }
 
-// Close the log file.
-func (lf *LogFile) Close() error {
-	return lf.File.Close()
+// LogWrite writes a string to the log file. Nothing happens if the log file is not initialised (see LogInit).
+func LogWrite(text string) {
+	if logger != nil {
+		logger.Print(text)
+
+	}
+}
+
+// LogWriteLine writes a string to the log file and terminates with new line. Nothing happens if the log file is not initialised (see LogInit).
+func LogWriteLine(text string) {
+	if logger != nil {
+		logger.Println(text)
+	}
+}
+
+// LogClose closes the log file.
+func LogClose() error {
+	return logfile.Close()
 }
