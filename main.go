@@ -159,7 +159,10 @@ func login(args []string) {
 	authcl := auth.NewClient(authhost)
 	err = authcl.Login(username, password, "gin-cli", "97196a1c-silly-biscuit3-d161ea15a676")
 	util.CheckError(err)
-	fmt.Printf("[Login success] You are now logged in as %s\n", username)
+	info, err := authcl.RequestAccount(username)
+	util.CheckError(err)
+	fmt.Printf("Hello %s. You are now logged in.\n", info.FirstName)
+	// fmt.Printf("[Login success] You are now logged in as %s\n", username)
 }
 
 func logout(args []string) {
