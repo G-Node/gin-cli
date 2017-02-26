@@ -21,23 +21,28 @@ import (
 const usage = `
 GIN command line client
 
-Usage: gin [--version] <command> [<args>...]
+Usage: gin <command> [<args>...]
+       gin --help
+       gin --version
 
 Options:
     -h --help    This help screen
     --version    Client version
 
 Commands:
-    gin login    [<username>]
-    gin logout
-    gin create   [<name>] [<description>]
-    gin get      <repopath>
-    gin upload
-    gin download
-    gin repos    [<username>]
-    gin info     [<username>]
-    gin keys     [-v | --verbose]
-    gin keys     --add <filename>
+    login    [<username>]
+    logout
+    create   [<name>] [<description>]
+    get      <repopath>
+    upload
+    download
+    repos    [<username>]
+    info     [<username>]
+    keys     [-v | --verbose]
+    keys     --add <filename>
+    cmdhelp
+
+Use 'cmdhelp' to see full description of individual commands.
 `
 
 const cmdUsage = `
@@ -410,8 +415,7 @@ func listRepos(args []string) {
 }
 
 func main() {
-	fullUsage := usage + "\n" + cmdUsage
-	args, _ := docopt.Parse(fullUsage, nil, true, "GIN command line client v0.1", true)
+	args, _ := docopt.Parse(usage, nil, true, "GIN command line client v0.1", true)
 	command := args["<command>"].(string)
 	cmdArgs := args["<args>"].([]string)
 
@@ -438,6 +442,9 @@ func main() {
 		listRepos(cmdArgs)
 	case "logout":
 		logout(cmdArgs)
+	case "cmdhelp":
+		fullUsage := usage + "\n" + cmdUsage
+		fmt.Print(fullUsage)
 	default:
 		util.Die(usage)
 	}
