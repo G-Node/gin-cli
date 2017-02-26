@@ -27,14 +27,18 @@ func LogInit() error {
 	flags := log.Ldate | log.Ltime | log.LUTC
 	logger = log.New(logfile, "", flags)
 
+	LogWriteLine("---")
+
 	return nil
 }
 
 // LogWrite writes a string to the log file. Nothing happens if the log file is not initialised (see LogInit).
-func LogWrite(text string) {
-	if logger != nil {
-		logger.Print(text)
-
+// Depending on the number of arguments passed, LogWrite either behaves as a Print or a Printf. The first argument must always be a string. If more than one argument is given, the function behaves as Printf.
+func LogWrite(fmtstr string, args ...interface{}) {
+	if len(args) == 0 {
+		logger.Print(fmtstr)
+	} else {
+		logger.Printf(fmtstr, args...)
 	}
 }
 
