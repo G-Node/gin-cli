@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-repo/wire"
 )
@@ -26,14 +27,17 @@ func NewClient(host string) *Client {
 
 // GetRepos gets a list of repositories (public or user specific)
 func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
+	util.LogWrite("Retrieving repos")
 	var repoList []wire.Repo
 	var res *http.Response
 	var err error
 
 	if user == "" {
+		util.LogWriteLine("User: public")
 		res, err = repocl.Get("/repos/public")
 		fmt.Print("Listing all public repositories\n\n")
 	} else {
+		util.LogWriteLine(fmt.Sprintf("User: %s", user))
 		err = repocl.LoadToken()
 		if err != nil {
 			fmt.Print("You are not logged in - Showing public repositories\n\n")
@@ -60,12 +64,14 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 
 // CreateRepo creates a repository on the server.
 func (repocl *Client) CreateRepo(name, description string) error {
+	util.LogWrite("Creating repository")
 	err := repocl.LoadToken()
 	if err != nil {
 		return fmt.Errorf("[Create repository] This action requires login")
 	}
 
 	data := wire.Repo{Name: name, Description: description}
+	util.LogWrite("Name: %s :: Description: %s", name, description)
 	res, err := repocl.Post(fmt.Sprintf("/users/%s/repos", repocl.Username), data)
 	if err != nil {
 		return err
@@ -73,12 +79,14 @@ func (repocl *Client) CreateRepo(name, description string) error {
 		return fmt.Errorf("[Create repository] Failed. Server returned %s", res.Status)
 	}
 	web.CloseRes(res.Body)
+	util.LogWrite("Repository created")
 	return nil
 }
 
 // UploadRepo adds files to a repository and uploads them.
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
+	util.LogWrite("UploadRepo")
 
 	err := repocl.Connect()
 	if err != nil {
@@ -110,6 +118,7 @@ func (repocl *Client) UploadRepo(localPath string) error {
 // DownloadRepo downloads the files in an already checked out repository.
 func (repocl *Client) DownloadRepo(localPath string) error {
 	defer CleanUpTemp()
+	util.LogWrite("DownloadRepo")
 
 	err := repocl.Connect()
 	if err != nil {
@@ -122,6 +131,7 @@ func (repocl *Client) DownloadRepo(localPath string) error {
 // CloneRepo downloads the files of a given repository.
 func (repocl *Client) CloneRepo(repoPath string) error {
 	defer CleanUpTemp()
+	util.LogWrite("CloneRepo")
 
 	err := repocl.Connect()
 	if err != nil {
