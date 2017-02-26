@@ -415,7 +415,7 @@ func listRepos(args []string) {
 }
 
 func main() {
-	args, _ := docopt.Parse(usage, nil, true, "GIN command line client v0.1", true)
+	args, _ := docopt.Parse(usage, nil, true, "GIN command line client v0.2", true)
 	command := args["<command>"].(string)
 	cmdArgs := args["<args>"].([]string)
 
