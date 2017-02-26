@@ -50,9 +50,9 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	}
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
-		util.LogWriteLine("Added bearer tokent to GET")
+		util.LogWrite("Added bearer tokent to GET")
 	}
-	util.LogWriteLine(fmt.Sprintf("Performing GET: %s", req.URL))
+	util.LogWrite("Performing GET: %s", req.URL)
 	return cl.web.Do(req)
 }
 
@@ -71,9 +71,9 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
-		util.LogWriteLine("Added bearer tokent to POST")
+		util.LogWrite("Added bearer tokent to POST")
 	}
-	util.LogWriteLine(fmt.Sprintf("Performing POST: %s", req.URL))
+	util.LogWrite("Performing POST: %s", req.URL)
 	return cl.web.Do(req)
 }
 
@@ -88,7 +88,7 @@ func (cl *Client) PostForm(address string, data url.Values) (*http.Response, err
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	util.LogWriteLine(fmt.Sprintf("Performing POST (with form data): %s", req.URL))
+	util.LogWrite("Performing POST (with form data): %s", req.URL)
 	return cl.web.Do(req)
 }
 
@@ -118,7 +118,7 @@ func (ut *UserToken) LoadToken() error {
 	if err != nil {
 		return err
 	}
-	util.LogWriteLine("Decoded")
+	util.LogWrite("Decoded")
 	return nil
 }
 
@@ -141,7 +141,7 @@ func (ut *UserToken) StoreToken() error {
 	if err != nil {
 		return err
 	}
-	util.LogWriteLine("Saved")
+	util.LogWrite("Saved")
 	return nil
 }
 
@@ -156,7 +156,7 @@ func DeleteToken() error {
 	if err != nil {
 		return err
 	}
-	util.LogWriteLine("Token deleted")
+	util.LogWrite("Token deleted")
 	return nil
 }
 

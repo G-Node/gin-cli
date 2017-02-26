@@ -27,7 +27,7 @@ func LogInit() error {
 	flags := log.Ldate | log.Ltime | log.LUTC
 	logger = log.New(logfile, "", flags)
 
-	LogWriteLine("---")
+	LogWrite("---")
 
 	return nil
 }
@@ -39,13 +39,6 @@ func LogWrite(fmtstr string, args ...interface{}) {
 		logger.Print(fmtstr)
 	} else {
 		logger.Printf(fmtstr, args...)
-	}
-}
-
-// LogWriteLine writes a string to the log file and terminates with new line. Nothing happens if the log file is not initialised (see LogInit).
-func LogWriteLine(text string) {
-	if logger != nil {
-		logger.Println(text)
 	}
 }
 

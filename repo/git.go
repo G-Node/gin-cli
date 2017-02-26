@@ -150,10 +150,10 @@ func (repocl *Client) Clone(repopath string) error {
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	if err != nil {
-		util.LogWriteLine(fmt.Sprintf("Error during clone command. [stderr] %s", stderr.String()))
+		util.LogWrite("Error during clone command. [stderr] %s", stderr.String())
 		return fmt.Errorf("Error retrieving repository")
 	}
 	return nil
@@ -171,16 +171,16 @@ func AnnexInit(localPath string) error {
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	if err != nil {
 		// TODO: Collect and print stderr
-		util.LogWriteLine(fmt.Sprintf("%s [stderr] %s", initError, ""))
+		util.LogWrite("%s [stderr] %s", initError, "")
 		return initError
 	}
 
 	cmd = exec.Command("git", "-C", localPath, "config", "annex.addunlocked", "true")
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err = cmd.Run()
 	if err != nil {
 		return initError
@@ -196,19 +196,19 @@ func AnnexInit(localPath string) error {
 	sizethreshold := "10M"
 	lfvalue := fmt.Sprintf("largerthan=%s and not (%s)", sizethreshold, strings.Join(includes, " or "))
 	cmd = exec.Command("git", "-C", localPath, "config", "annex.largefiles", lfvalue)
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err = cmd.Run()
 	if err != nil {
 		return initError
 	}
 	cmd = exec.Command("git", "-C", localPath, "config", "annex.backends", "WORM")
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err = cmd.Run()
 	if err != nil {
 		return initError
 	}
 	cmd = exec.Command("git", "-C", localPath, "config", "annex.thin", "true")
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err = cmd.Run()
 	if err != nil {
 		return initError
@@ -223,12 +223,12 @@ func AnnexPull(localPath string) error {
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
 		// TODO: Collect and print stderr to log
-		util.LogWriteLine(fmt.Sprintf("Error during AnnexPull. [stderr] %s", ""))
+		util.LogWrite("Error during AnnexPull. [stderr] %s", "")
 		return fmt.Errorf("Error downloading files")
 	}
 	return nil
@@ -241,12 +241,12 @@ func AnnexSync(localPath string) error {
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
 		// TODO: Collect and print stderr to log
-		util.LogWriteLine(fmt.Sprintf("Error during AnnexSync. [stderr] %s", ""))
+		util.LogWrite("Error during AnnexSync. [stderr] %s", "")
 		return fmt.Errorf("Error synchronising files")
 	}
 	return nil
@@ -263,11 +263,11 @@ func AnnexPush(localPath, commitMsg string) error {
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
-		util.LogWriteLine(fmt.Sprintf("Error during AnnexPush. [stderr] %s", stderr.String()))
+		util.LogWrite("Error during AnnexPush. [stderr] %s", stderr.String())
 		return fmt.Errorf("Error uploading files")
 	}
 	return nil
@@ -289,11 +289,11 @@ func AnnexAdd(localPath string) ([]string, error) {
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
-		util.LogWriteLine(fmt.Sprintf("Error during AnnexAdd. [stderr] %s", stderr.String()))
+		util.LogWrite("Error during AnnexAdd. [stderr] %s", stderr.String())
 		return nil, fmt.Errorf("Error adding files to repository.")
 	}
 
@@ -344,11 +344,11 @@ func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
-		util.LogWriteLine(fmt.Sprintf("Error during AnnexWhereis. [stderr] %s", stderr.String()))
+		util.LogWrite("Error during AnnexWhereis. [stderr] %s", stderr.String())
 		return nil, fmt.Errorf("Error getting file status from server")
 	}
 
@@ -383,11 +383,11 @@ func DescribeChanges(localPath string) (string, error) {
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
-	util.LogWriteLine(fmt.Sprintf("Running shell command: %s", strings.Join(cmd.Args, " ")))
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
-		util.LogWriteLine(fmt.Sprintf("Error during DescribeChanges. [stderr] %s", stderr.String()))
+		util.LogWrite("Error during DescribeChanges. [stderr] %s", stderr.String())
 		return "", fmt.Errorf("Error retrieving file status")
 	}
 

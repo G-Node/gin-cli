@@ -157,8 +157,8 @@ func (authcl *Client) Login(username, password, clientID, clientSecret string) e
 
 	authcl.Username = username
 	authcl.Token = authresp.AccessToken
-	util.LogWriteLine(fmt.Sprintf("Login successful. Username: %s", username))
-	util.LogWriteLine(fmt.Sprintf("Permissions granted: %s", strings.Replace(authresp.Scope, " ", ", ", -1)))
+	util.LogWrite("Login successful. Username: %s", username)
+	util.LogWrite("Permissions granted: %s", strings.Replace(authresp.Scope, " ", ", ", -1))
 
 	return authcl.StoreToken()
 }

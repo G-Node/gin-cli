@@ -28,7 +28,7 @@ type TempFile struct {
 
 // MakeKeyPair generates and returns a private-public key pair.
 func MakeKeyPair() (*KeyPair, error) {
-	LogWriteLine("Creating temporary key pair")
+	LogWrite("Creating temporary key pair")
 	privkey, err := rsa.GenerateKey(rand.Reader, 2048) // TODO: Key size as parameter
 	if err != nil {
 		return nil, fmt.Errorf("Error generating key pair: %s", err)
@@ -85,7 +85,7 @@ func SaveTempKeyFile(key string) (*TempFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	LogWriteLine(fmt.Sprintf("Saved key in temporary directory %s", newfile.Dir))
+	LogWrite("Saved key in temporary directory %s", newfile.Dir)
 	return &newfile, nil
 
 }
@@ -102,7 +102,7 @@ func (tf TempFile) Write(content string) error {
 func (tf TempFile) Delete() {
 	_ = os.RemoveAll(tf.Dir)
 	tf.Active = false
-	LogWriteLine(fmt.Sprintf("Deleted temporary key directory %s", tf.Dir))
+	LogWrite("Deleted temporary key directory %s", tf.Dir)
 }
 
 // FullPath returns the full path to the temporary file.

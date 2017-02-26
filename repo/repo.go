@@ -33,11 +33,11 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	var err error
 
 	if user == "" {
-		util.LogWriteLine("User: public")
+		util.LogWrite("User: public")
 		res, err = repocl.Get("/repos/public")
 		fmt.Print("Listing all public repositories\n\n")
 	} else {
-		util.LogWriteLine(fmt.Sprintf("User: %s", user))
+		util.LogWrite("User: %s", user)
 		err = repocl.LoadToken()
 		if err != nil {
 			fmt.Print("You are not logged in - Showing public repositories\n\n")
