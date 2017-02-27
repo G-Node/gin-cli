@@ -118,12 +118,6 @@ Command help:
                  Login required.
 `
 
-// TODO: Load from config
-const authhost = "https://auth.gin.g-node.org"
-const repohost = "https://repo.gin.g-node.org"
-const githost = "gin.g-node.org:22"
-const gituser = "git"
-
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
 	var username string
@@ -161,7 +155,7 @@ func login(args []string) {
 		util.Die("No password provided. Aborting.")
 	}
 
-	authcl := auth.NewClient(authhost)
+	authcl := auth.NewClient(util.Config.AuthHost)
 	err = authcl.Login(username, password, "gin-cli", "97196a1c-silly-biscuit3-d161ea15a676")
 	util.CheckError(err)
 	info, err := authcl.RequestAccount(username)
@@ -200,10 +194,10 @@ func createRepo(args []string) {
 		}
 	}
 	// TODO: Check name validity before sending to server?
-	repocl := repo.NewClient(repohost)
-	repocl.GitUser = gituser
-	repocl.GitHost = githost
-	repocl.KeyHost = authhost
+	repocl := repo.NewClient(util.Config.RepoHost)
+	repocl.GitUser = util.Config.GitUser
+	repocl.GitHost = util.Config.GitHost
+	repocl.KeyHost = util.Config.AuthHost
 	err := repocl.CreateRepo(repoName, repoDesc)
 	util.CheckError(err)
 }
@@ -215,10 +209,10 @@ func getRepo(args []string) {
 	} else {
 		repostr = args[0]
 	}
-	repocl := repo.NewClient(repohost)
-	repocl.GitUser = gituser
-	repocl.GitHost = githost
-	repocl.KeyHost = authhost
+	repocl := repo.NewClient(util.Config.RepoHost)
+	repocl.GitUser = util.Config.GitUser
+	repocl.GitHost = util.Config.GitHost
+	repocl.KeyHost = util.Config.AuthHost
 	err := repocl.CloneRepo(repostr)
 	util.CheckError(err)
 }
@@ -227,10 +221,10 @@ func upload(args []string) {
 	if len(args) > 0 {
 		util.Die(usage)
 	}
-	repocl := repo.NewClient(repohost)
-	repocl.GitUser = gituser
-	repocl.GitHost = githost
-	repocl.KeyHost = authhost
+	repocl := repo.NewClient(util.Config.RepoHost)
+	repocl.GitUser = util.Config.GitUser
+	repocl.GitHost = util.Config.GitHost
+	repocl.KeyHost = util.Config.AuthHost
 	err := repocl.UploadRepo(".")
 	util.CheckError(err)
 }
@@ -242,10 +236,10 @@ func download(args []string) {
 	if !repo.IsRepo(".") {
 		util.Die("Current directory is not a repository.")
 	}
-	repocl := repo.NewClient(repohost)
-	repocl.GitUser = gituser
-	repocl.GitHost = githost
-	repocl.KeyHost = authhost
+	repocl := repo.NewClient(util.Config.RepoHost)
+	repocl.GitUser = util.Config.GitUser
+	repocl.GitHost = util.Config.GitHost
+	repocl.KeyHost = util.Config.AuthHost
 	err := repocl.DownloadRepo(".")
 	util.CheckError(err)
 }
@@ -277,7 +271,7 @@ func printKeys(args []string) {
 		}
 	}
 
-	authcl := auth.NewClient(authhost)
+	authcl := auth.NewClient(util.Config.AuthHost)
 	keys, err := authcl.GetUserKeys()
 	util.CheckError(err)
 
@@ -302,7 +296,7 @@ func addKey(args []string) {
 	if len(args) != 2 {
 		util.Die(usage)
 	}
-	authcl := auth.NewClient(authhost)
+	authcl := auth.NewClient(util.Config.AuthHost)
 	err := authcl.LoadToken()
 	if err != nil {
 		util.Die("This command requires login.")
@@ -330,7 +324,7 @@ func addKey(args []string) {
 func printAccountInfo(args []string) {
 	var username string
 
-	authcl := auth.NewClient(authhost)
+	authcl := auth.NewClient(util.Config.AuthHost)
 	_ = authcl.LoadToken()
 
 	if len(args) == 0 {
@@ -394,7 +388,7 @@ func listRepos(args []string) {
 		util.Die(usage)
 	}
 	var username string
-	repocl := repo.NewClient(repohost)
+	repocl := repo.NewClient(util.Config.RepoHost)
 
 	if len(args) == 0 {
 		username = ""
@@ -422,6 +416,9 @@ func main() {
 	err := util.LogInit()
 	util.CheckError(err)
 	defer util.LogClose()
+
+	err = util.LoadConfig()
+	util.CheckError(err)
 
 	switch command {
 	case "login":

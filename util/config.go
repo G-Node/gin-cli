@@ -7,25 +7,14 @@ import (
 )
 
 type conf struct {
-	Bin struct {
+	AuthHost string
+	RepoHost string
+	GitHost  string
+	GitUser  string
+	Bin      struct {
 		Git      string
 		GitAnnex string
 		SSH      string
-	}
-	Host struct {
-		Auth struct {
-			Address string
-			Port    int
-		}
-		Repo struct {
-			Address string
-			Port    int
-		}
-		Git struct {
-			Address string
-			Port    int
-			User    string
-		}
 	}
 	Annex struct {
 		Exclude []string
@@ -33,10 +22,10 @@ type conf struct {
 	}
 }
 
-// Conf makes the configuration options available after LoadConfig is called
-var Conf conf
+// Config makes the configuration options available after LoadConfig is called
+var Config conf
 
-// LoadConfig reads in the configuration and makes it available through the package globals
+// LoadConfig reads in the configuration and makes it available through Config package global
 func LoadConfig() error {
 	// Binaries
 	viper.SetDefault("bin.git", "git")
@@ -44,13 +33,13 @@ func LoadConfig() error {
 	viper.SetDefault("bin.ssh", "ssh")
 
 	// Hosts
-	viper.SetDefault("host.auth.address", "auth.gin.g-node.org")
-	viper.SetDefault("host.auth.port", "443")
-	viper.SetDefault("host.repo.address", "repo.gin.g-node.org")
-	viper.SetDefault("host.repo.port", "443")
-	viper.SetDefault("host.git.address", "gin.g-node.org")
-	viper.SetDefault("host.git.port", "22")
-	viper.SetDefault("host.git.user", "git")
+	viper.SetDefault("auth.address", "auth.gin.g-node.org")
+	viper.SetDefault("auth.port", "443")
+	viper.SetDefault("repo.address", "repo.gin.g-node.org")
+	viper.SetDefault("repo.port", "443")
+	viper.SetDefault("git.address", "gin.g-node.org")
+	viper.SetDefault("git.port", "22")
+	viper.SetDefault("git.user", "git")
 
 	// annex filters
 	viper.SetDefault("annex.exclude", [...]string{"md", "rst", "txt", "c", "cpp", "h", "hpp", "py", "go"})
@@ -67,10 +56,28 @@ func LoadConfig() error {
 		return fmt.Errorf("Error reading config file: %s", err.Error())
 	}
 
-	err = viper.Unmarshal(&Conf)
+	err = viper.UnmarshalKey("bin", &Config.Bin)
 	if err != nil {
 		return fmt.Errorf("Error reading config file: %s", err.Error())
 	}
+	err = viper.UnmarshalKey("annex", &Config.Annex)
+	if err != nil {
+		return fmt.Errorf("Error reading config file: %s", err.Error())
+	}
+
+	authAddress := viper.GetString("auth.address")
+	authPort := viper.GetInt("auth.port")
+	Config.AuthHost = fmt.Sprintf("%s:%d", authAddress, authPort)
+
+	repoAddress := viper.GetString("repo.address")
+	repoPort := viper.GetInt("repo.port")
+	Config.RepoHost = fmt.Sprintf("%s:%d", repoAddress, repoPort)
+
+	gitAddress := viper.GetString("git.address")
+	gitPort := viper.GetInt("git.port")
+	Config.GitHost = fmt.Sprintf("%s:%d", gitAddress, gitPort)
+
+	Config.GitUser = viper.GetString("git.user")
 
 	return nil
 }
