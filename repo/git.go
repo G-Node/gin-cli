@@ -19,11 +19,8 @@ import (
 	"github.com/G-Node/gin-cli/util"
 )
 
-// Keys
-
 // Temporary (SSH key) file handling
-
-var privKeyFile *util.TempFile
+var privKeyFile util.TempFile
 
 // MakeTempKeyPair creates a temporary key pair and stores it in a temporary directory.
 // It also sets the global tempFile for use by the annex commands. The key pair is returned directly.

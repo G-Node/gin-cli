@@ -69,24 +69,25 @@ func MakeTempFile(filename string) (TempFile, error) {
 
 // SaveTempKeyFile stores a given private key to a temporary file.
 // Returns a TempFile struct which contains the absolute path and filename.
-func SaveTempKeyFile(key string) (*TempFile, error) {
+func SaveTempKeyFile(key string) (TempFile, error) {
+	var newfile TempFile
 	dir, err := ioutil.TempDir("", "gin")
 	if err != nil {
-		return nil, fmt.Errorf("Error creating temporary key directory: %s", err)
+		return newfile, fmt.Errorf("Error creating temporary key directory: %s", err)
 	}
-	newfile := TempFile{
+	newfile = TempFile{
 		Dir:      dir,
 		Filename: "priv",
 	}
 	if err != nil {
-		return nil, err
+		return newfile, err
 	}
 	err = newfile.Write(key)
 	if err != nil {
-		return nil, err
+		return newfile, err
 	}
 	LogWrite("Saved key in temporary directory %s", newfile.Dir)
-	return &newfile, nil
+	return newfile, nil
 
 }
 
