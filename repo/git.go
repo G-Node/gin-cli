@@ -189,13 +189,17 @@ func AnnexInit(localPath string) error {
 	for idx, ext := range exclfilters {
 		excludes[idx] = fmt.Sprintf("exclude=%s", ext)
 	}
-	sizethreshold := util.Config.Annex.MinSize
-	lfvalue := fmt.Sprintf("largerthan=%s and %s", sizethreshold, strings.Join(excludes, " and "))
-	cmd = exec.Command("git", "-C", localPath, "config", "annex.largefiles", lfvalue)
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err = cmd.Run()
-	if err != nil {
-		return initError
+	sizethreshold := fmt.Sprintf("largerthan=%s", util.Config.Annex.MinSize)
+	conditions := append(excludes, sizethreshold)
+	lfvalue := strings.Join(conditions, " and ")
+
+	if lfvalue != "" {
+		cmd = exec.Command("git", "-C", localPath, "config", "annex.largefiles", lfvalue)
+		util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+		err = cmd.Run()
+		if err != nil {
+			return initError
+		}
 	}
 	cmd = exec.Command("git", "-C", localPath, "config", "annex.backends", "WORM")
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
