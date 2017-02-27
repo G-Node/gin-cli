@@ -188,12 +188,12 @@ func AnnexInit(localPath string) error {
 
 	// list of extensions that are added to git (not annex)
 	exclfilters := util.Config.Annex.Exclude
-	includes := make([]string, len(exclfilters))
+	excludes := make([]string, len(exclfilters))
 	for idx, ext := range exclfilters {
-		includes[idx] = fmt.Sprintf("include=*.%s", ext)
+		excludes[idx] = fmt.Sprintf("exclude=%s", ext)
 	}
 	sizethreshold := util.Config.Annex.MinSize
-	lfvalue := fmt.Sprintf("largerthan=%s and not (%s)", sizethreshold, strings.Join(includes, " or "))
+	lfvalue := fmt.Sprintf("largerthan=%s and %s", sizethreshold, strings.Join(excludes, " and "))
 	cmd = exec.Command("git", "-C", localPath, "config", "annex.largefiles", lfvalue)
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err = cmd.Run()

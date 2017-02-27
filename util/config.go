@@ -42,7 +42,7 @@ func LoadConfig() error {
 	viper.SetDefault("git.user", "git")
 
 	// annex filters
-	viper.SetDefault("annex.exclude", [...]string{"md", "rst", "txt", "c", "cpp", "h", "hpp", "py", "go"})
+	viper.SetDefault("annex.exclude", [...]string{"*.md", "*.rst", "*.txt", "*.c", "*.cpp", "*.h", "*.hpp", "*.py", "*.go"})
 	viper.SetDefault("annex.minsize", "10M")
 
 	viper.SetConfigName("config")
