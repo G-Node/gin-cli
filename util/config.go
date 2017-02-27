@@ -51,12 +51,9 @@ func LoadConfig() error {
 	viper.AddConfigPath(configpath)
 	viper.AddConfigPath(".")
 
-	err := viper.ReadInConfig()
-	if err != nil {
-		return fmt.Errorf("Error reading config file: %s", err.Error())
-	}
+	viper.ReadInConfig()
 
-	err = viper.UnmarshalKey("bin", &Config.Bin)
+	err := viper.UnmarshalKey("bin", &Config.Bin)
 	if err != nil {
 		return fmt.Errorf("Error reading config file: %s", err.Error())
 	}
