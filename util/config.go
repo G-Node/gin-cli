@@ -33,9 +33,9 @@ func LoadConfig() error {
 	viper.SetDefault("bin.ssh", "ssh")
 
 	// Hosts
-	viper.SetDefault("auth.address", "auth.gin.g-node.org")
+	viper.SetDefault("auth.address", "https://auth.gin.g-node.org")
 	viper.SetDefault("auth.port", "443")
-	viper.SetDefault("repo.address", "repo.gin.g-node.org")
+	viper.SetDefault("repo.address", "https://repo.gin.g-node.org")
 	viper.SetDefault("repo.port", "443")
 	viper.SetDefault("git.address", "gin.g-node.org")
 	viper.SetDefault("git.port", "22")
