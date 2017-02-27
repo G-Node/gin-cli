@@ -120,7 +120,7 @@ func (repocl *Client) Connect() error {
 
 	if err != nil {
 		// Connection error (other than "unable to auth")
-		return fmt.Errorf("Failed to dial: %s\n", err.Error())
+		return fmt.Errorf("Failed to connect to git host: %s\n", err.Error())
 	}
 	defer connection.Close()
 
