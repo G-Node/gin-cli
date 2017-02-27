@@ -49,18 +49,14 @@ func LoadConfig() error {
 	configpath, _ := ConfigPath(false)
 	// Add /etc/gin/config ?
 	viper.AddConfigPath(configpath)
-	viper.AddConfigPath(".")
 
 	viper.ReadInConfig()
 
-	err := viper.UnmarshalKey("bin", &Config.Bin)
-	if err != nil {
-		return fmt.Errorf("Error reading config file: %s", err.Error())
-	}
-	err = viper.UnmarshalKey("annex", &Config.Annex)
-	if err != nil {
-		return fmt.Errorf("Error reading config file: %s", err.Error())
-	}
+	Config.Bin.Git = viper.GetString("bin.git")
+	Config.Bin.GitAnnex = viper.GetString("bin.gitannex")
+	Config.Bin.SSH = viper.GetString("bin.ssh")
+	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
+	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
 	authAddress := viper.GetString("auth.address")
 	authPort := viper.GetInt("auth.port")
