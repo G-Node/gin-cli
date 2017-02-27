@@ -120,5 +120,6 @@ func (tf TempFile) AnnexSSHOpt() string {
 // GitSSHOpt returns a formatted string that can be used in git commands tht should make
 // use of the temporary private key.
 func (tf TempFile) GitSSHOpt() string {
-	return fmt.Sprintf("core.sshCommand=ssh -i %s", tf.FullPath())
+	sshbin := Config.Bin.SSH
+	return fmt.Sprintf("core.sshCommand=%s -i %s", sshbin, tf.FullPath())
 }

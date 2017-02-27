@@ -166,6 +166,7 @@ func (repocl *Client) Clone(repopath string) error {
 // (git annex init)
 func AnnexInit(localPath string) error {
 	gitannexbin := util.Config.Bin.GitAnnex
+	gitbin := util.Config.Bin.Git
 	initError := fmt.Errorf("Repository annex initialisation failed.")
 	cmd := exec.Command(gitannexbin, "init", "--version=6")
 	cmd.Dir = localPath
@@ -180,7 +181,7 @@ func AnnexInit(localPath string) error {
 		return initError
 	}
 
-	cmd = exec.Command("git", "config", "annex.addunlocked", "true")
+	cmd = exec.Command(gitbin, "config", "annex.addunlocked", "true")
 	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err = cmd.Run()
@@ -199,7 +200,7 @@ func AnnexInit(localPath string) error {
 	lfvalue := strings.Join(conditions, " and ")
 
 	if lfvalue != "" {
-		cmd = exec.Command("git", "config", "annex.largefiles", lfvalue)
+		cmd = exec.Command(gitbin, "config", "annex.largefiles", lfvalue)
 		cmd.Dir = localPath
 		util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 		err = cmd.Run()
@@ -207,14 +208,14 @@ func AnnexInit(localPath string) error {
 			return initError
 		}
 	}
-	cmd = exec.Command("git", "config", "annex.backends", "WORM")
+	cmd = exec.Command(gitbin, "config", "annex.backends", "WORM")
 	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err = cmd.Run()
 	if err != nil {
 		return initError
 	}
-	cmd = exec.Command("git", "config", "annex.thin", "true")
+	cmd = exec.Command(gitbin, "config", "annex.thin", "true")
 	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err = cmd.Run()
