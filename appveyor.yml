@@ -5,6 +5,7 @@ clone_folder: c:\gopath\src\github.com\G-Node\gin-cli
 
 environment:
   GOPATH: c:\gopath
+  BINDIR: bin
   # GO15VENDOREXPERIMENT: 1
 
   matrix:
@@ -39,11 +40,20 @@ build_script:
   - golint github.com/G-Node/gin-cli...
   - go test -v ./...
 
-# to disable automatic tests
-test: off
+test_script:
+  - go test -v ./...
+
+after_test:
+  - go build .
+  - md %BINDIR%
+  - copy *.exe %BINDIR%
 
 # to disable deployment
 deploy: off
+
+artifacts:
+  - path: $(BINDIR)\*
+    name: bin
 
 # Uncomment on_finish block to enable RDP
 # on_finish:

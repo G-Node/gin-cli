@@ -5,38 +5,63 @@ package util
 import (
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 )
 
 var suffix = "gin"
 
-func makePath(path string) error {
-	err := os.MkdirAll(path, 0777)
-	if err != nil {
-		return fmt.Errorf("Error accessing directory %s\n", path)
-	}
-	return nil
-}
-
 // ConfigPath returns the configuration path where configuration files should be stored.
 func ConfigPath(create bool) (string, error) {
-	// TODO: OS dependent paths
-	xdghome := os.Getenv("XDG_CONFIG_HOME")
-	homedir := os.Getenv("HOME")
-
+	// TODO: Handle Windows paths
 	var path string
 	var err error
 
-	if xdghome != "" {
-		path = filepath.Join(xdghome, suffix)
+	xdgconfig := os.Getenv("XDG_CONFIG_HOME")
+	if xdgconfig != "" {
+		path = filepath.Join(xdgconfig, suffix)
 	} else {
+		usr, err := user.Current()
+		if err != nil {
+			return "", fmt.Errorf("Error getting user home dir")
+		}
+		homedir := usr.HomeDir
 		path = filepath.Join(homedir, ".config", suffix)
 	}
+
 	if create {
-		err = makePath(path)
+		err = os.MkdirAll(path, 0777)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("Error creating directory %s", path)
 		}
 	}
+	return path, err
+}
+
+// DataPath returns the data path where gin data files (such as transaction logs) should be stored.
+func DataPath(create bool) (string, error) {
+	// TODO: Handle Windows paths
+	var path string
+	var err error
+
+	xdgdata := os.Getenv("XDG_DATA_HOME")
+	if xdgdata != "" {
+		path = filepath.Join(xdgdata, suffix)
+	} else {
+		usr, err := user.Current()
+		if err != nil {
+			return "", fmt.Errorf("Error getting user home dir")
+		}
+		homedir := usr.HomeDir
+		path = filepath.Join(homedir, ".local/share", suffix)
+	}
+
+	if create {
+		err = os.MkdirAll(path, 0777)
+		if err != nil {
+			return "", fmt.Errorf("Error creating directory %s", path)
+		}
+	}
+
 	return path, err
 }

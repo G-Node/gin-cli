@@ -23,7 +23,7 @@ import (
 
 // Temporary (SSH key) file handling
 
-var privKeyFile util.TempFile
+var privKeyFile *util.TempFile
 
 // MakeTempKeyPair creates a temporary key pair and stores it in a temporary directory.
 // It also sets the global tempFile for use by the annex commands. The key pair is returned directly.
@@ -41,12 +41,7 @@ func (repocl *Client) MakeTempKeyPair() (*util.KeyPair, error) {
 		return tempKeyPair, err
 	}
 
-	privKeyFile, err = util.MakeTempFile("priv")
-	if err != nil {
-		return tempKeyPair, err
-	}
-
-	err = privKeyFile.Write(tempKeyPair.Private)
+	privKeyFile, err = util.SaveTempKeyFile(tempKeyPair.Private)
 	if err != nil {
 		return tempKeyPair, err
 	}
@@ -155,10 +150,11 @@ func (repocl *Client) Clone(repopath string) error {
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	if err != nil {
-		fmt.Println()
-		return fmt.Errorf("Error retrieving repository: %s", stderr.String())
+		util.LogWrite("Error during clone command. [stderr] %s", stderr.String())
+		return fmt.Errorf("Error retrieving repository")
 	}
 	return nil
 }
@@ -175,12 +171,17 @@ func AnnexInit(localPath string) error {
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	if err != nil {
+		// TODO: Collect and print stderr
+		util.LogWrite("%s [stderr] %s", initError, "")
 		return initError
 	}
 
-	err = exec.Command("git", "-C", localPath, "config", "annex.addunlocked", "true").Run()
+	cmd = exec.Command("git", "-C", localPath, "config", "annex.addunlocked", "true")
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	err = cmd.Run()
 	if err != nil {
 		return initError
 	}
@@ -194,15 +195,21 @@ func AnnexInit(localPath string) error {
 	}
 	sizethreshold := "10M"
 	lfvalue := fmt.Sprintf("largerthan=%s and not (%s)", sizethreshold, strings.Join(includes, " or "))
-	err = exec.Command("git", "-C", localPath, "config", "annex.largefiles", lfvalue).Run()
+	cmd = exec.Command("git", "-C", localPath, "config", "annex.largefiles", lfvalue)
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	err = cmd.Run()
 	if err != nil {
 		return initError
 	}
-	err = exec.Command("git", "-C", localPath, "config", "annex.backends", "WORM").Run()
+	cmd = exec.Command("git", "-C", localPath, "config", "annex.backends", "WORM")
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	err = cmd.Run()
 	if err != nil {
 		return initError
 	}
-	err = exec.Command("git", "-C", localPath, "config", "annex.thin", "true").Run()
+	cmd = exec.Command("git", "-C", localPath, "config", "annex.thin", "true")
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	err = cmd.Run()
 	if err != nil {
 		return initError
 	}
@@ -216,10 +223,13 @@ func AnnexPull(localPath string) error {
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
-	out, err := cmd.Output()
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	err := cmd.Run()
 
 	if err != nil {
-		return fmt.Errorf("Error downloading files: %s", out)
+		// TODO: Collect and print stderr to log
+		util.LogWrite("Error during AnnexPull. [stderr] %s", "")
+		return fmt.Errorf("Error downloading files")
 	}
 	return nil
 }
@@ -231,10 +241,13 @@ func AnnexSync(localPath string) error {
 	if privKeyFile.Active {
 		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
 	}
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
-		return fmt.Errorf("Error synchronising files: %s", err.Error())
+		// TODO: Collect and print stderr to log
+		util.LogWrite("Error during AnnexSync. [stderr] %s", "")
+		return fmt.Errorf("Error synchronising files")
 	}
 	return nil
 }
@@ -250,10 +263,12 @@ func AnnexPush(localPath, commitMsg string) error {
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
-		return fmt.Errorf("Error uploading files: %s", stderr.String())
+		util.LogWrite("Error during AnnexPush. [stderr] %s", stderr.String())
+		return fmt.Errorf("Error uploading files")
 	}
 	return nil
 }
@@ -274,10 +289,12 @@ func AnnexAdd(localPath string) ([]string, error) {
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
-		return nil, fmt.Errorf("Error adding files to repository: %s", stderr.String())
+		util.LogWrite("Error during AnnexAdd. [stderr] %s", stderr.String())
+		return nil, fmt.Errorf("Error adding files to repository.")
 	}
 
 	var outStruct AnnexAddResult
@@ -300,6 +317,7 @@ func AnnexAdd(localPath string) ([]string, error) {
 	return added, nil
 }
 
+// AnnexWhereisResult holds the JSON output of a "git annex whereis" command
 type AnnexWhereisResult struct {
 	File      string   `json:"file"`
 	Command   string   `json:"command"`
@@ -326,10 +344,12 @@ func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
-		return nil, fmt.Errorf("Error getting file status from server: %s", stderr.String())
+		util.LogWrite("Error during AnnexWhereis. [stderr] %s", stderr.String())
+		return nil, fmt.Errorf("Error getting file status from server")
 	}
 
 	resultsJSON := bytes.Split(out.Bytes(), []byte("\n"))
@@ -363,10 +383,12 @@ func DescribeChanges(localPath string) (string, error) {
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 
 	if err != nil {
-		return "", fmt.Errorf("Error retrieving file status: %s", stderr.String())
+		util.LogWrite("Error during DescribeChanges. [stderr] %s", stderr.String())
+		return "", fmt.Errorf("Error retrieving file status")
 	}
 
 	var outStruct AnnexStatusResult

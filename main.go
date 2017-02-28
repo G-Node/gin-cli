@@ -21,23 +21,28 @@ import (
 const usage = `
 GIN command line client
 
-Usage: gin [--version] <command> [<args>...]
+Usage: gin <command> [<args>...]
+       gin --help
+       gin --version
 
 Options:
     -h --help    This help screen
     --version    Client version
 
 Commands:
-    gin login    [<username>]
-    gin logout
-    gin create   [<name>] [<description>]
-    gin get      <repopath>
-    gin upload
-    gin download
-    gin repos    [<username>]
-    gin info     [<username>]
-    gin keys     [-v | --verbose]
-    gin keys     --add <filename>
+    login    [<username>]
+    logout
+    create   [<name>] [<description>]
+    get      <repopath>
+    upload
+    download
+    repos    [<username>]
+    info     [<username>]
+    keys     [-v | --verbose]
+    keys     --add <filename>
+    cmdhelp
+
+Use 'cmdhelp' to see full description of individual commands.
 `
 
 const cmdUsage = `
@@ -159,8 +164,10 @@ func login(args []string) {
 	authcl := auth.NewClient(authhost)
 	err = authcl.Login(username, password, "gin-cli", "97196a1c-silly-biscuit3-d161ea15a676")
 	util.CheckError(err)
-	fmt.Printf("[Login success] You are now logged in as %s\n", username)
-	// fmt.Printf("You have been granted the following permissions: %v\n", strings.Replace(authresp.Scope, " ", ", ", -1))
+	info, err := authcl.RequestAccount(username)
+	util.CheckError(err)
+	fmt.Printf("Hello %s. You are now logged in.\n", info.FirstName)
+	// fmt.Printf("[Login success] You are now logged in as %s\n", username)
 }
 
 func logout(args []string) {
@@ -175,6 +182,7 @@ func logout(args []string) {
 
 	err = web.DeleteToken()
 	util.CheckErrorMsg(err, "Error deleting user token.")
+	util.LogWrite("Logged out. Token deleted.")
 }
 
 func createRepo(args []string) {
@@ -407,10 +415,13 @@ func listRepos(args []string) {
 }
 
 func main() {
-	fullUsage := usage + "\n" + cmdUsage
-	args, _ := docopt.Parse(fullUsage, nil, true, "GIN command line client v0.1", true)
+	args, _ := docopt.Parse(usage, nil, true, "GIN command line client v0.2", true)
 	command := args["<command>"].(string)
 	cmdArgs := args["<args>"].([]string)
+
+	err := util.LogInit()
+	util.CheckError(err)
+	defer util.LogClose()
 
 	switch command {
 	case "login":
@@ -431,6 +442,9 @@ func main() {
 		listRepos(cmdArgs)
 	case "logout":
 		logout(cmdArgs)
+	case "cmdhelp":
+		fullUsage := usage + "\n" + cmdUsage
+		fmt.Print(fullUsage)
 	default:
 		util.Die(usage)
 	}

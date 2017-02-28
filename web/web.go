@@ -50,7 +50,9 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	}
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+		util.LogWrite("Added bearer tokent to GET")
 	}
+	util.LogWrite("Performing GET: %s", req.URL)
 	return cl.web.Do(req)
 }
 
@@ -69,7 +71,9 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
+		util.LogWrite("Added bearer tokent to POST")
 	}
+	util.LogWrite("Performing POST: %s", req.URL)
 	return cl.web.Do(req)
 }
 
@@ -84,6 +88,7 @@ func (cl *Client) PostForm(address string, data url.Values) (*http.Response, err
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	util.LogWrite("Performing POST (with form data): %s", req.URL)
 	return cl.web.Do(req)
 }
 
@@ -95,6 +100,7 @@ func NewClient(address string) *Client {
 // LoadToken reads the username and auth token from the token file and sets the
 // values in the struct.
 func (ut *UserToken) LoadToken() error {
+	util.LogWrite("Loading token. ")
 	path, err := util.ConfigPath(false)
 	if err != nil {
 		return fmt.Errorf("Could not read token: Error accessing config directory.")
@@ -107,11 +113,18 @@ func (ut *UserToken) LoadToken() error {
 	defer closeFile(file)
 
 	decoder := gob.NewDecoder(file)
-	return decoder.Decode(ut)
+	util.LogWrite("Loaded. Decoding. ")
+	err = decoder.Decode(ut)
+	if err != nil {
+		return err
+	}
+	util.LogWrite("Decoded")
+	return nil
 }
 
 // StoreToken saves the username and auth token to the token file.
 func (ut *UserToken) StoreToken() error {
+	util.LogWrite("Saving token. ")
 	path, err := util.ConfigPath(true)
 	if err != nil {
 		return fmt.Errorf("Could not save token: Error creating or accessing config directory.")
@@ -124,7 +137,12 @@ func (ut *UserToken) StoreToken() error {
 	defer closeFile(file)
 
 	encoder := gob.NewEncoder(file)
-	return encoder.Encode(ut)
+	err = encoder.Encode(ut)
+	if err != nil {
+		return err
+	}
+	util.LogWrite("Saved")
+	return nil
 }
 
 // DeleteToken deletes the token file if it exists. It essentially logs out the user.
@@ -134,7 +152,12 @@ func DeleteToken() error {
 		return fmt.Errorf("Could not delete token: Error accessing config directory.")
 	}
 	filepath := filepath.Join(path, "token")
-	return os.Remove(filepath)
+	err = os.Remove(filepath)
+	if err != nil {
+		return err
+	}
+	util.LogWrite("Token deleted")
+	return nil
 }
 
 // CloseRes closes a given result buffer (for use with defer).
