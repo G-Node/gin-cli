@@ -117,9 +117,16 @@ func (tf TempFile) AnnexSSHOpt() string {
 	return fmt.Sprintf("annex.ssh-options=-i %s", tf.FullPath())
 }
 
-// GitSSHOpt returns a formatted string that can be used in git commands tht should make
+// GitSSHOpt returns a formatted string that can be used in git commands that should make
 // use of the temporary private key.
 func (tf TempFile) GitSSHOpt() string {
 	sshbin := Config.Bin.SSH
 	return fmt.Sprintf("core.sshCommand=%s -i %s", sshbin, tf.FullPath())
+}
+
+// GitSSHEnv returns the value that should be set for the GIT_SSH_COMMAND environment variable
+// if the temporary SSH key is to be used.
+func (tf TempFile) GitSSHEnv() string {
+	sshbin := Config.Bin.SSH
+	return fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s", sshbin, tf.FullPath())
 }

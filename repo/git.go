@@ -139,10 +139,10 @@ func (repocl *Client) Clone(repopath string) error {
 	gitbin := util.Config.Bin.Git
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repopath)
 	var cmd *exec.Cmd
+	cmd = exec.Command(gitbin)
 	if privKeyFile.Active {
-		cmd = exec.Command(gitbin, "-c", privKeyFile.GitSSHOpt())
-	} else {
-		cmd = exec.Command(gitbin)
+		env := os.Environ()
+		cmd.Env = append(env, privKeyFile.GitSSHEnv())
 	}
 	cmd.Args = append(cmd.Args, "clone", remotePath)
 	var out bytes.Buffer
