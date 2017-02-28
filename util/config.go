@@ -51,7 +51,12 @@ func LoadConfig() error {
 	viper.AddConfigPath(configpath)
 
 	viper.ReadInConfig()
-	LogWrite("Loading config file %s", viper.ConfigFileUsed())
+	fileused := viper.ConfigFileUsed()
+	if fileused != "" {
+		LogWrite("Loading config file %s", viper.ConfigFileUsed())
+	} else {
+		LogWrite("No config file found. Using defaults.")
+	}
 
 	Config.Bin.Git = viper.GetString("bin.git")
 	Config.Bin.GitAnnex = viper.GetString("bin.gitannex")
