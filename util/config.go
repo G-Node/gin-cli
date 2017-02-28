@@ -51,6 +51,7 @@ func LoadConfig() error {
 	viper.AddConfigPath(configpath)
 
 	viper.ReadInConfig()
+	LogWrite("Loading config file %s", viper.ConfigFileUsed())
 
 	Config.Bin.Git = viper.GetString("bin.git")
 	Config.Bin.GitAnnex = viper.GetString("bin.gitannex")
@@ -71,6 +72,9 @@ func LoadConfig() error {
 	Config.GitHost = fmt.Sprintf("%s:%d", gitAddress, gitPort)
 
 	Config.GitUser = viper.GetString("git.user")
+
+	LogWrite("Configuration values")
+	LogWrite("%+v", Config)
 
 	return nil
 }
