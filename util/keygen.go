@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -128,5 +129,8 @@ func (tf TempFile) GitSSHOpt() string {
 // if the temporary SSH key is to be used.
 func (tf TempFile) GitSSHEnv() string {
 	sshbin := Config.Bin.SSH
-	return fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s", sshbin, tf.FullPath())
+	sshbin = strings.Replace(sshbin, "\\", "/", -1)
+	keyfile := tf.FullPath()
+	keyfile = strings.Replace(keyfile, "\\", "/", -1)
+	return fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s", sshbin, keyfile)
 }
