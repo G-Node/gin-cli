@@ -129,8 +129,10 @@ func (tf TempFile) GitSSHOpt() string {
 // if the temporary SSH key is to be used.
 func (tf TempFile) GitSSHEnv() string {
 	sshbin := Config.Bin.SSH
-	sshbin = strings.Replace(sshbin, "\\", "/", -1)
+	// Windows git seems to require Unix paths for the SSH command -- this is dirty but works
+	ossep := string(os.PathSeparator)
+	sshbin = strings.Replace(sshbin, ossep, "/", -1)
 	keyfile := tf.FullPath()
-	keyfile = strings.Replace(keyfile, "\\", "/", -1)
+	keyfile = strings.Replace(keyfile, ossep, "/", -1)
 	return fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s", sshbin, keyfile)
 }
