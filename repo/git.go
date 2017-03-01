@@ -62,7 +62,9 @@ func CleanUpTemp() {
 // IsRepo checks whether a given path is a git repository.
 func IsRepo(path string) bool {
 	gitbin := util.Config.Bin.Git
-	err := exec.Command(gitbin, "status").Run()
+	cmd := exec.Command(gitbin, "status")
+	cmd.Dir = path
+	err := cmd.Run()
 	if err != nil {
 		return false
 	}
