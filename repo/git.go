@@ -170,6 +170,16 @@ func (repocl *Client) Clone(repopath string) error {
 
 // Git annex commands
 
+func gitAnnexBaseCmd() *exec.Cmd {
+	gitannexbin := util.Config.Bin.GitAnnex
+	annexsshopt := "-c annex.ssh-options=-o StrictHostKeyChecking=no"
+	if privKeyFile.Active {
+		annexsshopt = fmt.Sprintf("%s -i %s", annexsshopt, privKeyFile.FullPath())
+	}
+	cmd := exec.Command(gitannexbin, annexsshopt)
+	return cmd
+}
+
 // AnnexInit initialises the repository for annex
 // (git annex init)
 func AnnexInit(localPath string) error {
@@ -178,9 +188,6 @@ func AnnexInit(localPath string) error {
 	initError := fmt.Errorf("Repository annex initialisation failed.")
 	cmd := exec.Command(gitannexbin, "init", "--version=6")
 	cmd.Dir = localPath
-	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
-	}
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -262,11 +269,8 @@ func AnnexInit(localPath string) error {
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
 func AnnexPull(localPath string) error {
-	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := exec.Command(gitannexbin, "sync", "--no-push", "--content")
-	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
-	}
+	cmd := gitAnnexBaseCmd()
+	cmd.Args = append(cmd.Args, "sync", "--no-push", "--content")
 	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	var out bytes.Buffer
@@ -287,11 +291,8 @@ func AnnexPull(localPath string) error {
 // AnnexSync synchronises the local repository with the remote.
 // (git annex sync --content)
 func AnnexSync(localPath string) error {
-	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := exec.Command(gitannexbin, "sync", "--content")
-	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
-	}
+	cmd := gitAnnexBaseCmd()
+	cmd.Args = append(cmd.Args, "sync", "--content")
 	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	var out bytes.Buffer
@@ -312,11 +313,8 @@ func AnnexSync(localPath string) error {
 // AnnexPush uploads all annexed files.
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath, commitMsg string) error {
-	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := exec.Command(gitannexbin, "sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg))
-	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
-	}
+	cmd := gitAnnexBaseCmd()
+	cmd.Args = append(cmd.Args, "sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg))
 	cmd.Dir = localPath
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -400,11 +398,8 @@ type AnnexWhereisResult struct {
 // AnnexWhereis returns information about annexed files in the repository
 // (git annex find)
 func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
-	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := exec.Command(gitannexbin, "whereis", "--json")
-	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
-	}
+	cmd := gitAnnexBaseCmd()
+	cmd.Args = append(cmd.Args, "whereis", "--json")
 	cmd.Dir = localPath
 	var out bytes.Buffer
 	var stderr bytes.Buffer
