@@ -134,5 +134,5 @@ func (tf TempFile) GitSSHEnv() string {
 	sshbin = strings.Replace(sshbin, ossep, "/", -1)
 	keyfile := tf.FullPath()
 	keyfile = strings.Replace(keyfile, ossep, "/", -1)
-	return fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s", sshbin, keyfile)
+	return fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o StrictHostKeyChecking=no", sshbin, keyfile)
 }
