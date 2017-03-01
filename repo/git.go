@@ -89,9 +89,11 @@ func publicKeyFile(file string) ssh.AuthMethod {
 // a temporary key pair is generated, the public key is uploaded to the auth server,
 // and the private key is stored internally, to be used for subsequent functions.
 func (repocl *Client) Connect() error {
+	util.LogWrite("Checking connection to git server")
 	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
 		// No agent running - use temp keys
+		util.LogWrite("No agent running. Setting up temporary keys")
 		_, err = repocl.MakeTempKeyPair()
 		if err != nil {
 			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
@@ -108,9 +110,11 @@ func (repocl *Client) Connect() error {
 		},
 	}
 
+	util.LogWrite("Attempting connection with key from SSH agent")
 	connection, err := ssh.Dial("tcp", repocl.GitHost, sshConfig)
 	if err != nil && strings.Contains(err.Error(), "unable to authenticate") {
 		// Agent key authentication failed - use temp keys
+		util.LogWrite("Auth key authentication failed. Setting up temporary keys")
 		_, err = repocl.MakeTempKeyPair()
 		if err != nil {
 			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
@@ -126,10 +130,12 @@ func (repocl *Client) Connect() error {
 	defer connection.Close()
 
 	session, err := connection.NewSession()
+	util.LogWrite("Creating SSH session")
 	if err != nil {
 		return fmt.Errorf("Failed to create session: %s", err.Error())
 	}
 	defer session.Close()
+	util.LogWrite("Connection to git server OK")
 	return nil
 }
 
@@ -153,8 +159,8 @@ func (repocl *Client) Clone(repopath string) error {
 	err := cmd.Run()
 	if err != nil {
 		util.LogWrite("Error during clone command")
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error retrieving repository")
 	}
 	return nil
@@ -183,8 +189,8 @@ func AnnexInit(localPath string) error {
 	err := cmd.Run()
 	if err != nil {
 		util.LogWrite(initError.Error())
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return initError
 	}
 
@@ -196,8 +202,8 @@ func AnnexInit(localPath string) error {
 	err = cmd.Run()
 	if err != nil {
 		util.LogWrite(initError.Error())
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return initError
 	}
 
@@ -220,8 +226,8 @@ func AnnexInit(localPath string) error {
 		err = cmd.Run()
 		if err != nil {
 			util.LogWrite(initError.Error())
-			util.LogWrite("[stdout] %s", out.String())
-			util.LogWrite("[stderr] %s", stderr.String())
+			util.LogWrite("[stdout]\r\n%s", out.String())
+			util.LogWrite("[stderr]\r\n%s", stderr.String())
 			return initError
 		}
 		if err != nil {
@@ -235,8 +241,8 @@ func AnnexInit(localPath string) error {
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return initError
 	}
 	cmd = exec.Command(gitbin, "config", "annex.thin", "true")
@@ -246,8 +252,8 @@ func AnnexInit(localPath string) error {
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return initError
 	}
 	return nil
@@ -271,8 +277,8 @@ func AnnexPull(localPath string) error {
 
 	if err != nil {
 		util.LogWrite("Error during AnnexPull.")
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error downloading files")
 	}
 	return nil
@@ -296,8 +302,8 @@ func AnnexSync(localPath string) error {
 
 	if err != nil {
 		util.LogWrite("Error during AnnexSync")
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error synchronising files")
 	}
 	return nil
@@ -321,8 +327,8 @@ func AnnexPush(localPath, commitMsg string) error {
 
 	if err != nil {
 		util.LogWrite("Error during AnnexPush")
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error uploading files")
 	}
 	return nil
@@ -350,8 +356,8 @@ func AnnexAdd(localPath string) ([]string, error) {
 
 	if err != nil {
 		util.LogWrite("Error during AnnexAdd")
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return nil, fmt.Errorf("Error adding files to repository.")
 	}
 
@@ -409,8 +415,8 @@ func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
 
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return nil, fmt.Errorf("Error getting file status from server")
 	}
 
@@ -452,8 +458,8 @@ func DescribeChanges(localPath string) (string, error) {
 
 	if err != nil {
 		util.LogWrite("Error during DescribeChanges")
-		util.LogWrite("[stdout] %s", out.String())
-		util.LogWrite("[stderr] %s", stderr.String())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return "", fmt.Errorf("Error retrieving file status")
 	}
 
