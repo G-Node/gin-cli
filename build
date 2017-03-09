@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#
+# Build script that replaces build numbers and similar info and builds the gin (cli) binary.
+
+verfile=version
+
+source $verfile
+commit=$(git rev-parse HEAD)
+
+echo $version
+echo $build
+echo $commit
+
+# increment build number
+build=$(printf "%05d" $((build+1)))
+
+# place values in main.go version string
+
+
+# overwrite the file with new info
+echo "version=$version" > $verfile
+echo "build=$build" >> $verfile
+
