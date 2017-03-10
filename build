@@ -2,22 +2,28 @@
 #
 # Build script that replaces build numbers and similar info and builds the gin (cli) binary.
 
+set -e
+
 verfile=version
 
 source $verfile
-commit=$(git rev-parse HEAD)
-
-echo $version
-echo $build
-echo $commit
-
 # increment build number
 build=$(printf "%05d" $((build+1)))
+# get current commit SHA1
+commit=$(git rev-parse HEAD)
 
-# place values in main.go version string
+echo "Version string: ${version} ${build} ${commit}"
+echo "Updating main.go"
 
 
-# overwrite the file with new info
+ldflags="-X main.version=${version} -X main.build=${build} -X main.commit=${commit}"
+echo "Building package..."
+go build -ldflags "${ldflags}" -o gin
+echo "Done!"
+
+# overwrite version file with new info
+echo "Updating version file"
 echo "version=$version" > $verfile
 echo "build=$build" >> $verfile
 
+echo "All done."
