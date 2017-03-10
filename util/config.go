@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/viper"
 )
@@ -46,6 +47,12 @@ func LoadConfig() error {
 	viper.SetDefault("annex.minsize", "10M")
 
 	viper.SetConfigName("config")
+	// prioritise config files in the directory of the executable
+	// this is useful for portable packaging
+	execloc, err := os.Executable()
+	if err == nil {
+		viper.AddConfigPath(execloc)
+	}
 	configpath, _ := ConfigPath(false)
 	// Add /etc/gin/config ?
 	viper.AddConfigPath(configpath)
