@@ -128,6 +128,18 @@ def get_appveyor_artifact_url():
                 return arturl
 
 
+def get_git_for_windows():
+    win_git_url = ("https://github.com/git-for-windows/git/releases/download/"
+                   "v2.12.0.windows.1/PortableGit-2.12.0-32-bit.7z.exe")
+    return download(win_git_url, "git-for-windows.exe")
+
+
+def get_git_annex_for_windows():
+    win_git_annex_url = ("https://downloads.kitenet.net/git-annex/windows/"
+                         "current/git-annex-installer.exe")
+    return download(win_git_annex_url)
+
+
 def main():
     try:
         os.mkdir("downloads")
@@ -135,10 +147,14 @@ def main():
         pass
     load_etags()
     linux_file = build_linux()
+    annexsa_file = download_annex_sa()
     win_url = get_appveyor_artifact_url()
     win_file = download(win_url, "gin.exe")
-    annexsa_file = download_annex_sa()
+    win_git_file = get_git_for_windows()
+    win_git_annex_file = get_git_annex_for_windows()
     save_etags()
+
+    print("Ready to package")
 
 
 if __name__ == "__main__":
