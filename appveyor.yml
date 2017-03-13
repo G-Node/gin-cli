@@ -45,7 +45,7 @@ test_script:
   - go test -v ./...
 
 after_test:
-  - go build .
+  - C:\Python36\python dorelease.py --no-dl
   - md %BINDIR%
   - copy *.exe %BINDIR%
 

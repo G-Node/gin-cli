@@ -1,10 +1,17 @@
+# -*- coding: utf-8 -*-
 import pickle
 import sys
 import os
 import json
-import requests
 import re
 from subprocess import check_output, call
+try:
+    import requests
+    HAVEREQUESTS = True
+except ImportError:
+    print("Requests module not installed. Will not download packages.")
+    requests = None
+    HAVEREQUESTS = False
 
 etagfile = "downloads/etags"
 etags = {}
@@ -60,8 +67,15 @@ def wait_for_ret():
         die("\nCancelled")
 
 
-def build_linux():
-    print("--> Building Linux binary")
+def build(incbuild=False):
+    plat = sys.platform
+    if plat.startswith("win"):
+        gin_exe = "gin.exe"
+        linecont = "=>"
+    else:
+        gin_exe = "./gin"
+        linecont = "↪"
+    print("--> Building binary for [{}]".format(plat))
     verfile = "version"
     with open(verfile) as fd:
         verinfo = fd.read()
@@ -77,22 +91,23 @@ def build_linux():
     ldflags = ("-X main.version={version} "
                "-X main.build={build} "
                "-X main.commit={commit}").format(**verdict)
-    cmd = ["go", "build", "-ldflags", ldflags, "-o", "gin"]
+    cmd = ["go", "build", "-ldflags", ldflags, "-o", gin_exe]
     ret = call(cmd)
     if ret > 0:
         die("Build failed")
 
     print("--> Build succeeded")
-    cmd = ["./gin", "--version"]
+    cmd = [gin_exe, "--version"]
     verstring = check_output(cmd).strip().decode()
-    print("{}\n↪ {}".format(" ".join(cmd), verstring))
+    print("{}\n{} {}".format(" ".join(cmd), linecont, verstring))
 
-    print("--> Updating version file")
-    verdict["build"] = "{:05d}".format(int(verdict["build"]) + 1)
-    newinfo = "version={version}\nbuild={build}\n".format(**verdict)
-    print(newinfo)
-    with open(verfile, "w") as fd:
-        fd.write(newinfo)
+    if incbuild:
+        print("--> Updating version file")
+        verdict["build"] = "{:05d}".format(int(verdict["build"]) + 1)
+        newinfo = "version={version}\nbuild={build}\n".format(**verdict)
+        print(newinfo)
+        with open(verfile, "w") as fd:
+            fd.write(newinfo)
 
 
 def download_annex_sa():
@@ -145,16 +160,19 @@ def main():
         os.mkdir("downloads")
     except FileExistsError:
         pass
-    load_etags()
-    linux_file = build_linux()
-    annexsa_file = download_annex_sa()
-    win_url = get_appveyor_artifact_url()
-    win_file = download(win_url, "gin.exe")
-    win_git_file = get_git_for_windows()
-    win_git_annex_file = get_git_annex_for_windows()
-    save_etags()
+    incbuild = "--incbuild" in sys.argv
+    dl = "--no-dl" not in sys.argv and HAVEREQUESTS
+    linux_file = build(incbuild)
+    if dl:
+        load_etags()
+        annexsa_file = download_annex_sa()
+        win_url = get_appveyor_artifact_url()
+        win_file = download(win_url, "gin.exe")
+        win_git_file = get_git_for_windows()
+        win_git_annex_file = get_git_annex_for_windows()
+        save_etags()
 
-    print("Ready to package")
+        print("Ready to package")
 
 
 if __name__ == "__main__":
