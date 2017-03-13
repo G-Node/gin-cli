@@ -5,13 +5,7 @@ import os
 import json
 import re
 from subprocess import check_output, call
-try:
-    import requests
-    HAVEREQUESTS = True
-except ImportError:
-    print("Requests module not installed. Will not download packages.")
-    requests = None
-    HAVEREQUESTS = False
+import requests
 
 etagfile = "downloads/etags"
 etags = {}
@@ -68,14 +62,8 @@ def wait_for_ret():
 
 
 def build(incbuild=False):
-    plat = sys.platform
-    if plat.startswith("win"):
-        gin_exe = "gin.exe"
-        linecont = "=>"
-    else:
-        gin_exe = "./gin"
-        linecont = "↪"
-    print("--> Building binary for [{}]".format(plat))
+    platforms = ["linux/amd64", "windows/386"]
+    print("--> Building binary for [{}]".format(", ".join(platforms)))
     verfile = "version"
     with open(verfile) as fd:
         verinfo = fd.read()
@@ -85,22 +73,6 @@ def build(incbuild=False):
     verdict["build"] = re.search(r"build=([0-9]+)", verinfo).group(1)
     cmd = ["git", "rev-parse", "HEAD"]
     verdict["commit"] = check_output(cmd).strip().decode()
-    print(("Version: {version} "
-           "Build: {build} "
-           "Commit: {commit}").format(**verdict))
-    ldflags = ("-X main.version={version} "
-               "-X main.build={build} "
-               "-X main.commit={commit}").format(**verdict)
-    cmd = ["go", "build", "-ldflags", ldflags, "-o", gin_exe]
-    ret = call(cmd)
-    if ret > 0:
-        die("Build failed")
-
-    print("--> Build succeeded")
-    cmd = [gin_exe, "--version"]
-    verstring = check_output(cmd).strip().decode()
-    print("{}\n{} {}".format(" ".join(cmd), linecont, verstring))
-
     if incbuild:
         print("--> Updating version file")
         verdict["build"] = "{:05d}".format(int(verdict["build"]) + 1)
@@ -108,6 +80,23 @@ def build(incbuild=False):
         print(newinfo)
         with open(verfile, "w") as fd:
             fd.write(newinfo)
+    print(("Version: {version} "
+           "Build: {build} "
+           "Commit: {commit}").format(**verdict))
+    ldflags = ("-X main.version={version} "
+               "-X main.build={build} "
+               "-X main.commit={commit}").format(**verdict)
+    # cmd = ["go", "build", "-ldflags", ldflags, "-o", "gin"]
+    cmd = ["gox", "-output=gin", "-osarch={}".format(" ".join(platforms)),
+           "-ldflags={}".format(ldflags)]
+    ret = call(cmd)
+    if ret > 0:
+        die("Build failed")
+
+    print("--> Build succeeded")
+    cmd = ["./gin", "--version"]
+    verstring = check_output(cmd).strip().decode()
+    print("{}\n↪ {}".format(" ".join(cmd), verstring))
 
 
 def download_annex_sa():
@@ -161,18 +150,14 @@ def main():
     except FileExistsError:
         pass
     incbuild = "--incbuild" in sys.argv
-    dl = "--no-dl" not in sys.argv and HAVEREQUESTS
-    linux_file = build(incbuild)
-    if dl:
-        load_etags()
-        annexsa_file = download_annex_sa()
-        win_url = get_appveyor_artifact_url()
-        win_file = download(win_url, "gin.exe")
-        win_git_file = get_git_for_windows()
-        win_git_annex_file = get_git_annex_for_windows()
-        save_etags()
+    binfiles = build(incbuild)
+    load_etags()
+    annexsa_file = download_annex_sa()
+    win_git_file = get_git_for_windows()
+    win_git_annex_file = get_git_annex_for_windows()
+    save_etags()
 
-        print("Ready to package")
+    print("Ready to package")
 
 
 if __name__ == "__main__":
