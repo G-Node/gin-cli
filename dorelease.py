@@ -4,11 +4,14 @@ import sys
 import os
 import json
 import re
+from glob import glob
 from subprocess import check_output, call
 import requests
 from requests.exceptions import ConnectionError
 
-etagfile = "downloads/etags"
+destdir = "dist"
+
+etagfile = os.path.join(destdir, "etags")
 etags = {}
 
 
@@ -28,7 +31,7 @@ def save_etags():
 def download(url, fname=None):
     if fname is None:
         fname = url.split("/")[-1]
-    fname = os.path.join("downloads", fname)
+    fname = os.path.join(destdir, fname)
     print("--> Downloading {} → {}".format(url, fname))
     try:
         req = requests.get(url, stream=True)
@@ -43,7 +46,7 @@ def download(url, fname=None):
     if et == oldet and os.path.exists(fname):
         fod_size = os.path.getsize(fname)
         if int(fod_size) == int(size):
-            print("File already downloaded. Skipping.")
+            print("File already downloaded. Skipping.", end="\n\n")
             return fname
     etags[url] = et
     prog = 0
@@ -53,6 +56,7 @@ def download(url, fname=None):
             prog += len(chunk)
             print("\r{}/{}".format(prog, size), end="", flush=True)
         print("\nDone!")
+    print()
     return fname
 
 
@@ -69,7 +73,7 @@ def wait_for_ret():
 
 
 def build(incbuild=False):
-    platforms = ["linux/amd64", "windows/386"]
+    platforms = ["linux/amd64", "windows/386", "darwin/amd64"]
     print("--> Building binary for [{}]".format(", ".join(platforms)))
     verfile = "version"
     with open(verfile) as fd:
@@ -94,16 +98,29 @@ def build(incbuild=False):
                "-X main.build={build} "
                "-X main.commit={commit}").format(**verdict)
     # cmd = ["go", "build", "-ldflags", ldflags, "-o", "gin"]
-    cmd = ["gox", "-output=gin", "-osarch={}".format(" ".join(platforms)),
+    output = os.path.join(destdir, "{{.OS}}-{{.Arch}}", "gin")
+    cmd = ["gox", "-output={}".format(output),
+           "-osarch={}".format(" ".join(platforms)),
            "-ldflags={}".format(ldflags)]
+    print("Running {}".format(" ".join(cmd)))
     ret = call(cmd)
+    print()
     if ret > 0:
         die("Build failed")
 
     print("--> Build succeeded")
-    cmd = ["./gin", "--version"]
-    verstring = check_output(cmd).strip().decode()
-    print("{}\n↪ {}".format(" ".join(cmd), verstring))
+    print("--> The following files were built:")
+    ginfiles = glob(os.path.join(destdir, "*", "gin*"))
+    print("\n".join(ginfiles), end="\n\n")
+
+    plat = sys.platform
+    for ginbin in ginfiles:
+        if plat in ginbin:
+            cmd = [ginbin, "--version"]
+            verstring = check_output(cmd).strip().decode()
+            print("{}\n↪ {}".format(" ".join(cmd), verstring))
+    print()
+    return ginfiles
 
 
 def download_annex_sa():
@@ -153,7 +170,7 @@ def get_git_annex_for_windows():
 
 def main():
     try:
-        os.mkdir("downloads")
+        os.mkdir(destdir)
     except FileExistsError:
         pass
     incbuild = "--incbuild" in sys.argv
