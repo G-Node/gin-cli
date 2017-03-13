@@ -45,7 +45,7 @@ test_script:
   - go test -v ./...
 
 after_test:
-  - C:\Python36\python dorelease.py --no-dl
+  - go build -ldflags "-X main.version=APPVEYOR-%APPVEYOR_BUILD_VERSION% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" .
   - md %BINDIR%
   - copy *.exe %BINDIR%
 
