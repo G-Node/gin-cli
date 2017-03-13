@@ -19,11 +19,8 @@ import (
 	"github.com/G-Node/gin-cli/util"
 )
 
-// Keys
-
 // Temporary (SSH key) file handling
-
-var privKeyFile *util.TempFile
+var privKeyFile util.TempFile
 
 // MakeTempKeyPair creates a temporary key pair and stores it in a temporary directory.
 // It also sets the global tempFile for use by the annex commands. The key pair is returned directly.
@@ -64,7 +61,10 @@ func CleanUpTemp() {
 
 // IsRepo checks whether a given path is a git repository.
 func IsRepo(path string) bool {
-	err := exec.Command("git", "status").Run()
+	gitbin := util.Config.Bin.Git
+	cmd := exec.Command(gitbin, "status")
+	cmd.Dir = path
+	err := cmd.Run()
 	if err != nil {
 		return false
 	}
@@ -91,9 +91,11 @@ func publicKeyFile(file string) ssh.AuthMethod {
 // a temporary key pair is generated, the public key is uploaded to the auth server,
 // and the private key is stored internally, to be used for subsequent functions.
 func (repocl *Client) Connect() error {
+	util.LogWrite("Checking connection to git server")
 	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
 		// No agent running - use temp keys
+		util.LogWrite("No agent running. Setting up temporary keys")
 		_, err = repocl.MakeTempKeyPair()
 		if err != nil {
 			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
@@ -110,9 +112,11 @@ func (repocl *Client) Connect() error {
 		},
 	}
 
+	util.LogWrite("Attempting connection with key from SSH agent")
 	connection, err := ssh.Dial("tcp", repocl.GitHost, sshConfig)
 	if err != nil && strings.Contains(err.Error(), "unable to authenticate") {
 		// Agent key authentication failed - use temp keys
+		util.LogWrite("Auth key authentication failed. Setting up temporary keys")
 		_, err = repocl.MakeTempKeyPair()
 		if err != nil {
 			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
@@ -123,27 +127,30 @@ func (repocl *Client) Connect() error {
 
 	if err != nil {
 		// Connection error (other than "unable to auth")
-		return fmt.Errorf("Failed to dial: %s\n", err.Error())
+		return fmt.Errorf("Failed to connect to git host: %s\n", err.Error())
 	}
 	defer connection.Close()
 
 	session, err := connection.NewSession()
+	util.LogWrite("Creating SSH session")
 	if err != nil {
 		return fmt.Errorf("Failed to create session: %s", err.Error())
 	}
 	defer session.Close()
+	util.LogWrite("Connection to git server OK")
 	return nil
 }
 
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
 func (repocl *Client) Clone(repopath string) error {
+	gitbin := util.Config.Bin.Git
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repopath)
 	var cmd *exec.Cmd
+	cmd = exec.Command(gitbin)
 	if privKeyFile.Active {
-		cmd = exec.Command("git", "-c", privKeyFile.GitSSHOpt())
-	} else {
-		cmd = exec.Command("git")
+		env := os.Environ()
+		cmd.Env = append(env, privKeyFile.GitSSHEnv())
 	}
 	cmd.Args = append(cmd.Args, "clone", remotePath)
 	var out bytes.Buffer
@@ -153,7 +160,9 @@ func (repocl *Client) Clone(repopath string) error {
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	if err != nil {
-		util.LogWrite("Error during clone command. [stderr] %s", stderr.String())
+		util.LogWrite("Error during clone command")
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error retrieving repository")
 	}
 	return nil
@@ -163,54 +172,97 @@ func (repocl *Client) Clone(repopath string) error {
 
 // Git annex commands
 
+func buildAnnexCmd(args ...string) *exec.Cmd {
+	gitannexbin := util.Config.Bin.GitAnnex
+	cmd := exec.Command(gitannexbin, args...)
+	annexsshopt := "annex.ssh-options=-o StrictHostKeyChecking=no"
+	if privKeyFile.Active {
+		annexsshopt = fmt.Sprintf("%s -i %s", annexsshopt, privKeyFile.FullPath())
+	}
+	cmd.Args = append(cmd.Args, "-c", annexsshopt)
+	return cmd
+}
+
 // AnnexInit initialises the repository for annex
 // (git annex init)
 func AnnexInit(localPath string) error {
+	gitbin := util.Config.Bin.Git
 	initError := fmt.Errorf("Repository annex initialisation failed.")
-	cmd := exec.Command("git", "-C", localPath, "annex", "init", "--version=6")
-	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
-	}
+	cmd := buildAnnexCmd("init", "--version=6")
+	cmd.Dir = localPath
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	if err != nil {
-		// TODO: Collect and print stderr
-		util.LogWrite("%s [stderr] %s", initError, "")
+		util.LogWrite(initError.Error())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return initError
 	}
 
-	cmd = exec.Command("git", "-C", localPath, "config", "annex.addunlocked", "true")
+	cmd = exec.Command(gitbin, "config", "annex.addunlocked", "true")
+	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
+		util.LogWrite(initError.Error())
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return initError
 	}
 
 	// list of extensions that are added to git (not annex)
-	// TODO: Read from file
-	gitexts := [...]string{"md", "rst", "txt", "c", "cpp", "h", "hpp", "py", "go"}
-	includes := make([]string, len(gitexts))
-	for idx, ext := range gitexts {
-		includes[idx] = fmt.Sprintf("include=*.%s", ext)
+	exclfilters := util.Config.Annex.Exclude
+	excludes := make([]string, len(exclfilters))
+	for idx, ext := range exclfilters {
+		excludes[idx] = fmt.Sprintf("exclude=%s", ext)
 	}
-	sizethreshold := "10M"
-	lfvalue := fmt.Sprintf("largerthan=%s and not (%s)", sizethreshold, strings.Join(includes, " or "))
-	cmd = exec.Command("git", "-C", localPath, "config", "annex.largefiles", lfvalue)
+	sizethreshold := fmt.Sprintf("largerthan=%s", util.Config.Annex.MinSize)
+	conditions := append(excludes, sizethreshold)
+	lfvalue := strings.Join(conditions, " and ")
+
+	if lfvalue != "" {
+		cmd = exec.Command(gitbin, "config", "annex.largefiles", lfvalue)
+		cmd.Dir = localPath
+		util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+		err = cmd.Run()
+		if err != nil {
+			util.LogWrite(initError.Error())
+			util.LogWrite("[stdout]\r\n%s", out.String())
+			util.LogWrite("[stderr]\r\n%s", stderr.String())
+			return initError
+		}
+		if err != nil {
+			return initError
+		}
+	}
+	cmd = exec.Command(gitbin, "config", "annex.backends", "WORM")
+	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return initError
 	}
-	cmd = exec.Command("git", "-C", localPath, "config", "annex.backends", "WORM")
+	cmd = exec.Command(gitbin, "config", "annex.thin", "true")
+	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		return initError
-	}
-	cmd = exec.Command("git", "-C", localPath, "config", "annex.thin", "true")
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err = cmd.Run()
-	if err != nil {
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return initError
 	}
 	return nil
@@ -219,16 +271,19 @@ func AnnexInit(localPath string) error {
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
 func AnnexPull(localPath string) error {
-	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-push", "--content")
-	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
-	}
+	cmd := buildAnnexCmd("sync", "--no-push", "--content")
+	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	err := cmd.Run()
 
 	if err != nil {
-		// TODO: Collect and print stderr to log
-		util.LogWrite("Error during AnnexPull. [stderr] %s", "")
+		util.LogWrite("Error during AnnexPull.")
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error downloading files")
 	}
 	return nil
@@ -237,16 +292,19 @@ func AnnexPull(localPath string) error {
 // AnnexSync synchronises the local repository with the remote.
 // (git annex sync --content)
 func AnnexSync(localPath string) error {
-	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--content")
-	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
-	}
+	cmd := buildAnnexCmd("sync", "--content")
+	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	err := cmd.Run()
 
 	if err != nil {
-		// TODO: Collect and print stderr to log
-		util.LogWrite("Error during AnnexSync. [stderr] %s", "")
+		util.LogWrite("Error during AnnexSync")
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error synchronising files")
 	}
 	return nil
@@ -255,10 +313,8 @@ func AnnexSync(localPath string) error {
 // AnnexPush uploads all annexed files.
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath, commitMsg string) error {
-	cmd := exec.Command("git", "-C", localPath, "annex", "sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg))
-	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
-	}
+	cmd := buildAnnexCmd("sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg))
+	cmd.Dir = localPath
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -267,7 +323,9 @@ func AnnexPush(localPath, commitMsg string) error {
 	err := cmd.Run()
 
 	if err != nil {
-		util.LogWrite("Error during AnnexPush. [stderr] %s", stderr.String())
+		util.LogWrite("Error during AnnexPush")
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error uploading files")
 	}
 	return nil
@@ -284,7 +342,8 @@ type AnnexAddResult struct {
 // AnnexAdd adds a path to the annex.
 // (git annex add)
 func AnnexAdd(localPath string) ([]string, error) {
-	cmd := exec.Command("git", "annex", "--json", "add", localPath)
+	gitannexbin := util.Config.Bin.GitAnnex
+	cmd := exec.Command(gitannexbin, "--json", "add", localPath)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -293,7 +352,9 @@ func AnnexAdd(localPath string) ([]string, error) {
 	err := cmd.Run()
 
 	if err != nil {
-		util.LogWrite("Error during AnnexAdd. [stderr] %s", stderr.String())
+		util.LogWrite("Error during AnnexAdd")
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return nil, fmt.Errorf("Error adding files to repository.")
 	}
 
@@ -336,10 +397,8 @@ type AnnexWhereisResult struct {
 // AnnexWhereis returns information about annexed files in the repository
 // (git annex find)
 func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
-	cmd := exec.Command("git", "-C", localPath, "annex", "whereis", "--json")
-	if privKeyFile.Active {
-		cmd.Args = append(cmd.Args, "-c", privKeyFile.AnnexSSHOpt())
-	}
+	cmd := buildAnnexCmd("whereis", "--json")
+	cmd.Dir = localPath
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -348,7 +407,9 @@ func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
 	err := cmd.Run()
 
 	if err != nil {
-		util.LogWrite("Error during AnnexWhereis. [stderr] %s", stderr.String())
+		util.LogWrite("Error during AnnexWhereis")
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return nil, fmt.Errorf("Error getting file status from server")
 	}
 
@@ -378,7 +439,9 @@ type AnnexStatusResult struct {
 // with respect to git annex. The resulting message can be used to inform the user of changes
 // that are about to be uploaded and as a long commit message.
 func DescribeChanges(localPath string) (string, error) {
-	cmd := exec.Command("git", "-C", localPath, "annex", "status", "--json")
+	gitannexbin := util.Config.Bin.GitAnnex
+	cmd := exec.Command(gitannexbin, "status", "--json")
+	cmd.Dir = localPath
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -387,7 +450,9 @@ func DescribeChanges(localPath string) (string, error) {
 	err := cmd.Run()
 
 	if err != nil {
-		util.LogWrite("Error during DescribeChanges. [stderr] %s", stderr.String())
+		util.LogWrite("Error during DescribeChanges")
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return "", fmt.Errorf("Error retrieving file status")
 	}
 

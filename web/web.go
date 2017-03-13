@@ -50,7 +50,7 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	}
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
-		util.LogWrite("Added bearer tokent to GET")
+		util.LogWrite("Added bearer token to GET")
 	}
 	util.LogWrite("Performing GET: %s", req.URL)
 	return cl.web.Do(req)
@@ -71,7 +71,7 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
-		util.LogWrite("Added bearer tokent to POST")
+		util.LogWrite("Added bearer token to POST")
 	}
 	util.LogWrite("Performing POST: %s", req.URL)
 	return cl.web.Do(req)
@@ -100,7 +100,7 @@ func NewClient(address string) *Client {
 // LoadToken reads the username and auth token from the token file and sets the
 // values in the struct.
 func (ut *UserToken) LoadToken() error {
-	util.LogWrite("Loading token. ")
+	util.LogWrite("Loading token")
 	path, err := util.ConfigPath(false)
 	if err != nil {
 		return fmt.Errorf("Could not read token: Error accessing config directory.")
@@ -113,12 +113,11 @@ func (ut *UserToken) LoadToken() error {
 	defer closeFile(file)
 
 	decoder := gob.NewDecoder(file)
-	util.LogWrite("Loaded. Decoding. ")
 	err = decoder.Decode(ut)
 	if err != nil {
 		return err
 	}
-	util.LogWrite("Decoded")
+	util.LogWrite("Token read OK")
 	return nil
 }
 
