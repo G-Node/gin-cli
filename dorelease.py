@@ -6,6 +6,7 @@ import json
 import re
 from subprocess import check_output, call
 import requests
+from requests.exceptions import ConnectionError
 
 etagfile = "downloads/etags"
 etags = {}
@@ -29,7 +30,13 @@ def download(url, fname=None):
         fname = url.split("/")[-1]
     fname = os.path.join("downloads", fname)
     print("--> Downloading {} → {}".format(url, fname))
-    req = requests.get(url, stream=True)
+    try:
+        req = requests.get(url, stream=True)
+    except ConnectionError:
+        print("Error while trying to download {}".format(url),
+              file=sys.stderr)
+        print("Skipping.", file=sys.stderr)
+        return
     size = req.headers.get("content-length")
     et = req.headers.get("etag")
     oldet = etags.get(url)
