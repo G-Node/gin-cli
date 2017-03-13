@@ -45,7 +45,8 @@ test_script:
   - go test -v ./...
 
 after_test:
-  - go build -ldflags "-X main.version=APPVEYOR-%APPVEYOR_BUILD_VERSION% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" .
+  - go build -ldflags "-X main.version=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o gin.exe .
+  - gin.exe --version
   - md %BINDIR%
   - copy *.exe %BINDIR%
 
