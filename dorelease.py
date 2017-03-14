@@ -2,12 +2,14 @@
 import pickle
 import sys
 import os
+import shutil
 import json
 import re
 from glob import glob
 from subprocess import check_output, call
 import requests
 from requests.exceptions import ConnectionError
+from tempfile import TemporaryDirectory
 
 destdir = "dist"
 
@@ -31,7 +33,7 @@ def save_etags():
 def download(url, fname=None):
     if fname is None:
         fname = url.split("/")[-1]
-    fname = os.path.join(destdir, fname)
+    fname = os.path.join(destdir, "downloads", fname)
     print("--> Downloading {} → {}".format(url, fname))
     try:
         req = requests.get(url, stream=True)
@@ -168,11 +170,59 @@ def get_git_annex_for_windows():
     return download(win_git_annex_url)
 
 
+def package_linux(binfiles, annexsa_archive):
+    """
+    For each Linux binary, make a standalone and a plain bin version.
+    """
+    # copy README into dist directory
+    shutil.copy("README.md", destdir)
+    for bf in binfiles:
+        d, f = os.path.split(bf)
+        # simple binary archive
+        cmd = ["tar", "-czf", "{}.tar.gz".format(d), "-C", d, f, "README.md"]
+        print("Running {}".format(" ".join(cmd)))
+        ret = call(cmd)
+        if ret > 0:
+            print("Packaging failed", file=sys.stderr)
+
+        # debian packaged with annex standalone
+        with TemporaryDirectory(suffix="gin-linux") as tmp_dir:
+            build_dir = os.path.join(tmp_dir, "gin-cli_0.3-1")
+            opt_dir = os.path.join(build_dir, "opt")
+            os.makedirs(opt_dir)
+            cmd = ["tar", "-xzf", annexsa_archive, "-C", opt_dir]
+            print("Running {}".format(" ".join(cmd)))
+            ret = call(cmd)
+            if ret > 0:
+                die("Archive extraction failed")
+
+            shutil.copytree("debdock/DEBIAN",
+                            os.path.join(build_dir, "DEBIAN"))
+            shutil.copy("README.md", opt_dir)
+
+            uid = os.getegid()
+            cmd = ["docker", "build", "--build-arg=userid={}".format(uid),
+                   "-t", "gin-deb", "debdock/."]
+            print("Preparing docker image for debian build")
+            ret = call(cmd)
+            if ret > 0:
+                die("docker build failed")
+
+            cmd = ["docker", "run", "--user={}".format(uid),
+                   "-v", "{}:/debbuild/".format(tmp_dir),
+                   "gin-deb", "dpkg-deb", "--build", "/debbuild/gin-cli_0.3-1"]
+            print("Building deb package")
+            ret = call(cmd)
+            if ret > 0:
+                die("Deb build failed")
+
+            debfile = os.path.join(tmp_dir, "gin-cli_0.3-1.deb")
+            shutil.move(debfile, destdir)
+            print("DONE")
+
+
 def main():
-    try:
-        os.mkdir(destdir)
-    except FileExistsError:
-        pass
+    os.makedirs(os.path.join(destdir, "downloads"), exist_ok=True)
     incbuild = "--incbuild" in sys.argv
     binfiles = build(incbuild)
     load_etags()
@@ -182,6 +232,9 @@ def main():
     save_etags()
 
     print("Ready to package")
+
+    linux_bins = [b for b in binfiles if "linux" in b]
+    linux_pkg = package_linux(linux_bins, annexsa_file)
 
 
 if __name__ == "__main__":
