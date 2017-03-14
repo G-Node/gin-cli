@@ -40,12 +40,12 @@ def download(url, fname=None):
               file=sys.stderr)
         print("Skipping.", file=sys.stderr)
         return
-    size = req.headers.get("content-length")
+    size = int(req.headers.get("content-length"))
     et = req.headers.get("etag")
     oldet = etags.get(url)
     if et == oldet and os.path.exists(fname):
         fod_size = os.path.getsize(fname)
-        if int(fod_size) == int(size):
+        if fod_size == size:
             print("File already downloaded. Skipping.", end="\n\n")
             return fname
     etags[url] = et
@@ -54,7 +54,7 @@ def download(url, fname=None):
         for chunk in req.iter_content(chunk_size=256):
             fd.write(chunk)
             prog += len(chunk)
-            print("\r{}/{}".format(prog, size), end="", flush=True)
+            print("\r{:2.1f}%".format(prog/size*100), end="", flush=True)
         print("\nDone!")
     print()
     return fname
