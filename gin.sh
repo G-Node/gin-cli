@@ -2,14 +2,15 @@
 #
 # GIN bundle script
 
-# set the path for the bundled git annex standalone binaries
+# run the gin binary using the git annex standalone wrapper
 scriptloc=$(readlink -f "$0")
 bindir=$(dirname "$scriptloc")
 gindir=$(dirname "${bindir}")
-annexbindir=${gindir}/git-annex.linux/bin
-PATH=${annexbindir}:${PATH}
+annexdir=${gindir}/git-annex.linux
 
 ginbin=${bindir}/gin
 
+annexwrapper=${annexdir}/runshell
+
 # run the command
-$ginbin "$@"
+$annexwrapper $ginbin "$@"
