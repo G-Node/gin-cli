@@ -188,11 +188,32 @@ def package_linux(binfiles, annexsa_archive):
 
         # debian packaged with annex standalone
         with TemporaryDirectory(suffix="gin-linux") as tmp_dir:
+            # create directory structure
+            # pkg gin-cli_version
+            # /opt
+            # /opt/gin/
+            # /opt/gin/git-annex.linux/...
+            # /opt/gin/bin/gin (binary)
+            # /opt/gin/bin/gin.sh (shell script for running gin cmds)
+            # /usr/local/gin -> /opt/gin/bin/gin.sh (symlink)
+
             pkgname = "gin-cli_{}".format(version["version"])
             build_dir = os.path.join(tmp_dir, pkgname)
             opt_dir = os.path.join(build_dir, "opt")
-            os.makedirs(opt_dir)
-            cmd = ["tar", "-xzf", annexsa_archive, "-C", opt_dir]
+            opt_gin_dir = os.path.join(opt_dir, "gin")
+            opt_gin_bin_dir = os.path.join(opt_gin_dir, "bin")
+            os.makedirs(opt_gin_bin_dir)
+            usr_local_dir = os.path.join(build_dir, "usr", "local")
+            os.makedirs(usr_local_dir)
+
+            shutil.copy(bf, opt_gin_bin_dir)
+            shutil.copy("gin.sh", opt_gin_bin_dir)
+
+            link_path = os.path.join(usr_local_dir, "gin")
+            os.symlink("/opt/gin/bin/gin.sh", link_path)
+
+            # extract annex standalone into pkg/opt/gin
+            cmd = ["tar", "-xzf", annexsa_archive, "-C", opt_gin_dir]
             print("Running {}".format(" ".join(cmd)))
             ret = call(cmd)
             if ret > 0:
@@ -200,27 +221,36 @@ def package_linux(binfiles, annexsa_archive):
 
             shutil.copytree("debdock/DEBIAN",
                             os.path.join(build_dir, "DEBIAN"))
-            shutil.copy("README.md", opt_dir)
+            shutil.copy("README.md", opt_gin_dir)
 
-            uid = os.getegid()
-            cmd = ["docker", "build", "--build-arg=userid={}".format(uid),
+            cmd = ["docker", "build",
                    "-t", "gin-deb", "debdock/."]
             print("Preparing docker image for debian build")
             ret = call(cmd)
             if ret > 0:
                 die("docker build failed")
 
-            cmd = ["docker", "run", "--user={}".format(uid),
+            cmd = ["docker", "run",
                    "-v", "{}:/debbuild/".format(tmp_dir),
                    "gin-deb", "dpkg-deb", "--build",
                    "/debbuild/{}".format(pkgname)]
+            call(["tree", "-L", "4", tmp_dir])
             print("Building deb package")
+            ret = call(cmd)
+            cmd = ["docker", "run",
+                   "-v", "{}:/debbuild/".format(tmp_dir),
+                   "gin-deb", "dpkg", "--contents",
+                   "/debbuild/{}.deb".format(pkgname)]
             ret = call(cmd)
             if ret > 0:
                 die("Deb build failed")
 
-            debfile = os.path.join(tmp_dir, "{}.deb".format(pkgname))
-            shutil.move(debfile, destdir)
+            debfilename = "{}.deb".format(pkgname)
+            debfilepath = os.path.join(tmp_dir, debfilename)
+            debfiledest = os.path.join(destdir, debfilename)
+            if os.path.exists(debfiledest):
+                os.remove(debfiledest)
+            shutil.move(debfilepath, debfiledest)
             print("DONE")
 
 
