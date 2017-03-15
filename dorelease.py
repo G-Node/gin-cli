@@ -16,6 +16,8 @@ destdir = "dist"
 etagfile = os.path.join(destdir, "etags")
 etags = {}
 
+version = {}
+
 
 def load_etags():
     try:
@@ -81,24 +83,23 @@ def build(incbuild=False):
     with open(verfile) as fd:
         verinfo = fd.read()
 
-    verdict = {}
-    verdict["version"] = re.search(r"version=([v0-9\.]+)", verinfo).group(1)
-    verdict["build"] = re.search(r"build=([0-9]+)", verinfo).group(1)
+    version["version"] = re.search(r"version=([v0-9\.]+)", verinfo).group(1)
+    version["build"] = re.search(r"build=([0-9]+)", verinfo).group(1)
     cmd = ["git", "rev-parse", "HEAD"]
-    verdict["commit"] = check_output(cmd).strip().decode()
+    version["commit"] = check_output(cmd).strip().decode()
     if incbuild:
         print("--> Updating version file")
-        verdict["build"] = "{:05d}".format(int(verdict["build"]) + 1)
-        newinfo = "version={version}\nbuild={build}\n".format(**verdict)
+        version["build"] = "{:05d}".format(int(version["build"]) + 1)
+        newinfo = "version={version}\nbuild={build}\n".format(**version)
         print(newinfo)
         with open(verfile, "w") as fd:
             fd.write(newinfo)
     print(("Version: {version} "
            "Build: {build} "
-           "Commit: {commit}").format(**verdict))
+           "Commit: {commit}").format(**version))
     ldflags = ("-X main.version={version} "
                "-X main.build={build} "
-               "-X main.commit={commit}").format(**verdict)
+               "-X main.commit={commit}").format(**version)
     # cmd = ["go", "build", "-ldflags", ldflags, "-o", "gin"]
     output = os.path.join(destdir, "{{.OS}}-{{.Arch}}", "gin")
     cmd = ["gox", "-output={}".format(output),
@@ -187,7 +188,8 @@ def package_linux(binfiles, annexsa_archive):
 
         # debian packaged with annex standalone
         with TemporaryDirectory(suffix="gin-linux") as tmp_dir:
-            build_dir = os.path.join(tmp_dir, "gin-cli_0.3-1")
+            pkgname = "gin-cli_{}".format(version["version"])
+            build_dir = os.path.join(tmp_dir, pkgname)
             opt_dir = os.path.join(build_dir, "opt")
             os.makedirs(opt_dir)
             cmd = ["tar", "-xzf", annexsa_archive, "-C", opt_dir]
@@ -210,13 +212,14 @@ def package_linux(binfiles, annexsa_archive):
 
             cmd = ["docker", "run", "--user={}".format(uid),
                    "-v", "{}:/debbuild/".format(tmp_dir),
-                   "gin-deb", "dpkg-deb", "--build", "/debbuild/gin-cli_0.3-1"]
+                   "gin-deb", "dpkg-deb", "--build",
+                   "/debbuild/{}".format(pkgname)]
             print("Building deb package")
             ret = call(cmd)
             if ret > 0:
                 die("Deb build failed")
 
-            debfile = os.path.join(tmp_dir, "gin-cli_0.3-1.deb")
+            debfile = os.path.join(tmp_dir, "{}.deb".format(pkgname))
             shutil.move(debfile, destdir)
             print("DONE")
 
