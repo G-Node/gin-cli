@@ -180,6 +180,7 @@ def package_linux(binfiles, annexsa_archive):
     for bf in binfiles:
         d, f = os.path.split(bf)
         # simple binary archive
+        shutil.copy("README.md", d)
         cmd = ["tar", "-czf", "{}.tar.gz".format(d), "-C", d, f, "README.md"]
         print("Running {}".format(" ".join(cmd)))
         ret = call(cmd)
@@ -230,6 +231,13 @@ def package_linux(binfiles, annexsa_archive):
             if ret > 0:
                 die("docker build failed")
 
+            cmd = ["docker", "run", "-v", "{}:/debbuild/".format(tmp_dir),
+                   "gin-deb", "/bin/bash", "-c",
+                   ("chown root:root -R /debbuild &&"
+                    " chmod go+rX,go-w -R /debbuild")]
+            print("Fixing permissions for build dir")
+            call(cmd)
+
             cmd = ["docker", "run",
                    "-v", "{}:/debbuild/".format(tmp_dir),
                    "gin-deb", "dpkg-deb", "--build",
@@ -237,20 +245,29 @@ def package_linux(binfiles, annexsa_archive):
             call(["tree", "-L", "5", tmp_dir])
             print("Building deb package")
             ret = call(cmd)
-            cmd = ["docker", "run",
-                   "-v", "{}:/debbuild/".format(tmp_dir),
-                   "gin-deb", "dpkg", "--contents",
-                   "/debbuild/{}.deb".format(pkgname)]
-            ret = call(cmd)
+            # cmd = ["docker", "run",
+            #        "-v", "{}:/debbuild/".format(tmp_dir),
+            #        "gin-deb", "dpkg", "--contents",
+            #        "/debbuild/{}.deb".format(pkgname)]
+            # ret = call(cmd)
             if ret > 0:
                 die("Deb build failed")
+
+            # revert ownership to allow deletion of tmp dir
+            uid = os.getuid()
+            cmd = ["docker", "run", "-v", "{}:/debbuild/".format(tmp_dir),
+                   "gin-deb", "/bin/bash", "-c",
+                   "chown {}:{} -R /debbuild".format(uid, uid)]
+            ret = call(cmd)
+            if ret > 0:
+                print("Error occured while reverting ownership to user")
 
             debfilename = "{}.deb".format(pkgname)
             debfilepath = os.path.join(tmp_dir, debfilename)
             debfiledest = os.path.join(destdir, debfilename)
             if os.path.exists(debfiledest):
                 os.remove(debfiledest)
-            shutil.move(debfilepath, debfiledest)
+            shutil.copy(debfilepath, debfiledest)
             print("DONE")
 
 
