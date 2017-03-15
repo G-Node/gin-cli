@@ -203,13 +203,13 @@ def package_linux(binfiles, annexsa_archive):
             opt_gin_dir = os.path.join(opt_dir, "gin")
             opt_gin_bin_dir = os.path.join(opt_gin_dir, "bin")
             os.makedirs(opt_gin_bin_dir)
-            usr_local_dir = os.path.join(build_dir, "usr", "local")
-            os.makedirs(usr_local_dir)
+            usr_local_bin_dir = os.path.join(build_dir, "usr", "local", "bin")
+            os.makedirs(usr_local_bin_dir)
 
             shutil.copy(bf, opt_gin_bin_dir)
             shutil.copy("gin.sh", opt_gin_bin_dir)
 
-            link_path = os.path.join(usr_local_dir, "gin")
+            link_path = os.path.join(usr_local_bin_dir, "gin")
             os.symlink("/opt/gin/bin/gin.sh", link_path)
 
             # extract annex standalone into pkg/opt/gin
@@ -234,7 +234,7 @@ def package_linux(binfiles, annexsa_archive):
                    "-v", "{}:/debbuild/".format(tmp_dir),
                    "gin-deb", "dpkg-deb", "--build",
                    "/debbuild/{}".format(pkgname)]
-            call(["tree", "-L", "4", tmp_dir])
+            call(["tree", "-L", "5", tmp_dir])
             print("Building deb package")
             ret = call(cmd)
             cmd = ["docker", "run",
