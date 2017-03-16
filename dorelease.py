@@ -298,6 +298,29 @@ def rpmify(binfiles, annexsa_archive):
     return []
 
 
+def package_mac_plain(binfiles):
+    """
+    For each Darwin binary make a tarball and include all related files
+    """
+    archives = []
+    for bf in binfiles:
+        d, f = os.path.split(bf)
+        _, osarch = os.path.split(d)
+        osarch.replace("darwin", "macos")
+        # simple binary archive
+        shutil.copy("README.md", d)
+        arc = "gin-cli_{}-{}.tar.gz".format(version["version"], osarch)
+        arc = os.path.join(pkgdir, arc)
+        cmd = ["tar", "-czf", arc, "-C", d, f, "README.md"]
+        print("Running {}".format(" ".join(cmd)))
+        ret = call(cmd)
+        if ret > 0:
+            print("Failed to make tarball for {}".format(bf), file=sys.stderr)
+            continue
+        archives.append(arc)
+    return archives
+
+
 def winbundle(binfiles, git_pkg, annex_pkg):
     """
     For each Windows binary make a zip and include git and git annex portable
@@ -305,7 +328,6 @@ def winbundle(binfiles, git_pkg, annex_pkg):
     winarchives = []
     for bf in binfiles:
         with TemporaryDirectory(suffix="gin-windows") as tmp_dir:
-            pkgname = "gin-cli_{}".format(version["version"])
             pkgroot = os.path.join(tmp_dir, "gin")
             bindir = os.path.join(pkgroot, "bin")
             os.makedirs(bindir)
@@ -380,6 +402,8 @@ def main():
     deb_pkgs = debianize(linux_bins, annexsa_file)
     rpm_pkgs = rpmify(linux_bins, annexsa_file)
 
+    mac_pkgs = package_mac_plain(darwin_bins)
+
     win_pkgs = winbundle(win_bins, win_git_file, win_git_annex_file)
 
     def printlist(lst):
@@ -396,6 +420,9 @@ def main():
 
     print("RPM packages:")
     printlist(rpm_pkgs)
+
+    print("macOS packages:")
+    printlist(mac_pkgs)
 
     print("Windows packages:")
     printlist(win_pkgs)
