@@ -24,7 +24,8 @@ def load_etags():
         with open(etagfile, "rb") as fd:
             etags.update(pickle.load(fd))
     except FileNotFoundError:
-        print("--> No etags file found. Skipping load.")
+        # print("--> No etags file found. Skipping load.")
+        pass
 
 
 def save_etags():
@@ -171,22 +172,35 @@ def get_git_annex_for_windows():
     return download(win_git_annex_url)
 
 
-def package_linux(binfiles, annexsa_archive):
+def package_linux_plain(binfiles):
     """
-    For each Linux binary, make a standalone and a plain bin version.
+    For each Linux binary make a tarball and include all related files
     """
     # copy README into dist directory
     shutil.copy("README.md", destdir)
+    archives = []
     for bf in binfiles:
         d, f = os.path.split(bf)
         # simple binary archive
         shutil.copy("README.md", d)
-        cmd = ["tar", "-czf", "{}.tar.gz".format(d), "-C", d, f, "README.md"]
+        arc = "{}.tar.gz".format(d)
+        cmd = ["tar", "-czf", arc, "-C", d, f, "README.md"]
         print("Running {}".format(" ".join(cmd)))
         ret = call(cmd)
         if ret > 0:
-            print("Packaging failed", file=sys.stderr)
+            print("Failed to make tarball for {}".format(bf), file=sys.stderr)
+            continue
+        archives.append(arc)
+    return archives
 
+
+def debianize(binfiles, annexsa_archive):
+    """
+    For each Linux binary make a deb package with git annex standalone
+    """
+    debs = []
+    for bf in binfiles:
+        d, f = os.path.split(bf)
         # debian packaged with annex standalone
         with TemporaryDirectory(suffix="gin-linux") as tmp_dir:
             # create directory structure
@@ -242,7 +256,7 @@ def package_linux(binfiles, annexsa_archive):
                    "-v", "{}:/debbuild/".format(tmp_dir),
                    "gin-deb", "dpkg-deb", "--build",
                    "/debbuild/{}".format(pkgname)]
-            call(["tree", "-L", "5", tmp_dir])
+            # call(["tree", "-L", "5", tmp_dir])
             print("Building deb package")
             ret = call(cmd)
             # cmd = ["docker", "run",
@@ -268,7 +282,13 @@ def package_linux(binfiles, annexsa_archive):
             if os.path.exists(debfiledest):
                 os.remove(debfiledest)
             shutil.copy(debfilepath, debfiledest)
+            debs.append(debfiledest)
             print("DONE")
+    return debs
+
+
+def rpmify(binfiles, annexsa_archive):
+    return []
 
 
 def main():
@@ -284,7 +304,20 @@ def main():
     print("Ready to package")
 
     linux_bins = [b for b in binfiles if "linux" in b]
-    linux_pkg = package_linux(linux_bins, annexsa_file)
+
+    linux_pkgs = package_linux_plain(linux_bins)
+    deb_pkgs = debianize(linux_bins, annexsa_file)
+    rpm_pkgs = rpmify(linux_bins, annexsa_file)
+
+    print("The following archives and packages were created")
+    print("Linux tarballs:")
+    print("> " + "\n> ".join(linux_pkgs))
+
+    print("Debian packages:")
+    print("> " + "\n> ".join(deb_pkgs))
+
+    print("RPM packages:")
+    print("> " + "\n> ".join(rpm_pkgs))
 
 
 if __name__ == "__main__":
