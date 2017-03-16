@@ -6,7 +6,7 @@ import shutil
 import json
 import re
 from glob import glob
-from subprocess import check_output, call
+from subprocess import check_output, call, DEVNULL
 import requests
 from requests.exceptions import ConnectionError
 from tempfile import TemporaryDirectory
@@ -163,7 +163,7 @@ def get_appveyor_artifact_url():
 def get_git_for_windows():
     win_git_url = ("https://github.com/git-for-windows/git/releases/download/"
                    "v2.12.0.windows.1/PortableGit-2.12.0-32-bit.7z.exe")
-    return download(win_git_url, "git-for-windows.exe")
+    return download(win_git_url)
 
 
 def get_git_annex_for_windows():
@@ -176,8 +176,6 @@ def package_linux_plain(binfiles):
     """
     For each Linux binary make a tarball and include all related files
     """
-    # copy README into dist directory
-    shutil.copy("README.md", destdir)
     archives = []
     for bf in binfiles:
         d, f = os.path.split(bf)
@@ -202,7 +200,6 @@ def debianize(binfiles, annexsa_archive):
     """
     debs = []
     for bf in binfiles:
-        d, f = os.path.split(bf)
         # debian packaged with annex standalone
         with TemporaryDirectory(suffix="gin-linux") as tmp_dir:
             # create directory structure
@@ -234,7 +231,10 @@ def debianize(binfiles, annexsa_archive):
             print("Running {}".format(" ".join(cmd)))
             ret = call(cmd)
             if ret > 0:
-                die("Archive extraction failed")
+                print("Failed to extract git annex standalone [{}]".format(
+                    annexsa_archive, file=sys.stderr
+                ))
+                continue
 
             shutil.copytree("debdock/DEBIAN",
                             os.path.join(build_dir, "DEBIAN"))
@@ -245,7 +245,8 @@ def debianize(binfiles, annexsa_archive):
             print("Preparing docker image for debian build")
             ret = call(cmd)
             if ret > 0:
-                die("docker build failed")
+                print("Docker build failed", file=sys.stderr)
+                continue
 
             cmd = ["docker", "run", "-v", "{}:/debbuild/".format(tmp_dir),
                    "gin-deb", "/bin/bash", "-c",
@@ -267,7 +268,8 @@ def debianize(binfiles, annexsa_archive):
             #        "/debbuild/{}.deb".format(pkgname)]
             # ret = call(cmd)
             if ret > 0:
-                die("Deb build failed")
+                print("Deb build failed", file=sys.stderr)
+                continue
 
             # revert ownership to allow deletion of tmp dir
             uid = os.getuid()
@@ -276,7 +278,8 @@ def debianize(binfiles, annexsa_archive):
                    "chown {}:{} -R /debbuild".format(uid, uid)]
             ret = call(cmd)
             if ret > 0:
-                print("Error occured while reverting ownership to user")
+                print("Error occured while reverting ownership to user",
+                      file=sys.stderr)
 
             debfilename = "{}.deb".format(pkgname)
             debfilepath = os.path.join(tmp_dir, debfilename)
@@ -293,6 +296,63 @@ def rpmify(binfiles, annexsa_archive):
     return []
 
 
+def winbundle(binfiles, git_pkg, annex_pkg):
+    """
+    For each Windows binary make a zip and include git and git annex portable
+    """
+    winarchives = []
+    for bf in binfiles:
+        with TemporaryDirectory(suffix="gin-windows") as tmp_dir:
+            pkgname = "gin-cli_{}".format(version["version"])
+            pkgroot = os.path.join(tmp_dir, "gin")
+            bindir = os.path.join(pkgroot, "bin")
+            os.makedirs(bindir)
+
+            shutil.copy(bf, bindir)
+            shutil.copy("README.md", pkgroot)
+
+            gitdir = os.path.join(pkgroot, "git")
+            os.makedirs(gitdir)
+
+            # extract git portable and annex into git dir
+            cmd = ["7z", "x", "-o{}".format(gitdir), git_pkg]
+            print("Running {}".format(" ".join(cmd)))
+            ret = call(cmd, stdout=DEVNULL)
+            if ret > 0:
+                print("Failed to extract git archive [{}]".format(git_pkg),
+                      file=sys.stderr)
+                continue
+
+            cmd = ["7z", "x", "-o{}".format(gitdir), annex_pkg]
+            print("Running {}".format(" ".join(cmd)))
+            ret = call(cmd, stdout=DEVNULL)
+            if ret > 0:
+                print("Failed to extract git archive [{}]".format(annex_pkg),
+                      file=sys.stderr)
+                continue
+            d, f = os.path.split(bf)
+            _, osarch = os.path.split(d)
+
+            arc = "gin-cli_{}-{}.zip".format(version["version"], osarch)
+            arc = os.path.join(destdir, arc)
+            print("Creating Windows zip file")
+            # need to change paths before making zip file
+            arc_abs = os.path.abspath(arc)
+            oldwd = os.getcwd()
+            os.chdir(pkgroot)
+            cmd = ["zip", "-r", arc_abs, "."]
+            print("Running {} (from {})".format(" ".join(cmd), pkgroot))
+            ret = call(cmd, stdout=DEVNULL)
+            os.chdir(oldwd)
+            if ret > 0:
+                print("Failed to create archive [{}]".format(arc),
+                      file=sys.stderr)
+                continue
+            winarchives.append(arc)
+            print("DONE")
+    return winarchives
+
+
 def main():
     os.makedirs(os.path.join(destdir, "downloads"), exist_ok=True)
     incbuild = "--incbuild" in sys.argv
@@ -306,10 +366,14 @@ def main():
     print("Ready to package")
 
     linux_bins = [b for b in binfiles if "linux" in b]
+    win_bins = [b for b in binfiles if "win" in b]
+    darwin_bins = [b for b in binfiles if "darwin" in b]
 
     linux_pkgs = package_linux_plain(linux_bins)
     deb_pkgs = debianize(linux_bins, annexsa_file)
     rpm_pkgs = rpmify(linux_bins, annexsa_file)
+
+    win_pkgs = winbundle(win_bins, win_git_file, win_git_annex_file)
 
     def printlist(lst):
         print("".join("> " + l + "\n" for l in lst))
@@ -325,6 +389,9 @@ def main():
 
     print("RPM packages:")
     printlist(rpm_pkgs)
+
+    print("Windows packages:")
+    printlist(win_pkgs)
 
 
 if __name__ == "__main__":
