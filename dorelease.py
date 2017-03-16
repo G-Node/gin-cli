@@ -12,6 +12,7 @@ from requests.exceptions import ConnectionError
 from tempfile import TemporaryDirectory
 
 destdir = "dist"
+pkgdir = os.path.join(destdir, "pkg")
 
 etagfile = os.path.join(destdir, "etags")
 etags = {}
@@ -114,7 +115,8 @@ def build(incbuild=False):
 
     print("--> Build succeeded")
     print("--> The following files were built:")
-    ginfiles = glob(os.path.join(destdir, "*", "gin*"))
+    ginfiles = glob(os.path.join(destdir, "*", "gin"))
+    ginfiles.extend(glob(os.path.join(destdir, "*", "gin.exe")))
     print("\n".join(ginfiles), end="\n\n")
 
     plat = sys.platform
@@ -183,7 +185,7 @@ def package_linux_plain(binfiles):
         # simple binary archive
         shutil.copy("README.md", d)
         arc = "gin-cli_{}-{}.tar.gz".format(version["version"], osarch)
-        arc = os.path.join(destdir, arc)
+        arc = os.path.join(pkgdir, arc)
         cmd = ["tar", "-czf", arc, "-C", d, f, "README.md"]
         print("Running {}".format(" ".join(cmd)))
         ret = call(cmd)
@@ -283,7 +285,7 @@ def debianize(binfiles, annexsa_archive):
 
             debfilename = "{}.deb".format(pkgname)
             debfilepath = os.path.join(tmp_dir, debfilename)
-            debfiledest = os.path.join(destdir, debfilename)
+            debfiledest = os.path.join(pkgdir, debfilename)
             if os.path.exists(debfiledest):
                 os.remove(debfiledest)
             shutil.copy(debfilepath, debfiledest)
@@ -310,6 +312,7 @@ def winbundle(binfiles, git_pkg, annex_pkg):
 
             shutil.copy(bf, bindir)
             shutil.copy("README.md", pkgroot)
+            shutil.copy("gin.bat", pkgroot)
 
             gitdir = os.path.join(pkgroot, "git")
             os.makedirs(gitdir)
@@ -334,9 +337,11 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             _, osarch = os.path.split(d)
 
             arc = "gin-cli_{}-{}.zip".format(version["version"], osarch)
-            arc = os.path.join(destdir, arc)
+            arc = os.path.join(pkgdir, arc)
             print("Creating Windows zip file")
             # need to change paths before making zip file
+            if os.path.exists(arc):
+                os.remove(arc)
             arc_abs = os.path.abspath(arc)
             oldwd = os.getcwd()
             os.chdir(pkgroot)
@@ -355,6 +360,8 @@ def winbundle(binfiles, git_pkg, annex_pkg):
 
 def main():
     os.makedirs(os.path.join(destdir, "downloads"), exist_ok=True)
+    os.makedirs(pkgdir, exist_ok=True)
+
     incbuild = "--incbuild" in sys.argv
     binfiles = build(incbuild)
     load_etags()
@@ -366,7 +373,7 @@ def main():
     print("Ready to package")
 
     linux_bins = [b for b in binfiles if "linux" in b]
-    win_bins = [b for b in binfiles if "win" in b]
+    win_bins = [b for b in binfiles if "windows" in b]
     darwin_bins = [b for b in binfiles if "darwin" in b]
 
     linux_pkgs = package_linux_plain(linux_bins)
