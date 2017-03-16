@@ -309,15 +309,21 @@ def main():
     deb_pkgs = debianize(linux_bins, annexsa_file)
     rpm_pkgs = rpmify(linux_bins, annexsa_file)
 
+    def printlist(lst):
+        print("".join("> " + l + "\n" for l in lst))
+
+    print("------------------------------------------------")
     print("The following archives and packages were created")
+    print("------------------------------------------------")
     print("Linux tarballs:")
     print("> " + "\n> ".join(linux_pkgs))
+    printlist(linux_pkgs)
 
     print("Debian packages:")
-    print("> " + "\n> ".join(deb_pkgs))
+    printlist(deb_pkgs)
 
     print("RPM packages:")
-    print("> " + "\n> ".join(rpm_pkgs))
+    printlist(rpm_pkgs)
 
 
 if __name__ == "__main__":
