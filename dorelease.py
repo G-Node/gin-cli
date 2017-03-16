@@ -181,9 +181,11 @@ def package_linux_plain(binfiles):
     archives = []
     for bf in binfiles:
         d, f = os.path.split(bf)
+        _, osarch = os.path.split(d)
         # simple binary archive
         shutil.copy("README.md", d)
-        arc = "{}.tar.gz".format(d)
+        arc = "gin-cli_{}-{}.tar.gz".format(version["version"], osarch)
+        arc = os.path.join(destdir, arc)
         cmd = ["tar", "-czf", arc, "-C", d, f, "README.md"]
         print("Running {}".format(" ".join(cmd)))
         ret = call(cmd)
@@ -316,7 +318,6 @@ def main():
     print("The following archives and packages were created")
     print("------------------------------------------------")
     print("Linux tarballs:")
-    print("> " + "\n> ".join(linux_pkgs))
     printlist(linux_pkgs)
 
     print("Debian packages:")
