@@ -306,7 +306,7 @@ def package_mac_plain(binfiles):
     for bf in binfiles:
         d, f = os.path.split(bf)
         _, osarch = os.path.split(d)
-        osarch.replace("darwin", "macos")
+        osarch = osarch.replace("darwin", "macos")
         # simple binary archive
         shutil.copy("README.md", d)
         arc = "gin-cli_{}-{}.tar.gz".format(version["version"], osarch)
