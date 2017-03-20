@@ -1,0 +1,8 @@
+Package: gin-cli
+Version: 0.3
+Section: base
+Priority: optional
+Architecture: amd64
+Maintainer: Achilleas Koutsou <achilleas.k@gmail.com>
+Description: GIN (G-Node INfrastructure services) command line client
+

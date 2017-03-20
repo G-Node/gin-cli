@@ -18,6 +18,10 @@ import (
 	"github.com/howeyc/gopass"
 )
 
+var version string
+var build string
+var commit string
+
 const usage = `
 GIN command line client
 
@@ -409,7 +413,9 @@ func listRepos(args []string) {
 }
 
 func main() {
-	args, _ := docopt.Parse(usage, nil, true, "GIN command line client v0.3", true)
+	verstr := fmt.Sprintf("GIN command line client %s Build %s (%s)", version, build, commit)
+
+	args, _ := docopt.Parse(usage, nil, true, verstr, true)
 	command := args["<command>"].(string)
 	cmdArgs := args["<args>"].([]string)
 

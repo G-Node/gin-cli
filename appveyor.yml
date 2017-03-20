@@ -13,10 +13,10 @@ environment:
       ARCH: 32
     - GENERATOR: "Visual Studio 11 Win64"
       ARCH: 64
-    - GENERATOR: "MSYS Makefiles"
-      ARCH: i686 # this is for 32-bit MinGW-w64
-    - GENERATOR: "MSYS Makefiles"
-      ARCH: 64
+    # - GENERATOR: "MSYS Makefiles"
+    #   ARCH: i686 # this is for 32-bit MinGW-w64
+    # - GENERATOR: "MSYS Makefiles"
+    #   ARCH: 64
 
 install:
   # go stuff
@@ -45,7 +45,8 @@ test_script:
   - go test -v ./...
 
 after_test:
-  - go build .
+  - go build -ldflags "-X main.version=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o gin.exe .
+  - gin.exe --version
   - md %BINDIR%
   - copy *.exe %BINDIR%
 

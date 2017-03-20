@@ -4,3 +4,6 @@
 # Idea
 *.iml
 .idea
+
+# directories
+dist
