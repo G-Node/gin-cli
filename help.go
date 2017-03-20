@@ -66,13 +66,13 @@ ARGUMENTS
 
 	<name>
 		The name of the repository. If no <name> is provided, you will be
-		prompted for one.  Specifying a name is required if a description is to
-		be specified. Names should contain only alphanumeric characters, '-',
-		and '_'.
+		prompted for one. If you want to provide a description, you need to
+		provide a repository name on the command line. Names should contain
+		only alphanumeric characters, '.', '-', and '_'.
 
 	<description>
 		A repository description (optional). The description should be
-		specified as a single argument.  For most shells, this means the
+		specified as a single argument. For most shells, this means the
 		description should be in quotes.
 
 EXAMPLES
@@ -126,7 +126,7 @@ DESCRIPTION
 
 	Upload changes made in a local repository clone to the remote repository on
 	the GIN server. This command must be called from within the (cloned)
-	repository directory.  All changes made will be sent to the server,
+	repository directory. All changes made will be sent to the server,
 	including addition of new files, modifications and renaming of existing
 	files, and file deletions.
 
@@ -164,7 +164,7 @@ ARGUMENTS
 	<username>
 		The name of the user whose repositories should be listed. This can be
 		the username of the currently logged in user (YOU), in which case the
-		command will list all repositories owned by YOU.  If it is the username
+		command will list all repositories owned by YOU. If it is the username
 		of a different user, it will list all the repositories owned by the
 		specified user that YOU have access to. This consists of public
 		repositories and repositories shared with YOU.
