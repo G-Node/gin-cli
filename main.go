@@ -44,83 +44,211 @@ Commands:
     info     [<username>]
     keys     [-v | --verbose]
     keys     --add <filename>
-    cmdhelp
+    help     <command>
 
-Use 'cmdhelp' to see full description of individual commands.
+Use 'help' followed by a command to see full description of the command.
 `
 
-const cmdUsage = `
-Command help:
+var cmdHelp = map[string]string{
+	// LOGIN HELP
+	"login": `USAGE
 
-    login        Login to the GIN services
+	gin login [<username>]
 
-                 If no <username> is specified on the command line, you will be
-                 prompted for it. The login command always prompts for a
-                 password.
+DESCRIPTION
+
+	Login to the GIN services
+
+ARGUMENTS
+
+	<username>
+		If no username is specified on the command line, you will be
+		prompted for it. The login command always prompts for a
+		password.`,
+
+	"logout": `USAGE
+
+	gin logout
+
+DESCRIPTION
+
+	Logout of the GIN services
+
+	This command takes no arguments.`,
+
+	// CREATE HELP
+	"create": `USAGE
+
+	gin create [<name>] [<description>]
+
+DESCRIPTION
+
+	Create a new repository on the GIN server.
+
+ARGUMENTS
+
+	<name>
+		The name of the repository. If no <name> is provided, you will be
+		prompted for one.  Specifying a name is required if a description is to
+		be specified. Names should contain only alphanumeric characters, '-',
+		and '_'.
+
+	<description>
+		A repository description (optional). The description should be
+		specified as a single argument.  For most shells, this means the
+		description should be in quotes.
+
+EXAMPLES
+
+	Create a repository. Prompt for name
+
+		$ gin create
+
+	Create a repository named 'example' with a description
+
+		$ gin create example "An example repository"
+
+	Create a repository named 'example' with no description
+
+		$ gin create example
+		`,
+
+	// GET HELP
+	"get": `USAGE
+
+	gin get <repopath>
+
+DESCRIPTION
+
+	Download a remote repository to a new directory and initialise the directory
+	with the default options. The local directory is referred to as the 'clone' of
+	the repository.
+
+ARGUMENTS
+
+	<repopath>
+		The repository path <repopath> must be specified on the command line.
+		A repository path is the owner's username, followed by a "/" and the
+		repository name.
+
+EXAMPLES
+
+	Get and intialise the repository named 'example' owned by user 'alice'
+
+		$ gin get alice/example
+
+	Get and initialise the repository named 'eegdata' owned by user 'peter'
+
+		$ gin get peter/eegdata
+		`,
+
+	"upload": `USAGE
+
+	gin upload
+
+DESCRIPTION
+
+	Upload changes made in a local repository clone to the remote repository on the
+	GIN server.  This command must be called from within the (cloned) repository
+	directory.  All changes made will be sent to the server, including addition of
+	new files, modifications and renaming of existing files, and file deletions.
+
+	This command takes no arguments.`,
+
+	"download": `USAGE
+
+	gin download
+
+DESCRIPTION
+
+	Download changes made in the remote repository on the GIN server to the local
+	repository clone.  This command must be called from within the (cloned)
+	repository directory. All changes made on the remote server will be retrieved,
+	including addition of new files, modifications and renaming of existing files,
+	and file deletions.
+
+	This command takes no arguments.`,
+
+	"repos": `USAGE
+
+	gin repos [<username>]
 
 
-    logout       Logout of the GIN services
+DESCRIPTION
 
+	List repositories on the server that provide read access. If no argument is
+	provided, it will list all publicly accessible repositories on the GIN server.
 
-    create       Create a new repository on the GIN server
+ARGUMENTS
 
-                 If no <name> is provided, you will be prompted for one.
-                 A repository <description> can only be specified on the
-                 command line after the <name>.
-                 Login required.
+	<username>
+		The name of the user whose repositories should be listed. This can be
+		the username of the currently logged in user (YOU), in which case the
+		command will list all repositories owned by YOU.  If it is the username
+		of a different user, it will list all the repositories owned by the
+		specified user that YOU have access to. This consists of public
+		repositories and repositories shared with YOU.
 
+	   `,
 
-    get          Download a remote repository to a new directory
+	//              Without any argument, lists all the publicly accessible
+	//              repositories on the GIN server.
+	//              If a <username> is specified, this command will list the
+	//              specified user's publicly accessible repositories.
+	//              If you are logged in, it will also list any repositories
+	//              owned by the user that you have access to.
 
-                 The repository path <repopath> must be specified on the
-                 command line. A repository path is the owner's username,
-                 followed by a "/" and the repository name
-                 (e.g., peter/eegdata).
-                 Login required.
+	"info": `USAGE
 
+	gin info [<username>]
 
-    upload       Upload local repository changes to the remote repository
+DESCRIPTION
 
-                 Uploads any changes made on the local data to the GIN server.
-                 The upload command should be run from inside the directory of
-                 an existing repository.
+	Print user information. If no argument is provided, it will print the
+	information of the currently logged in user.
 
+ARGUMENTS
 
-    download     Download remote repository changes to the local repository
+	<username>
+		The name of the user whose information should be printed. This can be
+		the username of the currently logged in user, in which case the command
+		will print all the profile information with indicators for which data
+		is publicly visible. If it is the username of a different user, only
+		the publicly visible information is printed.
 
-                 Downloads any changes made to the data on the server to the
-                 local data directory.
-                 The download command should be run from inside the directory
-                 of an existing repository.
+`,
 
+	"keys": `USAGE
 
-    repos        List accessible repositories
+	gin keys [-v | --verbose]
+	gin keys --add <filename>
 
-                 Without any argument, lists all the publicly accessible
-                 repositories on the GIN server.
-                 If a <username> is specified, this command will list the
-                 specified user's publicly accessible repositories.
-                 If you are logged in, it will also list any repositories
-                 owned by the user that you have access to.
+DESCRIPTION
 
+	List or add SSH keys. If no argument is provided, it will list the
+	description and fingerprint for each key associated with the logged in
+	account.
 
-    info         Print user information
+	The command can also be used to add a public key to your account from an
+	existing filename (see --add argument).
 
-                 Without argument, print the information of the currently
-                 logged in user or, if you are not logged in, prompt for a
-                 username to look up.
-                 If a <username> is specified, print the user's information.
+ARGUMENTS
 
+	--verbose, -v
+		Verbose printing. Prints the entire public key when listing.
 
-    keys         List or add SSH keys
+	--add <filename>
+		Specify a filename which contains a public key to be added to the GIN
+		server.
 
-                 By default will list the keys (description and fingerprint)
-                 associated with the logged in user. The verbose flag will also
-                 print the full public keys.
-                 To add a new key, use the --add option and specify a pub key
-                 <filename>.
-                 Login required.
-`
+EXAMPLES 
+
+	Add a public key to your account, as generated from the default ssh-keygen 
+	command
+
+		$ gin keys --add ~/.ssh/id_rsa.pub
+`,
+}
 
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
@@ -419,6 +547,18 @@ func listRepos(args []string) {
 	}
 }
 
+func help(args []string) {
+	if len(args) != 1 {
+		util.Die(usage)
+	}
+	helptext, ok := cmdHelp[args[0]]
+	if !ok {
+		util.Die(usage)
+	}
+
+	fmt.Println(helptext)
+}
+
 func main() {
 	verstr := fmt.Sprintf("GIN command line client %s Build %s (%s)", version, build, commit)
 
@@ -452,9 +592,8 @@ func main() {
 		listRepos(cmdArgs)
 	case "logout":
 		logout(cmdArgs)
-	case "cmdhelp":
-		fullUsage := usage + "\n" + cmdUsage
-		fmt.Print(fullUsage)
+	case "help":
+		help(cmdArgs)
 	default:
 		util.Die(usage)
 	}
