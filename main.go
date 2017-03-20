@@ -141,6 +141,30 @@ func getRepo(args []string) {
 	util.CheckError(err)
 }
 
+func lsRepo(args []string) {
+	var dirs []string
+	if len(args) == 0 {
+		dirs = []string{"."}
+	} else {
+		dirs = args
+	}
+
+	multiarg := false
+	if len(dirs) > 1 {
+		multiarg = true
+	}
+
+	repocl := repo.NewClient(util.Config.RepoHost)
+	repocl.GitUser = util.Config.GitUser
+	repocl.GitHost = util.Config.GitHost
+	repocl.KeyHost = util.Config.AuthHost
+
+	var err error
+	for _, d := range dirs {
+		_ = repocl.ListFiles(d)
+	}
+}
+
 func upload(args []string) {
 	if len(args) > 0 {
 		util.Die(usage)
@@ -398,6 +422,8 @@ func main() {
 		createRepo(cmdArgs)
 	case "get":
 		getRepo(cmdArgs)
+	case "ls":
+		lsRepo(cmdArgs)
 	case "upload":
 		upload(cmdArgs)
 	case "download":

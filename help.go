@@ -12,17 +12,18 @@ Options:
 	--version    Client version
 
 Commands:
-	login
-	logout
-	create
-	get
-	upload
-	download
-	repos
-	info
-	keys
-	keys
-	help
+    login    [<username>]
+    logout
+    create   [<name>] [<description>]
+    get      <repopath>
+    ls       [<directory>]
+    upload
+    download
+    repos    [<username>]
+    info     [<username>]
+    keys     [-v | --verbose]
+    keys     --add <filename>
+    help     <command>
 
 Use 'help' followed by a command to see full description of the command.
 `
@@ -118,6 +119,16 @@ EXAMPLES
 		$ gin get peter/eegdata
 `
 
+const lsHelp = `USAGE
+
+	gin ls [<directory>]
+
+DESCRIPTION
+
+	List the contents of a directory (current directory by default) and the
+	status of the files within it.
+`
+
 const uploadHelp = `USAGE
 
 	gin upload
@@ -183,6 +194,9 @@ DESCRIPTION
 	Print user information. If no argument is provided, it will print the
 	information of the currently logged in user.
 
+	Using this command with no argument can also be used to check if a user is
+	currently logged in.
+
 ARGUMENTS
 
 	<username>
@@ -228,6 +242,7 @@ var cmdHelp = map[string]string{
 	"logout":   logoutHelp,
 	"create":   createHelp,
 	"get":      getHelp,
+	"ls":       lsHelp,
 	"upload":   uploadHelp,
 	"download": downloadHelp,
 	"repos":    reposHelp,
