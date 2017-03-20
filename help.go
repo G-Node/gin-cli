@@ -33,7 +33,7 @@ const loginHelp = `USAGE
 
 DESCRIPTION
 
-	Login to the GIN services
+	Login to the GIN services.
 
 ARGUMENTS
 
@@ -49,7 +49,7 @@ const logoutHelp = `USAGE
 
 DESCRIPTION
 
-	Logout of the GIN services
+	Logout of the GIN services.
 
 	This command takes no arguments.
 `
@@ -96,9 +96,9 @@ const getHelp = `USAGE
 
 DESCRIPTION
 
-	Download a remote repository to a new directory and initialise the directory
-	with the default options. The local directory is referred to as the 'clone' of
-	the repository.
+	Download a remote repository to a new directory and initialise the
+	directory with the default options. The local directory is referred to as
+	the 'clone' of the repository.
 
 ARGUMENTS
 
@@ -124,10 +124,11 @@ const uploadHelp = `USAGE
 
 DESCRIPTION
 
-	Upload changes made in a local repository clone to the remote repository on the
-	GIN server.  This command must be called from within the (cloned) repository
-	directory.  All changes made will be sent to the server, including addition of
-	new files, modifications and renaming of existing files, and file deletions.
+	Upload changes made in a local repository clone to the remote repository on
+	the GIN server. This command must be called from within the (cloned)
+	repository directory.  All changes made will be sent to the server,
+	including addition of new files, modifications and renaming of existing
+	files, and file deletions.
 
 	This command takes no arguments.
 `
@@ -138,11 +139,11 @@ const downloadHelp = `USAGE
 
 DESCRIPTION
 
-	Download changes made in the remote repository on the GIN server to the local
-	repository clone.  This command must be called from within the (cloned)
-	repository directory. All changes made on the remote server will be retrieved,
-	including addition of new files, modifications and renaming of existing files,
-	and file deletions.
+	Download changes made in the remote repository on the GIN server to the
+	local repository clone. This command must be called from within the
+	(cloned) repository directory. All changes made on the remote server will
+	be retrieved, including addition of new files, modifications and renaming
+	of existing files, and file deletions.
 
 	This command takes no arguments.
 `
@@ -155,7 +156,8 @@ const reposHelp = `USAGE
 DESCRIPTION
 
 	List repositories on the server that provide read access. If no argument is
-	provided, it will list all publicly accessible repositories on the GIN server.
+	provided, it will list all publicly accessible repositories on the GIN
+	server.
 
 ARGUMENTS
 
