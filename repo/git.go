@@ -57,6 +57,13 @@ func CleanUpTemp() {
 
 // **************** //
 
+// ListFiles lists the files in the specified directory and their sync status.
+func ListFiles(path string) (map[string]string, error) {
+	var fileStatus map[string]string
+
+	return fileStatus, nil
+}
+
 // Git commands
 
 // IsRepo checks whether a given path is a git repository.
