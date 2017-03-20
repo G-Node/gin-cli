@@ -18,7 +18,7 @@ echo off
 set ginbinpath=%CD%\bin
 set gitpaths=%CD%\git\usr\bin;%CD%\git\bin
 
-path %path%;%ginbinpath%;%gitpaths%
+path %ginbinpath%;%gitpaths%;%path%
 
 cd %USERPROFILE%
 
