@@ -21,6 +21,7 @@ import (
 var version string
 var build string
 var commit string
+var verstr string
 
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
@@ -370,9 +371,15 @@ func help(args []string) {
 	fmt.Println(helptext)
 }
 
-func main() {
-	verstr := fmt.Sprintf("GIN command line client %s Build %s (%s)", version, build, commit)
+func init() {
+	if version == "" {
+		verstr = "GIN command line client [dev build]"
+	} else {
+		verstr = fmt.Sprintf("GIN command line client %s Build %s (%s)", version, build, commit)
+	}
+}
 
+func main() {
 	args, _ := docopt.Parse(usage, nil, true, verstr, true)
 	command := args["<command>"].(string)
 	cmdArgs := args["<args>"].([]string)
