@@ -22,106 +22,6 @@ var version string
 var build string
 var commit string
 
-const usage = `
-GIN command line client
-
-Usage: gin <command> [<args>...]
-       gin --help
-       gin --version
-
-Options:
-    -h --help    This help screen
-    --version    Client version
-
-Commands:
-    login    [<username>]
-    logout
-    create   [<name>] [<description>]
-    get      <repopath>
-    upload
-    download
-    repos    [<username>]
-    info     [<username>]
-    keys     [-v | --verbose]
-    keys     --add <filename>
-    cmdhelp
-
-Use 'cmdhelp' to see full description of individual commands.
-`
-
-const cmdUsage = `
-Command help:
-
-    login        Login to the GIN services
-
-                 If no <username> is specified on the command line, you will be
-                 prompted for it. The login command always prompts for a
-                 password.
-
-
-    logout       Logout of the GIN services
-
-
-    create       Create a new repository on the GIN server
-
-                 If no <name> is provided, you will be prompted for one.
-                 A repository <description> can only be specified on the
-                 command line after the <name>.
-                 Login required.
-
-
-    get          Download a remote repository to a new directory
-
-                 The repository path <repopath> must be specified on the
-                 command line. A repository path is the owner's username,
-                 followed by a "/" and the repository name
-                 (e.g., peter/eegdata).
-                 Login required.
-
-
-    upload       Upload local repository changes to the remote repository
-
-                 Uploads any changes made on the local data to the GIN server.
-                 The upload command should be run from inside the directory of
-                 an existing repository.
-
-
-    download     Download remote repository changes to the local repository
-
-                 Downloads any changes made to the data on the server to the
-                 local data directory.
-                 The download command should be run from inside the directory
-                 of an existing repository.
-
-
-    repos        List accessible repositories
-
-                 Without any argument, lists all the publicly accessible
-                 repositories on the GIN server.
-                 If a <username> is specified, this command will list the
-                 specified user's publicly accessible repositories.
-                 If you are logged in, it will also list any repositories
-                 owned by the user that you have access to.
-
-
-    info         Print user information
-
-                 Without argument, print the information of the currently
-                 logged in user or, if you are not logged in, prompt for a
-                 username to look up.
-                 If a <username> is specified, print the user's information.
-
-
-    keys         List or add SSH keys
-
-                 By default will list the keys (description and fingerprint)
-                 associated with the logged in user. The verbose flag will also
-                 print the full public keys.
-                 To add a new key, use the --add option and specify a pub key
-                 <filename>.
-                 Login required.
-`
-
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
 	var username string
@@ -286,7 +186,14 @@ func printKeys(args []string) {
 	} else {
 		plural = "s"
 	}
-	fmt.Printf("You have %d key%s associated with your account.\n\n", nkeys, plural)
+
+	var nkeysStr string
+	if nkeys == 0 {
+		nkeysStr = "no"
+	} else {
+		nkeysStr = fmt.Sprintf("%d", nkeys)
+	}
+	fmt.Printf("You have %s key%s associated with your account.\n\n", nkeysStr, plural)
 	for idx, key := range keys {
 		fmt.Printf("[%v] \"%s\" ", idx+1, key.Description)
 		fmt.Printf("(Fingerprint: %s)\n", key.Fingerprint)
@@ -412,6 +319,18 @@ func listRepos(args []string) {
 	}
 }
 
+func help(args []string) {
+	if len(args) != 1 {
+		util.Die(usage)
+	}
+	helptext, ok := cmdHelp[args[0]]
+	if !ok {
+		util.Die(usage)
+	}
+
+	fmt.Println(helptext)
+}
+
 func main() {
 	verstr := fmt.Sprintf("GIN command line client %s Build %s (%s)", version, build, commit)
 
@@ -445,9 +364,8 @@ func main() {
 		listRepos(cmdArgs)
 	case "logout":
 		logout(cmdArgs)
-	case "cmdhelp":
-		fullUsage := usage + "\n" + cmdUsage
-		fmt.Print(fullUsage)
+	case "help":
+		help(cmdArgs)
 	default:
 		util.Die(usage)
 	}
