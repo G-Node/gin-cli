@@ -27,9 +27,7 @@ Commands:
 Use 'help' followed by a command to see full description of the command.
 `
 
-var cmdHelp = map[string]string{
-	// LOGIN HELP
-	"login": `USAGE
+const loginHelp = `USAGE
 
 	gin login [<username>]
 
@@ -43,10 +41,9 @@ ARGUMENTS
 		If no username is specified on the command line, you will be
 		prompted for it. The login command always prompts for a
 		password.
-`,
+`
 
-	// LOGOUT HELP
-	"logout": `USAGE
+const logoutHelp = `USAGE
 
 	gin logout
 
@@ -55,10 +52,9 @@ DESCRIPTION
 	Logout of the GIN services
 
 	This command takes no arguments.
-`,
+`
 
-	// CREATE HELP
-	"create": `USAGE
+const createHelp = `USAGE
 
 	gin create [<name>] [<description>]
 
@@ -92,10 +88,9 @@ EXAMPLES
 	Create a repository named 'example' with no description
 
 		$ gin create example
-`,
+`
 
-	// GET HELP
-	"get": `USAGE
+const getHelp = `USAGE
 
 	gin get <repopath>
 
@@ -121,10 +116,9 @@ EXAMPLES
 	Get and initialise the repository named 'eegdata' owned by user 'peter'
 
 		$ gin get peter/eegdata
-`,
+`
 
-	// UPLOAD HELP
-	"upload": `USAGE
+const uploadHelp = `USAGE
 
 	gin upload
 
@@ -136,10 +130,9 @@ DESCRIPTION
 	new files, modifications and renaming of existing files, and file deletions.
 
 	This command takes no arguments.
-`,
+`
 
-	// DOWNLOAD HELP
-	"download": `USAGE
+const downloadHelp = `USAGE
 
 	gin download
 
@@ -152,10 +145,9 @@ DESCRIPTION
 	and file deletions.
 
 	This command takes no arguments.
-`,
+`
 
-	// REPOS HELP
-	"repos": `USAGE
+const reposHelp = `USAGE
 
 	gin repos [<username>]
 
@@ -174,10 +166,9 @@ ARGUMENTS
 		of a different user, it will list all the repositories owned by the
 		specified user that YOU have access to. This consists of public
 		repositories and repositories shared with YOU.
-`,
+`
 
-	// INFO HELP
-	"info": `USAGE
+const infoHelp = `USAGE
 
 	gin info [<username>]
 
@@ -194,10 +185,8 @@ ARGUMENTS
 		will print all the profile information with indicators for which data
 		is publicly visible. If it is the username of a different user, only
 		the publicly visible information is printed.
-`,
-
-	// KEYS HELP
-	"keys": `USAGE
+`
+const keysHelp = `USAGE
 
 	gin keys [-v | --verbose]
 	gin keys --add <filename>
@@ -226,5 +215,16 @@ EXAMPLES
 	command
 
 		$ gin keys --add ~/.ssh/id_rsa.pub
-`,
+`
+
+var cmdHelp = map[string]string{
+	"login":    loginHelp,
+	"logout":   logoutHelp,
+	"create":   createHelp,
+	"get":      getHelp,
+	"upload":   uploadHelp,
+	"download": downloadHelp,
+	"repos":    reposHelp,
+	"info":     infoHelp,
+	"keys":     keysHelp,
 }
