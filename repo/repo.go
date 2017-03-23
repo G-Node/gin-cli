@@ -35,13 +35,9 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	if user == "" {
 		util.LogWrite("User: public")
 		res, err = repocl.Get("/repos/public")
-		fmt.Print("Listing all public repositories\n\n")
 	} else {
 		util.LogWrite("User: %s", user)
 		err = repocl.LoadToken()
-		if err != nil {
-			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s'.\n\n", user)
-		}
 		res, err = repocl.Get(fmt.Sprintf("/users/%s/repos", user))
 	}
 

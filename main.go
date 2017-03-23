@@ -318,6 +318,14 @@ func listRepos(args []string) {
 	repos, err := repocl.GetRepos(username)
 	util.CheckError(err)
 
+	if username == "" {
+		fmt.Print("Listing all public repositories\n\n")
+	} else {
+		err = repocl.LoadToken()
+		if err != nil {
+			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s'.\n\n", username)
+		}
+	}
 	for idx, repoInfo := range repos {
 		fmt.Printf("%d: %s/%s\n", idx+1, repoInfo.Owner, repoInfo.Name)
 		fmt.Printf("Description: %s\n", strings.Trim(repoInfo.Description, "\n"))
