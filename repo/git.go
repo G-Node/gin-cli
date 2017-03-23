@@ -163,7 +163,7 @@ func (repocl *Client) Clone(repopath string) error {
 		util.LogWrite("Error during clone command")
 		util.LogWrite("[stdout]\r\n%s", out.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return fmt.Errorf("Error retrieving repository")
+		return fmt.Errorf("Error retrieving repository.\nPlease make sure you have the correct access rights and the repository exists.")
 	}
 	return nil
 }
