@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path"
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
@@ -138,8 +137,8 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 		return err
 	}
 
-	localPath := path.Base(repoPath)
-	fmt.Printf("Fetching repository '%s'... ", localPath)
+	_, repoName := splitRepoParts(repoPath)
+	fmt.Printf("Fetching repository '%s'... ", repoPath)
 	err = repocl.Clone(repoPath)
 	if err != nil {
 		return err
@@ -147,12 +146,12 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 	fmt.Printf("done.\n")
 
 	// git annex init the clone and set defaults
-	err = AnnexInit(localPath)
+	err = AnnexInit(repoName)
 	if err != nil {
 		return err
 	}
 
-	annexFiles, err := AnnexWhereis(localPath)
+	annexFiles, err := AnnexWhereis(repoName)
 	if err != nil {
 		return err
 	}
@@ -161,7 +160,7 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 	}
 
 	fmt.Printf("Downloading files... ")
-	err = AnnexPull(localPath)
+	err = AnnexPull(repoName)
 	if err != nil {
 		return err
 	}

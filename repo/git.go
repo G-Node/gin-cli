@@ -141,11 +141,18 @@ func (repocl *Client) Connect() error {
 	return nil
 }
 
+func splitRepoParts(repoPath string) (repoOwner, repoName string) {
+	repoPathParts := strings.SplitN(repoPath, "/", 2)
+	repoOwner = repoPathParts[0]
+	repoName = repoPathParts[1]
+	return
+}
+
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
-func (repocl *Client) Clone(repopath string) error {
+func (repocl *Client) Clone(repoPath string) error {
 	gitbin := util.Config.Bin.Git
-	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repopath)
+	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repoPath)
 	var cmd *exec.Cmd
 	cmd = exec.Command(gitbin)
 	if privKeyFile.Active {
@@ -163,8 +170,13 @@ func (repocl *Client) Clone(repopath string) error {
 		util.LogWrite("Error during clone command")
 		util.LogWrite("[stdout]\r\n%s", out.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		repoOwner := strings.SplitN(repopath, "/", 2)[0]
-		return fmt.Errorf("Error retrieving repository.\nPlease make sure you have the correct access rights and the repository exists.\nType 'gin repos %s' to see if the repository exists and if you have access to it.", repoOwner)
+		repoOwner, repoName := splitRepoParts(repoPath)
+
+		if strings.Contains(stderr.String(), "Server returned non-OK status: 404") {
+			return fmt.Errorf("Error retrieving repository.\nPlease make sure you typed the repository path correctly.\nType 'gin repos %s' to see if the repository exists and if you have access to it.", repoOwner)
+		} else if strings.Contains(stderr.String(), "already exists and is not an empty directory") {
+			return fmt.Errorf("Error retrieving repository.\nDirectory '%s' already exists and is not empty.", repoName)
+		}
 	}
 	return nil
 }
