@@ -48,7 +48,7 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 		authcl := auth.NewClient(util.Config.AuthHost)
 		_, raErr := authcl.RequestAccount(user)
 		if raErr == nil {
-			return repoList, fmt.Errorf("User '%s' exists but does not appear to have accessible repositories.", user)
+			return repoList, fmt.Errorf("User '%s' does not appear to have accessible repositories.", user)
 		}
 		return repoList, fmt.Errorf("Error: No such user '%s'.", user)
 	} else if res.StatusCode != 200 {
