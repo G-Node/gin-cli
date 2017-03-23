@@ -81,6 +81,7 @@ func logout(args []string) {
 	err = web.DeleteToken()
 	util.CheckErrorMsg(err, "Error deleting user token.")
 	util.LogWrite("Logged out. Token deleted.")
+	fmt.Println("You have been logged out.")
 }
 
 func createRepo(args []string) {
