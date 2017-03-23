@@ -119,7 +119,7 @@ func getRepo(args []string) {
 	}
 
 	if !isValidRepoPath(repostr) {
-		util.Die(fmt.Sprintf("Invalid repository path [%s]. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
+		util.Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
 	}
 
 	repocl := repo.NewClient(util.Config.RepoHost)
@@ -272,7 +272,7 @@ func printAccountInfo(args []string) {
 
 	var outBuffer bytes.Buffer
 
-	_, _ = outBuffer.WriteString(fmt.Sprintf("User [%s]\nName: %s\n", info.Login, fullnameBuffer.String()))
+	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.Login, fullnameBuffer.String()))
 
 	if info.Email != nil && info.Email.Email != "" {
 		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s", info.Email.Email))
