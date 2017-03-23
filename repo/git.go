@@ -57,6 +57,21 @@ func CleanUpTemp() {
 
 // **************** //
 
+const (
+	// SYNCED indicates that an annexed file is synced between local and remote
+	SYNCED = iota
+	// NOCONTENT indicates that a file represents an annexed file that has not had its contents synced yet
+	NOCONTENT
+	// MODIFIED indicates that a file has local modifications that have not been committed
+	MODIFIED
+	// LOCALUPDATES indicates that a file has local, committed modifications that have not been pushed
+	LOCALUPDATES
+	// REMOTEUPDATES indicates that a file has remote modifications that have not been pulled
+	REMOTEUPDATES
+	// UNTRACKED indicates that a file is not being tracked by neither git nor git annex
+	UNTRACKED
+)
+
 // ListFiles lists the files in the specified directory and their sync status.
 func ListFiles(path string) (map[string]string, error) {
 	var fileStatus map[string]string
