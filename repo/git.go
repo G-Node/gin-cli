@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -57,9 +58,12 @@ func CleanUpTemp() {
 
 // **************** //
 
+// FileStatus ...
+type FileStatus uint8
+
 const (
 	// SYNCED indicates that an annexed file is synced between local and remote
-	SYNCED = iota
+	SYNCED FileStatus = iota
 	// NOCONTENT indicates that a file represents an annexed file that has not had its contents synced yet
 	NOCONTENT
 	// MODIFIED indicates that a file has local modifications that have not been committed
@@ -72,11 +76,44 @@ const (
 	UNTRACKED
 )
 
-// ListFiles lists the files in the specified directory and their sync status.
-func ListFiles(path string) (map[string]string, error) {
-	var fileStatus map[string]string
+func fileStatus(filepath string) FileStatus {
+	return UNTRACKED
+}
 
-	return fileStatus, nil
+// ListFiles lists the files in the specified directory and their sync status.
+func ListFiles(path string, filesStatus map[string]FileStatus) error {
+	// TODO: use filepath.Walk
+
+	pathInfo, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("Failed to stat. Error: %s", err.Error())
+	}
+
+	switch mode := pathInfo.Mode(); {
+	case mode.IsDir():
+		// dir stuff
+		pathfp, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("Failed to open directory. Error: %s", err.Error())
+		}
+		children, err := pathfp.Readdirnames(0)
+		if err != nil {
+			return fmt.Errorf("Failed to list directory contents. Error: %s", err.Error())
+		}
+		for _, ch := range children {
+			err = ListFiles(filepath.Join(path, ch), filesStatus)
+			if err != nil {
+				return fmt.Errorf("Failed recursive call to ListFiles. Error: %s", err.Error())
+			}
+		}
+
+	case mode.IsRegular():
+		// file stuff
+		fs := fileStatus(path)
+		filesStatus[path] = fs
+	}
+
+	return nil
 }
 
 // Git commands

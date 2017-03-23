@@ -149,19 +149,23 @@ func lsRepo(args []string) {
 		dirs = args
 	}
 
-	multiarg := false
-	if len(dirs) > 1 {
-		multiarg = true
-	}
-
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
 
-	var err error
+	filesStatus := make(map[string]repo.FileStatus)
+
 	for _, d := range dirs {
-		_ = repocl.ListFiles(d)
+		err := repo.ListFiles(d, filesStatus)
+		if err != nil {
+			fmt.Printf("Error listing %s: %s\n", d, err.Error())
+			continue
+		}
+	}
+
+	for file, status := range filesStatus {
+		fmt.Printf("[%d] %s\n", status, file)
 	}
 }
 
