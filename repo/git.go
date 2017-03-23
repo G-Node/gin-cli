@@ -163,7 +163,8 @@ func (repocl *Client) Clone(repopath string) error {
 		util.LogWrite("Error during clone command")
 		util.LogWrite("[stdout]\r\n%s", out.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return fmt.Errorf("Error retrieving repository.\nPlease make sure you have the correct access rights and the repository exists.")
+		repoOwner := strings.SplitN(repopath, "/", 2)[0]
+		return fmt.Errorf("Error retrieving repository.\nPlease make sure you have the correct access rights and the repository exists.\nType 'gin repos %s' to see if the repository exists and if you have access to it.", repoOwner)
 	}
 	return nil
 }
