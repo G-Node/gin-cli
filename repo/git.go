@@ -176,6 +176,8 @@ func (repocl *Client) Clone(repoPath string) error {
 			return fmt.Errorf("Error retrieving repository.\nPlease make sure you typed the repository path correctly.\nType 'gin repos %s' to see if the repository exists and if you have access to it.", repoOwner)
 		} else if strings.Contains(stderr.String(), "already exists and is not an empty directory") {
 			return fmt.Errorf("Error retrieving repository.\nDirectory '%s' already exists and is not empty.", repoName)
+		} else {
+			return fmt.Errorf("Error retrieving repository.\nAn unknown error occured.")
 		}
 	}
 	return nil
