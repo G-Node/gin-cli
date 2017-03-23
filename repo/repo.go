@@ -26,7 +26,7 @@ func NewClient(host string) *Client {
 
 // GetRepos gets a list of repositories (public or user specific)
 func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
-	util.LogWrite("Retrieving repos")
+	util.LogWrite("Retrieving repo list")
 	var repoList []wire.Repo
 	var res *http.Response
 	var err error
@@ -39,7 +39,7 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 		util.LogWrite("User: %s", user)
 		err = repocl.LoadToken()
 		if err != nil {
-			fmt.Print("You are not logged in - Showing public repositories\n\n")
+			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s'.\n\n", user)
 		}
 		res, err = repocl.Get(fmt.Sprintf("/users/%s/repos", user))
 	}
