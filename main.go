@@ -106,6 +106,10 @@ func createRepo(args []string) {
 	util.CheckError(err)
 }
 
+func isValidRepoPath(path string) bool {
+	return strings.Contains(path, "/")
+}
+
 func getRepo(args []string) {
 	var repostr string
 	if len(args) != 1 {
@@ -113,6 +117,11 @@ func getRepo(args []string) {
 	} else {
 		repostr = args[0]
 	}
+
+	if !isValidRepoPath(repostr) {
+		util.Die(fmt.Sprintf("Invalid repository path [%s]. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
+	}
+
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
