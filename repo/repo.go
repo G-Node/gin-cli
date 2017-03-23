@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-repo/wire"
@@ -47,7 +48,13 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	if err != nil {
 		return repoList, err
 	} else if res.StatusCode == 404 {
-		return repoList, fmt.Errorf("Server returned empty result. Either user does not exist or has no accessible repositories.")
+		// Check if user exists
+		authcl := auth.NewClient(util.Config.AuthHost)
+		_, raErr := authcl.RequestAccount(user)
+		if raErr == nil {
+			return repoList, fmt.Errorf("User '%s' exists but does not appear to have accessible repositories.", user)
+		}
+		return repoList, fmt.Errorf("Error: No such user '%s'.", user)
 	} else if res.StatusCode != 200 {
 		return repoList, fmt.Errorf("[Repository request] Failed. Server returned: %s", res.Status)
 	}
