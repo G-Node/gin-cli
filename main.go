@@ -154,19 +154,26 @@ func lsRepo(args []string) {
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
 
-	filesStatus := make(map[string]repo.FileStatus)
+	multi := false
+	if len(dirs) > 1 {
+		multi = true
+	}
 
 	for _, d := range dirs {
+		filesStatus := make(map[string]repo.FileStatus)
 		err := repo.ListFiles(d, filesStatus)
 		if err != nil {
 			fmt.Printf("Error listing %s: %s\n", d, err.Error())
 			continue
 		}
+		if multi {
+			fmt.Printf("%s:\n", d)
+		}
+		for file, status := range filesStatus {
+			fmt.Printf("[%d] %s\n", status, file)
+		}
 	}
 
-	for file, status := range filesStatus {
-		fmt.Printf("[%d] %s\n", status, file)
-	}
 }
 
 func upload(args []string) {
