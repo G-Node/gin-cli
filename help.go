@@ -121,12 +121,25 @@ EXAMPLES
 
 const lsHelp = `USAGE
 
-	gin ls [<directory>]
+	gin ls [<directory>]...
 
 DESCRIPTION
 
-	List the contents of a directory (current directory by default) and the
-	status of the files within it.
+	List the contents one or more directories and the status of the files
+	within it. With no arguments, lists the status of the files under the
+	current directory.
+
+	The meaning of the status abbreviations is as follows:
+		[OK] The file is part of the GIN repository and its contents are
+		synchronised with the server.
+		[..] ...
+		[??] The file is not under repository control.
+
+ARGUMENTS
+
+	<directory>
+		One or more directories or files to list.
+
 `
 
 const uploadHelp = `USAGE
@@ -249,3 +262,5 @@ var cmdHelp = map[string]string{
 	"info":     infoHelp,
 	"keys":     keysHelp,
 }
+
+// ex: set cc=80:
