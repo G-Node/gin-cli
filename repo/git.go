@@ -173,9 +173,13 @@ func (repocl *Client) Clone(repoPath string) error {
 		repoOwner, repoName := splitRepoParts(repoPath)
 
 		if strings.Contains(stderr.String(), "Server returned non-OK status: 404") {
-			return fmt.Errorf("Error retrieving repository.\nPlease make sure you typed the repository path correctly.\nType 'gin repos %s' to see if the repository exists and if you have access to it.", repoOwner)
+			return fmt.Errorf("Error retrieving repository.\n"+
+				"Please make sure you typed the repository path correctly.\n"+
+				"Type 'gin repos %s' to see if the repository exists and if you have access to it.",
+				repoOwner)
 		} else if strings.Contains(stderr.String(), "already exists and is not an empty directory") {
-			return fmt.Errorf("Error retrieving repository.\n'%s' already exists in the current directory and is not empty.", repoName)
+			return fmt.Errorf("Error retrieving repository.\n"+
+				"'%s' already exists in the current directory and is not empty.", repoName)
 		} else {
 			return fmt.Errorf("Error retrieving repository.\nAn unknown error occured.")
 		}
