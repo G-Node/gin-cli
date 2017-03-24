@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -159,19 +160,37 @@ func lsRepo(args []string) {
 		multi = true
 	}
 
-	for _, d := range dirs {
+	maybeNewLine := func(idx int) {
+		if idx < len(dirs)-1 {
+			fmt.Println()
+		}
+	}
+
+	for idx, d := range dirs {
+		if multi {
+			fmt.Printf("%s:\n", d)
+		}
+		if filepath.Base(d) == ".git" {
+			fmt.Printf("Skipping directory '%s'\n", d)
+			maybeNewLine(idx)
+			continue
+		}
+		if !repo.IsRepo(d) {
+			fmt.Printf("Directory '%s' is not under gin control\n", d)
+			maybeNewLine(idx)
+			continue
+		}
 		filesStatus := make(map[string]repo.FileStatus)
 		err := repo.ListFiles(d, filesStatus)
 		if err != nil {
-			fmt.Printf("Error listing %s: %s\n", d, err.Error())
+			fmt.Printf("Error listing %s: %s\n\n", d, err.Error())
+			maybeNewLine(idx)
 			continue
-		}
-		if multi {
-			fmt.Printf("%s:\n", d)
 		}
 		for file, status := range filesStatus {
 			fmt.Printf("[%d] %s\n", status, file)
 		}
+		maybeNewLine(idx)
 	}
 
 }

@@ -84,6 +84,9 @@ func getFileStatus(filepath string) FileStatus {
 func ListFiles(path string, filesStatus map[string]FileStatus) error {
 
 	walker := func(path string, info os.FileInfo, err error) error {
+		if filepath.Base(path) == ".git" {
+			return filepath.SkipDir
+		}
 		if info.Mode().IsRegular() {
 			filesStatus[path] = getFileStatus(path)
 		}
