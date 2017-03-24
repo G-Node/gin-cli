@@ -188,7 +188,7 @@ func lsRepo(args []string) {
 			continue
 		}
 		for file, status := range filesStatus {
-			fmt.Printf("[%d] %s\n", status, file)
+			fmt.Printf("[%s] %s\n", status.Abbrev(), file)
 		}
 		maybeNewLine(idx)
 	}

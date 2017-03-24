@@ -62,22 +62,43 @@ func CleanUpTemp() {
 type FileStatus uint8
 
 const (
-	// SYNCED indicates that an annexed file is synced between local and remote
-	SYNCED FileStatus = iota
-	// NOCONTENT indicates that a file represents an annexed file that has not had its contents synced yet
-	NOCONTENT
-	// MODIFIED indicates that a file has local modifications that have not been committed
-	MODIFIED
-	// LOCALUPDATES indicates that a file has local, committed modifications that have not been pushed
-	LOCALUPDATES
-	// REMOTEUPDATES indicates that a file has remote modifications that have not been pulled
-	REMOTEUPDATES
-	// UNTRACKED indicates that a file is not being tracked by neither git nor git annex
-	UNTRACKED
+	// Synced indicates that an annexed file is synced between local and remote
+	Synced FileStatus = iota
+	// NoContent indicates that a file represents an annexed file that has not had its contents synced yet
+	NoContent
+	// Modified indicatres that a file has local modifications that have not been committed
+	Modified
+	// LocalUpdates indicates that a file has local, committed modifications that have not been pushed
+	LocalUpdates
+	// RemoteUpdates indicates that a file has remote modifications that have not been pulled
+	RemoteUpdates
+	// Untracked indicates that a file is not being tracked by neither git nor git annex
+	Untracked
 )
 
+// Abbrev returns the two-letter abbrevation of the file status
+// TODO: List status abbreviations
+func (fs FileStatus) Abbrev() string {
+	switch {
+	case fs == Synced:
+		return "OK"
+	case fs == NoContent:
+		return "NC"
+	case fs == Modified:
+		return "MD"
+	case fs == LocalUpdates:
+		return "LC"
+	case fs == RemoteUpdates:
+		return "RU"
+	case fs == Untracked:
+		return "??"
+	default:
+		return "??"
+	}
+}
+
 func getFileStatus(filepath string) FileStatus {
-	return UNTRACKED
+	return Synced
 }
 
 // ListFiles lists the files in the specified directory and their sync status.
