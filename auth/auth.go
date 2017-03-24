@@ -61,8 +61,10 @@ func (authcl *Client) RequestAccount(name string) (gin.Account, error) {
 	res, err := authcl.Get(fmt.Sprintf("/api/accounts/%s", name))
 	if err != nil {
 		return acc, err
-	} else if res.StatusCode != 200 {
+	} else if res.StatusCode == 404 {
 		return acc, fmt.Errorf("User '%s' does not exist", name)
+	} else if res.StatusCode != 200 {
+		return acc, fmt.Errorf("Unknown error during user lookup for '%s'\nThe server returned '%s'", name, res.Status)
 	}
 
 	defer web.CloseRes(res.Body)
