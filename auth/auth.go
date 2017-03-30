@@ -58,11 +58,13 @@ func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 func (authcl *Client) RequestAccount(name string) (gin.Account, error) {
 	var acc gin.Account
 
-	res, err := authcl.Get("/api/accounts/" + name)
+	res, err := authcl.Get(fmt.Sprintf("/api/accounts/%s", name))
 	if err != nil {
 		return acc, err
+	} else if res.StatusCode == 404 {
+		return acc, fmt.Errorf("User '%s' does not exist", name)
 	} else if res.StatusCode != 200 {
-		return acc, fmt.Errorf("[Account retrieval] Failed. Server returned %s", res.Status)
+		return acc, fmt.Errorf("Unknown error during user lookup for '%s'\nThe server returned '%s'", name, res.Status)
 	}
 
 	defer web.CloseRes(res.Body)

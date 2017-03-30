@@ -81,6 +81,7 @@ func logout(args []string) {
 	err = web.DeleteToken()
 	util.CheckErrorMsg(err, "Error deleting user token.")
 	util.LogWrite("Logged out. Token deleted.")
+	fmt.Println("You have been logged out.")
 }
 
 func createRepo(args []string) {
@@ -106,6 +107,10 @@ func createRepo(args []string) {
 	util.CheckError(err)
 }
 
+func isValidRepoPath(path string) bool {
+	return strings.Contains(path, "/")
+}
+
 func getRepo(args []string) {
 	var repostr string
 	if len(args) != 1 {
@@ -113,6 +118,11 @@ func getRepo(args []string) {
 	} else {
 		repostr = args[0]
 	}
+
+	if !isValidRepoPath(repostr) {
+		util.Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
+	}
+
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
@@ -263,7 +273,7 @@ func printAccountInfo(args []string) {
 
 	var outBuffer bytes.Buffer
 
-	_, _ = outBuffer.WriteString(fmt.Sprintf("User [%s]\nName: %s\n", info.Login, fullnameBuffer.String()))
+	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.Login, fullnameBuffer.String()))
 
 	if info.Email != nil && info.Email.Email != "" {
 		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s", info.Email.Email))
@@ -309,6 +319,14 @@ func listRepos(args []string) {
 	repos, err := repocl.GetRepos(username)
 	util.CheckError(err)
 
+	if username == "" {
+		fmt.Print("Listing all public repositories\n\n")
+	} else {
+		err = repocl.LoadToken()
+		if err != nil {
+			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s'.\n\n", username)
+		}
+	}
 	for idx, repoInfo := range repos {
 		fmt.Printf("%d: %s/%s\n", idx+1, repoInfo.Owner, repoInfo.Name)
 		fmt.Printf("Description: %s\n", strings.Trim(repoInfo.Description, "\n"))

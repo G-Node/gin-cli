@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path"
 
+	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-repo/wire"
@@ -27,7 +27,7 @@ func NewClient(host string) *Client {
 
 // GetRepos gets a list of repositories (public or user specific)
 func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
-	util.LogWrite("Retrieving repos")
+	util.LogWrite("Retrieving repo list")
 	var repoList []wire.Repo
 	var res *http.Response
 	var err error
@@ -35,20 +35,22 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	if user == "" {
 		util.LogWrite("User: public")
 		res, err = repocl.Get("/repos/public")
-		fmt.Print("Listing all public repositories\n\n")
 	} else {
 		util.LogWrite("User: %s", user)
 		err = repocl.LoadToken()
-		if err != nil {
-			fmt.Print("You are not logged in - Showing public repositories\n\n")
-		}
 		res, err = repocl.Get(fmt.Sprintf("/users/%s/repos", user))
 	}
 
 	if err != nil {
 		return repoList, err
 	} else if res.StatusCode == 404 {
-		return repoList, fmt.Errorf("Server returned empty result. Either user does not exist or has no accessible repositories.")
+		// Check if user exists
+		authcl := auth.NewClient(util.Config.AuthHost)
+		_, raErr := authcl.RequestAccount(user)
+		if raErr == nil {
+			return repoList, fmt.Errorf("User '%s' does not appear to have accessible repositories.", user)
+		}
+		return repoList, fmt.Errorf("Error: No such user '%s'.", user)
 	} else if res.StatusCode != 200 {
 		return repoList, fmt.Errorf("[Repository request] Failed. Server returned: %s", res.Status)
 	}
@@ -138,8 +140,8 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 		return err
 	}
 
-	localPath := path.Base(repoPath)
-	fmt.Printf("Fetching repository '%s'... ", localPath)
+	_, repoName := splitRepoParts(repoPath)
+	fmt.Printf("Fetching repository '%s'... ", repoPath)
 	err = repocl.Clone(repoPath)
 	if err != nil {
 		return err
@@ -147,12 +149,12 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 	fmt.Printf("done.\n")
 
 	// git annex init the clone and set defaults
-	err = AnnexInit(localPath)
+	err = AnnexInit(repoName)
 	if err != nil {
 		return err
 	}
 
-	annexFiles, err := AnnexWhereis(localPath)
+	annexFiles, err := AnnexWhereis(repoName)
 	if err != nil {
 		return err
 	}
@@ -161,7 +163,7 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 	}
 
 	fmt.Printf("Downloading files... ")
-	err = AnnexPull(localPath)
+	err = AnnexPull(repoName)
 	if err != nil {
 		return err
 	}
