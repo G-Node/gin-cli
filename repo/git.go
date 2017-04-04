@@ -343,6 +343,7 @@ func AnnexPush(localPath, commitMsg string) error {
 
 	if err != nil {
 		util.LogWrite("Error during AnnexPush")
+		util.LogWrite("[Error]: %v", err)
 		util.LogWrite("[stdout]\r\n%s", out.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error uploading files")
