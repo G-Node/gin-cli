@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 
 	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/util"
@@ -158,7 +159,13 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 	fmt.Printf("done.\n")
 
 	// git annex init the clone and set defaults
-	err = AnnexInit(repoName)
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "localhost"
+	}
+	repocl.LoadToken()
+	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
+	err = AnnexInit(localPath, description)
 	if err != nil {
 		return err
 	}

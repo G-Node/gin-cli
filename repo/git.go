@@ -264,10 +264,10 @@ func buildAnnexCmd(args ...string) *exec.Cmd {
 
 // AnnexInit initialises the repository for annex
 // (git annex init)
-func AnnexInit(localPath string) error {
+func AnnexInit(localPath, description string) error {
 	gitbin := util.Config.Bin.Git
 	initError := fmt.Errorf("Repository annex initialisation failed.")
-	cmd := buildAnnexCmd("init", "--version=6")
+	cmd := buildAnnexCmd("init", description, "--version=6")
 	cmd.Dir = localPath
 	var out bytes.Buffer
 	var stderr bytes.Buffer
