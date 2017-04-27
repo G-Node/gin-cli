@@ -535,19 +535,17 @@ func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
 	return results, nil
 }
 
-// AnnexStatusResult ...
+// AnnexStatusResult for getting the (annex) status of individual files
 type AnnexStatusResult struct {
 	Status string `json:"status"`
 	File   string `json:"file"`
 }
 
-// DescribeChanges returns a string which describes the status of the files in the working tree
-// with respect to git annex. The resulting message can be used to inform the user of changes
-// that are about to be uploaded and as a long commit message.
-func DescribeChanges(localPath string) (string, error) {
+// AnnexStatus returns the status of a file or files in a directory
+func AnnexStatus(path string) ([]AnnexStatusResult, error) {
 	gitannexbin := util.Config.Bin.GitAnnex
 	cmd := exec.Command(gitannexbin, "status", "--json")
-	cmd.Dir = localPath
+	cmd.Dir = path
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -559,22 +557,39 @@ func DescribeChanges(localPath string) (string, error) {
 		util.LogWrite("Error during DescribeChanges")
 		util.LogWrite("[stdout]\r\n%s", out.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return "", fmt.Errorf("Error retrieving file status")
+		return nil, fmt.Errorf("Error retrieving file status")
 	}
 
-	var outStruct AnnexStatusResult
 	files := bytes.Split(out.Bytes(), []byte("\n"))
 
-	statusmap := make(map[string][]string)
+	statuses := make([]AnnexStatusResult, 0, len(files))
+	var outStruct AnnexStatusResult
 	for _, f := range files {
 		if len(f) == 0 {
+			// can return empty lines
 			continue
 		}
 		err := json.Unmarshal(f, &outStruct)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		statusmap[outStruct.Status] = append(statusmap[outStruct.Status], outStruct.File)
+		statuses = append(statuses, outStruct)
+	}
+	return statuses, nil
+}
+
+// DescribeChanges returns a string which describes the status of the files in the working tree
+// with respect to git annex. The resulting message can be used to inform the user of changes
+// that are about to be uploaded and as a long commit message.
+func DescribeChanges(localPath string) (string, error) {
+	statuses, err := AnnexStatus(localPath)
+	if err != nil {
+		return "", err
+	}
+
+	statusmap := make(map[string][]string)
+	for _, item := range statuses {
+		statusmap[item.Status] = append(statusmap[item.Status], item.File)
 	}
 
 	var changeList string
