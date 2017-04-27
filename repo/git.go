@@ -475,16 +475,27 @@ type AnnexWhereisResult struct {
 }
 
 // AnnexWhereis returns information about annexed files in the repository
-// (git annex find)
+// (git annex whereis)
 func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
-	cmd := buildAnnexCmd("whereis", "--json")
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return nil, err
+	}
+	var filename string
+	switch mode := info.Mode(); {
+	case mode.IsRegular():
+		localPath, filename = filepath.Split(localPath)
+	case mode.IsDir():
+		filename = "."
+	}
+	cmd := buildAnnexCmd("whereis", "--json", filename)
 	cmd.Dir = localPath
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err := cmd.Run()
+	err = cmd.Run()
 
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
