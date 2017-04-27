@@ -128,7 +128,7 @@ func getFileStatus(filepath string) FileStatus {
 
 	// committed but not pushed?
 	gitbin := util.Config.Bin.Git
-	// TODO: origin/master should be default remote/branch
+	// TODO: use default remote/branch
 	dir, filename := util.PathSplit(filepath)
 	cmd := exec.Command(gitbin, "diff", "--name-only", "origin/master", filename)
 	cmd.Dir = dir

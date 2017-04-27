@@ -163,7 +163,8 @@ func lsRepo(args []string) {
 
 	// TODO: Handle file arguments
 	for idx, d := range dirs {
-		if len(dirs) > 1 {
+		path, filename := util.PathSplit(d)
+		if len(dirs) > 1 && filename == "." {
 			fmt.Printf("%s:\n", d)
 		}
 		if filepath.Base(d) == ".git" {
@@ -171,7 +172,7 @@ func lsRepo(args []string) {
 			maybeNewLine(idx)
 			continue
 		}
-		if !repo.IsRepo(d) {
+		if !repo.IsRepo(path) {
 			fmt.Printf("Directory '%s' is not under gin control\n", d)
 			maybeNewLine(idx)
 			continue
