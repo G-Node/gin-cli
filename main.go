@@ -155,39 +155,39 @@ func lsRepo(args []string) {
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
 
-	maybeNewLine := func(idx int) {
-		if idx < len(dirs)-1 {
-			fmt.Println()
-		}
-	}
-
-	// TODO: Handle file arguments
-	for idx, d := range dirs {
+	var fileStatusBuffer, dirStatusBuffer, skipped bytes.Buffer
+	for _, d := range dirs {
 		path, filename := util.PathSplit(d)
-		if len(dirs) > 1 && filename == "." {
-			fmt.Printf("%s:\n", d)
-		}
 		if filepath.Base(d) == ".git" {
-			fmt.Printf("Skipping directory '%s'\n", d)
-			maybeNewLine(idx)
+			skipped.WriteString(fmt.Sprintf("Skipping directory '%s'\n", d))
 			continue
 		}
 		if !repo.IsRepo(path) {
-			fmt.Printf("Directory '%s' is not under gin control\n", d)
-			maybeNewLine(idx)
+			skipped.WriteString(fmt.Sprintf("'%s' is not under gin control\n", d))
 			continue
 		}
 		filesStatus := make(map[string]repo.FileStatus)
 		err := repo.ListFiles(d, filesStatus)
 		if err != nil {
-			fmt.Printf("Error listing %s: %s\n\n", d, err.Error())
-			maybeNewLine(idx)
+			skipped.WriteString(fmt.Sprintf("Error listing %s: %s\n", d, err.Error()))
 			continue
 		}
-		for file, status := range filesStatus {
-			fmt.Printf("[%s] %s\n", status.Abbrev(), file)
+
+		currentBuffer := &fileStatusBuffer
+		if filename == "." {
+			currentBuffer = &dirStatusBuffer
+			if len(dirs) > 1 {
+				dirStatusBuffer.WriteString(fmt.Sprintf("\n%s:\n", d))
+			}
 		}
-		maybeNewLine(idx)
+		for file, status := range filesStatus {
+			currentBuffer.WriteString(fmt.Sprintf("%s %s\n", status.Abbrev(), file))
+		}
+	}
+
+	fmt.Printf("%s%s", fileStatusBuffer.String(), dirStatusBuffer.String())
+	if skipped.Len() > 0 {
+		fmt.Printf("\n%s", skipped.String())
 	}
 
 }
