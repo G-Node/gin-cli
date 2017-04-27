@@ -104,14 +104,26 @@ func getFileStatus(filepath string) FileStatus {
 		// File does not exist. Different status???
 		return Untracked
 	}
-	for _, wr := range wiRes {
-		for _, remote := range wr.Whereis {
+
+	// function only runs for one file
+	if len(wiRes) > 0 {
+		for _, remote := range wiRes[0].Whereis {
 			if remote.Here {
 				return Synced
 			}
 		}
 		return NoContent
 	}
+
+	// not in annex, but AnnexStatus can still tell us the file status
+	anexStat, err := AnnexStatus(filepath)
+	switch stat := anexStat[0].Status; {
+	case stat == "M" || stat == "A":
+		return Modified
+	case stat == "?":
+		return Untracked
+	}
+
 	return Untracked
 }
 
