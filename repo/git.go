@@ -117,11 +117,36 @@ func getFileStatus(filepath string) FileStatus {
 
 	// not in annex, but AnnexStatus can still tell us the file status
 	anexStat, err := AnnexStatus(filepath)
-	switch stat := anexStat[0].Status; {
-	case stat == "M" || stat == "A":
-		return Modified
-	case stat == "?":
+	if err == nil && len(anexStat) > 0 {
+		switch stat := anexStat[0].Status; {
+		case stat == "M" || stat == "A":
+			return Modified
+		case stat == "?":
+			return Untracked
+		}
+	}
+
+	// committed but not pushed?
+	gitbin := util.Config.Bin.Git
+	// TODO: origin/master should be default remote/branch
+	dir, filename := util.PathSplit(filepath)
+	cmd := exec.Command(gitbin, "diff", "--name-only", "origin/master", filename)
+	cmd.Dir = dir
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	err = cmd.Run()
+	if err != nil {
+		// Error out?
+		util.LogWrite("Error during diff command for status")
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return Untracked
+	}
+	if out.Len() > 0 {
+		return LocalUpdates
 	}
 
 	return Untracked
