@@ -155,19 +155,15 @@ func lsRepo(args []string) {
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
 
-	multi := false
-	if len(dirs) > 1 {
-		multi = true
-	}
-
 	maybeNewLine := func(idx int) {
 		if idx < len(dirs)-1 {
 			fmt.Println()
 		}
 	}
 
+	// TODO: Handle file arguments
 	for idx, d := range dirs {
-		if multi {
+		if len(dirs) > 1 {
 			fmt.Printf("%s:\n", d)
 		}
 		if filepath.Base(d) == ".git" {

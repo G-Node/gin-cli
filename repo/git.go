@@ -119,7 +119,8 @@ func ListFiles(path string, filesStatus map[string]FileStatus) error {
 
 // Git commands
 
-// IsRepo checks whether a given path is a git repository.
+// IsRepo checks whether a given path is (in) a git repository.
+// This function assumes path is a directory and will return false for files.
 func IsRepo(path string) bool {
 	gitbin := util.Config.Bin.Git
 	cmd := exec.Command(gitbin, "status")
