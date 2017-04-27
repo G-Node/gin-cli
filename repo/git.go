@@ -97,8 +97,22 @@ func (fs FileStatus) Abbrev() string {
 	}
 }
 
+// getFileStatus determines the state of the file at filepath and returns a FileStatus.
 func getFileStatus(filepath string) FileStatus {
-	return Synced
+	wiRes, err := AnnexWhereis(filepath)
+	if err != nil {
+		// File does not exist. Different status???
+		return Untracked
+	}
+	for _, wr := range wiRes {
+		for _, remote := range wr.Whereis {
+			if remote.Here {
+				return Synced
+			}
+		}
+		return NoContent
+	}
+	return Untracked
 }
 
 // ListFiles lists the files in the specified directory and their sync status.
