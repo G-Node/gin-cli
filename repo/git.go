@@ -533,9 +533,10 @@ type AnnexStatusResult struct {
 
 // AnnexStatus returns the status of a file or files in a directory
 func AnnexStatus(path string) ([]AnnexStatusResult, error) {
+	dir, filename := util.PathSplit(path)
 	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := exec.Command(gitannexbin, "status", "--json")
-	cmd.Dir = path
+	cmd := exec.Command(gitannexbin, "status", "--json", filename)
+	cmd.Dir = dir
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
