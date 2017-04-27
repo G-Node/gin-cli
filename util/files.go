@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // PathExists returns true if the path exists
@@ -11,6 +12,24 @@ func PathExists(path string) bool {
 		return false
 	}
 	return true
+}
+
+// PathSplit returns the directory path separated from the filename. If the
+// argument is a directory, the filename "." is returned. Errors are ignored.
+func PathSplit(path string) (string, string) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return path, "."
+	}
+	var dir, filename string
+	switch mode := info.Mode(); {
+	case mode.IsRegular():
+		dir, filename = filepath.Split(path)
+	case mode.IsDir():
+		dir = path
+		filename = "."
+	}
+	return dir, filename
 }
 
 // DataSize returns the simplest representation of bytes as a string (with units)
