@@ -68,16 +68,16 @@ const (
 	NoContent
 	// Modified indicatres that a file has local modifications that have not been committed
 	Modified
-	// LocalUpdates indicates that a file has local, committed modifications that have not been pushed
-	LocalUpdates
-	// RemoteUpdates indicates that a file has remote modifications that have not been pulled
-	RemoteUpdates
+	// LocalChanges indicates that a file has local, committed modifications that have not been pushed
+	LocalChanges
+	// RemoteChanges indicates that a file has remote modifications that have not been pulled
+	RemoteChanges
 	// Untracked indicates that a file is not being tracked by neither git nor git annex
 	Untracked
 )
 
 // Abbrev returns the two-letter abbrevation of the file status
-// TODO: List status abbreviations
+// OK (Synced), NC (NoContent), MD (Modified), LU (LocalUpdates), RU (RemoteUpdates), ?? (Untracked)
 func (fs FileStatus) Abbrev() string {
 	switch {
 	case fs == Synced:
@@ -86,10 +86,10 @@ func (fs FileStatus) Abbrev() string {
 		return "NC"
 	case fs == Modified:
 		return "MD"
-	case fs == LocalUpdates:
+	case fs == LocalChanges:
 		return "LC"
-	case fs == RemoteUpdates:
-		return "RU"
+	case fs == RemoteChanges:
+		return "RC"
 	case fs == Untracked:
 		return "??"
 	default:
@@ -146,7 +146,7 @@ func getFileStatus(filepath string) FileStatus {
 		return Untracked
 	}
 	if out.Len() > 0 {
-		return LocalUpdates
+		return LocalChanges
 	}
 
 	return Untracked
