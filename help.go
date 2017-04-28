@@ -125,15 +125,20 @@ const lsHelp = `USAGE
 
 DESCRIPTION
 
-	List the contents one or more directories and the status of the files
-	within it. With no arguments, lists the status of the files under the
-	current directory.
+	List the contents one or more files or directories and the status of the
+	files within it. With no arguments, lists the status of the files under the
+	current directory. Directory listings are performed recursively.
 
 	The meaning of the status abbreviations is as follows:
-		[OK] The file is part of the GIN repository and its contents are
+		OK: The file is part of the GIN repository and its contents are
 		synchronised with the server.
-		[..] ...
-		[??] The file is not under repository control.
+		NC: The local file is a placeholder and its contents have not been
+		downloaded.
+		MD: The file has been modified locally and the changes have not been
+		recorded yet.
+		LC: The file has been modified locally, the changes have been recorded
+		but they haven't been uploaded.
+		??: The file is not under repository control.
 
 ARGUMENTS
 
