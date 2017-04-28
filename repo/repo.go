@@ -165,7 +165,7 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 	}
 	repocl.LoadToken()
 	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
-	err = AnnexInit(localPath, description)
+	err = AnnexInit(repoName, description)
 	if err != nil {
 		return err
 	}
