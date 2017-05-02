@@ -100,11 +100,21 @@ func createRepo(args []string) {
 	}
 	// TODO: Check name validity before sending to server?
 	repocl := repo.NewClient(util.Config.RepoHost)
+	err := repocl.LoadToken()
+	util.CheckError(err)
+
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err := repocl.CreateRepo(repoName, repoDesc)
+	repoPath := fmt.Sprintf("%s/%s", repocl.Username, repoName)
+	fmt.Printf("Creating repository '%s'...", repoPath)
+	err = repocl.CreateRepo(repoName, repoDesc)
+	// Parse error message and make error nicer
 	util.CheckError(err)
+	fmt.Println(" done.")
+
+	// Clone repository after creation
+	getRepo([]string{repoPath})
 }
 
 func isValidRepoPath(path string) bool {
