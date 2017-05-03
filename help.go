@@ -125,7 +125,7 @@ const lsHelp = `USAGE
 
 DESCRIPTION
 
-	List the contents one or more files or directories and the status of the
+	List one or more files or the contents of directories and the status of the
 	files within it. With no arguments, lists the status of the files under the
 	current directory. Directory listings are performed recursively.
 

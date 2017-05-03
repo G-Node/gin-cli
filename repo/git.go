@@ -77,7 +77,7 @@ const (
 )
 
 // Abbrev returns the two-letter abbrevation of the file status
-// OK (Synced), NC (NoContent), MD (Modified), LU (LocalUpdates), RU (RemoteUpdates), ?? (Untracked)
+// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), ?? (Untracked)
 func (fs FileStatus) Abbrev() string {
 	switch {
 	case fs == Synced:
