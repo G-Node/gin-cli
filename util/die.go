@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 //Die prints a message to stderr and exits the program.
@@ -12,12 +13,14 @@ func Die(msg string) {
 }
 
 // CheckError exits the program if an error is passed to the function.
-// Before exiting, the error message is printed to stderr.
-// The function should be used to avoid constantly checking if `err != nil` and
-// returning errors up the stack when all that needs to be done is to stop execution.
+// The error message is checked for known error messages and an informative message is printed.
+// Otherwise, the error message is printed to stderr.
 func CheckError(err error) {
 	if err != nil {
 		LogWrite(err.Error())
+		if strings.Contains(err.Error(), "Error loading user token") {
+			Die("This operation requires login.")
+		}
 		Die(err.Error())
 	}
 }
