@@ -326,6 +326,11 @@ func listRepos(args []string) {
 		}
 	} else {
 		arg = args[0]
+		if arg == "-p" {
+			arg = "--public"
+		} else if arg == "-s" {
+			arg = "--shared-with-me"
+		}
 	}
 	repos, err := repocl.GetRepos(arg)
 	util.CheckError(err)
