@@ -43,7 +43,7 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 			return nil, fmt.Errorf(msg)
 		}
 		util.LogWrite("Shared with user: %s", repocl.Username)
-		res, err = repocl.Get("repos/shared")
+		res, err = repocl.Get("/repos/shared")
 	} else {
 		util.LogWrite("User: %s", user)
 		repocl.LoadToken()

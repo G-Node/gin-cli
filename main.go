@@ -338,7 +338,7 @@ func listRepos(args []string) {
 	if arg == "" || arg == "--public" {
 		fmt.Print("Listing all public repositories:\n\n")
 	} else if arg == "--shared-with-me" {
-		fmt.Print("Listing all accissible shared repositories:\n\n")
+		fmt.Print("Listing all accessible shared repositories:\n\n")
 	} else {
 		if repocl.Username == "" {
 			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s':\n\n", arg)
