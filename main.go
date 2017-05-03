@@ -317,28 +317,30 @@ func listRepos(args []string) {
 	if len(args) > 1 {
 		util.Die(usage)
 	}
-	var username string
+	var arg string
 	repocl := repo.NewClient(util.Config.RepoHost)
 	err := repocl.LoadToken()
 	if len(args) == 0 {
 		if err == nil {
-			username = repocl.Username
+			arg = repocl.Username
 		}
 	} else {
-		username = args[0]
+		arg = args[0]
 	}
-	repos, err := repocl.GetRepos(username)
+	repos, err := repocl.GetRepos(arg)
 	util.CheckError(err)
 
-	if username == "" {
+	if arg == "" || arg == "--public" {
 		fmt.Print("Listing all public repositories:\n\n")
+	} else if arg == "--shared" {
+		fmt.Print("Listing all accissible shared repositories:\n\n")
 	} else {
 		if repocl.Username == "" {
-			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s':\n\n", username)
-		} else if username == repocl.Username {
+			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s':\n\n", arg)
+		} else if arg == repocl.Username {
 			fmt.Print("Listing your repositories:\n\n")
 		} else {
-			fmt.Printf("Listing accessible repositories owned by '%s':\n\n", username)
+			fmt.Printf("Listing accessible repositories owned by '%s':\n\n", arg)
 		}
 	}
 	for idx, repoInfo := range repos {

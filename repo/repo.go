@@ -32,7 +32,7 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	var res *http.Response
 	var err error
 
-	if user == "" {
+	if user == "" || user == "--public" {
 		util.LogWrite("User: public")
 		res, err = repocl.Get("/repos/public")
 	} else {
