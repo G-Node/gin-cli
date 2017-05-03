@@ -3,26 +3,26 @@ package main
 const usage = `
 GIN command line client
 
-Usage: gin <command> [<args>...]
-       gin --help
-       gin --version
+Usage:	gin <command> [<args>...]
+	gin --help
+	gin --version
 
 Options:
-    -h --help    This help screen
-    --version    Client version
+	-h --help    This help screen
+	--version    Client version
 
 Commands:
-    login    [<username>]
-    logout
-    create   [<name>] [<description>]
-    get      <repopath>
-    upload
-    download
-    repos    [<username>]
-    info     [<username>]
-    keys     [-v | --verbose]
-    keys     --add <filename>
-    help     <command>
+	login
+	logout
+	create
+	get
+	upload
+	download
+	repos
+	info
+	keys
+	keys
+	help
 
 Use 'help' followed by a command to see full description of the command.
 `
@@ -151,24 +151,28 @@ DESCRIPTION
 const reposHelp = `USAGE
 
 	gin repos [<username>]
+	gin repos -s, --shared-with-me
+	gin repos -p, --public
 
 
 DESCRIPTION
 
 	List repositories on the server that provide read access. If no argument is
-	provided, it will list all publicly accessible repositories on the GIN
-	server.
+	provided, it will list the repositories owned by the logged in user. If no
+	user is logged in, it will list all public repositories.
 
 ARGUMENTS
 
+	-s, --shared-with-me
+		List all repositories shared with the logged in user.
+
+	-p, --public
+		List all public repositories.
+
 	<username>
-		The name of the user whose repositories should be listed. This can be
-		the username of the currently logged in user (YOU), in which case the
-		command will list all repositories owned by YOU. If it is the username
-		of a different user, it will list all the repositories owned by the
-		specified user that YOU have access to. This consists of public
-		repositories and repositories shared with YOU.
-`
+		The name of the user whose repositories should be listed.  This
+		consists of public repositories and repositories shared with the logged
+		in user.  `
 
 const infoHelp = `USAGE
 
@@ -204,16 +208,16 @@ DESCRIPTION
 
 ARGUMENTS
 
-	--verbose, -v
+	-v, --verbose
 		Verbose printing. Prints the entire public key when listing.
 
 	--add <filename>
 		Specify a filename which contains a public key to be added to the GIN
 		server.
 
-EXAMPLES 
+EXAMPLES
 
-	Add a public key to your account, as generated from the default ssh-keygen 
+	Add a public key to your account, as generated from the default ssh-keygen
 	command
 
 		$ gin keys --add ~/.ssh/id_rsa.pub
