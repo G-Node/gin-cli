@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -57,9 +58,120 @@ func CleanUpTemp() {
 
 // **************** //
 
+// FileStatus ...
+type FileStatus uint8
+
+const (
+	// Synced indicates that an annexed file is synced between local and remote
+	Synced FileStatus = iota
+	// NoContent indicates that a file represents an annexed file that has not had its contents synced yet
+	NoContent
+	// Modified indicatres that a file has local modifications that have not been committed
+	Modified
+	// LocalChanges indicates that a file has local, committed modifications that have not been pushed
+	LocalChanges
+	// RemoteChanges indicates that a file has remote modifications that have not been pulled
+	RemoteChanges
+	// Untracked indicates that a file is not being tracked by neither git nor git annex
+	Untracked
+)
+
+// Abbrev returns the two-letter abbrevation of the file status
+// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), ?? (Untracked)
+func (fs FileStatus) Abbrev() string {
+	switch {
+	case fs == Synced:
+		return "OK"
+	case fs == NoContent:
+		return "NC"
+	case fs == Modified:
+		return "MD"
+	case fs == LocalChanges:
+		return "LC"
+	case fs == RemoteChanges:
+		return "RC"
+	case fs == Untracked:
+		return "??"
+	default:
+		return "??"
+	}
+}
+
+// getFileStatus determines the state of the file at filepath and returns a FileStatus.
+func getFileStatus(filepath string) FileStatus {
+	wiRes, err := AnnexWhereis(filepath)
+	if err != nil {
+		// File does not exist. Different status???
+		return Untracked
+	}
+
+	// function only runs for one file
+	if len(wiRes) > 0 {
+		for _, remote := range wiRes[0].Whereis {
+			if remote.Here {
+				return Synced
+			}
+		}
+		return NoContent
+	}
+
+	// not in annex, but AnnexStatus can still tell us the file status
+	anexStat, err := AnnexStatus(filepath)
+	if err == nil && len(anexStat) > 0 {
+		switch stat := anexStat[0].Status; {
+		case stat == "M" || stat == "A":
+			return Modified
+		case stat == "?":
+			return Untracked
+		}
+	}
+
+	// committed but not pushed?
+	gitbin := util.Config.Bin.Git
+	// TODO: use default remote/branch
+	dir, filename := util.PathSplit(filepath)
+	cmd := exec.Command(gitbin, "diff", "--name-only", "origin/master", filename)
+	cmd.Dir = dir
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	err = cmd.Run()
+	if err != nil {
+		// Error out?
+		util.LogWrite("Error during diff command for status")
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return Untracked
+	}
+	if out.Len() > 0 {
+		return LocalChanges
+	}
+
+	return Untracked
+}
+
+// ListFiles lists the files in the specified directory and their sync status.
+func ListFiles(path string, filesStatus map[string]FileStatus) error {
+
+	walker := func(path string, info os.FileInfo, err error) error {
+		if filepath.Base(path) == ".git" {
+			return filepath.SkipDir
+		}
+		if info.Mode().IsRegular() {
+			filesStatus[path] = getFileStatus(path)
+		}
+		return nil
+	}
+
+	return filepath.Walk(path, walker)
+}
+
 // Git commands
 
-// IsRepo checks whether a given path is a git repository.
+// IsRepo checks whether a given path is (in) a git repository.
+// This function assumes path is a directory and will return false for files.
 func IsRepo(path string) bool {
 	gitbin := util.Config.Bin.Git
 	cmd := exec.Command(gitbin, "status")
@@ -204,10 +316,10 @@ func buildAnnexCmd(args ...string) *exec.Cmd {
 
 // AnnexInit initialises the repository for annex
 // (git annex init)
-func AnnexInit(localPath string) error {
+func AnnexInit(localPath, description string) error {
 	gitbin := util.Config.Bin.Git
 	initError := fmt.Errorf("Repository annex initialisation failed.")
-	cmd := buildAnnexCmd("init", "--version=6")
+	cmd := buildAnnexCmd("init", description, "--version=6")
 	cmd.Dir = localPath
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -415,10 +527,11 @@ type AnnexWhereisResult struct {
 }
 
 // AnnexWhereis returns information about annexed files in the repository
-// (git annex find)
-func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
-	cmd := buildAnnexCmd("whereis", "--json")
-	cmd.Dir = localPath
+// (git annex whereis)
+func AnnexWhereis(path string) ([]AnnexWhereisResult, error) {
+	dir, filename := util.PathSplit(path)
+	cmd := buildAnnexCmd("whereis", "--json", filename)
+	cmd.Dir = dir
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -449,19 +562,18 @@ func AnnexWhereis(localPath string) ([]AnnexWhereisResult, error) {
 	return results, nil
 }
 
-// AnnexStatusResult ...
+// AnnexStatusResult for getting the (annex) status of individual files
 type AnnexStatusResult struct {
 	Status string `json:"status"`
 	File   string `json:"file"`
 }
 
-// DescribeChanges returns a string which describes the status of the files in the working tree
-// with respect to git annex. The resulting message can be used to inform the user of changes
-// that are about to be uploaded and as a long commit message.
-func DescribeChanges(localPath string) (string, error) {
+// AnnexStatus returns the status of a file or files in a directory
+func AnnexStatus(path string) ([]AnnexStatusResult, error) {
+	dir, filename := util.PathSplit(path)
 	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := exec.Command(gitannexbin, "status", "--json")
-	cmd.Dir = localPath
+	cmd := exec.Command(gitannexbin, "status", "--json", filename)
+	cmd.Dir = dir
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -473,22 +585,39 @@ func DescribeChanges(localPath string) (string, error) {
 		util.LogWrite("Error during DescribeChanges")
 		util.LogWrite("[stdout]\r\n%s", out.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return "", fmt.Errorf("Error retrieving file status")
+		return nil, fmt.Errorf("Error retrieving file status")
 	}
 
-	var outStruct AnnexStatusResult
 	files := bytes.Split(out.Bytes(), []byte("\n"))
 
-	statusmap := make(map[string][]string)
+	statuses := make([]AnnexStatusResult, 0, len(files))
+	var outStruct AnnexStatusResult
 	for _, f := range files {
 		if len(f) == 0 {
+			// can return empty lines
 			continue
 		}
 		err := json.Unmarshal(f, &outStruct)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		statusmap[outStruct.Status] = append(statusmap[outStruct.Status], outStruct.File)
+		statuses = append(statuses, outStruct)
+	}
+	return statuses, nil
+}
+
+// DescribeChanges returns a string which describes the status of the files in the working tree
+// with respect to git annex. The resulting message can be used to inform the user of changes
+// that are about to be uploaded and as a long commit message.
+func DescribeChanges(localPath string) (string, error) {
+	statuses, err := AnnexStatus(localPath)
+	if err != nil {
+		return "", err
+	}
+
+	statusmap := make(map[string][]string)
+	for _, item := range statuses {
+		statusmap[item.Status] = append(statusmap[item.Status], item.File)
 	}
 
 	var changeList string

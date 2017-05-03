@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 var version string
 var build string
 var commit string
+var verstr string
 
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
@@ -138,6 +140,56 @@ func getRepo(args []string) {
 	repocl.KeyHost = util.Config.AuthHost
 	err := repocl.CloneRepo(repostr)
 	util.CheckError(err)
+}
+
+func lsRepo(args []string) {
+	var dirs []string
+	if len(args) == 0 {
+		dirs = []string{"."}
+	} else {
+		dirs = args
+	}
+
+	repocl := repo.NewClient(util.Config.RepoHost)
+	repocl.GitUser = util.Config.GitUser
+	repocl.GitHost = util.Config.GitHost
+	repocl.KeyHost = util.Config.AuthHost
+
+	var fileStatusBuffer, dirStatusBuffer, skipped bytes.Buffer
+	for _, d := range dirs {
+		path, filename := util.PathSplit(d)
+		if filepath.Base(d) == ".git" {
+			skipped.WriteString(fmt.Sprintf("Skipping directory '%s'\n", d))
+			continue
+		}
+		if !repo.IsRepo(path) {
+			skipped.WriteString(fmt.Sprintf("'%s' is not under gin control\n", d))
+			continue
+		}
+		filesStatus := make(map[string]repo.FileStatus)
+		err := repo.ListFiles(d, filesStatus)
+		if err != nil {
+			skipped.WriteString(fmt.Sprintf("Error listing %s: %s\n", d, err.Error()))
+			continue
+		}
+
+		currentBuffer := &fileStatusBuffer
+		if filename == "." {
+			currentBuffer = &dirStatusBuffer
+			if len(dirs) > 1 {
+				dirStatusBuffer.WriteString(fmt.Sprintf("\n%s:\n", d))
+			}
+		}
+		for file, status := range filesStatus {
+			currentBuffer.WriteString(fmt.Sprintf("%s %s\n", status.Abbrev(), file))
+		}
+	}
+
+	fmt.Printf("%s%s", fileStatusBuffer.String(), dirStatusBuffer.String())
+	if skipped.Len() > 0 {
+		fmt.Printf("\n%s", skipped.String())
+	}
+
 }
 
 func upload(args []string) {
@@ -370,9 +422,15 @@ func help(args []string) {
 	fmt.Println(helptext)
 }
 
-func main() {
-	verstr := fmt.Sprintf("GIN command line client %s Build %s (%s)", version, build, commit)
+func init() {
+	if version == "" {
+		verstr = "GIN command line client [dev build]"
+	} else {
+		verstr = fmt.Sprintf("GIN command line client %s Build %s (%s)", version, build, commit)
+	}
+}
 
+func main() {
 	args, _ := docopt.Parse(usage, nil, true, verstr, true)
 	command := args["<command>"].(string)
 	cmdArgs := args["<args>"].([]string)
@@ -391,6 +449,8 @@ func main() {
 		createRepo(cmdArgs)
 	case "get":
 		getRepo(cmdArgs)
+	case "ls":
+		lsRepo(cmdArgs)
 	case "upload":
 		upload(cmdArgs)
 	case "download":
