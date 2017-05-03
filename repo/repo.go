@@ -32,12 +32,21 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	var res *http.Response
 	var err error
 
-	if user == "" {
-		util.LogWrite("User: public")
+	if user == "" || user == "--public" {
+		util.LogWrite("Public")
 		res, err = repocl.Get("/repos/public")
+	} else if user == "--shared-with-me" {
+		err = repocl.LoadToken()
+		if err != nil {
+			msg := fmt.Sprintf("Error loading token: %s", err.Error())
+			util.LogWrite(msg)
+			return nil, fmt.Errorf(msg)
+		}
+		util.LogWrite("Shared with user: %s", repocl.Username)
+		res, err = repocl.Get("/repos/shared")
 	} else {
 		util.LogWrite("User: %s", user)
-		err = repocl.LoadToken()
+		repocl.LoadToken()
 		res, err = repocl.Get(fmt.Sprintf("/users/%s/repos", user))
 	}
 

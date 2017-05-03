@@ -100,6 +100,7 @@ func NewClient(address string) *Client {
 // LoadToken reads the username and auth token from the token file and sets the
 // values in the struct.
 func (ut *UserToken) LoadToken() error {
+	// TODO: Don't reload if already set
 	util.LogWrite("Loading token")
 	path, err := util.ConfigPath(false)
 	if err != nil {

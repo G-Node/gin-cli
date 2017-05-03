@@ -38,7 +38,6 @@ func login(args []string) {
 	}
 
 	// prompt for password
-	password = ""
 	fmt.Print("Password: ")
 	pwbytes, err := gopass.GetPasswdMasked()
 	fmt.Println()
@@ -318,23 +317,35 @@ func listRepos(args []string) {
 	if len(args) > 1 {
 		util.Die(usage)
 	}
-	var username string
+	var arg string
 	repocl := repo.NewClient(util.Config.RepoHost)
-
+	err := repocl.LoadToken()
 	if len(args) == 0 {
-		username = ""
+		if err == nil {
+			arg = repocl.Username
+		}
 	} else {
-		username = args[0]
+		arg = args[0]
+		if arg == "-p" {
+			arg = "--public"
+		} else if arg == "-s" {
+			arg = "--shared-with-me"
+		}
 	}
-	repos, err := repocl.GetRepos(username)
+	repos, err := repocl.GetRepos(arg)
 	util.CheckError(err)
 
-	if username == "" {
-		fmt.Print("Listing all public repositories\n\n")
+	if arg == "" || arg == "--public" {
+		fmt.Print("Listing all public repositories:\n\n")
+	} else if arg == "--shared-with-me" {
+		fmt.Print("Listing all accessible shared repositories:\n\n")
 	} else {
-		err = repocl.LoadToken()
-		if err != nil {
-			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s'.\n\n", username)
+		if repocl.Username == "" {
+			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s':\n\n", arg)
+		} else if arg == repocl.Username {
+			fmt.Print("Listing your repositories:\n\n")
+		} else {
+			fmt.Printf("Listing accessible repositories owned by '%s':\n\n", arg)
 		}
 	}
 	for idx, repoInfo := range repos {
