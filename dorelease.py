@@ -213,6 +213,8 @@ def debianize(binfiles, annexsa_archive):
             # /opt/gin/bin/gin.sh (shell script for running gin cmds)
             # /usr/local/gin -> /opt/gin/bin/gin.sh (symlink)
 
+            # TODO: Update Debian control file version automatically
+
             pkgname = "gin-cli_{}".format(version["version"])
             build_dir = os.path.join(tmp_dir, pkgname)
             opt_dir = os.path.join(build_dir, "opt")
