@@ -12,18 +12,18 @@ Options:
 	--version    Client version
 
 Commands:
-    login    [<username>]
-    logout
-    create   [<name>] [<description>]
-    get      <repopath>
-    ls       [<directory>]
-    upload
-    download
-    repos    [<username>]
-    info     [<username>]
-    keys     [-v | --verbose]
-    keys     --add <filename>
-    help     <command>
+	login    [<username>]
+	logout
+	create   [<name>] [<description>]
+	get      <repopath>
+	ls       [<directory>]
+	upload
+	download
+	repos    [<username>]
+	info     [<username>]
+	keys     [-v | --verbose]
+	keys     --add <filename>
+	help     <command>
 
 Use 'help' followed by a command to see full description of the command.
 `
@@ -144,7 +144,6 @@ ARGUMENTS
 
 	<directory>
 		One or more directories or files to list.
-
 `
 
 const uploadHelp = `USAGE
@@ -201,7 +200,8 @@ ARGUMENTS
 	<username>
 		The name of the user whose repositories should be listed.  This
 		consists of public repositories and repositories shared with the logged
-		in user.  `
+		in user.
+`
 
 const infoHelp = `USAGE
 
@@ -224,6 +224,7 @@ ARGUMENTS
 		is publicly visible. If it is the username of a different user, only
 		the publicly visible information is printed.
 `
+
 const keysHelp = `USAGE
 
 	gin keys [-v | --verbose]
