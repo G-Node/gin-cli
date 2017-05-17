@@ -184,7 +184,7 @@ def package_linux_plain(binfiles):
         _, osarch = os.path.split(d)
         # simple binary archive
         shutil.copy("README.md", d)
-        arc = "gin-cli_{}-{}.tar.gz".format(version["version"], osarch)
+        arc = "gin-cli-{}-{}.tar.gz".format(version["version"], osarch)
         arc = os.path.join(pkgdir, arc)
         cmd = ["tar", "-czf", arc, "-C", d, f, "README.md"]
         print("Running {}".format(" ".join(cmd)))
@@ -215,7 +215,7 @@ def debianize(binfiles, annexsa_archive):
 
             # TODO: Update Debian control file version automatically
 
-            pkgname = "gin-cli_{}".format(version["version"])
+            pkgname = "gin-cli-{}".format(version["version"])
             build_dir = os.path.join(tmp_dir, pkgname)
             opt_dir = os.path.join(build_dir, "opt")
             opt_gin_dir = os.path.join(opt_dir, "gin")
@@ -311,7 +311,7 @@ def package_mac_plain(binfiles):
         osarch = osarch.replace("darwin", "macos")
         # simple binary archive
         shutil.copy("README.md", d)
-        arc = "gin-cli_{}-{}.tar.gz".format(version["version"], osarch)
+        arc = "gin-cli-{}-{}.tar.gz".format(version["version"], osarch)
         arc = os.path.join(pkgdir, arc)
         cmd = ["tar", "-czf", arc, "-C", d, f, "README.md"]
         print("Running {}".format(" ".join(cmd)))
@@ -360,7 +360,7 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             d, f = os.path.split(bf)
             _, osarch = os.path.split(d)
 
-            arc = "gin-cli_{}-{}.zip".format(version["version"], osarch)
+            arc = "gin-cli-{}-{}.zip".format(version["version"], osarch)
             arc = os.path.join(pkgdir, arc)
             print("Creating Windows zip file")
             # need to change paths before making zip file
@@ -411,23 +411,34 @@ def main():
     def printlist(lst):
         print("".join("> " + l + "\n" for l in lst))
 
+    def link_latest(lst):
+        for l in lst:
+            latestname = l.replace(version["version"], "latest")
+            print("Linking {} to {}".format(l, latestname))
+            os.link(l, latestname)
+
     print("------------------------------------------------")
     print("The following archives and packages were created")
     print("------------------------------------------------")
     print("Linux tarballs:")
     printlist(linux_pkgs)
+    link_latest(linux_pkgs)
 
     print("Debian packages:")
     printlist(deb_pkgs)
+    link_latest(deb_pkgs)
 
     print("RPM packages:")
     printlist(rpm_pkgs)
+    link_latest(rpm_pkgs)
 
     print("macOS packages:")
     printlist(mac_pkgs)
+    link_latest(mac_pkgs)
 
     print("Windows packages:")
     printlist(win_pkgs)
+    link_latest(win_pkgs)
 
 
 if __name__ == "__main__":
