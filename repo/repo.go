@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/G-Node/gin-cli/auth"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-repo/wire"
+	"github.com/gogits/go-gogs-client"
 )
 
 // Client is a client interface to the repo server. Embeds web.Client.
@@ -20,7 +20,6 @@ type Client struct {
 	GitHost string
 	GitUser string
 }
-
 // NewClient returns a new client for the repo server.
 func NewClient(host string) *Client {
 	return &Client{Client: web.NewClient(host)}
@@ -29,48 +28,23 @@ func NewClient(host string) *Client {
 // GetRepos gets a list of repositories (public or user specific)
 func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	util.LogWrite("Retrieving repo list")
+	gogsRepos := []gogs.Repository{}
 	var repoList []wire.Repo
 	var res *http.Response
 	var err error
-
-	if user == "" || user == "--public" {
-		util.LogWrite("Public")
-		res, err = repocl.Get("/repos/public")
-	} else if user == "--shared-with-me" {
-		err = repocl.LoadToken()
-		if err != nil {
-			msg := fmt.Sprintf("Error loading token: %s", err.Error())
-			util.LogWrite(msg)
-			return nil, fmt.Errorf(msg)
-		}
-		util.LogWrite("Shared with user: %s", repocl.Username)
-		res, err = repocl.Get("/repos/shared")
-	} else {
-		util.LogWrite("User: %s", user)
-		repocl.LoadToken()
-		res, err = repocl.Get(fmt.Sprintf("/users/%s/repos", user))
-	}
-
+	res, err = repocl.Get("/api/v1/user/repos")
 	if err != nil {
 		return repoList, err
-	} else if res.StatusCode == 404 {
-		// Check if user exists
-		authcl := auth.NewClient(util.Config.AuthHost)
-		_, raErr := authcl.RequestAccount(user)
-		if raErr == nil {
-			return repoList, fmt.Errorf("User '%s' does not appear to have accessible repositories.", user)
-		}
-		return repoList, fmt.Errorf("Error: No such user '%s'.", user)
-	} else if res.StatusCode != 200 {
-		return repoList, fmt.Errorf("[Repository request] Failed. Server returned: %s", res.Status)
 	}
-
 	defer web.CloseRes(res.Body)
 	b, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return repoList, err
 	}
-	err = json.Unmarshal(b, &repoList)
+	err = json.Unmarshal(b, &gogsRepos)
+	for _, repo := range (gogsRepos) {
+		repoList = append(repoList, wire.Repo{Name: repo.Name, Description: repo.Description, Owner: repo.Owner.FullName})
+	}
 	return repoList, err
 }
 
@@ -82,9 +56,9 @@ func (repocl *Client) CreateRepo(name, description string) error {
 		return fmt.Errorf("[Create repository] This action requires login")
 	}
 
-	data := wire.Repo{Name: name, Description: description}
+	gogsRepo := gogs.Repository{Name: name, Description: description}
 	util.LogWrite("Name: %s :: Description: %s", name, description)
-	res, err := repocl.Post(fmt.Sprintf("/users/%s/repos", repocl.Username), data)
+	res, err := repocl.Post("/api/v1/user/repos", gogsRepo)
 	if err != nil {
 		return err
 	} else if res.StatusCode != 201 {
