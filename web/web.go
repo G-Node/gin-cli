@@ -26,7 +26,7 @@ type UserToken struct {
 type Client struct {
 	Host string
 	UserToken
-	web *http.Client
+	web  *http.Client
 }
 
 func urlJoin(parts ...string) string {
@@ -48,9 +48,11 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("content-type", "application/jsonAuthorization")
+	util.LogWrite("Performing GET with token: %s", cl.Token)
 	if cl.Token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
-		util.LogWrite("Added bearer token to GET")
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
+		util.LogWrite("Added token token to GET")
 	}
 	util.LogWrite("Performing GET: %s", req.URL)
 	return cl.web.Do(req)
@@ -68,10 +70,10 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-
+	req.Header.Set("content-type", "application/jsonAuthorization")
 	if cl.Token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cl.Token))
-		util.LogWrite("Added bearer token to POST")
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
+		util.LogWrite("Added token token to POST")
 	}
 	util.LogWrite("Performing POST: %s", req.URL)
 	return cl.web.Do(req)

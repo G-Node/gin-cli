@@ -13,7 +13,7 @@ type conf struct {
 	RepoHost string
 	GitHost  string
 	GitUser  string
-	Bin      struct {
+	Bin struct {
 		Git      string
 		GitAnnex string
 		SSH      string
@@ -36,12 +36,12 @@ func LoadConfig() error {
 	viper.SetDefault("bin.ssh", "ssh")
 
 	// Hosts
-	viper.SetDefault("auth.address", "https://auth.gin.g-node.org")
-	viper.SetDefault("auth.port", "443")
-	viper.SetDefault("repo.address", "https://repo.gin.g-node.org")
-	viper.SetDefault("repo.port", "443")
-	viper.SetDefault("git.address", "gin.g-node.org")
-	viper.SetDefault("git.port", "22")
+	viper.SetDefault("auth.address", "http://dev.g-node.org")
+	viper.SetDefault("auth.port", "10080")
+	viper.SetDefault("repo.address", "http://dev.g-node.org")
+	viper.SetDefault("repo.port", "10080")
+	viper.SetDefault("git.address", "dev.g-node.org")
+	viper.SetDefault("git.port", "10022")
 	viper.SetDefault("git.user", "git")
 	viper.SetDefault("secret", "97196a1c-silly-biscuit3-d161ea15a676")
 
