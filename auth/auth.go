@@ -84,7 +84,7 @@ func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 // RequestAccount requests a specific account by name.
 func (authcl *Client) RequestAccount(name string) (gin.Account, error) {
 	var acc gin.Account
-	gogsUSer := GogsUser{}
+	gogsUser := GogsUser{}
 	res, err := authcl.Get(fmt.Sprintf("/api/v1/users/%s", name))
 	if err != nil {
 		return acc, err
@@ -97,12 +97,13 @@ func (authcl *Client) RequestAccount(name string) (gin.Account, error) {
 	defer web.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
-	if err := json.Unmarshal(b, &gogsUSer); err != nil {
+	if err := json.Unmarshal(b, &gogsUser); err != nil {
 		return gin.Account{}, err
 	}
-	acc.LastName = gogsUSer.FullName
-	acc.Login = gogsUSer.UserName
-	acc.Email = &gin.Email{Email: gogsUSer.Email}
+	acc.LastName = gogsUser.FullName
+	acc.Login = gogsUser.UserName
+	acc.Email = &gin.Email{Email: gogsUser.Email}
+
 	return acc, err
 }
 
@@ -136,7 +137,7 @@ func (authcl *Client) AddKey(key, description string, temp bool) error {
 		return err
 	}
 	gogsKey := GogsPublicKey{Key: key, Title: description}
-	address := fmt.Sprintf("/api/v1/user/keys", authcl.Username)
+	address := fmt.Sprintf("/api/v1/user/keys")
 	res, err := authcl.Post(address, gogsKey)
 	if err != nil {
 		return err
