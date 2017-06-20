@@ -52,6 +52,7 @@ type GogsPublicKey struct {
 	Key   string    `json:"key"`
 	Title string    `json:"title,omitempty"`
 }
+
 // GetUserKeys fetches the public keys that the user has added to the auth server.
 func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 	gogKeys := make([]*PublicKey, 0, 10)
@@ -161,14 +162,17 @@ func (authcl *Client) Login(username, password, clientID, clientSecret string) e
 	// 	ClientSecret: clientSecret,
 	// }
 	cl := http.Client{}
-	bd, _ := json.Marshal(&CreateAccessTokenOption{Name: "Hallo"})
+	bd, _ := json.Marshal(&CreateAccessTokenOption{Name: "gin-cli"})
 	requrl := urlJoin(authcl.Host, fmt.Sprintf("/api/v1/users/%s/tokens", username))
 	req, _ := http.NewRequest(http.MethodPost, requrl, bytes.NewReader(bd))
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", "Basic "+BasicAuthEncode(username, password))
 	resp, err := cl.Do(req)
 	if err != nil {
-		fmt.Errorf("[Add key] Failed Basic Auth request %v", err)
+		return fmt.Errorf("[Login] Failed Basic Auth request %v", err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("[Login] Failed to login. May be credentials wrong: %s", resp.Status)
 	}
 	data, _ := ioutil.ReadAll(resp.Body)
 	util.LogWrite("Got response: %s,%s", string(data), string(resp.StatusCode))
