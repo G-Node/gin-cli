@@ -52,7 +52,7 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	util.LogWrite("Performing GET with token: %s", cl.Token)
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
-		util.LogWrite("Added token token to GET")
+		util.LogWrite("Added token to GET")
 	}
 	util.LogWrite("Performing GET: %s", req.URL)
 	return cl.web.Do(req)
@@ -73,7 +73,7 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	req.Header.Set("content-type", "application/jsonAuthorization")
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
-		util.LogWrite("Added token token to POST")
+		util.LogWrite("Added token to POST")
 	}
 	util.LogWrite("Performing POST: %s", req.URL)
 	return cl.web.Do(req)
