@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"github.com/gogits/go-gogs-client"
 
 	"github.com/G-Node/gin-cli/util"
 )
@@ -92,6 +93,32 @@ func (cl *Client) PostForm(address string, data url.Values) (*http.Response, err
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	util.LogWrite("Performing POST (with form data): %s", req.URL)
 	return cl.web.Do(req)
+}
+
+func (cl *Client) GLogin(username, password string) (*http.Response, error) {
+	// The struct below will be used when we switch token request to using json post data on auth
+	// See https://github.com/G-Node/gin-auth/issues/112
+	// params := gin.LoginRequest{
+	// 	Scope:        "repo-read repo-write account-read account-write",
+	// 	Username:     username,
+	// 	Password:     password,
+	// 	GrantType:    "password",
+	// 	ClientID:     clientID,
+	// 	ClientSecret: clientSecret,
+	// }
+	bd, _ := json.Marshal(&gogs.CreateAccessTokenOption{Name: "gin-cli"})
+	requrl := urlJoin(cl.Host, fmt.Sprintf("/api/v1/users/%s/tokens", username))
+	req, _ := http.NewRequest(http.MethodPost, requrl, bytes.NewReader(bd))
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Authorization", "Basic "+gogs.BasicAuthEncode(username, password))
+	resp, err := cl.web.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("[Login] Failed Basic Auth request %v", err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("[Login] Failed to login. May be credentials wrong: %s", resp.Status)
+	}
+	return resp, nil
 }
 
 // NewClient creates a new client for a given host.

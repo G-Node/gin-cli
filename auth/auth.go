@@ -10,7 +10,6 @@ import (
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
 	"net/http"
-	"bytes"
 	"encoding/base64"
 	"path"
 )
@@ -158,21 +157,14 @@ func (authcl *Client) Login(username, password, clientID, clientSecret string) e
 	// 	Username:     username,
 	// 	Password:     password,
 	// 	GrantType:    "password",
+
 	// 	ClientID:     clientID,
 	// 	ClientSecret: clientSecret,
 	// }
-	cl := http.Client{}
-	bd, _ := json.Marshal(&CreateAccessTokenOption{Name: "gin-cli"})
-	requrl := urlJoin(authcl.Host, fmt.Sprintf("/api/v1/users/%s/tokens", username))
-	req, _ := http.NewRequest(http.MethodPost, requrl, bytes.NewReader(bd))
-	req.Header.Set("content-type", "application/json")
-	req.Header.Set("Authorization", "Basic "+BasicAuthEncode(username, password))
-	resp, err := cl.Do(req)
+	resp, err := authcl.GLogin(username, password)
+
 	if err != nil {
-		return fmt.Errorf("[Login] Failed Basic Auth request %v", err)
-	}
-	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("[Login] Failed to login. May be credentials wrong: %s", resp.Status)
+		return err
 	}
 	data, _ := ioutil.ReadAll(resp.Body)
 	util.LogWrite("Got response: %s,%s", string(data), string(resp.StatusCode))
@@ -193,10 +185,6 @@ func BasicAuthEncode(user, pass string) string {
 type AccessToken struct {
 	Name string `json:"name"`
 	Sha1 string `json:"sha1"`
-}
-
-type CreateAccessTokenOption struct {
-	Name string `json:"name" binding:"Required"`
 }
 
 func urlJoin(parts ...string) string {
