@@ -30,6 +30,7 @@ install:
   - go get github.com/G-Node/gin-core/gin
   - go get github.com/G-Node/gin-repo/wire
   - go get golang.org/x/crypto/ssh
+  - go get github.com/gogits/go-gogs-client
   # import path symlink for forks
   - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -vs $(pwd) ${GOPATH}/src/github.com/G-Node/gin-cli; fi
 

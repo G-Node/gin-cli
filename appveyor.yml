@@ -36,6 +36,7 @@ build_script:
   - go get github.com/G-Node/gin-core/gin
   - go get github.com/G-Node/gin-repo/wire
   - go get golang.org/x/crypto/ssh
+  - go get github.com/gogits/go-gogs-client
   - go vet ./...
   - gofmt -s -l .
   - golint github.com/G-Node/gin-cli...
