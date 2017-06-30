@@ -65,7 +65,7 @@ func login(args []string) {
 	util.CheckError(err)
 	info, err := authcl.RequestAccount(username)
 	util.CheckError(err)
-	fmt.Printf("Hello %s. You are now logged in.\n", info.FirstName)
+	fmt.Printf("Hello %s. You are now logged in.\n", info.Login)
 	// fmt.Printf("[Login success] You are now logged in as %s\n", username)
 }
 
