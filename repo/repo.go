@@ -115,7 +115,7 @@ func (repocl *Client) DownloadRepo(localPath string) error {
 	return err
 }
 
-// CloneRepo downloads the files of a given repository.
+// CloneRepo clones a remote repository and initialises anex init with the options specified in the config file.
 func (repocl *Client) CloneRepo(repoPath string) error {
 	defer CleanUpTemp()
 	util.LogWrite("CloneRepo")
@@ -143,24 +143,5 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 		return err
 	}
 	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
-	err = AnnexInit(repoName, description)
-	if err != nil {
-		return err
-	}
-
-	annexFiles, err := AnnexWhereis(repoName)
-	if err != nil {
-		return err
-	}
-	if len(annexFiles) == 0 {
-		return nil
-	}
-
-	fmt.Printf("Downloading files... ")
-	err = AnnexPull(repoName)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("done.\n")
-	return nil
+	return AnnexInit(repoName, description)
 }
