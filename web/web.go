@@ -79,35 +79,22 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	return cl.web.Do(req)
 }
 
-// PostForm sends a POST request to address with the provided data.
-// The address is appended to the client host, so it should be specified without the host prefix.
-// Unlike the Post method, the data in this case is sent as x-www-form-urlencoded.
-func (cl *Client) PostForm(address string, data url.Values) (*http.Response, error) {
-
-	requrl := urlJoin(cl.Host, address)
-	req, err := http.NewRequest("POST", requrl, strings.NewReader(data.Encode()))
+// PostBasicAuth sends a POST request to address with the provided data.
+// The username and password are used to perform Basic authentication.
+func (cl *Client) PostBasicAuth(address, username, password string, data interface{}) (*http.Response, error) {
+	datajson, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	util.LogWrite("Performing POST (with form data): %s", req.URL)
-	return cl.web.Do(req)
-}
-
-func (cl *Client) GLogin(username, password string) (*http.Response, error) {
-	bd, _ := json.Marshal(&gogs.CreateAccessTokenOption{Name: "gin-cli"})
-	requrl := urlJoin(cl.Host, fmt.Sprintf("/api/v1/users/%s/tokens", username))
-	req, _ := http.NewRequest(http.MethodPost, requrl, bytes.NewReader(bd))
-	req.Header.Set("content-type", "application/json")
-	req.Header.Set("Authorization", "Basic "+gogs.BasicAuthEncode(username, password))
-	resp, err := cl.web.Do(req)
+	requrl := urlJoin(cl.Host, address)
+	req, err := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
 	if err != nil {
-		return nil, fmt.Errorf("[Login] Failed Basic Auth request %v", err)
+		return nil, err
 	}
-	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("[Login] Failed. Check username and password: %s", resp.Status)
-	}
-	return resp, nil
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", gogs.BasicAuthEncode(username, password)))
+	util.LogWrite("Performing POST: %s", req.URL)
+	return cl.web.Do(req)
 }
 
 // NewClient creates a new client for a given host.

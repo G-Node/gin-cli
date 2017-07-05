@@ -153,35 +153,30 @@ func (authcl *Client) AddKey(key, description string, temp bool) error {
 
 // Login requests a token from the auth server and stores the username and token to file.
 func (authcl *Client) Login(username, password, clientID, clientSecret string) error {
-	// The struct below will be used when we switch token request to using json post data on auth
-	// See https://github.com/G-Node/gin-auth/issues/112
-	// params := gin.LoginRequest{
-	// 	Scope:        "repo-read repo-write account-read account-write",
-	// 	Username:     username,
-	// 	Password:     password,
-	// 	GrantType:    "password",
-
-	// 	ClientID:     clientID,
-	// 	ClientSecret: clientSecret,
-	// }
-	resp, err := authcl.GLogin(username, password)
-
+	tokenCreate := &gogs.CreateAccessTokenOption{Name: "gin-cli"}
+	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
+	resp, err := authcl.PostBasicAuth(address, username, password, tokenCreate)
+	if err != nil {
+		return fmt.Errorf("[Login] Request failed: %s", resp.Status)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("[Login] Failed. Check username and password: %s", resp.Status)
+	}
+	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-	data, _ := ioutil.ReadAll(resp.Body)
 	util.LogWrite("Got response: %s,%s", string(data), string(resp.StatusCode))
 	token := AccessToken{}
-	json.Unmarshal(data, &token)
+	err = json.Unmarshal(data, &token)
+	if err != nil {
+		return err
+	}
 	authcl.Username = username
 	authcl.Token = token.Sha1
 	util.LogWrite("Login successful. Username: %s, %v", username, token)
 
 	return authcl.StoreToken()
-}
-
-func BasicAuthEncode(user, pass string) string {
-	return base64.StdEncoding.EncodeToString([]byte(user + ":" + pass))
 }
 
 // AccessToken represents a API access token.
