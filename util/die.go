@@ -33,3 +33,11 @@ func CheckErrorMsg(err error, msg string) {
 		Die(msg)
 	}
 }
+
+// LogError prints err to the logfile and returns, effectively ignoring the error.
+// No logging is performed if err == nil.
+func LogError(err error) {
+	if err != nil {
+		LogWrite("The following error occured:\n%s", err.Error())
+	}
+}

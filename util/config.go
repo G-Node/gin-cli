@@ -13,7 +13,7 @@ type conf struct {
 	RepoHost string
 	GitHost  string
 	GitUser  string
-	Bin struct {
+	Bin      struct {
 		Git      string
 		GitAnnex string
 		SSH      string
@@ -63,7 +63,8 @@ func LoadConfig() error {
 	viper.AddConfigPath(configpath)
 	LogWrite("Config path added %s", configpath)
 
-	viper.ReadInConfig()
+	err = viper.ReadInConfig()
+	LogError(err)
 	fileused := viper.ConfigFileUsed()
 	if fileused != "" {
 		LogWrite("Loading config file %s", viper.ConfigFileUsed())

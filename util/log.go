@@ -46,6 +46,6 @@ func LogWrite(fmtstr string, args ...interface{}) {
 }
 
 // LogClose closes the log file.
-func LogClose() error {
-	return logfile.Close()
+func LogClose() {
+	_ = logfile.Close()
 }

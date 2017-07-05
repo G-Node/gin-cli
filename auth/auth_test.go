@@ -12,6 +12,7 @@ import (
 
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
+	gogs "github.com/gogits/go-gogs-client"
 )
 
 func TestMain(m *testing.M) {
@@ -117,7 +118,7 @@ func TestRequestKeys(t *testing.T) {
 	}
 
 	respOK := keys[0].Key == "ssh-rsa SSHKEY12344567 name@host" &&
-		keys[0].Description == "name@host"
+		keys[0].Title == "name@host"
 
 	if !respOK {
 		t.Error("[Key retrieval] Test failed. Response does not match expected values.")
@@ -167,7 +168,7 @@ func addKeyHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(os.Stderr, "Error in request handler for AddKey test")
 	}
 
-	newKey := &PublicKey{}
+	newKey := &gogs.PublicKey{}
 	if r.URL.Path == goodURL {
 		err := json.Unmarshal(b, newKey)
 		if err != nil {
@@ -195,7 +196,6 @@ func TestAddKey(t *testing.T) {
 		t.Errorf("[Add key] Function returned error: %s", err.Error())
 	}
 }
-
 
 func searchAccountHandler(w http.ResponseWriter, r *http.Request) {
 	goodURL := "/api/accounts?q=alice"
@@ -293,4 +293,3 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}
 }
-

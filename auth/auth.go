@@ -15,14 +15,6 @@ import (
 	gogs "github.com/gogits/go-gogs-client"
 )
 
-// PublicKey is used to represent the information of the public part of a key pair.
-type PublicKey struct {
-	ID    int64  `json:"id"`
-	Key   string `json:"key"`
-	URL   string `json:"url,omitempty"`
-	Title string `json:"title,omitempty"`
-}
-
 // GINUser represents a API user.
 type GINUser struct {
 	ID        int64  `json:"id"`
@@ -42,29 +34,15 @@ func NewClient(host string) *Client {
 	return &Client{web.NewClient(host)}
 }
 
-// NewKey is used for adding new public keys to gin-auth
-type NewKey struct {
-	Key         string `json:"key"`
-	Description string `json:"description"`
-	Temporary   bool   `json:"temporary"`
-}
-
-// GogsPublicKey is used to represent the information of the public part of a key pair (Gogs API only).
-type GogsPublicKey struct {
-	Key   string `json:"key"`
-	Title string `json:"title,omitempty"`
-}
-
 // GetUserKeys fetches the public keys that the user has added to the auth server.
-func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
-	gogKeys := make([]*PublicKey, 0, 10)
-	var keys []gin.SSHKey
+func (authcl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
+	var keys []gogs.PublicKey
 	err := authcl.LoadToken()
 	if err != nil {
 		return keys, fmt.Errorf("This command requires login")
 	}
 
-	res, err := authcl.Get(fmt.Sprintf("/api/v1/user/keys"))
+	res, err := authcl.Get("/api/v1/user/keys")
 	if err != nil {
 		return keys, fmt.Errorf("Request for keys returned error")
 	} else if res.StatusCode != 200 {
@@ -77,10 +55,7 @@ func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 	if err != nil {
 		return keys, err
 	}
-	err = json.Unmarshal(b, &gogKeys)
-	for _, element := range gogKeys {
-		keys = append(keys, gin.SSHKey{Description: element.Title, Key: element.Key})
-	}
+	err = json.Unmarshal(b, &keys)
 	return keys, err
 }
 
@@ -139,9 +114,9 @@ func (authcl *Client) AddKey(key, description string, temp bool) error {
 	if err != nil {
 		return err
 	}
-	gogsKey := GogsPublicKey{Key: key, Title: description}
+	newkey := gogs.PublicKey{Key: key, Title: description}
 	address := fmt.Sprintf("/api/v1/user/keys")
-	res, err := authcl.Post(address, gogsKey)
+	res, err := authcl.Post(address, newkey)
 	if err != nil {
 		return err
 	} else if res.StatusCode != http.StatusCreated {

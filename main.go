@@ -266,8 +266,7 @@ func printKeys(args []string) {
 	}
 	fmt.Printf("You have %s key%s associated with your account.\n\n", nkeysStr, plural)
 	for idx, key := range keys {
-		fmt.Printf("[%v] \"%s\" ", idx+1, key.Description)
-		fmt.Printf("(Fingerprint: %s)\n", key.Fingerprint)
+		fmt.Printf("[%v] \"%s\"\n", idx+1, key.Title)
 		if printFull {
 			fmt.Printf("--- Key ---\n%s\n", key.Key)
 		}
