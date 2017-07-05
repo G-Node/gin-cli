@@ -20,6 +20,7 @@ type Client struct {
 	GitHost string
 	GitUser string
 }
+
 // NewClient returns a new client for the repo server.
 func NewClient(host string) *Client {
 	return &Client{Client: web.NewClient(host)}
@@ -42,7 +43,7 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 		return repoList, err
 	}
 	err = json.Unmarshal(b, &gogsRepos)
-	for _, repo := range (gogsRepos) {
+	for _, repo := range gogsRepos {
 		repoList = append(repoList, wire.Repo{Name: repo.Name, Description: repo.Description, Owner: repo.Owner.FullName})
 	}
 	return repoList, err
@@ -137,7 +138,10 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 	if err != nil {
 		hostname = "localhost"
 	}
-	repocl.LoadToken()
+	err = repocl.LoadToken()
+	if err != nil {
+		return err
+	}
 	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
 	err = AnnexInit(repoName, description)
 	if err != nil {

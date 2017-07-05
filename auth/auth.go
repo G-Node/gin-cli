@@ -6,28 +6,30 @@ import (
 	"io/ioutil"
 	"net/url"
 
+	"net/http"
+	"path"
+
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
-	"net/http"
-	"encoding/base64"
-	"path"
+	gogs "github.com/gogits/go-gogs-client"
 )
 
+// PublicKey is used to represent the information of the public part of a key pair.
 type PublicKey struct {
-	ID    int64     `json:"id"`
-	Key   string    `json:"key"`
-	URL   string    `json:"url,omitempty"`
-	Title string    `json:"title,omitempty"`
+	ID    int64  `json:"id"`
+	Key   string `json:"key"`
+	URL   string `json:"url,omitempty"`
+	Title string `json:"title,omitempty"`
 }
 
-// User represents a API user.
-type GogsUser struct {
+// GINUser represents a API user.
+type GINUser struct {
 	ID        int64  `json:"id"`
 	UserName  string `json:"login"`
 	FullName  string `json:"full_name"`
 	Email     string `json:"email"`
-	AvatarUrl string `json:"avatar_url"`
+	AvatarURL string `json:"avatar_url"`
 }
 
 // Client is a client interface to the auth server. Embeds web.Client.
@@ -47,9 +49,10 @@ type NewKey struct {
 	Temporary   bool   `json:"temporary"`
 }
 
+// GogsPublicKey is used to represent the information of the public part of a key pair (Gogs API only).
 type GogsPublicKey struct {
-	Key   string    `json:"key"`
-	Title string    `json:"title,omitempty"`
+	Key   string `json:"key"`
+	Title string `json:"title,omitempty"`
 }
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
@@ -84,7 +87,7 @@ func (authcl *Client) GetUserKeys() ([]gin.SSHKey, error) {
 // RequestAccount requests a specific account by name.
 func (authcl *Client) RequestAccount(name string) (gin.Account, error) {
 	var acc gin.Account
-	gogsUser := GogsUser{}
+	gogsUser := GINUser{}
 	res, err := authcl.Get(fmt.Sprintf("/api/v1/users/%s", name))
 	if err != nil {
 		return acc, err

@@ -11,11 +11,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
-
-	"github.com/gogits/go-gogs-client"
 
 	"github.com/G-Node/gin-cli/util"
+	gogs "github.com/gogits/go-gogs-client"
 )
 
 // UserToken struct for username and token
