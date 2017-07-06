@@ -118,6 +118,44 @@ func createRepo(args []string) {
 	getRepo([]string{repoPath})
 }
 
+func deleteRepo(args []string) {
+	var repostr, confirmation string
+
+	if len(args) == 0 {
+		util.Die(usage)
+	} else {
+		repostr = args[0]
+	}
+
+	repocl := repo.NewClient(util.Config.RepoHost)
+	err := repocl.LoadToken()
+	util.CheckError(err)
+
+	repoinfo, err := repocl.GetRepo(repostr)
+	util.CheckError(err)
+
+	if repoinfo.FullName != repostr {
+		util.LogWrite("ERROR: Mismatch in repository names: %s != %s", repoinfo.FullName, repostr)
+		util.Die("An unexpected error occurred while communicating with the server.")
+	}
+
+	fmt.Println("--- WARNING ---")
+	fmt.Println("You are about to delete a remote repository, all its files, and history.")
+	fmt.Println("This action is irreversible.")
+
+	fmt.Println("If you are sure you want to delete this repository, type its full name (owner/name) below")
+	fmt.Print("> ")
+	fmt.Scanln(&confirmation)
+
+	if repoinfo.FullName == confirmation && repostr == confirmation {
+		err = repocl.DelRepo(repostr)
+		util.CheckErrorMsg(err, fmt.Sprintf("Error deleting repository. Server returned: %s", err.Error()))
+	} else {
+		util.Die("Confirmation does not match repository name. Cancelling.")
+	}
+
+}
+
 func isValidRepoPath(path string) bool {
 	return strings.Contains(path, "/")
 }
@@ -452,6 +490,8 @@ func main() {
 		login(cmdArgs)
 	case "create":
 		createRepo(cmdArgs)
+	case "delete":
+		deleteRepo(cmdArgs)
 	case "get":
 		getRepo(cmdArgs)
 	case "ls":

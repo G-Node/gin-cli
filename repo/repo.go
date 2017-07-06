@@ -89,6 +89,11 @@ func (repocl *Client) CreateRepo(name, description string) error {
 	return nil
 }
 
+// DelRepo deletes a repository from the server.
+func (repocl *Client) DelRepo(name string) error {
+	return fmt.Errorf("NOT IMPLEMENTED YET")
+}
+
 // UploadRepo adds files to a repository and uploads them.
 func (repocl *Client) UploadRepo(localPath string) error {
 	defer CleanUpTemp()
