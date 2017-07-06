@@ -370,7 +370,7 @@ func printAccountInfo(args []string) {
 	fmt.Println(outBuffer.String())
 }
 
-func listRepos(args []string) {
+func repos(args []string) {
 	if len(args) > 1 {
 		util.Die(usage)
 	}
@@ -389,7 +389,7 @@ func listRepos(args []string) {
 			arg = "--shared-with-me"
 		}
 	}
-	repos, err := repocl.GetRepos(arg)
+	repolist, err := repocl.GetRepos(arg)
 	util.CheckError(err)
 
 	if arg == "" || arg == "--public" {
@@ -405,7 +405,7 @@ func listRepos(args []string) {
 			fmt.Printf("Listing accessible repositories owned by '%s':\n\n", arg)
 		}
 	}
-	for idx, repoInfo := range repos {
+	for idx, repoInfo := range repolist {
 		fmt.Printf("%d: %s/%s\n", idx+1, repoInfo.Owner, repoInfo.Name)
 		fmt.Printf("Description: %s\n", strings.Trim(repoInfo.Description, "\n"))
 		if repoInfo.Public {
@@ -465,7 +465,7 @@ func main() {
 	case "keys":
 		keys(cmdArgs)
 	case "repos":
-		listRepos(cmdArgs)
+		repos(cmdArgs)
 	case "logout":
 		logout(cmdArgs)
 	case "help":
