@@ -26,6 +26,25 @@ func NewClient(host string) *Client {
 	return &Client{Client: web.NewClient(host)}
 }
 
+// GetRepo retrieves the information of a repository.
+func (repocl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
+	defer CleanUpTemp()
+	util.LogWrite("GetRepo")
+	var repo gogs.Repository
+
+	res, err := repocl.Get(fmt.Sprintf("/repos/%s", repoPath))
+	if err != nil {
+		return repo, err
+	}
+	defer web.CloseRes(res.Body)
+	b, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return repo, err
+	}
+	err = json.Unmarshal(b, &repo)
+	return repo, err
+}
+
 // GetRepos gets a list of repositories (public or user specific)
 func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	util.LogWrite("Retrieving repo list")
