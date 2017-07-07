@@ -35,6 +35,12 @@ func (repocl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
 	res, err := repocl.Get(fmt.Sprintf("/api/v1/repos/%s", repoPath))
 	if err != nil {
 		return repo, err
+	} else if res.StatusCode == http.StatusNotFound {
+		return repo, fmt.Errorf("Not found. Check repository owner and name.")
+	} else if res.StatusCode == http.StatusUnauthorized {
+		return repo, fmt.Errorf("You are not authorised to access repository.")
+	} else if res.StatusCode != http.StatusOK {
+		return repo, fmt.Errorf("Server returned %s", res.Body)
 	}
 	defer web.CloseRes(res.Body)
 	b, err := ioutil.ReadAll(res.Body)
