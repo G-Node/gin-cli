@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/G-Node/gin-cli/web"
-	"github.com/G-Node/gin-core/gin"
 	gogs "github.com/gogits/go-gogs-client"
 )
 
@@ -55,7 +54,7 @@ func TestRequestAccount(t *testing.T) {
 		t.Errorf("[Account lookup: alice] Request returned error [%s] when it should have succeeded.", err.Error())
 	}
 
-	respOK := acc.Login == "alice"
+	respOK := acc.UserName == "alice"
 
 	if !respOK {
 		t.Error("[Account lookup: alice] Test failed. Response does not match expected values.")
@@ -67,7 +66,7 @@ func TestRequestAccount(t *testing.T) {
 		t.Error("[Account lookup] Non existent account request succeeded when it should have failed.")
 	}
 
-	var emptyAcc gin.Account
+	var emptyAcc gogs.User
 	if acc != emptyAcc {
 		t.Errorf("[Account lookup] Non existent account request returned non-empty account info. [%+v]", acc)
 	}
