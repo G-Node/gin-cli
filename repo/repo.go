@@ -77,9 +77,9 @@ func (repocl *Client) CreateRepo(name, description string) error {
 		return fmt.Errorf("[Create repository] This action requires login")
 	}
 
-	gogsRepo := gogs.Repository{Name: name, Description: description}
+	newrepo := gogs.Repository{Name: name, Description: description}
 	util.LogWrite("Name: %s :: Description: %s", name, description)
-	res, err := repocl.Post("/api/v1/user/repos", gogsRepo)
+	res, err := repocl.Post("/api/v1/user/repos", newrepo)
 	if err != nil {
 		return err
 	} else if res.StatusCode != 201 {
@@ -92,7 +92,21 @@ func (repocl *Client) CreateRepo(name, description string) error {
 
 // DelRepo deletes a repository from the server.
 func (repocl *Client) DelRepo(name string) error {
-	return fmt.Errorf("NOT IMPLEMENTED YET")
+	util.LogWrite("Deleting repository")
+	err := repocl.LoadToken()
+	if err != nil {
+		return fmt.Errorf("[Delete repository] This action requires login")
+	}
+
+	res, err := repocl.Delete(fmt.Sprintf("/api/v1/repos/%s", name))
+	if err != nil {
+		return err
+	} else if res.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("[Delete repository] Failed. Server returned %s", res.Status)
+	}
+	web.CloseRes(res.Body)
+	util.LogWrite("Repository deleted")
+	return nil
 }
 
 // UploadRepo adds files to a repository and uploads them.

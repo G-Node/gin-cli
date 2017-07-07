@@ -97,9 +97,25 @@ func (cl *Client) PostBasicAuth(address, username, password string, data interfa
 	return cl.web.Do(req)
 }
 
+// Delete sends a DELETE request to address.
+func (cl *Client) Delete(address string) (*http.Response, error) {
+	requrl := urlJoin(cl.Host, address)
+	req, err := http.NewRequest("DELETE", requrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("content-type", "application/jsonAuthorization")
+	if cl.Token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
+		util.LogWrite("Added token to DELETE")
+	}
+	util.LogWrite("Performing DELETE: %s", req.URL)
+	return cl.web.Do(req)
+}
+
 // NewClient creates a new client for a given host.
-func NewClient(address string) *Client {
-	return &Client{Host: address, web: &http.Client{}}
+func NewClient(host string) *Client {
+	return &Client{Host: host, web: &http.Client{}}
 }
 
 // LoadToken reads the username and auth token from the token file and sets the

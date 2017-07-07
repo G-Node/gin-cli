@@ -149,11 +149,12 @@ func deleteRepo(args []string) {
 
 	if repoinfo.FullName == confirmation && repostr == confirmation {
 		err = repocl.DelRepo(repostr)
-		util.CheckErrorMsg(err, fmt.Sprintf("Error deleting repository. Server returned: %s", err.Error()))
+		util.CheckError(err)
 	} else {
 		util.Die("Confirmation does not match repository name. Cancelling.")
 	}
 
+	fmt.Printf("Repository %s has been deleted!\n", repostr)
 }
 
 func isValidRepoPath(path string) bool {
