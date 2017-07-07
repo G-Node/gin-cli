@@ -65,8 +65,7 @@ func login(args []string) {
 	util.CheckError(err)
 	info, err := authcl.RequestAccount(username)
 	util.CheckError(err)
-	fmt.Printf("Hello %s. You are now logged in.\n", info.Login)
-	// fmt.Printf("[Login success] You are now logged in as %s\n", username)
+	fmt.Printf("Hello %s. You are now logged in.\n", info.UserName)
 }
 
 func logout(args []string) {
@@ -371,39 +370,14 @@ func printAccountInfo(args []string) {
 
 	var fullnameBuffer bytes.Buffer
 
-	condAppend(&fullnameBuffer, info.Title)
-	condAppend(&fullnameBuffer, &info.FirstName)
-	condAppend(&fullnameBuffer, info.MiddleName)
-	condAppend(&fullnameBuffer, &info.LastName)
+	condAppend(&fullnameBuffer, &info.FullName)
 
 	var outBuffer bytes.Buffer
 
-	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.Login, fullnameBuffer.String()))
+	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.UserName, fullnameBuffer.String()))
 
-	if info.Email != nil && info.Email.Email != "" {
-		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s", info.Email.Email))
-		if info.Email.IsPublic && info.Login == authcl.Username {
-			_, _ = outBuffer.WriteString(fmt.Sprintf(" (publicly visible)"))
-		}
-		_, _ = outBuffer.WriteString(fmt.Sprintf("\n"))
-	}
-
-	if info.Affiliation != nil {
-		var affiliationBuffer bytes.Buffer
-		affiliation := info.Affiliation
-
-		condAppend(&affiliationBuffer, &affiliation.Department)
-		condAppend(&affiliationBuffer, &affiliation.Institute)
-		condAppend(&affiliationBuffer, &affiliation.City)
-		condAppend(&affiliationBuffer, &affiliation.Country)
-
-		if affiliationBuffer.Len() > 0 {
-			_, _ = outBuffer.WriteString(fmt.Sprintf("Affiliation: %s", affiliationBuffer.String()))
-			if info.Affiliation.IsPublic && info.Login == authcl.Username {
-				_, _ = outBuffer.WriteString(fmt.Sprintf(" (publicly visible)"))
-			}
-			_, _ = outBuffer.WriteString(fmt.Sprintf("\n"))
-		}
+	if info.Email != "" {
+		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email))
 	}
 
 	fmt.Println(outBuffer.String())

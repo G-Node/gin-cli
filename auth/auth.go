@@ -60,9 +60,8 @@ func (authcl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
 }
 
 // RequestAccount requests a specific account by name.
-func (authcl *Client) RequestAccount(name string) (gin.Account, error) {
-	var acc gin.Account
-	gogsUser := GINUser{}
+func (authcl *Client) RequestAccount(name string) (gogs.User, error) {
+	var acc gogs.User
 	res, err := authcl.Get(fmt.Sprintf("/api/v1/users/%s", name))
 	if err != nil {
 		return acc, err
@@ -75,13 +74,10 @@ func (authcl *Client) RequestAccount(name string) (gin.Account, error) {
 	defer web.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
-	if err := json.Unmarshal(b, &gogsUser); err != nil {
-		return gin.Account{}, err
+	if err != nil {
+		return acc, err
 	}
-	acc.LastName = gogsUser.FullName
-	acc.Login = gogsUser.UserName
-	acc.Email = &gin.Email{Email: gogsUser.Email}
-
+	err = json.Unmarshal(b, &acc)
 	return acc, err
 }
 
