@@ -9,7 +9,6 @@ import (
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
-	"github.com/G-Node/gin-repo/wire"
 	"github.com/gogits/go-gogs-client"
 )
 
@@ -52,10 +51,9 @@ func (repocl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
 }
 
 // GetRepos gets a list of repositories (public or user specific)
-func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
+func (repocl *Client) GetRepos(user string) ([]gogs.Repository, error) {
 	util.LogWrite("Retrieving repo list")
-	gogsRepos := []gogs.Repository{}
-	var repoList []wire.Repo
+	var repoList []gogs.Repository
 	var res *http.Response
 	var err error
 	res, err = repocl.Get("/api/v1/user/repos")
@@ -67,10 +65,7 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	if err != nil {
 		return repoList, err
 	}
-	err = json.Unmarshal(b, &gogsRepos)
-	for _, repo := range gogsRepos {
-		repoList = append(repoList, wire.Repo{Name: repo.Name, Description: repo.Description, Owner: repo.Owner.FullName})
-	}
+	err = json.Unmarshal(b, &repoList)
 	return repoList, err
 }
 

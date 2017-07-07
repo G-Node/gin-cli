@@ -444,9 +444,9 @@ func repos(args []string) {
 		}
 	}
 	for idx, repoInfo := range repolist {
-		fmt.Printf("%d: %s/%s\n", idx+1, repoInfo.Owner, repoInfo.Name)
+		fmt.Printf("%d: %s\n", idx+1, repoInfo.FullName)
 		fmt.Printf("Description: %s\n", strings.Trim(repoInfo.Description, "\n"))
-		if repoInfo.Public {
+		if !repoInfo.Private {
 			fmt.Println("[This repository is public]")
 		}
 		fmt.Println()
