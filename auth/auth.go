@@ -45,7 +45,7 @@ func (authcl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
 	res, err := authcl.Get("/api/v1/user/keys")
 	if err != nil {
 		return keys, fmt.Errorf("Request for keys returned error")
-	} else if res.StatusCode != 200 {
+	} else if res.StatusCode != http.StatusOK {
 		return keys, fmt.Errorf("[Keys request error] Server returned: %s", res.Status)
 	}
 
@@ -66,9 +66,9 @@ func (authcl *Client) RequestAccount(name string) (gin.Account, error) {
 	res, err := authcl.Get(fmt.Sprintf("/api/v1/users/%s", name))
 	if err != nil {
 		return acc, err
-	} else if res.StatusCode == 404 {
+	} else if res.StatusCode == http.StatusNotFound {
 		return acc, fmt.Errorf("User '%s' does not exist", name)
-	} else if res.StatusCode != 200 {
+	} else if res.StatusCode != http.StatusOK {
 		return acc, fmt.Errorf("Unknown error during user lookup for '%s'\nThe server returned '%s'", name, res.Status)
 	}
 
@@ -95,7 +95,7 @@ func (authcl *Client) SearchAccount(query string) ([]gin.Account, error) {
 	res, err := authcl.Get(address)
 	if err != nil {
 		return accs, err
-	} else if res.StatusCode != 200 {
+	} else if res.StatusCode != http.StatusOK {
 		return accs, fmt.Errorf("[Account search] Failed. Server returned: %s", res.Status)
 	}
 

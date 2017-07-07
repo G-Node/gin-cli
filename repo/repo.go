@@ -82,7 +82,7 @@ func (repocl *Client) CreateRepo(name, description string) error {
 	res, err := repocl.Post("/api/v1/user/repos", newrepo)
 	if err != nil {
 		return err
-	} else if res.StatusCode != 201 {
+	} else if res.StatusCode != http.StatusCreated {
 		return fmt.Errorf("[Create repository] Failed. Server returned %s", res.Status)
 	}
 	web.CloseRes(res.Body)
