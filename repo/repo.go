@@ -32,7 +32,7 @@ func (repocl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
 	util.LogWrite("GetRepo")
 	var repo gogs.Repository
 
-	res, err := repocl.Get(fmt.Sprintf("/repos/%s", repoPath))
+	res, err := repocl.Get(fmt.Sprintf("/api/v1/repos/%s", repoPath))
 	if err != nil {
 		return repo, err
 	}
