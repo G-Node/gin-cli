@@ -263,13 +263,6 @@ func download(args []string) {
 	util.CheckError(err)
 }
 
-// condAppend Conditionally append str to b if not empty
-func condAppend(b *bytes.Buffer, str *string) {
-	if str != nil && *str != "" {
-		_, _ = b.WriteString(*str + " ")
-	}
-}
-
 func keys(args []string) {
 	if len(args) > 0 && args[0] == "--add" {
 		addKey(args)
@@ -368,14 +361,8 @@ func printAccountInfo(args []string) {
 	info, err := authcl.RequestAccount(username)
 	util.CheckError(err)
 
-	var fullnameBuffer bytes.Buffer
-
-	condAppend(&fullnameBuffer, &info.FullName)
-
 	var outBuffer bytes.Buffer
-
-	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.UserName, fullnameBuffer.String()))
-
+	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.UserName, info.FullName))
 	if info.Email != "" {
 		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email))
 	}
