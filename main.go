@@ -249,9 +249,6 @@ func upload(args []string) {
 }
 
 func download(args []string) {
-	if len(args) > 0 {
-		util.Die(usage)
-	}
 	if !repo.IsRepo(".") {
 		util.Die("Current directory is not a repository.")
 	}
@@ -259,7 +256,7 @@ func download(args []string) {
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err := repocl.DownloadRepo(".")
+	err := repocl.GetContent(".", args)
 	util.CheckError(err)
 }
 

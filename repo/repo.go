@@ -159,6 +159,19 @@ func (repocl *Client) DownloadRepo(localPath string) error {
 	return err
 }
 
+// GetContent retrieves the contents of placeholder files in a checked out repository.
+func (repocl *Client) GetContent(localPath string, filepaths []string) error {
+	defer CleanUpTemp()
+	util.LogWrite("GetContent")
+
+	err := repocl.Connect()
+	if err != nil {
+		return err
+	}
+	err = AnnexGet(localPath, filepaths)
+	return err
+}
+
 // CloneRepo clones a remote repository and initialises anex init with the options specified in the config file.
 func (repocl *Client) CloneRepo(repoPath string) error {
 	defer auth.NewClient(repocl.Host).DeleteTmpKeys()

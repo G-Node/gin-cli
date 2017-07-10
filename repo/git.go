@@ -452,7 +452,29 @@ func AnnexPush(localPath, commitMsg string) error {
 	return nil
 }
 
-// AnnexAddResult ...
+// AnnexGet retrieves the content of specified files.
+func AnnexGet(localPath string, filepaths []string) error {
+	args := append([]string{"get"}, filepaths...)
+	cmd := buildAnnexCmd(args...)
+	cmd.Dir = localPath
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	err := cmd.Run()
+
+	if err != nil {
+		util.LogWrite("Error during AnnexGet")
+		util.LogWrite("[Error]: %v", err)
+		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return fmt.Errorf("Error uploading files")
+	}
+	return nil
+}
+
+// AnnexAddResult is used to store information about each added file, as returned from the annex command.
 type AnnexAddResult struct {
 	Command string `json:"command"`
 	File    string `json:"file"`

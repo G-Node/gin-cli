@@ -18,7 +18,7 @@ Commands:
 	get      <repopath>
 	ls       [<directory>]
 	upload
-	download
+	download [<filenames>]
 	repos    [<username>]
 	info     [<username>]
 	keys     [-v | --verbose]
@@ -163,17 +163,19 @@ DESCRIPTION
 
 const downloadHelp = `USAGE
 
-	gin download
+	gin download [<filenames>]...
 
 DESCRIPTION
 
-	Download changes made in the remote repository on the GIN server to the
-	local repository clone. This command must be called from within the
-	local repository clone. All changes made on the remote server will
-	be retrieved, including addition of new files, modifications and renaming
-	of existing files, and file deletions.
+	Download the content of the listed files. The download command is intended
+	to be used to retrieve the content of placeholder files in a local
+	repository. This command must be called from within the local repository
+	clone.
 
-	This command takes no arguments.
+	<filenames>
+		One or more names of files or directories to retrieve. If unspecified,
+		the content of all the files under the current directory will be
+		retrieved.
 `
 
 const reposHelp = `USAGE
