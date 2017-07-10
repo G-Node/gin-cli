@@ -370,17 +370,6 @@ func AnnexInit(localPath, description string) error {
 			return initError
 		}
 	}
-	cmd = exec.Command(gitbin, "config", "annex.backends", "WORM")
-	cmd.Dir = localPath
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-	if err != nil {
-		util.LogWrite("[stdout]\r\n%s", out.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return initError
-	}
 	cmd = exec.Command(gitbin, "config", "annex.thin", "true")
 	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
