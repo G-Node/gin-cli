@@ -406,9 +406,13 @@ func AnnexPull(localPath string) error {
 }
 
 // AnnexSync synchronises the local repository with the remote.
-// (git annex sync --content)
-func AnnexSync(localPath string) error {
-	cmd := buildAnnexCmd("sync", "--content")
+// Optionally synchronises content if content=True
+// (git annex sync [--content])
+func AnnexSync(localPath string, content bool) error {
+	cmd := buildAnnexCmd("sync")
+	if content {
+		cmd.Args = append(cmd.Args, "--content")
+	}
 	cmd.Dir = localPath
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	var out bytes.Buffer
