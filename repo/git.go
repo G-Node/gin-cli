@@ -455,6 +455,7 @@ func AnnexPush(localPath, commitMsg string) error {
 
 // AnnexGet retrieves the content of specified files.
 func AnnexGet(localPath string, filepaths []string) error {
+	// TODO: Print success for each file as it finishes
 	args := append([]string{"get"}, filepaths...)
 	cmd := buildAnnexCmd(args...)
 	cmd.Dir = localPath
@@ -652,4 +653,33 @@ func makeFileList(header string, fnames []string) (list string) {
 	}
 	list += "\n"
 	return
+}
+
+// Utility functions for shelling out
+
+// RunGitCommand executes a external git command with the provided arguments and returns stdout and stderr
+func RunGitCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
+	gitbin := util.Config.Bin.Git
+	cmd := exec.Command(gitbin)
+	cmd.Args = append(cmd.Args, args...)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	err := cmd.Run()
+	return stdout, stderr, err
+}
+
+// RunAnnexCommand executes a git annex command with the provided arguments and returns stdout and stderr
+func RunAnnexCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
+	cmd := buildAnnexCmd(args...)
+	// cmd.Dir = localPath
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	err := cmd.Run()
+	return stdout, stderr, err
 }
