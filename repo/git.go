@@ -144,8 +144,9 @@ func getFileStatus(filepath string) FileStatus {
 }
 
 // ListFiles lists the files in the specified directory and their sync status.
-func ListFiles(path string, filesStatus map[string]FileStatus) error {
+func ListFiles(path string) (map[string]FileStatus, error) {
 
+	filesStatus := make(map[string]FileStatus)
 	walker := func(path string, info os.FileInfo, err error) error {
 		if filepath.Base(path) == ".git" {
 			// This may be the .git directory or any file inside it
@@ -163,7 +164,8 @@ func ListFiles(path string, filesStatus map[string]FileStatus) error {
 	}
 
 	util.LogWrite("ListFiles: Walking path %s", path)
-	return filepath.Walk(path, walker)
+	err := filepath.Walk(path, walker)
+	return filesStatus, err
 }
 
 // Git commands

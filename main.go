@@ -207,8 +207,7 @@ func lsRepo(args []string) {
 			util.LogError(err)
 			continue
 		}
-		filesStatus := make(map[string]repo.FileStatus)
-		err := repo.ListFiles(d, filesStatus)
+		filesStatus, err := repo.ListFiles(d)
 		if err != nil {
 			_, err = skipped.WriteString(fmt.Sprintf("Error listing %s: %s\n", d, err.Error()))
 			util.LogError(err)
