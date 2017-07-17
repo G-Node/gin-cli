@@ -127,25 +127,16 @@ func getFileStatus(filepath string) FileStatus {
 	}
 
 	// committed but not pushed?
-	gitbin := util.Config.Bin.Git
 	// TODO: use default remote/branch
-	dir, filename := util.PathSplit(filepath)
-	cmd := exec.Command(gitbin, "diff", "--name-only", "origin/master", filename)
-	cmd.Dir = dir
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err = cmd.Run()
+	stdout, stderr, err := RunGitCommand("diff", "--name-only", "origin/master", filepath)
 	if err != nil {
 		// Error out?
 		util.LogWrite("Error during diff command for status")
-		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return Untracked
 	}
-	if out.Len() > 0 {
+	if stdout.Len() > 0 {
 		return LocalChanges
 	}
 
@@ -261,23 +252,11 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 // Clone downloads a repository and sets the remote fetch and push urls.
 // (git clone ...)
 func (repocl *Client) Clone(repoPath string) error {
-	gitbin := util.Config.Bin.Git
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repoPath)
-	cmd := exec.Command(gitbin)
-	if privKeyFile.Active {
-		env := os.Environ()
-		cmd.Env = append(env, privKeyFile.GitSSHEnv())
-	}
-	cmd.Args = append(cmd.Args, "clone", remotePath)
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err := cmd.Run()
+	stdout, stderr, err := RunGitCommand("clone", remotePath)
 	if err != nil {
 		util.LogWrite("Error during clone command")
-		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		repoOwner, repoName := splitRepoParts(repoPath)
 
@@ -300,23 +279,12 @@ func (repocl *Client) Clone(repoPath string) error {
 
 // Git annex commands
 
-func buildAnnexCmd(args ...string) *exec.Cmd {
-	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := exec.Command(gitannexbin, args...)
-	annexsshopt := "annex.ssh-options=-o StrictHostKeyChecking=no"
-	if privKeyFile.Active {
-		annexsshopt = fmt.Sprintf("%s -i %s", annexsshopt, privKeyFile.FullPath())
-	}
-	cmd.Args = append(cmd.Args, "-c", annexsshopt)
-	return cmd
-}
-
 // AnnexInit initialises the repository for annex
 // (git annex init)
 func AnnexInit(localPath, description string) error {
-	initError := fmt.Errorf("Repository annex initialisation failed.")
 	stdout, stderr, err := RunAnnexCommand("init", description)
 	if err != nil {
+		initError := fmt.Errorf("Repository annex initialisation failed.")
 		util.LogWrite(initError.Error())
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
@@ -328,18 +296,10 @@ func AnnexInit(localPath, description string) error {
 // AnnexPull downloads all annexed files.
 // (git annex sync --no-push --content)
 func AnnexPull(localPath string) error {
-	cmd := buildAnnexCmd("sync", "--no-push", "--content")
-	cmd.Dir = localPath
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-
+	stdout, stderr, err := RunAnnexCommand("sync", "--no-push", "--content", fmt.Sprintf("--content-of=%s", localPath))
 	if err != nil {
 		util.LogWrite("Error during AnnexPull.")
-		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error downloading files")
 	}
@@ -350,21 +310,15 @@ func AnnexPull(localPath string) error {
 // Optionally synchronises content if content=True
 // (git annex sync [--content])
 func AnnexSync(localPath string, content bool) error {
-	cmd := buildAnnexCmd("sync")
+	var contentarg string
 	if content {
-		cmd.Args = append(cmd.Args, "--content")
+		contentarg = "--content"
 	}
-	cmd.Dir = localPath
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err := cmd.Run()
+	stdout, stderr, err := RunAnnexCommand("sync", contentarg)
 
 	if err != nil {
 		util.LogWrite("Error during AnnexSync")
-		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error synchronising files")
 	}
@@ -374,19 +328,16 @@ func AnnexSync(localPath string, content bool) error {
 // AnnexPush uploads all annexed files.
 // (git annex sync --no-pull --content)
 func AnnexPush(localPath, commitMsg string) error {
-	cmd := buildAnnexCmd("sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg))
-	cmd.Dir = localPath
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err := cmd.Run()
+	stdout, stderr, err := RunAnnexCommand(
+		"sync", "--no-pull", "--content",
+		fmt.Sprintf("--content-of=%s", localPath),
+		"--commit", fmt.Sprintf("--message=%s", commitMsg),
+	)
 
 	if err != nil {
 		util.LogWrite("Error during AnnexPush")
 		util.LogWrite("[Error]: %v", err)
-		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error uploading files")
 	}
@@ -394,22 +345,14 @@ func AnnexPush(localPath, commitMsg string) error {
 }
 
 // AnnexGet retrieves the content of specified files.
-func AnnexGet(localPath string, filepaths []string) error {
+func AnnexGet(filepaths []string) error {
 	// TODO: Print success for each file as it finishes
 	args := append([]string{"get"}, filepaths...)
-	cmd := buildAnnexCmd(args...)
-	cmd.Dir = localPath
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err := cmd.Run()
-
+	stdout, stderr, err := RunAnnexCommand(args...)
 	if err != nil {
 		util.LogWrite("Error during AnnexGet")
 		util.LogWrite("[Error]: %v", err)
-		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error uploading files")
 	}
@@ -427,24 +370,16 @@ type AnnexAddResult struct {
 // AnnexAdd adds a path to the annex.
 // (git annex add)
 func AnnexAdd(localPath string) ([]string, error) {
-	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := exec.Command(gitannexbin, "--json", "add", localPath)
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err := cmd.Run()
-
+	stdout, stderr, err := RunAnnexCommand("--json", "add", localPath)
 	if err != nil {
 		util.LogWrite("Error during AnnexAdd")
-		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return nil, fmt.Errorf("Error adding files to repository.")
 	}
 
 	var outStruct AnnexAddResult
-	files := bytes.Split(out.Bytes(), []byte("\n"))
+	files := bytes.Split(stdout.Bytes(), []byte("\n"))
 	added := make([]string, 0, len(files))
 	for _, f := range files {
 		if len(f) == 0 {
@@ -482,24 +417,15 @@ type AnnexWhereisResult struct {
 // AnnexWhereis returns information about annexed files in the repository
 // (git annex whereis)
 func AnnexWhereis(path string) ([]AnnexWhereisResult, error) {
-	dir, filename := util.PathSplit(path)
-	cmd := buildAnnexCmd("whereis", "--json", filename)
-	cmd.Dir = dir
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err := cmd.Run()
-
+	stdout, stderr, err := RunAnnexCommand("whereis", "--json", path)
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
-		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return nil, fmt.Errorf("Error getting file status from server")
 	}
 
-	resultsJSON := bytes.Split(out.Bytes(), []byte("\n"))
+	resultsJSON := bytes.Split(stdout.Bytes(), []byte("\n"))
 	results := make([]AnnexWhereisResult, 0, len(resultsJSON))
 	var res AnnexWhereisResult
 	for _, resJSON := range resultsJSON {
@@ -523,25 +449,15 @@ type AnnexStatusResult struct {
 
 // AnnexStatus returns the status of a file or files in a directory
 func AnnexStatus(path string) ([]AnnexStatusResult, error) {
-	dir, filename := util.PathSplit(path)
-	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := exec.Command(gitannexbin, "status", "--json", filename)
-	cmd.Dir = dir
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err := cmd.Run()
-
+	stdout, stderr, err := RunAnnexCommand("status", "--json", path)
 	if err != nil {
 		util.LogWrite("Error during DescribeChanges")
-		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return nil, fmt.Errorf("Error retrieving file status")
 	}
 
-	files := bytes.Split(out.Bytes(), []byte("\n"))
+	files := bytes.Split(stdout.Bytes(), []byte("\n"))
 
 	statuses := make([]AnnexStatusResult, 0, len(files))
 	var outStruct AnnexStatusResult
@@ -606,6 +522,10 @@ func RunGitCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	if privKeyFile.Active {
+		env := os.Environ()
+		cmd.Env = append(env, privKeyFile.GitSSHEnv())
+	}
 	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	return stdout, stderr, err
@@ -613,8 +533,13 @@ func RunGitCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
 
 // RunAnnexCommand executes a git annex command with the provided arguments and returns stdout and stderr
 func RunAnnexCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
-	cmd := buildAnnexCmd(args...)
-	// cmd.Dir = localPath
+	gitannexbin := util.Config.Bin.GitAnnex
+	cmd := exec.Command(gitannexbin, args...)
+	annexsshopt := "annex.ssh-options=-o StrictHostKeyChecking=no"
+	if privKeyFile.Active {
+		annexsshopt = fmt.Sprintf("%s -i %s", annexsshopt, privKeyFile.FullPath())
+	}
+	cmd.Args = append(cmd.Args, "-c", annexsshopt)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
