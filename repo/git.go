@@ -314,71 +314,11 @@ func buildAnnexCmd(args ...string) *exec.Cmd {
 // AnnexInit initialises the repository for annex
 // (git annex init)
 func AnnexInit(localPath, description string) error {
-	gitbin := util.Config.Bin.Git
 	initError := fmt.Errorf("Repository annex initialisation failed.")
-	cmd := buildAnnexCmd("init", description, "--version=6")
-	cmd.Dir = localPath
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	err := cmd.Run()
+	stdout, stderr, err := RunAnnexCommand("init", description)
 	if err != nil {
 		util.LogWrite(initError.Error())
-		util.LogWrite("[stdout]\r\n%s", out.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return initError
-	}
-
-	cmd = exec.Command(gitbin, "config", "annex.addunlocked", "true")
-	cmd.Dir = localPath
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-	if err != nil {
-		util.LogWrite(initError.Error())
-		util.LogWrite("[stdout]\r\n%s", out.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return initError
-	}
-
-	// list of extensions that are added to git (not annex)
-	exclfilters := util.Config.Annex.Exclude
-	excludes := make([]string, len(exclfilters))
-	for idx, ext := range exclfilters {
-		excludes[idx] = fmt.Sprintf("exclude=%s", ext)
-	}
-	sizethreshold := fmt.Sprintf("largerthan=%s", util.Config.Annex.MinSize)
-	conditions := append(excludes, sizethreshold)
-	lfvalue := strings.Join(conditions, " and ")
-
-	if lfvalue != "" {
-		cmd = exec.Command(gitbin, "config", "annex.largefiles", lfvalue)
-		cmd.Dir = localPath
-		util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-		cmd.Stdout = &out
-		cmd.Stderr = &stderr
-		err = cmd.Run()
-		if err != nil {
-			util.LogWrite(initError.Error())
-			util.LogWrite("[stdout]\r\n%s", out.String())
-			util.LogWrite("[stderr]\r\n%s", stderr.String())
-			return initError
-		}
-		if err != nil {
-			return initError
-		}
-	}
-	cmd = exec.Command(gitbin, "config", "annex.thin", "true")
-	cmd.Dir = localPath
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-	if err != nil {
-		util.LogWrite("[stdout]\r\n%s", out.String())
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return initError
 	}
