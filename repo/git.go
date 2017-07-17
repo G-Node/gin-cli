@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -97,75 +96,71 @@ func (fs FileStatus) Abbrev() string {
 	}
 }
 
-// getFileStatus determines the state of the file at filepath and returns a FileStatus.
-func getFileStatus(filepath string) FileStatus {
-	wiRes, err := AnnexWhereis(filepath)
-	if err != nil {
-		// File does not exist. Different status???
-		return Untracked
-	}
+// ListFiles lists the files in the specified directory and their sync status.
+func ListFiles(paths []string) (map[string]FileStatus, error) {
 
-	// function only runs for one file
-	if len(wiRes) > 0 {
-		for _, remote := range wiRes[0].Whereis {
-			if remote.Here {
-				return Synced
+	statuses := make(map[string]FileStatus)
+
+	wiResults, err := AnnexWhereis(paths)
+	if err != nil {
+		return statuses, err
+	}
+	for _, status := range wiResults {
+		fname := status.File
+		if !status.Success {
+			statuses[fname] = Untracked
+		} else {
+			statuses[fname] = NoContent
+			for _, remote := range status.Whereis {
+				if remote.Here {
+					statuses[fname] = Synced
+					break
+				}
 			}
 		}
-		return NoContent
 	}
+	return statuses, nil
+	// if err != nil {
+	// 	// File does not exist. Different status???
+	// 	return Untracked
+	// }
+
+	// function only runs for one file
+	// if len(wiRes) > 0 {
+	// 	for _, remote := range wiRes[0].Whereis {
+	// 		if remote.Here {
+	// 			return Synced
+	// 		}
+	// 	}
+	// 	return NoContent
+	// }
 
 	// not in annex, but AnnexStatus can still tell us the file status
-	annexStat, err := AnnexStatus(filepath)
-	if err == nil && len(annexStat) > 0 {
-		switch stat := annexStat[0].Status; {
-		case stat == "M" || stat == "A":
-			return Modified
-		case stat == "?":
-			return Untracked
-		}
-	}
+	// annexStat, err := AnnexStatus(filepath)
+	// if err == nil && len(annexStat) > 0 {
+	// 	switch stat := annexStat[0].Status; {
+	// 	case stat == "M" || stat == "A":
+	// 		return Modified
+	// 	case stat == "?":
+	// 		return Untracked
+	// 	}
+	// }
 
 	// committed but not pushed?
 	// TODO: use default remote/branch
-	stdout, stderr, err := RunGitCommand("diff", "--name-only", "origin/master", filepath)
-	if err != nil {
-		// Error out?
-		util.LogWrite("Error during diff command for status")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return Untracked
-	}
-	if stdout.Len() > 0 {
-		return LocalChanges
-	}
+	// stdout, stderr, err := RunGitCommand("diff", "--name-only", "origin/master", filepath)
+	// if err != nil {
+	// 	// Error out?
+	// 	util.LogWrite("Error during diff command for status")
+	// 	util.LogWrite("[stdout]\r\n%s", stdout.String())
+	// 	util.LogWrite("[stderr]\r\n%s", stderr.String())
+	// 	return Untracked
+	// }
+	// if stdout.Len() > 0 {
+	// 	return LocalChanges
+	// }
 
-	return Untracked
-}
-
-// ListFiles lists the files in the specified directory and their sync status.
-func ListFiles(path string) (map[string]FileStatus, error) {
-
-	filesStatus := make(map[string]FileStatus)
-	walker := func(path string, info os.FileInfo, err error) error {
-		if filepath.Base(path) == ".git" {
-			// This may be the .git directory or any file inside it
-			util.LogWrite("ListFiles: Ignoring .git directory")
-			return filepath.SkipDir
-		}
-		// Descend into directories but don't check them explicitly
-		if info.IsDir() {
-			util.LogWrite("ListFiles: Directory %s", path)
-			return nil
-		}
-		util.LogWrite("ListFiles: Checking status of file %s", path)
-		filesStatus[path] = getFileStatus(path)
-		return nil
-	}
-
-	util.LogWrite("ListFiles: Walking path %s", path)
-	err := filepath.Walk(path, walker)
-	return filesStatus, err
+	// return Untracked
 }
 
 // Git commands
@@ -425,8 +420,10 @@ type AnnexWhereisResult struct {
 
 // AnnexWhereis returns information about annexed files in the repository
 // (git annex whereis)
-func AnnexWhereis(path string) ([]AnnexWhereisResult, error) {
-	stdout, stderr, err := RunAnnexCommand(".", "whereis", "--json", path)
+func AnnexWhereis(paths []string) ([]AnnexWhereisResult, error) {
+	args := []string{"whereis", "--json"}
+	args = append(args, paths...)
+	stdout, stderr, err := RunAnnexCommand(".", args...)
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())

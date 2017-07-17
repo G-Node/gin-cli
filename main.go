@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -193,46 +192,15 @@ func lsRepo(args []string) {
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
 
-	var err error
-	var fileStatusBuffer, dirStatusBuffer, skipped bytes.Buffer
-	for _, d := range dirs {
-		path, filename := util.PathSplit(d)
-		if filepath.Base(d) == ".git" {
-			_, err = skipped.WriteString(fmt.Sprintf("Skipping directory '%s'\n", d))
-			util.LogError(err)
-			continue
-		}
-		if !repo.IsRepo(path) {
-			_, err = skipped.WriteString(fmt.Sprintf("'%s' is not under gin control\n", d))
-			util.LogError(err)
-			continue
-		}
-		filesStatus, err := repo.ListFiles(d)
-		if err != nil {
-			_, err = skipped.WriteString(fmt.Sprintf("Error listing %s: %s\n", d, err.Error()))
-			util.LogError(err)
-			continue
-		}
+	// var fileStatusBuffer, dirStatusBuffer, skipped bytes.Buffer
+	filesStatus, err := repo.ListFiles(dirs)
+	util.CheckError(err)
 
-		currentBuffer := &fileStatusBuffer
-		if filename == "." {
-			currentBuffer = &dirStatusBuffer
-			if len(dirs) > 1 {
-				_, err = dirStatusBuffer.WriteString(fmt.Sprintf("\n%s:\n", d))
-				util.LogError(err)
-			}
-		}
-		for file, status := range filesStatus {
-			_, err = currentBuffer.WriteString(fmt.Sprintf("%s %s\n", status.Abbrev(), file))
-			util.LogError(err)
-		}
+	for file, status := range filesStatus {
+		// _, err = currentBuffer.WriteString(fmt.Sprintf("%s %s\n", status.Abbrev(), file))
+		fmt.Printf("%s %s\n", status.Abbrev(), file)
+		// util.LogError(err)
 	}
-
-	fmt.Printf("%s%s", fileStatusBuffer.String(), dirStatusBuffer.String())
-	if skipped.Len() > 0 {
-		fmt.Printf("\n%s", skipped.String())
-	}
-
 }
 
 func upload(args []string) {
