@@ -265,30 +265,3 @@ func TestSearchAccount(t *testing.T) {
 		t.Errorf("[Search account] Bad server account search returned non-empty account info. [%+v]", accs)
 	}
 }
-
-func loginHandler(w http.ResponseWriter, r *http.Request) {
-	goodURL := "/oauth/token"
-	goodFormData := `client_id=clientid&client_secret=clientsecret&grant_type=password&password=alicepw&scope=repo-read+repo-write+account-read+account-write&username=alice`
-	brokenFormData := `client_id=clientid&client_secret=clientsecret&grant_type=password&password=BREAK&scope=repo-read+repo-write+account-read+account-write&username=BREAK`
-	resp := `{"token_type":"Bearer","scope":"account-read account-write repo-read repo-write","access_token":"THETOKEN","refresh_token":null}`
-	badAuthResp := `{"code":401,"error":"Unauthorized","message":"Wront username or password","reasons":null}`
-	err := r.ParseForm()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error while parsing form in request handler for Login test")
-	}
-
-	if r.URL.Path == goodURL {
-		if r.Form.Encode() == goodFormData {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, resp)
-		} else if r.Form.Encode() == brokenFormData {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, "not_json_response")
-		} else {
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprint(w, badAuthResp)
-		}
-	} else {
-		w.WriteHeader(http.StatusNotFound)
-	}
-}
