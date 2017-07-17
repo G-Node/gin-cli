@@ -172,7 +172,7 @@ func (repocl *Client) GetContent(localPath string, filepaths []string) error {
 	return err
 }
 
-// CloneRepo clones a remote repository and initialises anex init with the options specified in the config file.
+// CloneRepo clones a remote repository and initialises annex init with the options specified in the config file.
 func (repocl *Client) CloneRepo(repoPath string) error {
 	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
 	defer CleanUpTemp()

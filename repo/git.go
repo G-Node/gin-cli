@@ -116,9 +116,9 @@ func getFileStatus(filepath string) FileStatus {
 	}
 
 	// not in annex, but AnnexStatus can still tell us the file status
-	anexStat, err := AnnexStatus(filepath)
-	if err == nil && len(anexStat) > 0 {
-		switch stat := anexStat[0].Status; {
+	annexStat, err := AnnexStatus(filepath)
+	if err == nil && len(annexStat) > 0 {
+		switch stat := annexStat[0].Status; {
 		case stat == "M" || stat == "A":
 			return Modified
 		case stat == "?":
