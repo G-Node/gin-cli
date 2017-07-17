@@ -61,12 +61,11 @@ func login(args []string) {
 	}
 
 	authcl := auth.NewClient(util.Config.AuthHost)
-	err = authcl.Login(username, password, "gin-cli", util.Config.Secret)
+	err = authcl.Login(username, password, "gin-cli")
 	util.CheckError(err)
 	info, err := authcl.RequestAccount(username)
 	util.CheckError(err)
-	fmt.Printf("Hello %s. You are now logged in.\n", info.Login)
-	// fmt.Printf("[Login success] You are now logged in as %s\n", username)
+	fmt.Printf("Hello %s. You are now logged in.\n", info.UserName)
 }
 
 func logout(args []string) {
@@ -118,6 +117,45 @@ func createRepo(args []string) {
 	getRepo([]string{repoPath})
 }
 
+func deleteRepo(args []string) {
+	var repostr, confirmation string
+
+	if len(args) == 0 {
+		util.Die(usage)
+	} else {
+		repostr = args[0]
+	}
+
+	repocl := repo.NewClient(util.Config.RepoHost)
+	err := repocl.LoadToken()
+	util.CheckError(err)
+
+	repoinfo, err := repocl.GetRepo(repostr)
+	util.CheckError(err)
+
+	if repoinfo.FullName != repostr {
+		util.LogWrite("ERROR: Mismatch in repository names: %s != %s", repoinfo.FullName, repostr)
+		util.Die("An unexpected error occurred while communicating with the server.")
+	}
+
+	fmt.Println("--- WARNING ---")
+	fmt.Println("You are about to delete a remote repository, all its files, and history.")
+	fmt.Println("This action is irreversible.")
+
+	fmt.Println("If you are sure you want to delete this repository, type its full name (owner/name) below")
+	fmt.Print("> ")
+	fmt.Scanln(&confirmation)
+
+	if repoinfo.FullName == confirmation && repostr == confirmation {
+		err = repocl.DelRepo(repostr)
+		util.CheckError(err)
+	} else {
+		util.Die("Confirmation does not match repository name. Cancelling.")
+	}
+
+	fmt.Printf("Repository %s has been deleted!\n", repostr)
+}
+
 func isValidRepoPath(path string) bool {
 	return strings.Contains(path, "/")
 }
@@ -155,21 +193,25 @@ func lsRepo(args []string) {
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
 
+	var err error
 	var fileStatusBuffer, dirStatusBuffer, skipped bytes.Buffer
 	for _, d := range dirs {
 		path, filename := util.PathSplit(d)
 		if filepath.Base(d) == ".git" {
-			skipped.WriteString(fmt.Sprintf("Skipping directory '%s'\n", d))
+			_, err = skipped.WriteString(fmt.Sprintf("Skipping directory '%s'\n", d))
+			util.LogError(err)
 			continue
 		}
 		if !repo.IsRepo(path) {
-			skipped.WriteString(fmt.Sprintf("'%s' is not under gin control\n", d))
+			_, err = skipped.WriteString(fmt.Sprintf("'%s' is not under gin control\n", d))
+			util.LogError(err)
 			continue
 		}
 		filesStatus := make(map[string]repo.FileStatus)
 		err := repo.ListFiles(d, filesStatus)
 		if err != nil {
-			skipped.WriteString(fmt.Sprintf("Error listing %s: %s\n", d, err.Error()))
+			_, err = skipped.WriteString(fmt.Sprintf("Error listing %s: %s\n", d, err.Error()))
+			util.LogError(err)
 			continue
 		}
 
@@ -177,11 +219,13 @@ func lsRepo(args []string) {
 		if filename == "." {
 			currentBuffer = &dirStatusBuffer
 			if len(dirs) > 1 {
-				dirStatusBuffer.WriteString(fmt.Sprintf("\n%s:\n", d))
+				_, err = dirStatusBuffer.WriteString(fmt.Sprintf("\n%s:\n", d))
+				util.LogError(err)
 			}
 		}
 		for file, status := range filesStatus {
-			currentBuffer.WriteString(fmt.Sprintf("%s %s\n", status.Abbrev(), file))
+			_, err = currentBuffer.WriteString(fmt.Sprintf("%s %s\n", status.Abbrev(), file))
+			util.LogError(err)
 		}
 	}
 
@@ -266,8 +310,7 @@ func printKeys(args []string) {
 	}
 	fmt.Printf("You have %s key%s associated with your account.\n\n", nkeysStr, plural)
 	for idx, key := range keys {
-		fmt.Printf("[%v] \"%s\" ", idx+1, key.Description)
-		fmt.Printf("(Fingerprint: %s)\n", key.Fingerprint)
+		fmt.Printf("[%v] \"%s\"\n", idx+1, key.Title)
 		if printFull {
 			fmt.Printf("--- Key ---\n%s\n", key.Key)
 		}
@@ -327,45 +370,20 @@ func printAccountInfo(args []string) {
 
 	var fullnameBuffer bytes.Buffer
 
-	condAppend(&fullnameBuffer, info.Title)
-	condAppend(&fullnameBuffer, &info.FirstName)
-	condAppend(&fullnameBuffer, info.MiddleName)
-	condAppend(&fullnameBuffer, &info.LastName)
+	condAppend(&fullnameBuffer, &info.FullName)
 
 	var outBuffer bytes.Buffer
 
-	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.Login, fullnameBuffer.String()))
+	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.UserName, fullnameBuffer.String()))
 
-	if info.Email != nil && info.Email.Email != "" {
-		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s", info.Email.Email))
-		if info.Email.IsPublic && info.Login == authcl.Username {
-			_, _ = outBuffer.WriteString(fmt.Sprintf(" (publicly visible)"))
-		}
-		_, _ = outBuffer.WriteString(fmt.Sprintf("\n"))
-	}
-
-	if info.Affiliation != nil {
-		var affiliationBuffer bytes.Buffer
-		affiliation := info.Affiliation
-
-		condAppend(&affiliationBuffer, &affiliation.Department)
-		condAppend(&affiliationBuffer, &affiliation.Institute)
-		condAppend(&affiliationBuffer, &affiliation.City)
-		condAppend(&affiliationBuffer, &affiliation.Country)
-
-		if affiliationBuffer.Len() > 0 {
-			_, _ = outBuffer.WriteString(fmt.Sprintf("Affiliation: %s", affiliationBuffer.String()))
-			if info.Affiliation.IsPublic && info.Login == authcl.Username {
-				_, _ = outBuffer.WriteString(fmt.Sprintf(" (publicly visible)"))
-			}
-			_, _ = outBuffer.WriteString(fmt.Sprintf("\n"))
-		}
+	if info.Email != "" {
+		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email))
 	}
 
 	fmt.Println(outBuffer.String())
 }
 
-func listRepos(args []string) {
+func repos(args []string) {
 	if len(args) > 1 {
 		util.Die(usage)
 	}
@@ -384,7 +402,7 @@ func listRepos(args []string) {
 			arg = "--shared-with-me"
 		}
 	}
-	repos, err := repocl.GetRepos(arg)
+	repolist, err := repocl.GetRepos(arg)
 	util.CheckError(err)
 
 	if arg == "" || arg == "--public" {
@@ -400,10 +418,10 @@ func listRepos(args []string) {
 			fmt.Printf("Listing accessible repositories owned by '%s':\n\n", arg)
 		}
 	}
-	for idx, repoInfo := range repos {
-		fmt.Printf("%d: %s/%s\n", idx+1, repoInfo.Owner, repoInfo.Name)
+	for idx, repoInfo := range repolist {
+		fmt.Printf("%d: %s\n", idx+1, repoInfo.FullName)
 		fmt.Printf("Description: %s\n", strings.Trim(repoInfo.Description, "\n"))
-		if repoInfo.Public {
+		if !repoInfo.Private {
 			fmt.Println("[This repository is public]")
 		}
 		fmt.Println()
@@ -447,6 +465,8 @@ func main() {
 		login(cmdArgs)
 	case "create":
 		createRepo(cmdArgs)
+	case "delete":
+		deleteRepo(cmdArgs)
 	case "get":
 		getRepo(cmdArgs)
 	case "ls":
@@ -460,7 +480,7 @@ func main() {
 	case "keys":
 		keys(cmdArgs)
 	case "repos":
-		listRepos(cmdArgs)
+		repos(cmdArgs)
 	case "logout":
 		logout(cmdArgs)
 	case "help":

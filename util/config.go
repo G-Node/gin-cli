@@ -13,7 +13,7 @@ type conf struct {
 	RepoHost string
 	GitHost  string
 	GitUser  string
-	Bin struct {
+	Bin      struct {
 		Git      string
 		GitAnnex string
 		SSH      string
@@ -22,7 +22,6 @@ type conf struct {
 		Exclude []string
 		MinSize string
 	}
-	Secret string
 }
 
 // Config makes the configuration options available after LoadConfig is called
@@ -43,7 +42,6 @@ func LoadConfig() error {
 	viper.SetDefault("git.address", "gin.g-node.org")
 	viper.SetDefault("git.port", "22")
 	viper.SetDefault("git.user", "git")
-	viper.SetDefault("secret", "97196a1c-silly-biscuit3-d161ea15a676")
 
 	// annex filters
 	viper.SetDefault("annex.exclude", [...]string{"*.md", "*.rst", "*.txt", "*.c", "*.cpp", "*.h", "*.hpp", "*.py", "*.go"})
@@ -63,7 +61,8 @@ func LoadConfig() error {
 	viper.AddConfigPath(configpath)
 	LogWrite("Config path added %s", configpath)
 
-	viper.ReadInConfig()
+	err = viper.ReadInConfig()
+	LogError(err)
 	fileused := viper.ConfigFileUsed()
 	if fileused != "" {
 		LogWrite("Loading config file %s", viper.ConfigFileUsed())
@@ -93,9 +92,6 @@ func LoadConfig() error {
 
 	LogWrite("Configuration values")
 	LogWrite("%+v", Config)
-
-	// Set secret after printing configuration to log file
-	Config.Secret = viper.GetString("secret")
 
 	return nil
 }

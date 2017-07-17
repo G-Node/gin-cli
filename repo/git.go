@@ -177,10 +177,7 @@ func IsRepo(path string) bool {
 	cmd := exec.Command(gitbin, "status")
 	cmd.Dir = path
 	err := cmd.Run()
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func publicKeyFile(file string) ssh.AuthMethod {
@@ -265,8 +262,7 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 func (repocl *Client) Clone(repoPath string) error {
 	gitbin := util.Config.Bin.Git
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repoPath)
-	var cmd *exec.Cmd
-	cmd = exec.Command(gitbin)
+	cmd := exec.Command(gitbin)
 	if privKeyFile.Active {
 		env := os.Environ()
 		cmd.Env = append(env, privKeyFile.GitSSHEnv())

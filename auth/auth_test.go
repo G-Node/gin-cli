@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/G-Node/gin-cli/web"
-	"github.com/G-Node/gin-core/gin"
+	gogs "github.com/gogits/go-gogs-client"
 )
 
 func TestMain(m *testing.M) {
@@ -54,7 +54,7 @@ func TestRequestAccount(t *testing.T) {
 		t.Errorf("[Account lookup: alice] Request returned error [%s] when it should have succeeded.", err.Error())
 	}
 
-	respOK := acc.Login == "alice"
+	respOK := acc.UserName == "alice"
 
 	if !respOK {
 		t.Error("[Account lookup: alice] Test failed. Response does not match expected values.")
@@ -66,7 +66,7 @@ func TestRequestAccount(t *testing.T) {
 		t.Error("[Account lookup] Non existent account request succeeded when it should have failed.")
 	}
 
-	var emptyAcc gin.Account
+	var emptyAcc gogs.User
 	if acc != emptyAcc {
 		t.Errorf("[Account lookup] Non existent account request returned non-empty account info. [%+v]", acc)
 	}
@@ -117,7 +117,7 @@ func TestRequestKeys(t *testing.T) {
 	}
 
 	respOK := keys[0].Key == "ssh-rsa SSHKEY12344567 name@host" &&
-		keys[0].Description == "name@host"
+		keys[0].Title == "name@host"
 
 	if !respOK {
 		t.Error("[Key retrieval] Test failed. Response does not match expected values.")
@@ -167,7 +167,7 @@ func addKeyHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(os.Stderr, "Error in request handler for AddKey test")
 	}
 
-	newKey := &PublicKey{}
+	newKey := &gogs.PublicKey{}
 	if r.URL.Path == goodURL {
 		err := json.Unmarshal(b, newKey)
 		if err != nil {
@@ -195,7 +195,6 @@ func TestAddKey(t *testing.T) {
 		t.Errorf("[Add key] Function returned error: %s", err.Error())
 	}
 }
-
 
 func searchAccountHandler(w http.ResponseWriter, r *http.Request) {
 	goodURL := "/api/accounts?q=alice"
@@ -266,31 +265,3 @@ func TestSearchAccount(t *testing.T) {
 		t.Errorf("[Search account] Bad server account search returned non-empty account info. [%+v]", accs)
 	}
 }
-
-func loginHandler(w http.ResponseWriter, r *http.Request) {
-	goodURL := "/oauth/token"
-	goodFormData := `client_id=clientid&client_secret=clientsecret&grant_type=password&password=alicepw&scope=repo-read+repo-write+account-read+account-write&username=alice`
-	brokenFormData := `client_id=clientid&client_secret=clientsecret&grant_type=password&password=BREAK&scope=repo-read+repo-write+account-read+account-write&username=BREAK`
-	resp := `{"token_type":"Bearer","scope":"account-read account-write repo-read repo-write","access_token":"THETOKEN","refresh_token":null}`
-	badAuthResp := `{"code":401,"error":"Unauthorized","message":"Wront username or password","reasons":null}`
-	err := r.ParseForm()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error while parsing form in request handler for Login test")
-	}
-
-	if r.URL.Path == goodURL {
-		if r.Form.Encode() == goodFormData {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, resp)
-		} else if r.Form.Encode() == brokenFormData {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, "not_json_response")
-		} else {
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprint(w, badAuthResp)
-		}
-	} else {
-		w.WriteHeader(http.StatusNotFound)
-	}
-}
-

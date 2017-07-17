@@ -103,7 +103,6 @@ func (tf TempFile) Write(content string) error {
 // Delete the temporary file and its diirectory.
 func (tf TempFile) Delete() {
 	_ = os.RemoveAll(tf.Dir)
-	tf.Active = false
 	LogWrite("Deleted temporary key directory %s", tf.Dir)
 }
 

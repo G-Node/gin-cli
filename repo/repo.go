@@ -9,7 +9,6 @@ import (
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
-	"github.com/G-Node/gin-repo/wire"
 	"github.com/gogits/go-gogs-client"
 )
 
@@ -20,16 +19,41 @@ type Client struct {
 	GitHost string
 	GitUser string
 }
+
 // NewClient returns a new client for the repo server.
 func NewClient(host string) *Client {
 	return &Client{Client: web.NewClient(host)}
 }
 
+// GetRepo retrieves the information of a repository.
+func (repocl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
+	defer CleanUpTemp()
+	util.LogWrite("GetRepo")
+	var repo gogs.Repository
+
+	res, err := repocl.Get(fmt.Sprintf("/api/v1/repos/%s", repoPath))
+	if err != nil {
+		return repo, err
+	} else if res.StatusCode == http.StatusNotFound {
+		return repo, fmt.Errorf("Not found. Check repository owner and name.")
+	} else if res.StatusCode == http.StatusUnauthorized {
+		return repo, fmt.Errorf("You are not authorised to access repository.")
+	} else if res.StatusCode != http.StatusOK {
+		return repo, fmt.Errorf("Server returned %s", res.Body)
+	}
+	defer web.CloseRes(res.Body)
+	b, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return repo, err
+	}
+	err = json.Unmarshal(b, &repo)
+	return repo, err
+}
+
 // GetRepos gets a list of repositories (public or user specific)
-func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
+func (repocl *Client) GetRepos(user string) ([]gogs.Repository, error) {
 	util.LogWrite("Retrieving repo list")
-	gogsRepos := []gogs.Repository{}
-	var repoList []wire.Repo
+	var repoList []gogs.Repository
 	var res *http.Response
 	var err error
 	res, err = repocl.Get("/api/v1/user/repos")
@@ -41,10 +65,7 @@ func (repocl *Client) GetRepos(user string) ([]wire.Repo, error) {
 	if err != nil {
 		return repoList, err
 	}
-	err = json.Unmarshal(b, &gogsRepos)
-	for _, repo := range (gogsRepos) {
-		repoList = append(repoList, wire.Repo{Name: repo.Name, Description: repo.Description, Owner: repo.Owner.FullName})
-	}
+	err = json.Unmarshal(b, &repoList)
 	return repoList, err
 }
 
@@ -56,16 +77,35 @@ func (repocl *Client) CreateRepo(name, description string) error {
 		return fmt.Errorf("[Create repository] This action requires login")
 	}
 
-	gogsRepo := gogs.Repository{Name: name, Description: description}
+	newrepo := gogs.Repository{Name: name, Description: description}
 	util.LogWrite("Name: %s :: Description: %s", name, description)
-	res, err := repocl.Post("/api/v1/user/repos", gogsRepo)
+	res, err := repocl.Post("/api/v1/user/repos", newrepo)
 	if err != nil {
 		return err
-	} else if res.StatusCode != 201 {
+	} else if res.StatusCode != http.StatusCreated {
 		return fmt.Errorf("[Create repository] Failed. Server returned %s", res.Status)
 	}
 	web.CloseRes(res.Body)
 	util.LogWrite("Repository created")
+	return nil
+}
+
+// DelRepo deletes a repository from the server.
+func (repocl *Client) DelRepo(name string) error {
+	util.LogWrite("Deleting repository")
+	err := repocl.LoadToken()
+	if err != nil {
+		return fmt.Errorf("[Delete repository] This action requires login")
+	}
+
+	res, err := repocl.Delete(fmt.Sprintf("/api/v1/repos/%s", name))
+	if err != nil {
+		return err
+	} else if res.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("[Delete repository] Failed. Server returned %s", res.Status)
+	}
+	web.CloseRes(res.Body)
+	util.LogWrite("Repository deleted")
 	return nil
 }
 
@@ -114,7 +154,7 @@ func (repocl *Client) DownloadRepo(localPath string) error {
 	return err
 }
 
-// CloneRepo downloads the files of a given repository.
+// CloneRepo clones a remote repository and initialises anex init with the options specified in the config file.
 func (repocl *Client) CloneRepo(repoPath string) error {
 	defer CleanUpTemp()
 	util.LogWrite("CloneRepo")
@@ -137,26 +177,10 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 	if err != nil {
 		hostname = "localhost"
 	}
-	repocl.LoadToken()
+	err = repocl.LoadToken()
+	if err != nil {
+		return err
+	}
 	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
-	err = AnnexInit(repoName, description)
-	if err != nil {
-		return err
-	}
-
-	annexFiles, err := AnnexWhereis(repoName)
-	if err != nil {
-		return err
-	}
-	if len(annexFiles) == 0 {
-		return nil
-	}
-
-	fmt.Printf("Downloading files... ")
-	err = AnnexPull(repoName)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("done.\n")
-	return nil
+	return AnnexInit(repoName, description)
 }
