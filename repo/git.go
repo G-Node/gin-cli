@@ -148,14 +148,21 @@ func ListFiles(path string, filesStatus map[string]FileStatus) error {
 
 	walker := func(path string, info os.FileInfo, err error) error {
 		if filepath.Base(path) == ".git" {
+			// This may be the .git directory or any file inside it
+			util.LogWrite("ListFiles: Ignoring .git directory")
 			return filepath.SkipDir
 		}
-		if info.Mode().IsRegular() {
-			filesStatus[path] = getFileStatus(path)
+		// Descend into directories but don't check them explicitly
+		if info.IsDir() {
+			util.LogWrite("ListFiles: Directory %s", path)
+			return nil
 		}
+		util.LogWrite("ListFiles: Checking status of file %s", path)
+		filesStatus[path] = getFileStatus(path)
 		return nil
 	}
 
+	util.LogWrite("ListFiles: Walking path %s", path)
 	return filepath.Walk(path, walker)
 }
 
