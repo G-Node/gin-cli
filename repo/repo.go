@@ -160,7 +160,7 @@ func (repocl *Client) DownloadRepo(localPath string) error {
 }
 
 // GetContent retrieves the contents of placeholder files in a checked out repository.
-func (repocl *Client) GetContent(localPath string, filepaths []string) error {
+func (repocl *Client) GetContent(filepaths []string) error {
 	defer CleanUpTemp()
 	util.LogWrite("GetContent")
 
@@ -168,7 +168,7 @@ func (repocl *Client) GetContent(localPath string, filepaths []string) error {
 	if err != nil {
 		return err
 	}
-	err = AnnexGet(localPath, filepaths)
+	err = AnnexGet(filepaths)
 	return err
 }
 

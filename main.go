@@ -256,7 +256,7 @@ func download(args []string) {
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err := repocl.GetContent(".", args)
+	err := repocl.GetContent(args)
 	util.CheckError(err)
 }
 
