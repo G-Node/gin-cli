@@ -61,7 +61,7 @@ func login(args []string) {
 	}
 
 	authcl := auth.NewClient(util.Config.AuthHost)
-	err = authcl.Login(username, password, "gin-cli", util.Config.Secret)
+	err = authcl.Login(username, password, "gin-cli")
 	util.CheckError(err)
 	info, err := authcl.RequestAccount(username)
 	util.CheckError(err)

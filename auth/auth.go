@@ -123,7 +123,7 @@ func (authcl *Client) AddKey(key, description string, temp bool) error {
 }
 
 // Login requests a token from the auth server and stores the username and token to file.
-func (authcl *Client) Login(username, password, clientID, clientSecret string) error {
+func (authcl *Client) Login(username, password, clientID string) error {
 	tokenCreate := &gogs.CreateAccessTokenOption{Name: "gin-cli"}
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
 	resp, err := authcl.PostBasicAuth(address, username, password, tokenCreate)
