@@ -212,7 +212,7 @@ func lsRepo(args []string) {
 	// print each category with len(items) > 0 with appropriate header
 	// TODO: Print categories in deterministic order
 	for status, files := range statFiles {
-		fmt.Printf("[%s]\n", status.Description())
+		fmt.Printf("%s:\n", status.Description())
 		fmt.Printf("\n\t%s\n\n", strings.Join(files, "\n\t"))
 	}
 

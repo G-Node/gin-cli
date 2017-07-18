@@ -83,7 +83,7 @@ func (fs FileStatus) Description() string {
 	case fs == NoContent:
 		return "No local content"
 	case fs == Modified:
-		return "Locally modified"
+		return "Locally modified (unsaved)"
 	case fs == LocalChanges:
 		return "Locally modified (not uploaded)"
 	case fs == RemoteChanges:
@@ -128,14 +128,20 @@ func ListFiles(paths []string) (map[string]FileStatus, error) {
 	for _, status := range wiResults {
 		fname := status.File
 		statuses[fname] = Untracked
-		if status.Success {
-			for _, remote := range status.Whereis {
-				if remote.Here {
+		if !status.Success {
+			// default to untracked --- perhaps there should be an error state instead
+			continue
+		}
+		for _, remote := range status.Whereis {
+			if remote.Here {
+				if len(status.Whereis) > 1 {
 					statuses[fname] = Synced
-					break
+				} else {
+					statuses[fname] = LocalChanges
 				}
+				break
 			}
-		} // is !Success an error?
+		}
 	}
 	return statuses, nil
 	// if err != nil {
