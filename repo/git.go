@@ -127,17 +127,15 @@ func ListFiles(paths []string) (map[string]FileStatus, error) {
 	}
 	for _, status := range wiResults {
 		fname := status.File
-		if !status.Success {
-			statuses[fname] = Untracked
-		} else {
-			statuses[fname] = NoContent
+		statuses[fname] = Untracked
+		if status.Success {
 			for _, remote := range status.Whereis {
 				if remote.Here {
 					statuses[fname] = Synced
 					break
 				}
 			}
-		}
+		} // is !Success an error?
 	}
 	return statuses, nil
 	// if err != nil {
@@ -453,11 +451,11 @@ func AnnexWhereis(paths []string) ([]AnnexWhereisResult, error) {
 
 	resultsJSON := bytes.Split(stdout.Bytes(), []byte("\n"))
 	results := make([]AnnexWhereisResult, 0, len(resultsJSON))
-	var res AnnexWhereisResult
 	for _, resJSON := range resultsJSON {
 		if len(resJSON) == 0 {
 			continue
 		}
+		var res AnnexWhereisResult
 		err := json.Unmarshal(resJSON, &res)
 		if err != nil {
 			return nil, err
