@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -196,11 +197,25 @@ func lsRepo(args []string) {
 	filesStatus, err := repo.ListFiles(dirs)
 	util.CheckError(err)
 
+	// Files are printed separated by status and sorted by name
+	statFiles := make(map[repo.FileStatus][]string)
+
 	for file, status := range filesStatus {
-		// _, err = currentBuffer.WriteString(fmt.Sprintf("%s %s\n", status.Abbrev(), file))
-		fmt.Printf("%s %s\n", status.Abbrev(), file)
-		// util.LogError(err)
+		statFiles[status] = append(statFiles[status], file)
 	}
+
+	// sort files in each status (stable sorting unnecessary)
+	for status := range statFiles {
+		sort.Sort(sort.StringSlice(statFiles[status]))
+	}
+
+	// print each category with len(items) > 0 with appropriate header
+	// TODO: Print categories in deterministic order
+	for status, files := range statFiles {
+		fmt.Printf("[%s]\n", status.Description())
+		fmt.Printf("\n\t%s\n\n", strings.Join(files, "\n\t"))
+	}
+
 }
 
 func upload(args []string) {

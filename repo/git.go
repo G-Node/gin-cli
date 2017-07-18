@@ -75,6 +75,26 @@ const (
 	Untracked
 )
 
+// Description returns the long description of the file status
+func (fs FileStatus) Description() string {
+	switch {
+	case fs == Synced:
+		return "Synced"
+	case fs == NoContent:
+		return "No local content"
+	case fs == Modified:
+		return "Locally modified"
+	case fs == LocalChanges:
+		return "Locally modified (not uploaded)"
+	case fs == RemoteChanges:
+		return "Remotely modified (not downloaded)"
+	case fs == Untracked:
+		return "Untracked"
+	default:
+		return "Unknown"
+	}
+}
+
 // Abbrev returns the two-letter abbrevation of the file status
 // OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), ?? (Untracked)
 func (fs FileStatus) Abbrev() string {
