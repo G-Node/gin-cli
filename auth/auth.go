@@ -13,6 +13,7 @@ import (
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
 	gogs "github.com/gogits/go-gogs-client"
+	"strings"
 )
 
 // GINUser represents a API user.
@@ -120,6 +121,39 @@ func (authcl *Client) AddKey(key, description string, temp bool) error {
 	}
 	web.CloseRes(res.Body)
 	return nil
+}
+
+// DeleteKey removes the given key from the current user's authorised keys.
+func (authcl *Client) DeleteKey(key gogs.PublicKey) error {
+	err := authcl.LoadToken()
+	if err != nil {
+		return err
+	}
+	address := fmt.Sprintf("/api/v1/user/keys/%d", key.ID)
+	res, err := authcl.Delete(address)
+	if err != nil {
+		return err
+	} else if res.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("[Add key] Failed. Server returned %s", res.Status)
+	}
+	web.CloseRes(res.Body)
+	return nil
+}
+
+func (authcl *Client) DeleteTmpKeys() error {
+	keys, err := authcl.GetUserKeys()
+	if err != nil {
+		util.LogWrite("Error when getting user keys: %v", err)
+		return err
+	}
+	for _, key := range keys {
+		util.LogWrite("key: %s", key.Title)
+		if strings.Contains(key.Title, "tmpkey") {
+			// is logged
+			authcl.DeleteKey(key)
+		}
+	}
+	return err
 }
 
 // Login requests a token from the auth server and stores the username and token to file.
