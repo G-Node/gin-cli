@@ -10,6 +10,9 @@ import (
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/gogits/go-gogs-client"
+	// its a bit unfortunate that we have that import now
+	// but its only temporary...
+	"github.com/G-Node/gin-cli/auth"
 )
 
 // Client is a client interface to the repo server. Embeds web.Client.
@@ -111,6 +114,7 @@ func (repocl *Client) DelRepo(name string) error {
 
 // UploadRepo adds files to a repository and uploads them.
 func (repocl *Client) UploadRepo(localPath string) error {
+	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("UploadRepo")
 
@@ -143,6 +147,7 @@ func (repocl *Client) UploadRepo(localPath string) error {
 
 // DownloadRepo downloads the files in an already checked out repository.
 func (repocl *Client) DownloadRepo(localPath string) error {
+	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("DownloadRepo")
 
@@ -156,6 +161,7 @@ func (repocl *Client) DownloadRepo(localPath string) error {
 
 // CloneRepo clones a remote repository and initialises anex init with the options specified in the config file.
 func (repocl *Client) CloneRepo(repoPath string) error {
+	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("CloneRepo")
 
