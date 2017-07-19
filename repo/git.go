@@ -57,7 +57,7 @@ func CleanUpTemp() {
 
 // **************** //
 
-// FileStatus ...
+// FileStatus represents the state a file is in with respect to local and remote changes.
 type FileStatus uint8
 
 const (
@@ -114,6 +114,24 @@ func (fs FileStatus) Abbrev() string {
 	default:
 		return "??"
 	}
+}
+
+// FileStatusSlice is a slice of FileStatus which implements Len() and Less() to allow sorting.
+type FileStatusSlice []FileStatus
+
+// Len is the number of elements in FileStatusSlice.
+func (fsSlice FileStatusSlice) Len() int {
+	return len(fsSlice)
+}
+
+// Swap swaps the elements with intexes i and j.
+func (fsSlice FileStatusSlice) Swap(i, j int) {
+	fsSlice[i], fsSlice[j] = fsSlice[j], fsSlice[i]
+}
+
+// Less reports whether the element with index i should sort before the element with index j.
+func (fsSlice FileStatusSlice) Less(i, j int) bool {
+	return fsSlice[i] < fsSlice[j]
 }
 
 // ListFiles lists the files in the specified directory and their sync status.

@@ -205,15 +205,18 @@ func lsRepo(args []string) {
 	}
 
 	// sort files in each status (stable sorting unnecessary)
+	// also collect active statuses for sorting
+	var statuses repo.FileStatusSlice
 	for status := range statFiles {
 		sort.Sort(sort.StringSlice(statFiles[status]))
+		statuses = append(statuses, status)
 	}
+	sort.Sort(statuses)
 
 	// print each category with len(items) > 0 with appropriate header
-	// TODO: Print categories in deterministic order
-	for status, files := range statFiles {
+	for _, status := range statuses {
 		fmt.Printf("%s:\n", status.Description())
-		fmt.Printf("\n\t%s\n\n", strings.Join(files, "\n\t"))
+		fmt.Printf("\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
 	}
 
 }
