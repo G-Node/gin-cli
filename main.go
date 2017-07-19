@@ -181,6 +181,16 @@ func getRepo(args []string) {
 }
 
 func lsRepo(args []string) {
+
+	var short bool
+	for idx, arg := range args {
+		if arg == "-s" || arg == "--short" {
+			args = append(args[:idx], args[idx+1:]...)
+			short = true
+			break
+		}
+	}
+
 	var dirs []string
 	if len(args) == 0 {
 		dirs = []string{"."}
@@ -197,28 +207,33 @@ func lsRepo(args []string) {
 	filesStatus, err := repo.ListFiles(dirs)
 	util.CheckError(err)
 
-	// Files are printed separated by status and sorted by name
-	statFiles := make(map[repo.FileStatus][]string)
+	if short {
+		for fname, status := range filesStatus {
+			fmt.Printf("%s %s\n", status.Abbrev(), fname)
+		}
+	} else {
+		// Files are printed separated by status and sorted by name
+		statFiles := make(map[repo.FileStatus][]string)
 
-	for file, status := range filesStatus {
-		statFiles[status] = append(statFiles[status], file)
+		for file, status := range filesStatus {
+			statFiles[status] = append(statFiles[status], file)
+		}
+
+		// sort files in each status (stable sorting unnecessary)
+		// also collect active statuses for sorting
+		var statuses repo.FileStatusSlice
+		for status := range statFiles {
+			sort.Sort(sort.StringSlice(statFiles[status]))
+			statuses = append(statuses, status)
+		}
+		sort.Sort(statuses)
+
+		// print each category with len(items) > 0 with appropriate header
+		for _, status := range statuses {
+			fmt.Printf("%s:\n", status.Description())
+			fmt.Printf("\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
+		}
 	}
-
-	// sort files in each status (stable sorting unnecessary)
-	// also collect active statuses for sorting
-	var statuses repo.FileStatusSlice
-	for status := range statFiles {
-		sort.Sort(sort.StringSlice(statFiles[status]))
-		statuses = append(statuses, status)
-	}
-	sort.Sort(statuses)
-
-	// print each category with len(items) > 0 with appropriate header
-	for _, status := range statuses {
-		fmt.Printf("%s:\n", status.Description())
-		fmt.Printf("\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
-	}
-
 }
 
 func upload(args []string) {
