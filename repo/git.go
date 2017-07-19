@@ -151,6 +151,8 @@ func ListFiles(paths []string) (map[string]FileStatus, error) {
 			continue
 		}
 		for _, remote := range status.Whereis {
+			// if no remotes are "here", the file is NoContent
+			statuses[fname] = NoContent
 			if remote.Here {
 				if len(status.Whereis) > 1 {
 					statuses[fname] = Synced
