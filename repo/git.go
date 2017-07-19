@@ -163,48 +163,45 @@ func ListFiles(paths []string) (map[string]FileStatus, error) {
 			}
 		}
 	}
-	return statuses, nil
-	// if err != nil {
-	// 	// File does not exist. Different status???
-	// 	return Untracked
-	// }
-
-	// function only runs for one file
-	// if len(wiRes) > 0 {
-	// 	for _, remote := range wiRes[0].Whereis {
-	// 		if remote.Here {
-	// 			return Synced
-	// 		}
-	// 	}
-	// 	return NoContent
-	// }
-
-	// not in annex, but AnnexStatus can still tell us the file status
-	// annexStat, err := AnnexStatus(filepath)
-	// if err == nil && len(annexStat) > 0 {
-	// 	switch stat := annexStat[0].Status; {
-	// 	case stat == "M" || stat == "A":
-	// 		return Modified
-	// 	case stat == "?":
-	// 		return Untracked
-	// 	}
-	// }
-
-	// committed but not pushed?
 	// TODO: use default remote/branch
-	// stdout, stderr, err := RunGitCommand("diff", "--name-only", "origin/master", filepath)
-	// if err != nil {
-	// 	// Error out?
-	// 	util.LogWrite("Error during diff command for status")
-	// 	util.LogWrite("[stdout]\r\n%s", stdout.String())
-	// 	util.LogWrite("[stderr]\r\n%s", stderr.String())
-	// 	return Untracked
-	// }
-	// if stdout.Len() > 0 {
-	// 	return LocalChanges
-	// }
+	diffargs := []string{"diff", "--name-only", "--relative", "origin/master"}
+	diffargs = append(diffargs, paths...)
+	stdout, stderr, err := RunGitCommand(diffargs...)
+	if err != nil {
+		util.LogWrite("Error during diff command for status")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		// ignoring error and continuing
+	}
 
-	// return Untracked
+	diffresults := strings.Split(stdout.String(), "\n")
+	for _, fname := range diffresults {
+		// Two notes:
+		//		1. There will definitely be overlap here with the same status in annex (not a problem)
+		//		2. The diff might be due to remote or local changes, but for now we're going to assume local
+		if strings.TrimSpace(fname) != "" {
+			statuses[fname] = LocalChanges
+		}
+	}
+
+	// Annex status can differentiate between added and committed and will give us untracked files
+	annexStatusRes, err := AnnexStatus(paths)
+	if err != nil {
+		util.LogWrite("Error during annex status command")
+		util.LogWrite(err.Error())
+	}
+	for _, annexStat := range annexStatusRes {
+		switch s := annexStat.Status; {
+		case s == "M":
+			statuses[annexStat.File] = Modified
+		case s == "A":
+			statuses[annexStat.File] = LocalChanges
+		case s == "?":
+			statuses[annexStat.File] = Untracked
+		}
+	}
+
+	return statuses, nil
 }
 
 // Git commands
@@ -498,8 +495,10 @@ type AnnexStatusResult struct {
 }
 
 // AnnexStatus returns the status of a file or files in a directory
-func AnnexStatus(path string) ([]AnnexStatusResult, error) {
-	stdout, stderr, err := RunAnnexCommand(".", "status", "--json", path)
+func AnnexStatus(paths []string) ([]AnnexStatusResult, error) {
+	args := []string{"status", "--json"}
+	args = append(args, paths...)
+	stdout, stderr, err := RunAnnexCommand(".", args...)
 	if err != nil {
 		util.LogWrite("Error during DescribeChanges")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -529,7 +528,7 @@ func AnnexStatus(path string) ([]AnnexStatusResult, error) {
 // with respect to git annex. The resulting message can be used to inform the user of changes
 // that are about to be uploaded and as a long commit message.
 func DescribeChanges(localPath string) (string, error) {
-	statuses, err := AnnexStatus(localPath)
+	statuses, err := AnnexStatus([]string{localPath})
 	if err != nil {
 		return "", err
 	}
