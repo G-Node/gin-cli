@@ -135,7 +135,7 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 }
 
 // ListFiles lists the files and directories specified by paths and their sync status.
-func ListFiles(paths []string) (map[string]FileStatus, error) {
+func ListFiles(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
 	gitlsfiles := func(option string) []string {
@@ -551,7 +551,7 @@ type AnnexStatusResult struct {
 }
 
 // AnnexStatus returns the status of a file or files in a directory
-func AnnexStatus(paths []string) ([]AnnexStatusResult, error) {
+func AnnexStatus(paths ...string) ([]AnnexStatusResult, error) {
 	cmdargs := []string{"status", "--json"}
 	cmdargs = append(cmdargs, paths...)
 	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
@@ -584,7 +584,7 @@ func AnnexStatus(paths []string) ([]AnnexStatusResult, error) {
 // It is constructed using the result of 'git annex status'.
 // The description is composed of the file count for each status: added, modified, deleted
 func DescribeIndexShort() (string, error) {
-	statuses, err := AnnexStatus([]string{""})
+	statuses, err := AnnexStatus()
 	if err != nil {
 		return "", err
 	}
@@ -611,7 +611,7 @@ func DescribeIndexShort() (string, error) {
 // The resulting message can be used to inform the user of changes
 // that are about to be uploaded and as a long commit message.
 func DescribeIndex(localPath string) (string, error) {
-	statuses, err := AnnexStatus([]string{localPath})
+	statuses, err := AnnexStatus(localPath)
 	if err != nil {
 		return "", err
 	}

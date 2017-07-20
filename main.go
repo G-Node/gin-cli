@@ -191,20 +191,12 @@ func lsRepo(args []string) {
 		}
 	}
 
-	var dirs []string
-	if len(args) == 0 {
-		dirs = []string{"."}
-	} else {
-		dirs = args
-	}
-
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
 
-	// var fileStatusBuffer, dirStatusBuffer, skipped bytes.Buffer
-	filesStatus, err := repo.ListFiles(dirs)
+	filesStatus, err := repo.ListFiles(args...)
 	util.CheckError(err)
 
 	if short {
@@ -237,6 +229,9 @@ func lsRepo(args []string) {
 }
 
 func upload(args []string) {
+	if !repo.IsRepo(".") {
+		util.Die("Current directory is not a repository.")
+	}
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
