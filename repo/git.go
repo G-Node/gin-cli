@@ -524,10 +524,37 @@ func AnnexStatus(paths []string) ([]AnnexStatusResult, error) {
 	return statuses, nil
 }
 
-// DescribeChanges returns a string which describes the status of the files in the working tree
-// with respect to git annex. The resulting message can be used to inform the user of changes
+// DescribeIndexShort returns a string which represents a condensed form of the git (annex) index.
+// It is constructed using the result of 'git annex status'.
+// The description is composed of the file count for each status: added, modified, deleted
+func DescribeIndexShort(localPath string) (string, error) {
+	statuses, err := AnnexStatus([]string{localPath})
+	if err != nil {
+		return "", err
+	}
+
+	statusmap := make(map[string]int)
+	for _, item := range statuses {
+		statusmap[item.Status]++
+	}
+	var changesBuffer bytes.Buffer
+	if statusmap["A"] > 0 {
+		_, _ = changesBuffer.WriteString(fmt.Sprintf("New files: %d", statusmap["A"]))
+	}
+	if statusmap["M"] > 0 {
+		_, _ = changesBuffer.WriteString(fmt.Sprintf("Modified files: %d", statusmap["M"]))
+	}
+	if statusmap["D"] > 0 {
+		_, _ = changesBuffer.WriteString(fmt.Sprintf("Deleted files: %d", statusmap["D"]))
+	}
+	return changesBuffer.String(), nil
+}
+
+// DescribeIndex returns a string which describes the git (annex) index.
+// It is constructed using the result of 'git annex status'.
+// The resulting message can be used to inform the user of changes
 // that are about to be uploaded and as a long commit message.
-func DescribeChanges(localPath string) (string, error) {
+func DescribeIndex(localPath string) (string, error) {
 	statuses, err := AnnexStatus([]string{localPath})
 	if err != nil {
 		return "", err
