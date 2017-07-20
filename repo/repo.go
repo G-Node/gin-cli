@@ -113,7 +113,7 @@ func (repocl *Client) DelRepo(name string) error {
 }
 
 // UploadRepo adds files to a repository and uploads them.
-func (repocl *Client) UploadRepo(localPath string) error {
+func (repocl *Client) UploadRepo(paths []string) error {
 	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("UploadRepo")
@@ -123,12 +123,12 @@ func (repocl *Client) UploadRepo(localPath string) error {
 		return err
 	}
 
-	_, err = AnnexAdd(localPath)
+	_, err = AnnexAdd(paths)
 	if err != nil {
 		return err
 	}
 
-	changes, err := DescribeIndexShort(localPath)
+	changes, err := DescribeIndexShort()
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (repocl *Client) UploadRepo(localPath string) error {
 		return err
 	}
 
-	err = AnnexPush(localPath, changes)
+	err = AnnexPush(paths, changes)
 	return err
 }
 

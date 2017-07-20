@@ -237,14 +237,11 @@ func lsRepo(args []string) {
 }
 
 func upload(args []string) {
-	if len(args) > 0 {
-		util.Die(usage)
-	}
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err := repocl.UploadRepo(".")
+	err := repocl.UploadRepo(args)
 	util.CheckError(err)
 }
 

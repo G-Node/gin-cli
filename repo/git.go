@@ -423,12 +423,15 @@ func AnnexSync(localPath string, content bool) error {
 
 // AnnexPush uploads all annexed files.
 // (git annex sync --no-pull --content)
-func AnnexPush(localPath, commitMsg string) error {
-	stdout, stderr, err := RunAnnexCommand(
-		localPath, "sync", "--no-pull", "--content",
-		fmt.Sprintf("--content-of=%s", localPath),
-		"--commit", fmt.Sprintf("--message=%s", commitMsg),
-	)
+func AnnexPush(paths []string, commitMsg string) error {
+
+	contarg := make([]string, len(paths))
+	for idx, p := range paths {
+		contarg[idx] = fmt.Sprintf("--content-of=%s", p)
+	}
+	cmdargs := []string{"sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
+	cmdargs = append(cmdargs, contarg...)
+	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
 
 	if err != nil {
 		util.LogWrite("Error during AnnexPush")
@@ -443,8 +446,8 @@ func AnnexPush(localPath, commitMsg string) error {
 // AnnexGet retrieves the content of specified files.
 func AnnexGet(filepaths []string) error {
 	// TODO: Print success for each file as it finishes
-	args := append([]string{"get"}, filepaths...)
-	stdout, stderr, err := RunAnnexCommand(".", args...)
+	cmdargs := append([]string{"get"}, filepaths...)
+	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexGet")
 		util.LogWrite("[Error]: %v", err)
@@ -465,8 +468,10 @@ type AnnexAddResult struct {
 
 // AnnexAdd adds a path to the annex.
 // (git annex add)
-func AnnexAdd(localPath string) ([]string, error) {
-	stdout, stderr, err := RunAnnexCommand(".", "--json", "add", localPath)
+func AnnexAdd(filepaths []string) ([]string, error) {
+	cmdargs := []string{"--json", "add"}
+	cmdargs = append(cmdargs, filepaths...)
+	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexAdd")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -513,9 +518,9 @@ type AnnexWhereisResult struct {
 // AnnexWhereis returns information about annexed files in the repository
 // (git annex whereis)
 func AnnexWhereis(paths []string) ([]AnnexWhereisResult, error) {
-	args := []string{"whereis", "--json"}
-	args = append(args, paths...)
-	stdout, stderr, err := RunAnnexCommand(".", args...)
+	cmdargs := []string{"whereis", "--json"}
+	cmdargs = append(cmdargs, paths...)
+	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -547,9 +552,9 @@ type AnnexStatusResult struct {
 
 // AnnexStatus returns the status of a file or files in a directory
 func AnnexStatus(paths []string) ([]AnnexStatusResult, error) {
-	args := []string{"status", "--json"}
-	args = append(args, paths...)
-	stdout, stderr, err := RunAnnexCommand(".", args...)
+	cmdargs := []string{"status", "--json"}
+	cmdargs = append(cmdargs, paths...)
+	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during DescribeChanges")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -578,8 +583,8 @@ func AnnexStatus(paths []string) ([]AnnexStatusResult, error) {
 // DescribeIndexShort returns a string which represents a condensed form of the git (annex) index.
 // It is constructed using the result of 'git annex status'.
 // The description is composed of the file count for each status: added, modified, deleted
-func DescribeIndexShort(localPath string) (string, error) {
-	statuses, err := AnnexStatus([]string{localPath})
+func DescribeIndexShort() (string, error) {
+	statuses, err := AnnexStatus([]string{""})
 	if err != nil {
 		return "", err
 	}
