@@ -12,18 +12,20 @@ Options:
 	--version    Client version
 
 Commands:
-	login    [<username>]
-	logout
-	create   [<name>] [<description>]
-	get      <repopath>
-	ls       [<filenames>]
-	upload   [<filenames>]
-	download [<filenames>]
-	repos    [<username>]
-	info     [<username>]
-	keys     [-v | --verbose]
-	keys     --add <filename>
-	help     <command>
+	login          [<username>]                | Login to the GIN services
+	logout                                     | Logout from the GIN services
+	create         [<name>] [<description>]    | Create a repository on the remote server and clone it
+	get            <repopath>                  | Retrieve (clone) a repository from the remote server
+	ls             [-s, --short] [<filenames>] | List the sync status of files in a local repository
+	upload         [<filenames>]               | Upload local changes to a remote repository
+	download       [<filenames>]               | Download the content of files from a remote repository
+	remove-content [<filenames>]               | Remove the content of local files that have already been uploaded
+	rmc            [<filenames>]               | Synonym for remove-content
+	repos          [<username>]                | List available remote repositories
+	info           [<username>]                | Print user information
+	keys           [-v, --verbose]             | List the keys associated with the logged in user
+	keys           --add <filename>            | Add/upload a new public key to the GIN services
+	help           <command>                   | Get help for individual commands
 
 Use 'help' followed by a command to see full description of the command.
 `
@@ -121,7 +123,7 @@ EXAMPLES
 
 const lsHelp = `USAGE
 
-	gin ls [<filenames>]...
+	gin ls [--short, -s] [<filenames>]...
 
 DESCRIPTION
 
@@ -129,7 +131,7 @@ DESCRIPTION
 	files within it. With no arguments, lists the status of the files under the
 	current directory. Directory listings are performed recursively.
 
-	The meaning of the status abbreviations is as follows:
+	In the short form, the meaning of the status abbreviations is as follows:
 		OK: The file is part of the GIN repository and its contents are
 		synchronised with the server.
 		NC: The local file is a placeholder and its contents have not been
@@ -141,6 +143,9 @@ DESCRIPTION
 		??: The file is not under repository control.
 
 ARGUMENTS
+
+	--short, -s
+		Print listing in short form.
 
 	<filenames>
 		One or more directories or files to list.
