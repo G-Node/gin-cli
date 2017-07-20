@@ -538,26 +538,27 @@ func DescribeChanges(localPath string) (string, error) {
 		statusmap[item.Status] = append(statusmap[item.Status], item.File)
 	}
 
-	var changeList string
-	changeList += makeFileList("New files", statusmap["A"])
-	changeList += makeFileList("Modified files", statusmap["M"])
-	changeList += makeFileList("Deleted files", statusmap["D"])
-	changeList += makeFileList("Type modified files", statusmap["T"])
-	changeList += makeFileList("Untracked files ", statusmap["?"])
+	var changesBuffer bytes.Buffer
+	_, _ = changesBuffer.WriteString(makeFileList("New files", statusmap["A"]))
+	_, _ = changesBuffer.WriteString(makeFileList("Modified files", statusmap["M"]))
+	_, _ = changesBuffer.WriteString(makeFileList("Deleted files", statusmap["D"]))
+	_, _ = changesBuffer.WriteString(makeFileList("Type modified files", statusmap["T"]))
+	_, _ = changesBuffer.WriteString(makeFileList("Untracked files ", statusmap["?"]))
 
-	return changeList, nil
+	return changesBuffer.String(), nil
 }
 
-func makeFileList(header string, fnames []string) (list string) {
+func makeFileList(header string, fnames []string) string {
 	if len(fnames) == 0 {
-		return
+		return ""
 	}
-	list += fmt.Sprint(header) + "\n"
+	var filelist bytes.Buffer
+	_, _ = filelist.WriteString(fmt.Sprintf("%s (%d)\n", header, len(fnames)))
 	for idx, name := range fnames {
-		list += fmt.Sprintf("  %d: %s\n", idx+1, name)
+		_, _ = filelist.WriteString(fmt.Sprintf("  %d: %s\n", idx+1, name))
 	}
-	list += "\n"
-	return
+	_, _ = filelist.WriteString("\n")
+	return filelist.String()
 }
 
 // Utility functions for shelling out

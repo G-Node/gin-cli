@@ -134,10 +134,13 @@ func (repocl *Client) UploadRepo(localPath string) error {
 
 	changes, err := DescribeChanges(localPath)
 	// add header commit line
+	// TODO: Limit commit message length
 	changes = fmt.Sprintf("gin upload\n\n%s", changes)
 	if err != nil {
 		return err
 	}
+
+	// TODO: Add hostname to commit message
 
 	// fmt.Println(changes)
 
