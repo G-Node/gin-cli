@@ -132,14 +132,14 @@ func (repocl *Client) UploadRepo(localPath string) error {
 	if err != nil {
 		return err
 	}
-	if changes == "" {
-		return fmt.Errorf("No changes to upload")
-	}
 	// add header commit line
 	hostname, err := os.Hostname()
 	if err != nil {
 		util.LogWrite("Could not retrieve hostname")
 		hostname = "(unknown)"
+	}
+	if changes == "" {
+		changes = "No changes recorded"
 	}
 	changes = fmt.Sprintf("gin upload from %s\n\n%s", hostname, changes)
 	if err != nil {
