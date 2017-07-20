@@ -141,7 +141,7 @@ func ListFiles(paths []string) (map[string]FileStatus, error) {
 	gitlsfiles := func(option string) []string {
 		gitargs := []string{"ls-files", option}
 		gitargs = append(gitargs, paths...)
-		stdout, stderr, err := RunGitCommand(gitargs...)
+		stdout, stderr, err := RunGitCommand(".", gitargs...)
 		if err != nil {
 			util.LogWrite("Error during git ls-files %s", option)
 			util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -190,7 +190,7 @@ func ListFiles(paths []string) (map[string]FileStatus, error) {
 	// If cached files are diff from upstream, mark as LocalChanges
 	diffargs := []string{"diff", "--name-only", "--relative", "@{upstream}"}
 	diffargs = append(diffargs, cachedfiles...)
-	stdout, stderr, err := RunGitCommand(diffargs...)
+	stdout, stderr, err := RunGitCommand(".", diffargs...)
 	if err != nil {
 		util.LogWrite("Error during diff command for status")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -228,6 +228,34 @@ func ListFiles(paths []string) (map[string]FileStatus, error) {
 }
 
 // Git commands
+
+// GitCommitIfNew creates an empty initial git commit if the current repository is completely new.
+func GitCommitIfNew(path string) error {
+	if !IsRepo(path) {
+		return fmt.Errorf("Not a repository")
+	}
+
+	_, _, err := RunGitCommand(path, "rev-parse", "HEAD")
+	if err == nil {
+		// All good. No need to do anything
+		return nil
+	}
+
+	// Create an empty initial commit and run annex sync to synchronise everything
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "(unknown)"
+	}
+	stdout, stderr, err := RunGitCommand(path, "commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
+	if err != nil {
+		util.LogWrite("Error while creating initial commit")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return err
+	}
+
+	return AnnexSync(path, true)
+}
 
 // IsRepo checks whether a given path is (in) a git repository.
 // This function assumes path is a directory and will return false for files.
@@ -321,7 +349,7 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 // (git clone ...)
 func (repocl *Client) Clone(repoPath string) error {
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repoPath)
-	stdout, stderr, err := RunGitCommand("clone", remotePath)
+	stdout, stderr, err := RunGitCommand(".", "clone", remotePath)
 	if err != nil {
 		util.LogWrite("Error during clone command")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -614,9 +642,10 @@ func makeFileList(header string, fnames []string) string {
 // Utility functions for shelling out
 
 // RunGitCommand executes a external git command with the provided arguments and returns stdout and stderr
-func RunGitCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
+func RunGitCommand(path string, args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	gitbin := util.Config.Bin.Git
 	cmd := exec.Command(gitbin)
+	cmd.Dir = path
 	cmd.Args = append(cmd.Args, args...)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

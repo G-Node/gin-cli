@@ -206,5 +206,12 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 		return err
 	}
 	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
-	return AnnexInit(repoName, description)
+	err = AnnexInit(repoName, description)
+	if err != nil {
+		return err
+	}
+
+	// If there are no commits, create the initial commit.
+	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
+	return GitCommitIfNew(repoName)
 }
