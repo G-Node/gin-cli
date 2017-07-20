@@ -424,6 +424,15 @@ func init() {
 	}
 }
 
+func lockAllFiles() {
+	_ = repo.AnnexLock(".")
+}
+
+// unlockAllFiles unlocks all annexed files before returning control to the user.
+func unlockAllFiles() {
+	_ = repo.AnnexUnlock(".")
+}
+
 func main() {
 	args, _ := docopt.Parse(usage, nil, true, verstr, true)
 	command := args["<command>"].(string)
@@ -435,6 +444,8 @@ func main() {
 
 	err = util.LoadConfig()
 	util.CheckError(err)
+	defer unlockAllFiles()
+	lockAllFiles()
 
 	switch command {
 	case "login":

@@ -644,6 +644,47 @@ func makeFileList(header string, fnames []string) string {
 	return filelist.String()
 }
 
+// AnnexLock locks the specified files and directory contents if they are annexed.
+func AnnexLock(paths ...string) error {
+	// Annex lock doesn't work like it used to. It's better to instead annex add, but only the files that are already known to annex.
+	// To find these files, we can do a 'git-annex status paths...'and look for Type changes (T)
+	statuses, err := AnnexStatus(paths...)
+	if err != nil {
+		return err
+	}
+	unlockedfiles := make([]string, 0, len(paths))
+	for _, stat := range statuses {
+		if stat.Status == "T" {
+			unlockedfiles = append(unlockedfiles, stat.File)
+		}
+	}
+
+	cmdargs := []string{"add"}
+	cmdargs = append(cmdargs, unlockedfiles...)
+	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	if err != nil {
+		util.LogWrite("Error during AnnexLock")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return fmt.Errorf("Error locking files")
+	}
+	return nil
+}
+
+// AnnexUnlock unlocks the specified files and directory contents if they are annexed
+func AnnexUnlock(paths ...string) error {
+	cmdargs := []string{"unlock"}
+	cmdargs = append(cmdargs, paths...)
+	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	if err != nil {
+		util.LogWrite("Error during AnnexUnlock")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return fmt.Errorf("Error unlocking files")
+	}
+	return nil
+}
+
 // Utility functions for shelling out
 
 // RunGitCommand executes a external git command with the provided arguments and returns stdout and stderr
