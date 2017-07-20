@@ -177,6 +177,19 @@ func (repocl *Client) GetContent(filepaths []string) error {
 	return err
 }
 
+// RmContent removes the contents of local files, turning them into placeholders, but ONLY IF the content is available on a remote
+func (repocl *Client) RmContent(filepaths []string) error {
+	defer CleanUpTemp()
+	util.LogWrite("RmContent")
+
+	err := repocl.Connect()
+	if err != nil {
+		return err
+	}
+	err = AnnexDrop(filepaths)
+	return err
+}
+
 // CloneRepo clones a remote repository and initialises annex init with the options specified in the config file.
 func (repocl *Client) CloneRepo(repoPath string) error {
 	defer auth.NewClient(repocl.Host).DeleteTmpKeys()

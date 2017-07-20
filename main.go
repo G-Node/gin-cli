@@ -252,6 +252,18 @@ func download(args []string) {
 	util.CheckError(err)
 }
 
+func remove(args []string) {
+	if !repo.IsRepo(".") {
+		util.Die("Current directory is not a repository.")
+	}
+	repocl := repo.NewClient(util.Config.RepoHost)
+	repocl.GitUser = util.Config.GitUser
+	repocl.GitHost = util.Config.GitHost
+	repocl.KeyHost = util.Config.AuthHost
+	err := repocl.RmContent(args)
+	util.CheckError(err)
+}
+
 func keys(args []string) {
 	if len(args) > 0 && args[0] == "--add" {
 		addKey(args)
@@ -442,6 +454,8 @@ func main() {
 	util.CheckError(err)
 	defer util.LogClose()
 
+	util.LogWrite("COMMAND: %s %s", command, strings.Join(cmdArgs, " "))
+
 	err = util.LoadConfig()
 	util.CheckError(err)
 	defer unlockAllFiles()
@@ -462,6 +476,10 @@ func main() {
 		upload(cmdArgs)
 	case "download":
 		download(cmdArgs)
+	case "remove-content":
+		remove(cmdArgs)
+	case "rmc":
+		remove(cmdArgs)
 	case "info":
 		printAccountInfo(cmdArgs)
 	case "keys":

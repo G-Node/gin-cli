@@ -453,7 +453,22 @@ func AnnexGet(filepaths []string) error {
 		util.LogWrite("[Error]: %v", err)
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return fmt.Errorf("Error uploading files")
+		return fmt.Errorf("Error downloading files")
+	}
+	return nil
+}
+
+// AnnexDrop drops the content of specified files.
+func AnnexDrop(filepaths []string) error {
+	// TODO: Print success for each file as it finishes
+	cmdargs := append([]string{"drop"}, filepaths...)
+	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	if err != nil {
+		util.LogWrite("Error during AnnexDrop")
+		util.LogWrite("[Error]: %v", err)
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return fmt.Errorf("Error removing files")
 	}
 	return nil
 }
