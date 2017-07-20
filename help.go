@@ -16,8 +16,8 @@ Commands:
 	logout
 	create   [<name>] [<description>]
 	get      <repopath>
-	ls       [<directory>]
-	upload
+	ls       [<filenames>]
+	upload   [<filenames>]
 	download [<filenames>]
 	repos    [<username>]
 	info     [<username>]
@@ -121,7 +121,7 @@ EXAMPLES
 
 const lsHelp = `USAGE
 
-	gin ls [<directory>]...
+	gin ls [<filenames>]...
 
 DESCRIPTION
 
@@ -142,23 +142,29 @@ DESCRIPTION
 
 ARGUMENTS
 
-	<directory>
+	<filenames>
 		One or more directories or files to list.
 `
 
 const uploadHelp = `USAGE
 
-	gin upload
+	gin upload [<filenames>]...
 
 DESCRIPTION
 
 	Upload changes made in a local repository clone to the remote repository on
 	the GIN server. This command must be called from within the local
-	repository clone. All changes made will be sent to the server, including
-	addition of new files, modifications and renaming of existing files, and
-	file deletions.
+	repository clone. Specific files or directories may be specified.
+	All changes made will be sent to the server, including addition of new
+	files, modifications and renaming of existing files, and file deletions. 
+	With no arguments, uploads the changes made under the working directory,
+	recursively.
 
-	This command takes no arguments.
+ARGUMENTS
+
+	<filenames>
+		One or more directories of files to upload and update.
+
 `
 
 const downloadHelp = `USAGE
@@ -170,12 +176,11 @@ DESCRIPTION
 	Download the content of the listed files. The download command is intended
 	to be used to retrieve the content of placeholder files in a local
 	repository. This command must be called from within the local repository
-	clone.
+	clone. With no arguments, downloads the content for all files under the
+	working directory, recursively.
 
 	<filenames>
-		One or more names of files or directories to retrieve. If unspecified,
-		the content of all the files under the current directory will be
-		retrieved.
+		One or more names of files or directories to retrieve.
 `
 
 const reposHelp = `USAGE
