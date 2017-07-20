@@ -184,8 +184,35 @@ DESCRIPTION
 	clone. With no arguments, downloads the content for all files under the
 	working directory, recursively.
 
+ARGUMENTS
+
 	<filenames>
 		One or more names of files or directories to retrieve.
+`
+
+const rmcHelp = `USAGE
+	
+	gin remove-content [<filenames>]...
+	gin rmc [<filenames>]...
+
+DESCRIPTION
+
+	Remove the content of local files. This command will not remove the content
+	of files that have not been already uploaded to a remote repository, even
+	if the user specifies such files exclusively.  Removed content can be
+	retrieved from the server by using the 'gin download' command.  With no
+	arguments, removes the content of all files under the current working
+	directory, as long as they have been safely uploaded to a remote
+	repository.
+
+	Note that after removal, placeholder files will remain in the local
+	repository. These files appear as 'No Content' when running the 'gin ls'
+	command.
+
+ARGUMENTS
+
+	<filenames>
+		One or more names of files or directories to remove.
 `
 
 const reposHelp = `USAGE
@@ -269,16 +296,18 @@ EXAMPLES
 `
 
 var cmdHelp = map[string]string{
-	"login":    loginHelp,
-	"logout":   logoutHelp,
-	"create":   createHelp,
-	"get":      getHelp,
-	"ls":       lsHelp,
-	"upload":   uploadHelp,
-	"download": downloadHelp,
-	"repos":    reposHelp,
-	"info":     infoHelp,
-	"keys":     keysHelp,
+	"login":          loginHelp,
+	"logout":         logoutHelp,
+	"create":         createHelp,
+	"get":            getHelp,
+	"ls":             lsHelp,
+	"upload":         uploadHelp,
+	"download":       downloadHelp,
+	"remove-content": rmcHelp,
+	"rmc":            rmcHelp,
+	"repos":          reposHelp,
+	"info":           infoHelp,
+	"keys":           keysHelp,
 }
 
 // ex: set cc=80:
