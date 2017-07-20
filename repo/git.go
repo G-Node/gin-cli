@@ -134,38 +134,62 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 	return fsSlice[i] < fsSlice[j]
 }
 
-// ListFiles lists the files in the specified directory and their sync status.
+// ListFiles lists the files and directories specified by paths and their sync status.
 func ListFiles(paths []string) (map[string]FileStatus, error) {
-
 	statuses := make(map[string]FileStatus)
 
-	wiResults, err := AnnexWhereis(paths)
-	if err != nil {
-		return statuses, err
-	}
-	for _, status := range wiResults {
-		fname := status.File
-		statuses[fname] = Untracked
-		if !status.Success {
-			// default to untracked --- perhaps there should be an error state instead
-			continue
+	gitlsfiles := func(option string) []string {
+		gitargs := []string{"ls-files", option}
+		gitargs = append(gitargs, paths...)
+		stdout, stderr, err := RunGitCommand(gitargs...)
+		if err != nil {
+			util.LogWrite("Error during git ls-files %s", option)
+			util.LogWrite("[stdout]\r\n%s", stdout.String())
+			util.LogWrite("[stderr]\r\n%s", stderr.String())
+			// ignoring error and continuing
 		}
-		for _, remote := range status.Whereis {
-			// if no remotes are "here", the file is NoContent
-			statuses[fname] = NoContent
-			if remote.Here {
-				if len(status.Whereis) > 1 {
-					statuses[fname] = Synced
-				} else {
-					statuses[fname] = LocalChanges
+		var fnames []string
+		for _, fname := range strings.Split(stdout.String(), "\n") {
+			// filter out emtpty lines
+			if len(fname) > 0 {
+				fnames = append(fnames, fname)
+			}
+		}
+		return fnames
+	}
+
+	// Collect checked in files
+	cachedfiles := gitlsfiles("--cached")
+
+	// Collect modified files
+	modifiedfiles := gitlsfiles("--modified")
+
+	// Collect untracked files
+	untrackedfiles := gitlsfiles("--others")
+
+	// Run whereis on cached files
+	wiResults, err := AnnexWhereis(cachedfiles)
+	if err == nil {
+		for _, status := range wiResults {
+			fname := status.File
+			for _, remote := range status.Whereis {
+				// if no remotes are "here", the file is NoContent
+				statuses[fname] = NoContent
+				if remote.Here {
+					if len(status.Whereis) > 1 {
+						statuses[fname] = Synced
+					} else {
+						statuses[fname] = LocalChanges
+					}
+					break
 				}
-				break
 			}
 		}
 	}
-	// TODO: use default remote/branch
-	diffargs := []string{"diff", "--name-only", "--relative", "origin/master"}
-	diffargs = append(diffargs, paths...)
+
+	// If cached files are diff from upstream, mark as LocalChanges
+	diffargs := []string{"diff", "--name-only", "--relative", "@{upstream}"}
+	diffargs = append(diffargs, cachedfiles...)
 	stdout, stderr, err := RunGitCommand(diffargs...)
 	if err != nil {
 		util.LogWrite("Error during diff command for status")
@@ -184,21 +208,20 @@ func ListFiles(paths []string) (map[string]FileStatus, error) {
 		}
 	}
 
-	// Annex status can differentiate between added and committed and will give us untracked files
-	annexStatusRes, err := AnnexStatus(paths)
-	if err != nil {
-		util.LogWrite("Error during annex status command")
-		util.LogWrite(err.Error())
-	}
-	for _, annexStat := range annexStatusRes {
-		switch s := annexStat.Status; {
-		case s == "M":
-			statuses[annexStat.File] = Modified
-		case s == "A":
-			statuses[annexStat.File] = LocalChanges
-		case s == "?":
-			statuses[annexStat.File] = Untracked
+	// Add leftover cached files to the map
+	for _, fname := range cachedfiles {
+		if _, ok := statuses[fname]; !ok {
+			statuses[fname] = Synced
 		}
+	}
+
+	// Add modified and untracked files to the map
+	for _, fname := range modifiedfiles {
+		statuses[fname] = Modified
+	}
+
+	for _, fname := range untrackedfiles {
+		statuses[fname] = Untracked
 	}
 
 	return statuses, nil
