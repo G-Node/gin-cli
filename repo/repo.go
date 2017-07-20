@@ -123,18 +123,19 @@ func (repocl *Client) UploadRepo(localPath string) error {
 		return err
 	}
 
-	added, err := AnnexAdd(localPath)
+	_, err = AnnexAdd(localPath)
 	if err != nil {
 		return err
 	}
 
-	if len(added) == 0 {
+	changes, err := DescribeIndexShort(localPath)
+	if err != nil {
+		return err
+	}
+	if changes == "" {
 		return fmt.Errorf("No changes to upload")
 	}
-
-	changes, err := DescribeChanges(localPath)
 	// add header commit line
-	// TODO: Limit commit message length
 	changes = fmt.Sprintf("gin upload\n\n%s", changes)
 	if err != nil {
 		return err
