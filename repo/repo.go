@@ -226,5 +226,5 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 
 	// If there are no commits, create the initial commit.
 	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
-	return GitCommitIfNew(repoName)
+	return CommitIfNew(repoName)
 }

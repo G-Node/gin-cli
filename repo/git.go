@@ -229,8 +229,8 @@ func ListFiles(paths ...string) (map[string]FileStatus, error) {
 
 // Git commands
 
-// GitCommitIfNew creates an empty initial git commit if the current repository is completely new.
-func GitCommitIfNew(path string) error {
+// CommitIfNew creates an empty initial git commit if the current repository is completely new.
+func CommitIfNew(path string) error {
 	if !IsRepo(path) {
 		return fmt.Errorf("Not a repository")
 	}
