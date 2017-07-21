@@ -254,7 +254,7 @@ func CommitIfNew(path string) error {
 		return err
 	}
 
-	return AnnexSync(path, true)
+	return AnnexSync(path, false)
 }
 
 // IsRepo checks whether a given path is (in) a git repository.
