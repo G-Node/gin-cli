@@ -190,22 +190,23 @@ func (repocl *Client) RmContent(filepaths []string) error {
 	return err
 }
 
-// CloneRepo clones a remote repository and initialises annex init with the options specified in the config file.
-func (repocl *Client) CloneRepo(repoPath string) error {
+// CloneRepo clones a remote repository and initialises annex.
+// Returns the name of the directory in which the repository is cloned.
+func (repocl *Client) CloneRepo(repoPath string) (string, error) {
 	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("CloneRepo")
 
 	err := repocl.Connect()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	_, repoName := splitRepoParts(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", repoPath)
 	err = repocl.Clone(repoPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	fmt.Printf("done.\n")
 
@@ -216,15 +217,19 @@ func (repocl *Client) CloneRepo(repoPath string) error {
 	}
 	err = repocl.LoadToken()
 	if err != nil {
-		return err
+		return "", err
 	}
 	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
 	err = AnnexInit(repoName, description)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// If there are no commits, create the initial commit.
 	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
-	return CommitIfNew(repoName)
+	err = CommitIfNew(repoName)
+	if err != nil {
+		return "", err
+	}
+	return repoName, nil
 }

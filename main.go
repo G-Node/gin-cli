@@ -176,11 +176,18 @@ func getRepo(args []string) {
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err := repocl.CloneRepo(repostr)
+	repoDir, err := repocl.CloneRepo(repostr)
 	util.CheckError(err)
+
+	repo.UnlockAllFiles(repoDir)
 }
 
 func lsRepo(args []string) {
+	if !repo.IsRepo(".") {
+		util.Die("This command must be run from inside a gin repository.")
+	}
+	repo.LockAllFiles(".")
+	defer repo.UnlockAllFiles(".")
 
 	var short bool
 	for idx, arg := range args {
@@ -230,8 +237,11 @@ func lsRepo(args []string) {
 
 func upload(args []string) {
 	if !repo.IsRepo(".") {
-		util.Die("Current directory is not a repository.")
+		util.Die("This command must be run from inside a gin repository.")
 	}
+	repo.LockAllFiles(".")
+	defer repo.UnlockAllFiles(".")
+
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
@@ -242,8 +252,11 @@ func upload(args []string) {
 
 func download(args []string) {
 	if !repo.IsRepo(".") {
-		util.Die("Current directory is not a repository.")
+		util.Die("This command must be run from inside a gin repository.")
 	}
+	repo.LockAllFiles(".")
+	defer repo.UnlockAllFiles(".")
+
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
@@ -254,8 +267,11 @@ func download(args []string) {
 
 func remove(args []string) {
 	if !repo.IsRepo(".") {
-		util.Die("Current directory is not a repository.")
+		util.Die("This command must be run from inside a gin repository.")
 	}
+	repo.LockAllFiles(".")
+	defer repo.UnlockAllFiles(".")
+
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
@@ -436,29 +452,6 @@ func init() {
 	}
 }
 
-func lockAllFiles() {
-	info, err := repo.AnnexInfo(".")
-	if err != nil {
-		util.LogWrite(err.Error())
-		return
-	}
-	if info.RepositoryMode != "direct" {
-		_ = repo.AnnexLock(".")
-	}
-}
-
-// unlockAllFiles unlocks all annexed files before returning control to the user.
-func unlockAllFiles() {
-	info, err := repo.AnnexInfo(".")
-	if err != nil {
-		util.LogWrite(err.Error())
-		return
-	}
-	if info.RepositoryMode != "direct" {
-		_ = repo.AnnexUnlock(".")
-	}
-}
-
 func main() {
 	args, _ := docopt.Parse(usage, nil, true, verstr, true)
 	command := args["<command>"].(string)
@@ -472,8 +465,6 @@ func main() {
 
 	err = util.LoadConfig()
 	util.CheckError(err)
-	defer unlockAllFiles()
-	lockAllFiles()
 
 	switch command {
 	case "login":

@@ -741,6 +741,36 @@ func AnnexInfo(path string) (AnnexInfoResult, error) {
 	return info, err
 }
 
+// IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
+// If path is not a repository, or is not an initialised annex repository, the result defaults to false.
+func IsDirect(path string) bool {
+	info, err := AnnexInfo(".")
+	if err != nil {
+		util.LogWrite(err.Error())
+		return false
+	}
+	if info.RepositoryMode == "direct" {
+		return true
+	}
+	return false
+}
+
+// File locking and unlocking utility functions
+
+// LockAllFiles locks all annexed files which is necessary for most git annex operations. This has no effect in Direct mode.
+func LockAllFiles(path string) {
+	if IsRepo(path) && !IsDirect(path) {
+		_ = AnnexLock(path)
+	}
+}
+
+// UnlockAllFiles unlocks all annexed files. This has no effect in Direct mode.
+func UnlockAllFiles(path string) {
+	if IsRepo(path) && !IsDirect(path) {
+		_ = AnnexUnlock(path)
+	}
+}
+
 // Utility functions for shelling out
 
 // RunGitCommand executes a external git command with the provided arguments and returns stdout and stderr
