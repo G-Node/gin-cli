@@ -748,7 +748,7 @@ func AnnexInfo(path string) (AnnexInfoResult, error) {
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 func IsDirect(path string) bool {
-	info, err := AnnexInfo(".")
+	info, err := AnnexInfo(path)
 	if err != nil {
 		util.LogWrite(err.Error())
 		return false
