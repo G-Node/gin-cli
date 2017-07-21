@@ -406,7 +406,7 @@ func repos(args []string) {
 			arg = "--shared-with-me"
 		}
 	}
-	repolist, err := repocl.GetRepos(arg)
+	repolist, err := repocl.ListRepos(arg)
 	util.CheckError(err)
 
 	if arg == "" || arg == "--public" {

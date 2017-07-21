@@ -54,7 +54,7 @@ func (repocl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
 }
 
 // GetRepos gets a list of repositories (public or user specific)
-func (repocl *Client) GetRepos(user string) ([]gogs.Repository, error) {
+func (repocl *Client) ListRepos(user string) ([]gogs.Repository, error) {
 	util.LogWrite("Retrieving repo list")
 	var repoList []gogs.Repository
 	var res *http.Response
