@@ -410,11 +410,11 @@ func AnnexPull(localPath string) error {
 // Optionally synchronises content if content=True
 // (git annex sync [--content])
 func AnnexSync(localPath string, content bool) error {
-	var contentarg string
+	args := []string{"sync"}
 	if content {
-		contentarg = "--content"
+		args = append(args, "--content")
 	}
-	stdout, stderr, err := RunAnnexCommand(localPath, "sync", contentarg)
+	stdout, stderr, err := RunAnnexCommand(localPath, args...)
 
 	if err != nil {
 		util.LogWrite("Error during AnnexSync")
