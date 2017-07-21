@@ -260,11 +260,15 @@ func CommitIfNew(path string) error {
 // IsRepo checks whether a given path is (in) a git repository.
 // This function assumes path is a directory and will return false for files.
 func IsRepo(path string) bool {
+	util.LogWrite("IsRepo '%s'?", path)
 	gitbin := util.Config.Bin.Git
 	cmd := exec.Command(gitbin, "status")
 	cmd.Dir = path
+	util.LogWrite("Running shell command (Dir: %s): %s", path, strings.Join(cmd.Args, " "))
 	err := cmd.Run()
-	return err == nil
+	yes := err == nil
+	util.LogWrite("IsRepo: %v", yes)
+	return yes
 }
 
 func publicKeyFile(file string) ssh.AuthMethod {
@@ -379,11 +383,11 @@ func (repocl *Client) Clone(repoPath string) error {
 // (git annex init)
 func AnnexInit(localPath, description string) error {
 	stdout, stderr, err := RunAnnexCommand(localPath, "init", description)
+	util.LogWrite("[stdout]\r\n%s", stdout.String())
+	util.LogWrite("[stderr]\r\n%s", stderr.String())
 	if err != nil {
 		initError := fmt.Errorf("Repository annex initialisation failed.")
 		util.LogWrite(initError.Error())
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return initError
 	}
 	return nil
@@ -787,7 +791,7 @@ func RunGitCommand(path string, args ...string) (bytes.Buffer, bytes.Buffer, err
 		env := os.Environ()
 		cmd.Env = append(env, privKeyFile.GitSSHEnv())
 	}
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	util.LogWrite("Running shell command (Dir: %s): %s", path, strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	return stdout, stderr, err
 }
@@ -807,7 +811,7 @@ func RunAnnexCommand(path string, args ...string) (bytes.Buffer, bytes.Buffer, e
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	util.LogWrite("Running shell command: %s", strings.Join(cmd.Args, " "))
+	util.LogWrite("Running shell command (Dir: %s): %s", path, strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	return stdout, stderr, err
 }

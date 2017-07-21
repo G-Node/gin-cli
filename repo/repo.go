@@ -219,6 +219,7 @@ func (repocl *Client) CloneRepo(repoPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
 	err = AnnexInit(repoName, description)
 	if err != nil {
