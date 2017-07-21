@@ -700,6 +700,47 @@ func AnnexUnlock(paths ...string) error {
 	return nil
 }
 
+// AnnexInfoResult holds the information returned by AnnexInfo
+type AnnexInfoResult struct {
+	TransfersInProgress             []interface{} `json:"transfers in progress"`
+	LocalAnnexKeys                  int           `json:"local annex keys"`
+	AvailableLocalDiskSpace         string        `json:"available local disk space"`
+	AnnexedFilesInWorkingTree       int           `json:"annexed files in working tree"`
+	File                            interface{}   `json:"file"`
+	TrustedRepositories             []interface{} `json:"trusted repositories"`
+	SizeOfAnnexedFilesInWorkingTree string        `json:"size of annexed files in working tree"`
+	LocalAnnexSize                  string        `json:"local annex size"`
+	Command                         string        `json:"command"`
+	UntrustedRepositories           []interface{} `json:"untrusted repositories"`
+	SemitrustedRepositories         []struct {
+		Description string `json:"description"`
+		Here        bool   `json:"here"`
+		UUID        string `json:"uuid"`
+	} `json:"semitrusted repositories"`
+	Success         bool   `json:"success"`
+	BloomFilterSize string `json:"bloom filter size"`
+	BackendUsage    struct {
+		SHA256E int `json:"SHA256E"`
+		WORM    int `json:"WORM"`
+	} `json:"backend usage"`
+	RepositoryMode string `json:"repository mode"`
+}
+
+// AnnexInfo returns the annex information for a given repository
+func AnnexInfo(path string) (AnnexInfoResult, error) {
+	stdout, stderr, err := RunAnnexCommand(path, "info", "--json")
+	if err != nil {
+		util.LogWrite("Error during AnnexInfo")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return AnnexInfoResult{}, fmt.Errorf("Error retrieving annex info")
+	}
+
+	var info AnnexInfoResult
+	err = json.Unmarshal(stdout.Bytes(), &info)
+	return info, err
+}
+
 // Utility functions for shelling out
 
 // RunGitCommand executes a external git command with the provided arguments and returns stdout and stderr

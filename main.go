@@ -437,12 +437,26 @@ func init() {
 }
 
 func lockAllFiles() {
-	_ = repo.AnnexLock(".")
+	info, err := repo.AnnexInfo(".")
+	if err != nil {
+		util.LogWrite(err.Error())
+		return
+	}
+	if info.RepositoryMode != "direct" {
+		_ = repo.AnnexLock(".")
+	}
 }
 
 // unlockAllFiles unlocks all annexed files before returning control to the user.
 func unlockAllFiles() {
-	_ = repo.AnnexUnlock(".")
+	info, err := repo.AnnexInfo(".")
+	if err != nil {
+		util.LogWrite(err.Error())
+		return
+	}
+	if info.RepositoryMode != "direct" {
+		_ = repo.AnnexUnlock(".")
+	}
 }
 
 func main() {
