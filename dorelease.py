@@ -164,7 +164,7 @@ def get_appveyor_artifact_url():
 
 def get_git_for_windows():
     win_git_url = ("https://github.com/git-for-windows/git/releases/download/"
-                   "v2.12.0.windows.1/PortableGit-2.12.0-32-bit.7z.exe")
+                   "v2.13.3.windows.1/PortableGit-2.13.3-32-bit.7z.exe")
     return download(win_git_url)
 
 
@@ -415,6 +415,8 @@ def main():
         for l in lst:
             latestname = l.replace(version["version"], "latest")
             print("Linking {} to {}".format(l, latestname))
+            if os.path.exists(latestname):
+                os.unlink(latestname)
             os.link(l, latestname)
 
     print("------------------------------------------------")
