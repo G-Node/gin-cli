@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,9 @@ import (
 
 // Temporary (SSH key) file handling
 var privKeyFile util.TempFile
+
+// Workingdir sets the directory for shell commands
+var Workingdir = "."
 
 // MakeTempKeyPair creates a temporary key pair and stores it in a temporary directory.
 // It also sets the global tempFile for use by the annex commands. The key pair is returned directly.
@@ -135,13 +139,13 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 }
 
 // ListFiles lists the files and directories specified by paths and their sync status.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
 func ListFiles(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
-
 	gitlsfiles := func(option string) []string {
 		gitargs := []string{"ls-files", option}
 		gitargs = append(gitargs, paths...)
-		stdout, stderr, err := RunGitCommand(".", gitargs...)
+		stdout, stderr, err := RunGitCommand(gitargs...)
 		if err != nil {
 			util.LogWrite("Error during git ls-files %s", option)
 			util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -190,7 +194,7 @@ func ListFiles(paths ...string) (map[string]FileStatus, error) {
 	// If cached files are diff from upstream, mark as LocalChanges
 	diffargs := []string{"diff", "--name-only", "--relative", "@{upstream}"}
 	diffargs = append(diffargs, cachedfiles...)
-	stdout, stderr, err := RunGitCommand(".", diffargs...)
+	stdout, stderr, err := RunGitCommand(diffargs...)
 	if err != nil {
 		util.LogWrite("Error during diff command for status")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -230,12 +234,12 @@ func ListFiles(paths ...string) (map[string]FileStatus, error) {
 // Git commands
 
 // CommitIfNew creates an empty initial git commit if the current repository is completely new.
-func CommitIfNew(path string) error {
-	if !IsRepo(path) {
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func CommitIfNew() error {
+	if !IsRepo() {
 		return fmt.Errorf("Not a repository")
 	}
-
-	_, _, err := RunGitCommand(path, "rev-parse", "HEAD")
+	_, _, err := RunGitCommand("rev-parse", "HEAD")
 	if err == nil {
 		// All good. No need to do anything
 		return nil
@@ -246,7 +250,7 @@ func CommitIfNew(path string) error {
 	if err != nil {
 		hostname = "(unknown)"
 	}
-	stdout, stderr, err := RunGitCommand(path, "commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
+	stdout, stderr, err := RunGitCommand("commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
 	if err != nil {
 		util.LogWrite("Error while creating initial commit")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -254,17 +258,18 @@ func CommitIfNew(path string) error {
 		return err
 	}
 
-	return AnnexSync(path, false)
+	return AnnexSync(false)
 }
 
 // IsRepo checks whether a given path is (in) a git repository.
 // This function assumes path is a directory and will return false for files.
-func IsRepo(path string) bool {
-	util.LogWrite("IsRepo '%s'?", path)
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func IsRepo() bool {
+	util.LogWrite("IsRepo '%s'?", Workingdir)
 	gitbin := util.Config.Bin.Git
 	cmd := exec.Command(gitbin, "status")
-	cmd.Dir = path
-	util.LogWrite("Running shell command (Dir: %s): %s", path, strings.Join(cmd.Args, " "))
+	cmd.Dir = Workingdir
+	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	yes := err == nil
 	util.LogWrite("IsRepo: %v", yes)
@@ -350,10 +355,11 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 }
 
 // Clone downloads a repository and sets the remote fetch and push urls.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git clone ...)
 func (repocl *Client) Clone(repoPath string) error {
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repoPath)
-	stdout, stderr, err := RunGitCommand(".", "clone", remotePath)
+	stdout, stderr, err := RunGitCommand("clone", remotePath)
 	if err != nil {
 		util.LogWrite("Error during clone command")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -379,10 +385,16 @@ func (repocl *Client) Clone(repoPath string) error {
 
 // Git annex commands
 
-// AnnexInit initialises the repository for annex
+// AnnexInit initialises the repository for annex.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex init)
-func AnnexInit(localPath, description string) error {
-	stdout, stderr, err := RunAnnexCommand(localPath, "init", description)
+func AnnexInit(description string) error {
+	args := []string{"init", description}
+	if runtime.GOOS == "windows" {
+		// Use version 6 on Windows
+		args = append(args, "--version=6")
+	}
+	stdout, stderr, err := RunAnnexCommand(args...)
 	util.LogWrite("[stdout]\r\n%s", stdout.String())
 	util.LogWrite("[stderr]\r\n%s", stderr.String())
 	if err != nil {
@@ -394,9 +406,10 @@ func AnnexInit(localPath, description string) error {
 }
 
 // AnnexPull downloads all annexed files.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex sync --no-push --content)
-func AnnexPull(localPath string) error {
-	stdout, stderr, err := RunAnnexCommand(localPath, "sync", "--no-push", "--content")
+func AnnexPull() error {
+	stdout, stderr, err := RunAnnexCommand("sync", "--no-push", "--content")
 	if err != nil {
 		util.LogWrite("Error during AnnexPull.")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -408,13 +421,14 @@ func AnnexPull(localPath string) error {
 
 // AnnexSync synchronises the local repository with the remote.
 // Optionally synchronises content if content=True
+// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex sync [--content])
-func AnnexSync(localPath string, content bool) error {
+func AnnexSync(content bool) error {
 	args := []string{"sync"}
 	if content {
 		args = append(args, "--content")
 	}
-	stdout, stderr, err := RunAnnexCommand(localPath, args...)
+	stdout, stderr, err := RunAnnexCommand(args...)
 
 	if err != nil {
 		util.LogWrite("Error during AnnexSync")
@@ -426,16 +440,16 @@ func AnnexSync(localPath string, content bool) error {
 }
 
 // AnnexPush uploads all annexed files.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex sync --no-pull --content)
 func AnnexPush(paths []string, commitMsg string) error {
-
 	contarg := make([]string, len(paths))
 	for idx, p := range paths {
 		contarg[idx] = fmt.Sprintf("--content-of=%s", p)
 	}
 	cmdargs := []string{"sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
 	cmdargs = append(cmdargs, contarg...)
-	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 
 	if err != nil {
 		util.LogWrite("Error during AnnexPush")
@@ -448,10 +462,12 @@ func AnnexPush(paths []string, commitMsg string) error {
 }
 
 // AnnexGet retrieves the content of specified files.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// (git annex get)
 func AnnexGet(filepaths []string) error {
 	// TODO: Print success for each file as it finishes
 	cmdargs := append([]string{"get"}, filepaths...)
-	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexGet")
 		util.LogWrite("[Error]: %v", err)
@@ -463,10 +479,12 @@ func AnnexGet(filepaths []string) error {
 }
 
 // AnnexDrop drops the content of specified files.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// (git annex drop)
 func AnnexDrop(filepaths []string) error {
 	// TODO: Print success for each file as it finishes
 	cmdargs := append([]string{"drop"}, filepaths...)
-	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexDrop")
 		util.LogWrite("[Error]: %v", err)
@@ -486,11 +504,12 @@ type AnnexAddResult struct {
 }
 
 // AnnexAdd adds a path to the annex.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex add)
 func AnnexAdd(filepaths []string) ([]string, error) {
 	cmdargs := []string{"--json", "add"}
 	cmdargs = append(cmdargs, filepaths...)
-	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexAdd")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -535,11 +554,12 @@ type AnnexWhereisResult struct {
 }
 
 // AnnexWhereis returns information about annexed files in the repository
+// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex whereis)
 func AnnexWhereis(paths []string) ([]AnnexWhereisResult, error) {
 	cmdargs := []string{"whereis", "--json"}
 	cmdargs = append(cmdargs, paths...)
-	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -570,10 +590,11 @@ type AnnexStatusResult struct {
 }
 
 // AnnexStatus returns the status of a file or files in a directory
+// Setting the Workingdir package global affects the working directory in which the command is executed.
 func AnnexStatus(paths ...string) ([]AnnexStatusResult, error) {
 	cmdargs := []string{"status", "--json"}
 	cmdargs = append(cmdargs, paths...)
-	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during DescribeChanges")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -664,6 +685,8 @@ func makeFileList(header string, fnames []string) string {
 }
 
 // AnnexLock locks the specified files and directory contents if they are annexed.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// (git annex add)
 func AnnexLock(paths ...string) error {
 	// Annex lock doesn't work like it used to. It's better to instead annex add, but only the files that are already known to annex.
 	// To find these files, we can do a 'git-annex status paths...'and look for Type changes (T)
@@ -680,7 +703,7 @@ func AnnexLock(paths ...string) error {
 
 	cmdargs := []string{"add"}
 	cmdargs = append(cmdargs, unlockedfiles...)
-	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexLock")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -691,10 +714,12 @@ func AnnexLock(paths ...string) error {
 }
 
 // AnnexUnlock unlocks the specified files and directory contents if they are annexed
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// (git annex unlock)
 func AnnexUnlock(paths ...string) error {
 	cmdargs := []string{"unlock"}
 	cmdargs = append(cmdargs, paths...)
-	stdout, stderr, err := RunAnnexCommand(".", cmdargs...)
+	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexUnlock")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -731,8 +756,10 @@ type AnnexInfoResult struct {
 }
 
 // AnnexInfo returns the annex information for a given repository
-func AnnexInfo(path string) (AnnexInfoResult, error) {
-	stdout, stderr, err := RunAnnexCommand(path, "info", "--json")
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// (git annex info)
+func AnnexInfo() (AnnexInfoResult, error) {
+	stdout, stderr, err := RunAnnexCommand("info", "--json")
 	if err != nil {
 		util.LogWrite("Error during AnnexInfo")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -747,8 +774,9 @@ func AnnexInfo(path string) (AnnexInfoResult, error) {
 
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
-func IsDirect(path string) bool {
-	info, err := AnnexInfo(path)
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func IsDirect() bool {
+	info, err := AnnexInfo()
 	if err != nil {
 		util.LogWrite(err.Error())
 		return false
@@ -759,12 +787,12 @@ func IsDirect(path string) bool {
 	return false
 }
 
-func fixBare(path string) error {
-
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func fixBare() error {
 	// WINDOWS WORKAROUND
 	// On Windows, after initialising the annex, the directory is set to 'bare'.
 	// We manually revert in case it is set --- we should figure out why this is happening.
-	stdout, stderr, err := RunGitCommand(path, "config", "--local", "--get", "core.bare")
+	stdout, stderr, err := RunGitCommand("config", "--local", "--get", "core.bare")
 	if err != nil {
 		util.LogWrite("Error while checking repository bare status")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -772,7 +800,7 @@ func fixBare(path string) error {
 		return err
 	}
 	if strings.TrimSpace(stdout.String()) == "true" {
-		stdout, stderr, err = RunGitCommand(path, "config", "--local", "--bool", "core.bare", "false")
+		stdout, stderr, err = RunGitCommand("config", "--local", "--bool", "core.bare", "false")
 		if err != nil {
 			util.LogWrite("Error switching bare status to false")
 			util.LogWrite("[stdout]\r\n%s", stdout.String())
@@ -785,27 +813,30 @@ func fixBare(path string) error {
 
 // File locking and unlocking utility functions
 
-// LockAllFiles locks all annexed files which is necessary for most git annex operations. This has no effect in Direct mode.
-func LockAllFiles(path string) {
-	if IsRepo(path) && !IsDirect(path) {
-		_ = AnnexLock(path)
+// LockAllFiles locks all annexed files which is necessary for most git annex operations. This has no effect in Direct or version 6 mode.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func LockAllFiles() {
+	if IsRepo() && !IsDirect() {
+		_ = AnnexLock()
 	}
 }
 
 // UnlockAllFiles unlocks all annexed files. This has no effect in Direct mode.
-func UnlockAllFiles(path string) {
-	if IsRepo(path) && !IsDirect(path) {
-		_ = AnnexUnlock(path)
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func UnlockAllFiles() {
+	if IsRepo() && !IsDirect() {
+		_ = AnnexUnlock()
 	}
 }
 
 // Utility functions for shelling out
 
 // RunGitCommand executes a external git command with the provided arguments and returns stdout and stderr
-func RunGitCommand(path string, args ...string) (bytes.Buffer, bytes.Buffer, error) {
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func RunGitCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	gitbin := util.Config.Bin.Git
 	cmd := exec.Command(gitbin)
-	cmd.Dir = path
+	cmd.Dir = Workingdir
 	cmd.Args = append(cmd.Args, args...)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -815,17 +846,17 @@ func RunGitCommand(path string, args ...string) (bytes.Buffer, bytes.Buffer, err
 		env := os.Environ()
 		cmd.Env = append(env, privKeyFile.GitSSHEnv())
 	}
-	util.LogWrite("Running shell command (Dir: %s): %s", path, strings.Join(cmd.Args, " "))
+	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	return stdout, stderr, err
 }
 
 // RunAnnexCommand executes a git annex command with the provided arguments and returns stdout and stderr.
-// The first argument specifies the working directory inside which the command is executed.
-func RunAnnexCommand(path string, args ...string) (bytes.Buffer, bytes.Buffer, error) {
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func RunAnnexCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	gitannexbin := util.Config.Bin.GitAnnex
 	cmd := exec.Command(gitannexbin, args...)
-	cmd.Dir = path
+	cmd.Dir = Workingdir
 	annexsshopt := "annex.ssh-options=-o StrictHostKeyChecking=no"
 	if privKeyFile.Active {
 		annexsshopt = fmt.Sprintf("%s -i %s", annexsshopt, privKeyFile.FullPath())
@@ -835,7 +866,7 @@ func RunAnnexCommand(path string, args ...string) (bytes.Buffer, bytes.Buffer, e
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	util.LogWrite("Running shell command (Dir: %s): %s", path, strings.Join(cmd.Args, " "))
+	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	return stdout, stderr, err
 }

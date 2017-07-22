@@ -53,7 +53,7 @@ func (repocl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
 	return repo, err
 }
 
-// GetRepos gets a list of repositories (public or user specific)
+// ListRepos gets a list of repositories (public or user specific)
 func (repocl *Client) ListRepos(user string) ([]gogs.Repository, error) {
 	util.LogWrite("Retrieving repo list")
 	var repoList []gogs.Repository
@@ -151,7 +151,8 @@ func (repocl *Client) UploadRepo(paths []string) error {
 }
 
 // DownloadRepo downloads the files in an already checked out repository.
-func (repocl *Client) DownloadRepo(localPath string) error {
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func (repocl *Client) DownloadRepo() error {
 	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("DownloadRepo")
@@ -160,7 +161,7 @@ func (repocl *Client) DownloadRepo(localPath string) error {
 	if err != nil {
 		return err
 	}
-	err = AnnexPull(localPath)
+	err = AnnexPull()
 	return err
 }
 
@@ -221,19 +222,20 @@ func (repocl *Client) CloneRepo(repoPath string) (string, error) {
 	}
 
 	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
-	err = AnnexInit(repoName, description)
+	Workingdir = repoName
+	err = AnnexInit(description)
 	if err != nil {
 		return "", err
 	}
 
-	err = fixBare(repoName)
+	err = fixBare()
 	if err != nil {
 		return "", err
 	}
 
 	// If there are no commits, create the initial commit.
 	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
-	err = CommitIfNew(repoName)
+	err = CommitIfNew()
 	if err != nil {
 		return "", err
 	}
