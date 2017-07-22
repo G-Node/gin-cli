@@ -7,3 +7,6 @@
 
 # directories
 dist
+
+# macOS junk
+.DS_Store
