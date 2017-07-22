@@ -787,6 +787,22 @@ func IsDirect() bool {
 	return false
 }
 
+// IsVersion6 returns true if the repository in a given path is working in git annex 'direct' mode.
+// If path is not a repository, or is not an initialised annex repository, the result defaults to false.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func IsVersion6() bool {
+	stdout, stderr, err := RunGitCommand("config", "--local", "--get", "annex.version")
+	if err != nil {
+		util.LogWrite("Error while checking repository annex version")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return false
+	}
+	ver := strings.TrimSpace(stdout.String())
+	util.LogWrite("Annex version is %s", ver)
+	return ver == "6"
+}
+
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func fixBare() error {
 	// WINDOWS WORKAROUND
