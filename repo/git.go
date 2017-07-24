@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -412,10 +411,6 @@ func (repocl *Client) Clone(repoPath string) error {
 // (git annex init)
 func AnnexInit(description string) error {
 	args := []string{"init", description}
-	if runtime.GOOS == "windows" {
-		// Use version 6 on Windows
-		args = append(args, "--version=6")
-	}
 	stdout, stderr, err := RunAnnexCommand(args...)
 	util.LogWrite("[stdout]\r\n%s", stdout.String())
 	util.LogWrite("[stderr]\r\n%s", stderr.String())
