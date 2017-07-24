@@ -701,6 +701,10 @@ func AnnexLock(paths ...string) error {
 		}
 	}
 
+	if len(unlockedfiles) == 0 {
+		util.LogWrite("No files to lock")
+		return nil
+	}
 	cmdargs := []string{"add"}
 	cmdargs = append(cmdargs, unlockedfiles...)
 	stdout, stderr, err := RunAnnexCommand(cmdargs...)

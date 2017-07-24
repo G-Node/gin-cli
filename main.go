@@ -180,15 +180,12 @@ func getRepo(args []string) {
 	util.CheckError(err)
 
 	repo.Workingdir = repoDir
-	repo.UnlockAllFiles()
 }
 
 func lsRepo(args []string) {
 	if !repo.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	repo.LockAllFiles()
-	defer repo.UnlockAllFiles()
 
 	var short bool
 	for idx, arg := range args {
@@ -240,14 +237,14 @@ func upload(args []string) {
 	if !repo.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	repo.LockAllFiles()
-	defer repo.UnlockAllFiles()
+	err := repo.AnnexLock(args...)
+	util.CheckError(err)
 
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err := repocl.UploadRepo(args)
+	err = repocl.UploadRepo(args)
 	util.CheckError(err)
 }
 
@@ -255,8 +252,6 @@ func download(args []string) {
 	if !repo.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	repo.LockAllFiles()
-	defer repo.UnlockAllFiles()
 
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
@@ -270,14 +265,14 @@ func remove(args []string) {
 	if !repo.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	repo.LockAllFiles()
-	defer repo.UnlockAllFiles()
+	err := repo.AnnexLock(args...)
+	util.CheckError(err)
 
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err := repocl.RmContent(args)
+	err = repocl.RmContent(args)
 	util.CheckError(err)
 }
 
