@@ -419,6 +419,13 @@ func AnnexInit(description string) error {
 		util.LogWrite(initError.Error())
 		return initError
 	}
+	stdout, stderr, err = RunGitCommand("config", "annex.backends", "MD5")
+	if err != nil {
+		util.LogWrite("Failed to set default annex backend MD5")
+		util.LogWrite("[Error]: %v", err)
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+	}
 	return nil
 }
 
@@ -429,6 +436,7 @@ func AnnexPull() error {
 	stdout, stderr, err := RunAnnexCommand("sync", "--no-push", "--content")
 	if err != nil {
 		util.LogWrite("Error during AnnexPull.")
+		util.LogWrite("[Error]: %v", err)
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error downloading files")
@@ -449,6 +457,7 @@ func AnnexSync(content bool) error {
 
 	if err != nil {
 		util.LogWrite("Error during AnnexSync")
+		util.LogWrite("[Error]: %v", err)
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
 		return fmt.Errorf("Error synchronising files")
