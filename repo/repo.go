@@ -228,11 +228,6 @@ func (repocl *Client) CloneRepo(repoPath string) (string, error) {
 		return "", err
 	}
 
-	err = fixBare()
-	if err != nil {
-		return "", err
-	}
-
 	// If there are no commits, create the initial commit.
 	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
 	err = CommitIfNew()

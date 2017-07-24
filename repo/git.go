@@ -803,30 +803,6 @@ func IsVersion6() bool {
 	return ver == "6"
 }
 
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-func fixBare() error {
-	// WINDOWS WORKAROUND
-	// On Windows, after initialising the annex, the directory is set to 'bare'.
-	// We manually revert in case it is set --- we should figure out why this is happening.
-	stdout, stderr, err := RunGitCommand("config", "--local", "--get", "core.bare")
-	if err != nil {
-		util.LogWrite("Error while checking repository bare status")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return err
-	}
-	if strings.TrimSpace(stdout.String()) == "true" {
-		stdout, stderr, err = RunGitCommand("config", "--local", "--bool", "core.bare", "false")
-		if err != nil {
-			util.LogWrite("Error switching bare status to false")
-			util.LogWrite("[stdout]\r\n%s", stdout.String())
-			util.LogWrite("[stderr]\r\n%s", stderr.String())
-			return err
-		}
-	}
-	return nil
-}
-
 // File locking and unlocking utility functions
 
 // LockAllFiles locks all annexed files which is necessary for most git annex operations. This has no effect in Direct or version 6 mode.
