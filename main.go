@@ -233,6 +233,22 @@ func lsRepo(args []string) {
 	}
 }
 
+func lock(args []string) {
+	if !repo.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
+	}
+	err := repo.AnnexLock(args...)
+	util.CheckError(err)
+}
+
+func unlock(args []string) {
+	if !repo.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
+	}
+	err := repo.AnnexUnlock(args...)
+	util.CheckError(err)
+}
+
 func upload(args []string) {
 	if !repo.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
@@ -473,6 +489,10 @@ func main() {
 		getRepo(cmdArgs)
 	case "ls":
 		lsRepo(cmdArgs)
+	case "unlock":
+		unlock(cmdArgs)
+	case "lock":
+		lock(cmdArgs)
 	case "upload":
 		upload(cmdArgs)
 	case "download":

@@ -75,6 +75,8 @@ const (
 	LocalChanges
 	// RemoteChanges indicates that a file has remote modifications that have not been pulled
 	RemoteChanges
+	// Unlocked indicates that a file is being tracked and is unlocked for editing
+	Unlocked
 	// Untracked indicates that a file is not being tracked by neither git nor git annex
 	Untracked
 )
@@ -92,6 +94,8 @@ func (fs FileStatus) Description() string {
 		return "Locally modified (not uploaded)"
 	case fs == RemoteChanges:
 		return "Remotely modified (not downloaded)"
+	case fs == Unlocked:
+		return "Unlocked for editing"
 	case fs == Untracked:
 		return "Untracked"
 	default:
@@ -100,7 +104,7 @@ func (fs FileStatus) Description() string {
 }
 
 // Abbrev returns the two-letter abbrevation of the file status
-// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), ?? (Untracked)
+// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), UL (Unlocked), ?? (Untracked)
 func (fs FileStatus) Abbrev() string {
 	switch {
 	case fs == Synced:
@@ -113,6 +117,8 @@ func (fs FileStatus) Abbrev() string {
 		return "LC"
 	case fs == RemoteChanges:
 		return "RC"
+	case fs == Unlocked:
+		return "UL"
 	case fs == Untracked:
 		return "??"
 	default:
@@ -142,6 +148,7 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func ListFiles(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
+
 	gitlsfiles := func(option string) []string {
 		gitargs := []string{"ls-files", option}
 		gitargs = append(gitargs, paths...)
@@ -224,6 +231,21 @@ func ListFiles(paths ...string) (map[string]FileStatus, error) {
 		statuses[fname] = Modified
 	}
 
+	// Check if modified files are actually annex unlocked instead
+	mdfilestatus, err := AnnexStatus(modifiedfiles...)
+	if err != nil {
+		util.LogWrite("Error during annex status while searching for unlocked files")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		// ignoring error and continuing
+	}
+	for _, stat := range mdfilestatus {
+		if stat.Status == "T" {
+			statuses[stat.File] = Unlocked
+		}
+	}
+
+	// Add untracked files to the map
 	for _, fname := range untrackedfiles {
 		statuses[fname] = Untracked
 	}
