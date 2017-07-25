@@ -282,17 +282,18 @@ func CommitIfNew() error {
 	return AnnexSync(false)
 }
 
-// IsRepo checks whether a given path is (in) a git repository.
-// This function assumes path is a directory and will return false for files.
+// IsRepo checks whether the current working directory is in a git repository.
+// This function will also return true for bare repositories that use git annex (direct mode).
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsRepo() bool {
 	util.LogWrite("IsRepo '%s'?", Workingdir)
-	gitbin := util.Config.Bin.Git
-	cmd := exec.Command(gitbin, "status")
-	cmd.Dir = Workingdir
-	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
-	err := cmd.Run()
+	_, _, err := RunGitCommand("status")
 	yes := err == nil
+	if !yes {
+		// Maybe it's an annex repo in direct mode?
+		_, _, err = RunAnnexCommand("status")
+		yes = err == nil
+	}
 	util.LogWrite("IsRepo: %v", yes)
 	return yes
 }
