@@ -17,6 +17,8 @@ Commands:
 	create         [<name>] [<description>]    | Create a repository on the remote server and clone it
 	get            <repopath>                  | Retrieve (clone) a repository from the remote server
 	ls             [-s, --short] [<filenames>] | List the sync status of files in a local repository
+	unlock         [<filenames>]               | Unlock files for editing
+	lock           [<filenames>]               | Lock files
 	upload         [<filenames>]               | Upload local changes to a remote repository
 	download       [<filenames>]               | Download the content of files from a remote repository
 	remove-content [<filenames>]               | Remove the content of local files that have already been uploaded
@@ -149,6 +151,49 @@ ARGUMENTS
 
 	<filenames>
 		One or more directories or files to list.
+`
+
+const unlockHelp = `USAGE
+
+	gin unlock [<filenames>]...
+
+DESCRIPTION
+
+	Unlock one or more files for editing. Files added to the repository are
+	left in a locked state, which allows reading but prevents editing. In order
+	to edit or write to a file, it must first be unlocked. When done editing,
+	it is recommended that a file be locked again, using the 'lock' command,
+	which records changes in the repository.
+
+	After performing an 'upload', 'download', or 'get', affected files are
+	reverted to a locked state.
+
+ARGUMENTS
+
+	<filenames>
+		One or more directories or files to unlock.
+`
+
+const lockHelp = `USAGE
+
+	gin lock [<filenames>]...
+	
+DESCRIPTION
+
+	Lock one or more files after editing. After unlocking files for editing,
+	using the 'unlock' command, it is recommended that they be locked again.
+	This records any changes made and prepares a file for upload to the GIN
+	server.
+	
+	Locked files are replaced by symbolic links in the working directory.
+
+	After performing an 'upload', 'download', or 'get', affected files are
+	reverted to a locked state.
+
+ARGUMENTS
+
+	<filenames>
+		One or more directories or files to lock.
 `
 
 const uploadHelp = `USAGE
@@ -301,6 +346,8 @@ var cmdHelp = map[string]string{
 	"create":         createHelp,
 	"get":            getHelp,
 	"ls":             lsHelp,
+	"unlock":         unlockHelp,
+	"lock":           lockHelp,
 	"upload":         uploadHelp,
 	"download":       downloadHelp,
 	"remove-content": rmcHelp,
