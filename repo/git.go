@@ -711,6 +711,8 @@ func makeFileList(header string, fnames []string) string {
 }
 
 // AnnexLock locks the specified files and directory contents if they are annexed.
+// Note that this function uses 'git annex add' to lock files, but only if they are marked as unlocked (T) by git annex.
+// Attempting to lock an untracked file, or a file in any state other than T will have no effect.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex add)
 func AnnexLock(paths ...string) error {
@@ -831,24 +833,6 @@ func IsVersion6() bool {
 	ver := strings.TrimSpace(stdout.String())
 	util.LogWrite("Annex version is %s", ver)
 	return ver == "6"
-}
-
-// File locking and unlocking utility functions
-
-// LockAllFiles locks all annexed files which is necessary for most git annex operations. This has no effect in Direct or version 6 mode.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-func LockAllFiles() {
-	if IsRepo() && !IsDirect() {
-		_ = AnnexLock()
-	}
-}
-
-// UnlockAllFiles unlocks all annexed files. This has no effect in Direct mode.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-func UnlockAllFiles() {
-	if IsRepo() && !IsDirect() {
-		_ = AnnexUnlock()
-	}
 }
 
 // Utility functions for shelling out
