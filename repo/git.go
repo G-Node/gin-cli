@@ -144,16 +144,38 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 }
 
 func lfDirect(paths ...string) (map[string]FileStatus, error) {
-	annexstatuses, _ := AnnexStatus(paths...)
-	fmt.Printf("Running annex status on %+v\n", paths)
-	for _, stat := range annexstatuses {
-		println("Got result for ", stat.File)
-		if stat.Status == "?" {
-			untrackedfiles = append(untrackedfiles, stat.File)
+	statuses := make(map[string]FileStatus)
+
+	wiResults, _ := AnnexWhereis(paths)
+	for _, status := range wiResults {
+		fname := status.File
+		for _, remote := range status.Whereis {
+			// if no remotes are "here", the file is NoContent
+			statuses[fname] = NoContent
+			if remote.Here {
+				if len(status.Whereis) > 1 {
+					statuses[fname] = Synced
+				} else {
+					statuses[fname] = LocalChanges
+				}
+				break
+			}
 		}
 	}
 
-	return nil, nil
+	asargs := paths
+	if len(asargs) == 0 {
+		// AnnexStatus with no arguments defaults to root directory, so we should use "." instead
+		asargs = []string{"."}
+	}
+	annexstatuses, _ := AnnexStatus(asargs...)
+	for _, stat := range annexstatuses {
+		if stat.Status == "?" {
+			statuses[stat.File] = Untracked
+		}
+	}
+
+	return statuses, nil
 }
 
 func lfIndirect(paths ...string) (map[string]FileStatus, error) {
