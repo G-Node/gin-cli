@@ -832,13 +832,12 @@ func IsDirect() bool {
 	if mode, ok := modecache[Workingdir]; ok {
 		return mode
 	}
-	info, err := AnnexInfo()
+	stdout, _, err := RunGitCommand("config", "--local", "annex.direct")
 	if err != nil {
-		util.LogWrite(err.Error())
 		// Don't cache this result
 		return false
 	}
-	if info.RepositoryMode == "direct" {
+	if strings.TrimSpace(stdout.String()) == "true" {
 		modecache[Workingdir] = true
 		return true
 	}
