@@ -143,9 +143,20 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 	return fsSlice[i] < fsSlice[j]
 }
 
-// ListFiles lists the files and directories specified by paths and their sync status.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-func ListFiles(paths ...string) (map[string]FileStatus, error) {
+func lfDirect(paths ...string) (map[string]FileStatus, error) {
+	annexstatuses, _ := AnnexStatus(paths...)
+	fmt.Printf("Running annex status on %+v\n", paths)
+	for _, stat := range annexstatuses {
+		println("Got result for ", stat.File)
+		if stat.Status == "?" {
+			untrackedfiles = append(untrackedfiles, stat.File)
+		}
+	}
+
+	return nil, nil
+}
+
+func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
 	gitlsfiles := func(option string) []string {
@@ -234,9 +245,6 @@ func ListFiles(paths ...string) (map[string]FileStatus, error) {
 	mdfilestatus, err := AnnexStatus(modifiedfiles...)
 	if err != nil {
 		util.LogWrite("Error during annex status while searching for unlocked files")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		// ignoring error and continuing
 	}
 	for _, stat := range mdfilestatus {
 		if stat.Status == "T" {
@@ -250,6 +258,15 @@ func ListFiles(paths ...string) (map[string]FileStatus, error) {
 	}
 
 	return statuses, nil
+}
+
+// ListFiles lists the files and directories specified by paths and their sync status.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func ListFiles(paths ...string) (map[string]FileStatus, error) {
+	if IsDirect() {
+		return lfDirect(paths...)
+	}
+	return lfIndirect(paths...)
 }
 
 // Git commands
@@ -838,7 +855,7 @@ func IsVersion6() bool {
 
 // Utility functions for shelling out
 
-// RunGitCommand executes a external git command with the provided arguments and returns stdout and stderr
+// RunGitCommand executes an external git command with the provided arguments and returns stdout and stderr.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func RunGitCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	gitbin := util.Config.Bin.Git
