@@ -822,18 +822,27 @@ func AnnexInfo() (AnnexInfoResult, error) {
 	return info, err
 }
 
+var modecache = make(map[string]bool)
+
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
+// If the path is a repository and no error was raised, the result it cached so that subsequent checks are faster.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsDirect() bool {
+	if mode, ok := modecache[Workingdir]; ok {
+		return mode
+	}
 	info, err := AnnexInfo()
 	if err != nil {
 		util.LogWrite(err.Error())
+		// Don't cache this result
 		return false
 	}
 	if info.RepositoryMode == "direct" {
+		modecache[Workingdir] = true
 		return true
 	}
+	modecache[Workingdir] = false
 	return false
 }
 
