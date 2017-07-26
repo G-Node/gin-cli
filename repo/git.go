@@ -718,8 +718,8 @@ func DescribeIndexShort() (string, error) {
 // It is constructed using the result of 'git annex status'.
 // The resulting message can be used to inform the user of changes
 // that are about to be uploaded and as a long commit message.
-func DescribeIndex(localPath string) (string, error) {
-	statuses, err := AnnexStatus(localPath)
+func DescribeIndex() (string, error) {
+	statuses, err := AnnexStatus()
 	if err != nil {
 		return "", err
 	}
