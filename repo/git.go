@@ -172,6 +172,8 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	for _, stat := range annexstatuses {
 		if stat.Status == "?" {
 			statuses[stat.File] = Untracked
+		} else if stat.Status == "M" {
+			statuses[stat.File] = Modified
 		}
 	}
 
