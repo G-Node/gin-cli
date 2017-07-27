@@ -604,7 +604,13 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 
 // ListFiles lists the files and directories specified by paths and their sync status.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func ListFiles(paths ...string) (map[string]FileStatus, error) {
+func (repocl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
+	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
+	defer CleanUpTemp()
+	err := repocl.Connect()
+	if err != nil {
+		return nil, err
+	}
 	if IsDirect() {
 		return lfDirect(paths...)
 	}
