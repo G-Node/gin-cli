@@ -177,16 +177,30 @@ func AnnexSync(content bool) error {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex sync --no-pull --content)
 func AnnexPush(paths []string, commitMsg string) error {
-	contarg := make([]string, len(paths))
-	for idx, p := range paths {
-		contarg[idx] = fmt.Sprintf("--content-of=%s", p)
-	}
-	cmdargs := []string{"sync", "--no-pull", "--content", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
-	cmdargs = append(cmdargs, contarg...)
+	// contarg := make([]string, len(paths))
+	// for idx, p := range paths {
+	// 	contarg[idx] = fmt.Sprintf("--content-of=%s", p)
+	// }
+	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
+	// cmdargs = append(cmdargs, contarg...)
 	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 
 	if err != nil {
-		util.LogWrite("Error during AnnexPush")
+		util.LogWrite("Error during AnnexPush (sync --no-pull)")
+		util.LogWrite("[Error]: %v", err)
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return fmt.Errorf("Error uploading files")
+	}
+
+	cmdargs = []string{"copy"}
+	cmdargs = append(cmdargs, paths...)
+	// NOTE: Using origin which is the conventional default remote. This should be fixed.
+	cmdargs = append(cmdargs, "--to=origin")
+	stdout, stderr, err = RunAnnexCommand(cmdargs...)
+
+	if err != nil {
+		util.LogWrite("Error during AnnexPush (copy)")
 		util.LogWrite("[Error]: %v", err)
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
