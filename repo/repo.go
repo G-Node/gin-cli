@@ -194,7 +194,8 @@ func (repocl *Client) RmContent(filepaths []string) error {
 // CloneRepo clones a remote repository and initialises annex.
 // Returns the name of the directory in which the repository is cloned.
 func (repocl *Client) CloneRepo(repoPath string) (string, error) {
-	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
+	authcl := auth.NewClient(repocl.Host)
+	defer authcl.DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("CloneRepo")
 
@@ -211,28 +212,54 @@ func (repocl *Client) CloneRepo(repoPath string) (string, error) {
 	}
 	fmt.Printf("done.\n")
 
-	// git annex init the clone and set defaults
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = "localhost"
-	}
 	err = repocl.LoadToken()
 	if err != nil {
 		return "", err
 	}
 
-	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
+	// Following shell commands performed from within the repository root
 	Workingdir = repoName
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "localhost"
+	}
+	description := fmt.Sprintf("%s@%s", repocl.Username, hostname)
+
+	// If there is no global git user.name or user.email set local ones
+	globalGitName, _, _ := RunGitCommand("config", "--global", "user.name")
+	globalGitEmail, _, _ := RunGitCommand("config", "--global", "user.Email")
+	if globalGitName.Len() == 0 && globalGitEmail.Len() == 0 {
+		info, err := authcl.RequestAccount(repocl.Username)
+		name := info.FullName
+		if err != nil {
+			name = repocl.Username
+		}
+		// NOTE: Add user email too?
+		err = SetGitUser(name, "")
+		if err != nil {
+			util.LogWrite("Failed to set local git user configuration")
+		}
+	}
+
+	// If there are no commits, create the initial commit.
+	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
+	new, err := CommitIfNew()
+	if err != nil {
+		return "", err
+	}
+
 	err = AnnexInit(description)
 	if err != nil {
 		return "", err
 	}
 
-	// If there are no commits, create the initial commit.
-	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
-	err = CommitIfNew()
-	if err != nil {
-		return "", err
+	if new {
+		// Sync if an initial commit was created
+		err = AnnexSync(false)
+		if err != nil {
+			return "", err
+		}
 	}
+
 	return repoName, nil
 }

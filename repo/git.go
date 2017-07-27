@@ -295,16 +295,33 @@ func ListFiles(paths ...string) (map[string]FileStatus, error) {
 
 // Git commands
 
-// CommitIfNew creates an empty initial git commit if the current repository is completely new.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-func CommitIfNew() error {
+// SetGitUser sets the user.name and user.email configuration values for the local git repository.
+func SetGitUser(name, email string) error {
 	if !IsRepo() {
 		return fmt.Errorf("Not a repository")
+	}
+	_, _, err := RunGitCommand("config", "--local", "user.name", name)
+	if err != nil {
+		return err
+	}
+	_, _, err = RunGitCommand("config", "--local", "user.email", email)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// CommitIfNew creates an empty initial git commit if the current repository is completely new.
+// Returns 'true' if (and only if) a commit was created.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func CommitIfNew() (bool, error) {
+	if !IsRepo() {
+		return false, fmt.Errorf("Not a repository")
 	}
 	_, _, err := RunGitCommand("rev-parse", "HEAD")
 	if err == nil {
 		// All good. No need to do anything
-		return nil
+		return false, nil
 	}
 
 	// Create an empty initial commit and run annex sync to synchronise everything
@@ -312,15 +329,15 @@ func CommitIfNew() error {
 	if err != nil {
 		hostname = "(unknown)"
 	}
-	stdout, stderr, err := RunGitCommand("commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
+	commitargs := []string{"commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname)}
+	stdout, stderr, err := RunGitCommand(commitargs...)
 	if err != nil {
 		util.LogWrite("Error while creating initial commit")
 		util.LogWrite("[stdout]\r\n%s", stdout.String())
 		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		return err
+		return false, err
 	}
-
-	return AnnexSync(false)
+	return true, nil
 }
 
 // IsRepo checks whether the current working directory is in a git repository.
@@ -692,6 +709,7 @@ func AnnexStatus(paths ...string) ([]AnnexStatusResult, error) {
 // It is constructed using the result of 'git annex status'.
 // The description is composed of the file count for each status: added, modified, deleted
 func DescribeIndexShort() (string, error) {
+	// TODO: 'git annex status' doesn't list added (A) files wnen in direct mode.
 	statuses, err := AnnexStatus()
 	if err != nil {
 		return "", err
