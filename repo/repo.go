@@ -226,11 +226,11 @@ func (repocl *Client) DelRepo(name string) error {
 	return nil
 }
 
-// UploadRepo adds files to a repository and uploads them.
-func (repocl *Client) UploadRepo(paths []string) error {
+// Upload adds files to a repository and uploads them.
+func (repocl *Client) Upload(paths []string) error {
 	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
 	defer CleanUpTemp()
-	util.LogWrite("UploadRepo")
+	util.LogWrite("Upload")
 
 	err := repocl.Connect()
 	if err != nil {

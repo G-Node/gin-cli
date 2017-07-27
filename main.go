@@ -201,7 +201,7 @@ func lsRepo(args []string) {
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
 
-	filesStatus, err := repo.ListFiles(args...)
+	filesStatus, err := repocl.ListFiles(args...)
 	util.CheckError(err)
 
 	if short {
@@ -260,7 +260,7 @@ func upload(args []string) {
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err = repocl.UploadRepo(args)
+	err = repocl.Upload(args)
 	util.CheckError(err)
 }
 
