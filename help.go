@@ -20,8 +20,8 @@ Commands:
 	unlock         [<filenames>]               | Unlock files for editing
 	lock           [<filenames>]               | Lock files
 	upload         [<filenames>]               | Upload local changes to a remote repository
-	get-content    [<filenames>]               | Download the content of files from a remote repository
 	download       [--content]                 | Download all new information from a remote repository
+	get-content    [<filenames>]               | Download the content of files from a remote repository
 	remove-content [<filenames>]               | Remove the content of local files that have already been uploaded
 	rmc            [<filenames>]               | Synonym for remove-content
 	repos          [<username>]                | List available remote repositories
@@ -212,8 +212,6 @@ DESCRIPTION
 	repository clone. Specific files or directories may be specified.
 	All changes made will be sent to the server, including addition of new
 	files, modifications and renaming of existing files, and file deletions. 
-	With no arguments, uploads the changes made under the working directory,
-	recursively.
 
 ARGUMENTS
 

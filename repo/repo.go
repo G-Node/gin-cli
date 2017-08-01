@@ -237,11 +237,12 @@ func (repocl *Client) Upload(paths []string) error {
 		return err
 	}
 
-	_, err = AnnexAdd(paths)
-	if err != nil {
-		return err
+	if len(paths) > 0 {
+		_, err = AnnexAdd(paths)
+		if err != nil {
+			return err
+		}
 	}
-
 	changes, err := DescribeIndexShort()
 	if err != nil {
 		return err

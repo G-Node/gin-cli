@@ -260,8 +260,17 @@ func upload(args []string) {
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
+
+	if len(args) == 0 {
+		fmt.Println("No files specified for upload. Synchronising metadata.")
+		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
+	}
+
+	fmt.Print("Uploading...")
+
 	err = repocl.Upload(args)
 	util.CheckError(err)
+	fmt.Println("done!")
 }
 
 func download(args []string) {
@@ -283,7 +292,9 @@ func download(args []string) {
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
+	fmt.Print("Downloading...")
 	err = repocl.DownloadRepo(content)
+	fmt.Println("done!")
 	util.CheckError(err)
 }
 
