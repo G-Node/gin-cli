@@ -268,6 +268,29 @@ func download(args []string) {
 	if !repo.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
+	err := repo.AnnexLock()
+	util.CheckError(err)
+
+	var content bool
+	if len(args) > 0 {
+		if args[0] != "--content" {
+			util.Die(usage)
+		}
+		content = true
+	}
+
+	repocl := repo.NewClient(util.Config.RepoHost)
+	repocl.GitUser = util.Config.GitUser
+	repocl.GitHost = util.Config.GitHost
+	repocl.KeyHost = util.Config.AuthHost
+	err = repocl.DownloadRepo(content)
+	util.CheckError(err)
+}
+
+func getContent(args []string) {
+	if !repo.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
+	}
 
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
@@ -497,6 +520,8 @@ func main() {
 		upload(cmdArgs)
 	case "download":
 		download(cmdArgs)
+	case "get-content":
+		getContent(cmdArgs)
 	case "remove-content":
 		remove(cmdArgs)
 	case "rmc":

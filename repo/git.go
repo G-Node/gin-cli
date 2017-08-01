@@ -139,9 +139,13 @@ func AnnexInit(description string) error {
 
 // AnnexPull downloads all annexed files.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-// (git annex sync --no-push --content)
-func AnnexPull() error {
-	stdout, stderr, err := RunAnnexCommand("sync", "--no-push", "--content")
+// (git annex sync --no-push [--content])
+func AnnexPull(content bool) error {
+	args := []string{"sync", "--no-push"}
+	if content {
+		args = append(args, "--content")
+	}
+	stdout, stderr, err := RunAnnexCommand(args...)
 	if err != nil {
 		util.LogWrite("Error during AnnexPull.")
 		util.LogWrite("[Error]: %v", err)
