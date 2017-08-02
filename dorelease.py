@@ -78,7 +78,7 @@ def wait_for_ret():
         die("\nCancelled")
 
 
-def build(incbuild=False):
+def build():
     platforms = ["linux/amd64", "windows/386", "darwin/amd64"]
     print("--> Building binary for [{}]".format(", ".join(platforms)))
     verfile = "version"
@@ -86,21 +86,15 @@ def build(incbuild=False):
         verinfo = fd.read()
 
     version["version"] = re.search(r"version=([v0-9\.]+)", verinfo).group(1)
-    version["build"] = re.search(r"build=([0-9]+)", verinfo).group(1)
+    cmd = ["git", "rev-list", "--count", "HEAD"]
+    version["build"] = int(check_output(cmd).strip().decode())
     cmd = ["git", "rev-parse", "HEAD"]
     version["commit"] = check_output(cmd).strip().decode()
-    if incbuild:
-        print("--> Updating version file")
-        version["build"] = "{:05d}".format(int(version["build"]) + 1)
-        newinfo = "version={version}\nbuild={build}\n".format(**version)
-        print(newinfo)
-        with open(verfile, "w") as fd:
-            fd.write(newinfo)
     print(("Version: {version} "
-           "Build: {build} "
+           "Build: {build:06d} "
            "Commit: {commit}").format(**version))
     ldflags = ("-X main.version={version} "
-               "-X main.build={build} "
+               "-X main.build={build:06d} "
                "-X main.commit={commit}").format(**version)
     # cmd = ["go", "build", "-ldflags", ldflags, "-o", "gin"]
     output = os.path.join(destdir, "{{.OS}}-{{.Arch}}", "gin")
@@ -164,7 +158,7 @@ def get_appveyor_artifact_url():
 
 def get_git_for_windows():
     win_git_url = ("https://github.com/git-for-windows/git/releases/download/"
-                   "v2.12.0.windows.1/PortableGit-2.12.0-32-bit.7z.exe")
+                   "v2.13.3.windows.1/PortableGit-2.13.3-32-bit.7z.exe")
     return download(win_git_url)
 
 
@@ -386,8 +380,7 @@ def main():
     os.makedirs(os.path.join(destdir, "downloads"), exist_ok=True)
     os.makedirs(pkgdir, exist_ok=True)
 
-    incbuild = "--incbuild" in sys.argv
-    binfiles = build(incbuild)
+    binfiles = build()
     load_etags()
     annexsa_file = download_annex_sa()
     win_git_file = get_git_for_windows()
@@ -415,6 +408,8 @@ def main():
         for l in lst:
             latestname = l.replace(version["version"], "latest")
             print("Linking {} to {}".format(l, latestname))
+            if os.path.exists(latestname):
+                os.unlink(latestname)
             os.link(l, latestname)
 
     print("------------------------------------------------")

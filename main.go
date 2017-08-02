@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -176,16 +176,24 @@ func getRepo(args []string) {
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err := repocl.CloneRepo(repostr)
+	repoDir, err := repocl.CloneRepo(repostr)
 	util.CheckError(err)
+
+	repo.Workingdir = repoDir
 }
 
 func lsRepo(args []string) {
-	var dirs []string
-	if len(args) == 0 {
-		dirs = []string{"."}
-	} else {
-		dirs = args
+	if !repo.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
+	}
+
+	var short bool
+	for idx, arg := range args {
+		if arg == "-s" || arg == "--short" {
+			args = append(args[:idx], args[idx+1:]...)
+			short = true
+			break
+		}
 	}
 
 	repocl := repo.NewClient(util.Config.RepoHost)
@@ -193,81 +201,95 @@ func lsRepo(args []string) {
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
 
-	var err error
-	var fileStatusBuffer, dirStatusBuffer, skipped bytes.Buffer
-	for _, d := range dirs {
-		path, filename := util.PathSplit(d)
-		if filepath.Base(d) == ".git" {
-			_, err = skipped.WriteString(fmt.Sprintf("Skipping directory '%s'\n", d))
-			util.LogError(err)
-			continue
-		}
-		if !repo.IsRepo(path) {
-			_, err = skipped.WriteString(fmt.Sprintf("'%s' is not under gin control\n", d))
-			util.LogError(err)
-			continue
-		}
-		filesStatus := make(map[string]repo.FileStatus)
-		err := repo.ListFiles(d, filesStatus)
-		if err != nil {
-			_, err = skipped.WriteString(fmt.Sprintf("Error listing %s: %s\n", d, err.Error()))
-			util.LogError(err)
-			continue
-		}
+	filesStatus, err := repocl.ListFiles(args...)
+	util.CheckError(err)
 
-		currentBuffer := &fileStatusBuffer
-		if filename == "." {
-			currentBuffer = &dirStatusBuffer
-			if len(dirs) > 1 {
-				_, err = dirStatusBuffer.WriteString(fmt.Sprintf("\n%s:\n", d))
-				util.LogError(err)
-			}
+	if short {
+		for fname, status := range filesStatus {
+			fmt.Printf("%s %s\n", status.Abbrev(), fname)
 		}
+	} else {
+		// Files are printed separated by status and sorted by name
+		statFiles := make(map[repo.FileStatus][]string)
+
 		for file, status := range filesStatus {
-			_, err = currentBuffer.WriteString(fmt.Sprintf("%s %s\n", status.Abbrev(), file))
-			util.LogError(err)
+			statFiles[status] = append(statFiles[status], file)
+		}
+
+		// sort files in each status (stable sorting unnecessary)
+		// also collect active statuses for sorting
+		var statuses repo.FileStatusSlice
+		for status := range statFiles {
+			sort.Sort(sort.StringSlice(statFiles[status]))
+			statuses = append(statuses, status)
+		}
+		sort.Sort(statuses)
+
+		// print each category with len(items) > 0 with appropriate header
+		for _, status := range statuses {
+			fmt.Printf("%s:\n", status.Description())
+			fmt.Printf("\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
 		}
 	}
+}
 
-	fmt.Printf("%s%s", fileStatusBuffer.String(), dirStatusBuffer.String())
-	if skipped.Len() > 0 {
-		fmt.Printf("\n%s", skipped.String())
+func lock(args []string) {
+	if !repo.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
 	}
+	err := repo.AnnexLock(args...)
+	util.CheckError(err)
+}
 
+func unlock(args []string) {
+	if !repo.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
+	}
+	err := repo.AnnexUnlock(args...)
+	util.CheckError(err)
 }
 
 func upload(args []string) {
-	if len(args) > 0 {
-		util.Die(usage)
+	if !repo.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
 	}
+	err := repo.AnnexLock(args...)
+	util.CheckError(err)
+
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err := repocl.UploadRepo(".")
+	err = repocl.Upload(args)
 	util.CheckError(err)
 }
 
 func download(args []string) {
-	if len(args) > 0 {
-		util.Die(usage)
+	if !repo.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
 	}
-	if !repo.IsRepo(".") {
-		util.Die("Current directory is not a repository.")
-	}
+
 	repocl := repo.NewClient(util.Config.RepoHost)
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
-	err := repocl.DownloadRepo(".")
+	err := repocl.GetContent(args)
 	util.CheckError(err)
 }
 
-// condAppend Conditionally append str to b if not empty
-func condAppend(b *bytes.Buffer, str *string) {
-	if str != nil && *str != "" {
-		_, _ = b.WriteString(*str + " ")
+func remove(args []string) {
+	if !repo.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
 	}
+	err := repo.AnnexLock(args...)
+	util.CheckError(err)
+
+	repocl := repo.NewClient(util.Config.RepoHost)
+	repocl.GitUser = util.Config.GitUser
+	repocl.GitHost = util.Config.GitHost
+	repocl.KeyHost = util.Config.AuthHost
+	err = repocl.RmContent(args)
+	util.CheckError(err)
 }
 
 func keys(args []string) {
@@ -368,14 +390,8 @@ func printAccountInfo(args []string) {
 	info, err := authcl.RequestAccount(username)
 	util.CheckError(err)
 
-	var fullnameBuffer bytes.Buffer
-
-	condAppend(&fullnameBuffer, &info.FullName)
-
 	var outBuffer bytes.Buffer
-
-	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.UserName, fullnameBuffer.String()))
-
+	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.UserName, info.FullName))
 	if info.Email != "" {
 		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email))
 	}
@@ -402,7 +418,7 @@ func repos(args []string) {
 			arg = "--shared-with-me"
 		}
 	}
-	repolist, err := repocl.GetRepos(arg)
+	repolist, err := repocl.ListRepos(arg)
 	util.CheckError(err)
 
 	if arg == "" || arg == "--public" {
@@ -457,6 +473,8 @@ func main() {
 	util.CheckError(err)
 	defer util.LogClose()
 
+	util.LogWrite("COMMAND: %s %s", command, strings.Join(cmdArgs, " "))
+
 	err = util.LoadConfig()
 	util.CheckError(err)
 
@@ -471,10 +489,18 @@ func main() {
 		getRepo(cmdArgs)
 	case "ls":
 		lsRepo(cmdArgs)
+	case "unlock":
+		unlock(cmdArgs)
+	case "lock":
+		lock(cmdArgs)
 	case "upload":
 		upload(cmdArgs)
 	case "download":
 		download(cmdArgs)
+	case "remove-content":
+		remove(cmdArgs)
+	case "rmc":
+		remove(cmdArgs)
 	case "info":
 		printAccountInfo(cmdArgs)
 	case "keys":

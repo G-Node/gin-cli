@@ -12,18 +12,22 @@ Options:
 	--version    Client version
 
 Commands:
-	login    [<username>]
-	logout
-	create   [<name>] [<description>]
-	get      <repopath>
-	ls       [<directory>]
-	upload
-	download
-	repos    [<username>]
-	info     [<username>]
-	keys     [-v | --verbose]
-	keys     --add <filename>
-	help     <command>
+	login          [<username>]                | Login to the GIN services
+	logout                                     | Logout from the GIN services
+	create         [<name>] [<description>]    | Create a repository on the remote server and clone it
+	get            <repopath>                  | Retrieve (clone) a repository from the remote server
+	ls             [-s, --short] [<filenames>] | List the sync status of files in a local repository
+	unlock         [<filenames>]               | Unlock files for editing
+	lock           [<filenames>]               | Lock files
+	upload         [<filenames>]               | Upload local changes to a remote repository
+	download       [<filenames>]               | Download the content of files from a remote repository
+	remove-content [<filenames>]               | Remove the content of local files that have already been uploaded
+	rmc            [<filenames>]               | Synonym for remove-content
+	repos          [<username>]                | List available remote repositories
+	info           [<username>]                | Print user information
+	keys           [-v, --verbose]             | List the keys associated with the logged in user
+	keys           --add <filename>            | Add/upload a new public key to the GIN services
+	help           <command>                   | Get help for individual commands
 
 Use 'help' followed by a command to see full description of the command.
 `
@@ -121,7 +125,7 @@ EXAMPLES
 
 const lsHelp = `USAGE
 
-	gin ls [<directory>]...
+	gin ls [--short, -s] [<filenames>]...
 
 DESCRIPTION
 
@@ -129,7 +133,7 @@ DESCRIPTION
 	files within it. With no arguments, lists the status of the files under the
 	current directory. Directory listings are performed recursively.
 
-	The meaning of the status abbreviations is as follows:
+	In the short form, the meaning of the status abbreviations is as follows:
 		OK: The file is part of the GIN repository and its contents are
 		synchronised with the server.
 		NC: The local file is a placeholder and its contents have not been
@@ -142,38 +146,122 @@ DESCRIPTION
 
 ARGUMENTS
 
-	<directory>
+	--short, -s
+		Print listing in short form.
+
+	<filenames>
 		One or more directories or files to list.
+`
+
+const unlockHelp = `USAGE
+
+	gin unlock [<filenames>]...
+
+DESCRIPTION
+
+	Unlock one or more files for editing. Files added to the repository are
+	left in a locked state, which allows reading but prevents editing. In order
+	to edit or write to a file, it must first be unlocked. When done editing,
+	it is recommended that a file be locked again, using the 'lock' command,
+	which records changes in the repository.
+
+	After performing an 'upload', 'download', or 'get', affected files are
+	reverted to a locked state.
+
+	Unlocking a file takes longer depending on the size of the file.
+
+ARGUMENTS
+
+	<filenames>
+		One or more directories or files to unlock.
+`
+
+const lockHelp = `USAGE
+
+	gin lock [<filenames>]...
+	
+DESCRIPTION
+
+	Lock one or more files after editing. After unlocking files for editing,
+	using the 'unlock' command, it is recommended that they be locked again.
+	This records any changes made and prepares a file for upload to the GIN
+	server.
+	
+	Locked files are replaced by symbolic links in the working directory.
+
+	After performing an 'upload', 'download', or 'get', affected files are
+	reverted to a locked state.
+
+	Unlocking a file takes longer depending on the size of the file.
+
+ARGUMENTS
+
+	<filenames>
+		One or more directories or files to lock.
 `
 
 const uploadHelp = `USAGE
 
-	gin upload
+	gin upload [<filenames>]...
 
 DESCRIPTION
 
 	Upload changes made in a local repository clone to the remote repository on
 	the GIN server. This command must be called from within the local
-	repository clone. All changes made will be sent to the server, including
-	addition of new files, modifications and renaming of existing files, and
-	file deletions.
+	repository clone. Specific files or directories may be specified.
+	All changes made will be sent to the server, including addition of new
+	files, modifications and renaming of existing files, and file deletions. 
+	With no arguments, uploads the changes made under the working directory,
+	recursively.
 
-	This command takes no arguments.
+ARGUMENTS
+
+	<filenames>
+		One or more directories of files to upload and update.
+
 `
 
 const downloadHelp = `USAGE
 
-	gin download
+	gin download [<filenames>]...
 
 DESCRIPTION
 
-	Download changes made in the remote repository on the GIN server to the
-	local repository clone. This command must be called from within the
-	local repository clone. All changes made on the remote server will
-	be retrieved, including addition of new files, modifications and renaming
-	of existing files, and file deletions.
+	Download the content of the listed files. The download command is intended
+	to be used to retrieve the content of placeholder files in a local
+	repository. This command must be called from within the local repository
+	clone. With no arguments, downloads the content for all files under the
+	working directory, recursively.
 
-	This command takes no arguments.
+ARGUMENTS
+
+	<filenames>
+		One or more names of files or directories to retrieve.
+`
+
+const rmcHelp = `USAGE
+	
+	gin remove-content [<filenames>]...
+	gin rmc [<filenames>]...
+
+DESCRIPTION
+
+	Remove the content of local files. This command will not remove the content
+	of files that have not been already uploaded to a remote repository, even
+	if the user specifies such files exclusively.  Removed content can be
+	retrieved from the server by using the 'gin download' command.  With no
+	arguments, removes the content of all files under the current working
+	directory, as long as they have been safely uploaded to a remote
+	repository.
+
+	Note that after removal, placeholder files will remain in the local
+	repository. These files appear as 'No Content' when running the 'gin ls'
+	command.
+
+ARGUMENTS
+
+	<filenames>
+		One or more names of files or directories to remove.
 `
 
 const reposHelp = `USAGE
@@ -257,16 +345,20 @@ EXAMPLES
 `
 
 var cmdHelp = map[string]string{
-	"login":    loginHelp,
-	"logout":   logoutHelp,
-	"create":   createHelp,
-	"get":      getHelp,
-	"ls":       lsHelp,
-	"upload":   uploadHelp,
-	"download": downloadHelp,
-	"repos":    reposHelp,
-	"info":     infoHelp,
-	"keys":     keysHelp,
+	"login":          loginHelp,
+	"logout":         logoutHelp,
+	"create":         createHelp,
+	"get":            getHelp,
+	"ls":             lsHelp,
+	"unlock":         unlockHelp,
+	"lock":           lockHelp,
+	"upload":         uploadHelp,
+	"download":       downloadHelp,
+	"remove-content": rmcHelp,
+	"rmc":            rmcHelp,
+	"repos":          reposHelp,
+	"info":           infoHelp,
+	"keys":           keysHelp,
 }
 
 // ex: set cc=80:
