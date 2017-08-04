@@ -20,7 +20,8 @@ Commands:
 	unlock         [<filenames>]               | Unlock files for editing
 	lock           [<filenames>]               | Lock files
 	upload         [<filenames>]               | Upload local changes to a remote repository
-	download       [<filenames>]               | Download the content of files from a remote repository
+	download       [--content]                 | Download all new information from a remote repository
+	get-content    [<filenames>]               | Download the content of files from a remote repository
 	remove-content [<filenames>]               | Remove the content of local files that have already been uploaded
 	rmc            [<filenames>]               | Synonym for remove-content
 	repos          [<username>]                | List available remote repositories
@@ -211,24 +212,41 @@ DESCRIPTION
 	repository clone. Specific files or directories may be specified.
 	All changes made will be sent to the server, including addition of new
 	files, modifications and renaming of existing files, and file deletions. 
-	With no arguments, uploads the changes made under the working directory,
-	recursively.
 
 ARGUMENTS
 
 	<filenames>
 		One or more directories of files to upload and update.
-
 `
 
 const downloadHelp = `USAGE
 
-	gin download [<filenames>]...
+	gin download [content]
 
 DESCRIPTION
 
-	Download the content of the listed files. The download command is intended
-	to be used to retrieve the content of placeholder files in a local
+	Downloads changes from the remote repository to the local clone. This will
+	create new files that were addes remotely, delete files that were removed,
+	and update files that were changed.
+
+	Optionally downloads the content of all files in the repository. If
+	'content' is not specified, new files will be empty placeholders. Content
+	of individual files can later be retrieved using the get-content command.
+
+ARGUMENTS
+
+	--content
+		Optionally download the content for all files in the repository.
+`
+
+const getContentHelp = `USAGE
+
+	gin get-content [<filenames>]...
+
+DESCRIPTION
+
+	Download the content of the listed files. The get-content command is
+	intended to be used to retrieve the content of placeholder files in a local
 	repository. This command must be called from within the local repository
 	clone. With no arguments, downloads the content for all files under the
 	working directory, recursively.
@@ -353,6 +371,7 @@ var cmdHelp = map[string]string{
 	"unlock":         unlockHelp,
 	"lock":           lockHelp,
 	"upload":         uploadHelp,
+	"get-content":    getContentHelp,
 	"download":       downloadHelp,
 	"remove-content": rmcHelp,
 	"rmc":            rmcHelp,

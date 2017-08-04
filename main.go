@@ -260,11 +260,45 @@ func upload(args []string) {
 	repocl.GitUser = util.Config.GitUser
 	repocl.GitHost = util.Config.GitHost
 	repocl.KeyHost = util.Config.AuthHost
+
+	if len(args) == 0 {
+		fmt.Println("No files specified for upload. Synchronising metadata.")
+		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
+	}
+
+	fmt.Print("Uploading...")
+
 	err = repocl.Upload(args)
 	util.CheckError(err)
+	fmt.Println("done!")
 }
 
 func download(args []string) {
+	if !repo.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
+	}
+	err := repo.AnnexLock()
+	util.CheckError(err)
+
+	var content bool
+	if len(args) > 0 {
+		if args[0] != "--content" {
+			util.Die(usage)
+		}
+		content = true
+	}
+
+	repocl := repo.NewClient(util.Config.RepoHost)
+	repocl.GitUser = util.Config.GitUser
+	repocl.GitHost = util.Config.GitHost
+	repocl.KeyHost = util.Config.AuthHost
+	fmt.Print("Downloading...")
+	err = repocl.DownloadRepo(content)
+	fmt.Println("done!")
+	util.CheckError(err)
+}
+
+func getContent(args []string) {
 	if !repo.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -497,6 +531,8 @@ func main() {
 		upload(cmdArgs)
 	case "download":
 		download(cmdArgs)
+	case "get-content":
+		getContent(cmdArgs)
 	case "remove-content":
 		remove(cmdArgs)
 	case "rmc":

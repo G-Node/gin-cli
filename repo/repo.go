@@ -237,11 +237,12 @@ func (repocl *Client) Upload(paths []string) error {
 		return err
 	}
 
-	_, err = AnnexAdd(paths)
-	if err != nil {
-		return err
+	if len(paths) > 0 {
+		_, err = AnnexAdd(paths)
+		if err != nil {
+			return err
+		}
 	}
-
 	changes, err := DescribeIndexShort()
 	if err != nil {
 		return err
@@ -266,7 +267,7 @@ func (repocl *Client) Upload(paths []string) error {
 
 // DownloadRepo downloads the files in an already checked out repository.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func (repocl *Client) DownloadRepo() error {
+func (repocl *Client) DownloadRepo(content bool) error {
 	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("DownloadRepo")
@@ -275,7 +276,7 @@ func (repocl *Client) DownloadRepo() error {
 	if err != nil {
 		return err
 	}
-	err = AnnexPull()
+	err = AnnexPull(content)
 	return err
 }
 
