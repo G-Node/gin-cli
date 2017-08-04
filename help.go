@@ -65,7 +65,7 @@ const createHelp = `USAGE
 
 DESCRIPTION
 
-	Create a new repository on the GIN server.
+	Create a new repository on the GIN server and clone it locally.
 
 ARGUMENTS
 
