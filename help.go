@@ -221,7 +221,7 @@ ARGUMENTS
 
 const downloadHelp = `USAGE
 
-	gin download [content]
+	gin download [--content]
 
 DESCRIPTION
 
