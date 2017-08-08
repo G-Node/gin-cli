@@ -9,11 +9,12 @@ import (
 	"net/http"
 	"path"
 
+	"strings"
+
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/G-Node/gin-core/gin"
 	gogs "github.com/gogits/go-gogs-client"
-	"strings"
 )
 
 // GINUser represents a API user.
@@ -162,7 +163,10 @@ func (authcl *Client) Login(username, password, clientID string) error {
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
 	resp, err := authcl.PostBasicAuth(address, username, password, tokenCreate)
 	if err != nil {
-		return fmt.Errorf("[Login] Request failed: %s", resp.Status)
+		if resp != nil {
+			return fmt.Errorf("[Login] Request failed: %s", resp.Status)
+		}
+		return fmt.Errorf("[Login] Request failed. No response from server")
 	}
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("[Login] Failed. Check username and password: %s", resp.Status)
