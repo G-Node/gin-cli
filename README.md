@@ -4,8 +4,9 @@
 
 **G**-Node **In**frastructure command line client
 
-This package is a command line client for interfacing with the [gin-auth](https://github.com/G-Node/gin-auth) and [gin-repo](https://github.com/G-Node/gin-repo) services.
+This package is a command line client for interfacing with repositories hosted on [GIN](https://gin.g-node.org).
 It offers a simplified interface for downloading and uploading files from repositories hosted on Gin.
+For a guide on how to use the GIN service and this client, see the [GIN quick start](https://web.gin.g-node.org/G-Node/Info/wiki/Quick+start) page.
 
 ## Usage
 
