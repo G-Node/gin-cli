@@ -226,7 +226,7 @@ const downloadHelp = `USAGE
 DESCRIPTION
 
 	Downloads changes from the remote repository to the local clone. This will
-	create new files that were addes remotely, delete files that were removed,
+	create new files that were added remotely, delete files that were removed,
 	and update files that were changed.
 
 	Optionally downloads the content of all files in the repository. If
