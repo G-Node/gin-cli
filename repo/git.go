@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
+	"github.com/dustin/go-humanize"
 )
 
 // Workingdir sets the directory for shell commands
@@ -247,6 +249,25 @@ func AnnexDrop(filepaths []string) error {
 	return nil
 }
 
+func GitAdd(filepaths []string) ([]string, error) {
+	if len(filepaths) == 0 {
+		util.LogWrite("No paths to add to git. Nothing to do.")
+		return nil, nil
+	}
+
+	cmdargs := append([]string{"add"}, filepaths...)
+	stdout, stderr, err := RunGitCommand(cmdargs...)
+	if err != nil {
+		util.LogWrite("Error during GitAdd")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return nil, fmt.Errorf("Error adding files to repository")
+	}
+
+	added := strings.Split(stdout.String(), "\n")
+	return added, nil
+}
+
 // AnnexAddResult is used to store information about each added file, as returned from the annex command.
 type AnnexAddResult struct {
 	Command string `json:"command"`
@@ -259,6 +280,10 @@ type AnnexAddResult struct {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex add)
 func AnnexAdd(filepaths []string) ([]string, error) {
+	if len(filepaths) == 0 {
+		util.LogWrite("No paths to add to annex. Nothing to do.")
+		return nil, nil
+	}
 	cmdargs := []string{"--json", "add"}
 	cmdargs = append(cmdargs, filepaths...)
 	stdout, stderr, err := RunAnnexCommand(cmdargs...)
@@ -610,4 +635,37 @@ func RunAnnexCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	return stdout, stderr, err
+}
+
+// selectGitOrAnnex splits a list of paths into two: the first to be added to git proper and the second to be added to git annex.
+// The selection is made based on the file type (extension) and size, both of which are configurable.
+func selectGitOrAnnex(paths []string) (gitpaths []string, annexpaths []string) {
+	minsize, err := humanize.ParseBytes(util.Config.Annex.MinSize)
+	if err != nil {
+		util.LogWrite("Invalid minsize string found in config. Defaulting to 10 MiB")
+		minsize, _ = humanize.ParseBytes("10 MiB")
+	}
+	exclext := util.Config.Annex.Exclude
+
+	var fsize uint64
+	for _, p := range paths {
+		fstat, err := os.Stat(p)
+		if err != nil {
+			util.LogWrite("Cannot stat file [%s]: %s", p, err.Error())
+			fsize = math.MaxUint64
+		} else {
+			fsize = uint64(fstat.Size())
+		}
+		if fsize < minsize {
+			for _, ext := range exclext {
+				if strings.HasSuffix(p, ext) {
+					gitpaths = append(gitpaths, p)
+					continue
+				}
+			}
+		}
+		annexpaths = append(annexpaths, p)
+	}
+
+	return
 }

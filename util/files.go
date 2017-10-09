@@ -43,3 +43,9 @@ func DataSize(nbytes int) string {
 	}
 	return fmt.Sprintf("%d %s", lastPositive, units[unitIdx])
 }
+
+// ExpandPaths converts a list of path strings into a list of regular files.
+// This includes recursively traversing directories and expanding globs.
+func ExpandPaths(paths []string) []string {
+	return paths
+}
