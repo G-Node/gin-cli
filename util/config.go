@@ -29,6 +29,7 @@ var Config conf
 
 // LoadConfig reads in the configuration and makes it available through Config package global
 func LoadConfig() error {
+	viper.SetTypeByDefaultValue(true)
 	// Binaries
 	viper.SetDefault("bin.git", "git")
 	viper.SetDefault("bin.gitannex", "git-annex")
@@ -44,7 +45,7 @@ func LoadConfig() error {
 	viper.SetDefault("git.user", "git")
 
 	// annex filters
-	viper.SetDefault("annex.exclude", [...]string{"*.md", "*.rst", "*.txt", "*.c", "*.cpp", "*.h", "*.hpp", "*.py", "*.go"})
+	viper.SetDefault("annex.defaultexclude", []string{"*.md", "*.rst", "*.txt", "*.c", "*.cpp", "*.h", "*.hpp", "*.py", "*.go"})
 	viper.SetDefault("annex.minsize", "10M")
 
 	viper.SetConfigName("config")
@@ -73,7 +74,9 @@ func LoadConfig() error {
 	Config.Bin.Git = viper.GetString("bin.git")
 	Config.Bin.GitAnnex = viper.GetString("bin.gitannex")
 	Config.Bin.SSH = viper.GetString("bin.ssh")
-	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
+	// Built in text and source code extension list is defined separately from the user defined exclusion list
+	defaultexcl := viper.GetStringSlice("annex.defaultexclude")
+	Config.Annex.Exclude = append(defaultexcl, viper.GetStringSlice("annex.exclude")...)
 	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
 	authAddress := viper.GetString("auth.address")
