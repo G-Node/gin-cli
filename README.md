@@ -1,6 +1,7 @@
 # GIN-cli
 
-[![Build Status](https://travis-ci.org/G-Node/gin-cli.svg?branch=master)](https://travis-ci.org/G-Node/gin-cli) [![Coverage Status](https://coveralls.io/repos/github/G-Node/gin-cli/badge.svg?branch=master)](https://coveralls.io/github/G-Node/gin-cli?branch=master) [![GoDoc](https://godoc.org/github.com/G-Node/gin-cli?status.svg)](http://godoc.org/github.com/G-Node/gin-cli)
+[![Build Status](https://travis-ci.org/G-Node/gin-cli.svg?branch=master)](https://travis-ci.org/G-Node/gin-cli)
+[![GoDoc](https://godoc.org/github.com/G-Node/gin-cli?status.svg)](http://godoc.org/github.com/G-Node/gin-cli)
 
 **G**-Node **In**frastructure command line client
 
