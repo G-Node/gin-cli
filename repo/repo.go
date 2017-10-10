@@ -242,23 +242,13 @@ func (repocl *Client) Upload(paths []string) error {
 		return err
 	}
 
-	var gitpaths, annexpaths []string
-
-	if !IsDirect() {
-		gitpaths, annexpaths = selectGitOrAnnex(paths)
-	} else {
-		annexpaths = paths
-	}
-
-	util.LogWrite("git paths: %v", gitpaths)
-	util.LogWrite("annex paths: %v", annexpaths)
-
 	if len(paths) > 0 {
-		_, err = GitAdd(gitpaths)
+		// Run git annex add using exclusion filters and then add the rest to git
+		_, err = AnnexAdd(paths)
 		if err != nil {
 			return err
 		}
-		_, err = AnnexAdd(annexpaths)
+		_, err = GitAdd(paths)
 		if err != nil {
 			return err
 		}

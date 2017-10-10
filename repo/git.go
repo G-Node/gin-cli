@@ -282,6 +282,7 @@ type AnnexAddResult struct {
 }
 
 // AnnexAdd adds paths to the annex.
+// Files specified for exclusion in the configuration are ignored automatically.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex add)
 func AnnexAdd(filepaths []string) ([]string, error) {
@@ -291,6 +292,28 @@ func AnnexAdd(filepaths []string) ([]string, error) {
 	}
 	cmdargs := []string{"--json", "add"}
 	cmdargs = append(cmdargs, filepaths...)
+
+	// build exclusion argument list
+	// files < annex.minsize or matching exclusion extensions will not be annexed and
+	// will instead be handled by git
+	var exclargs []string
+	if util.Config.Annex.MinSize != "" {
+		sizefilterarg := fmt.Sprintf("--largerthan=%s", util.Config.Annex.MinSize)
+		exclargs = append(exclargs, sizefilterarg)
+	}
+
+	exclpatterns := util.Config.Annex.Exclude
+	if len(exclpatterns) > 0 {
+		for _, pattern := range exclpatterns {
+			arg := fmt.Sprintf("--exclude=%s", pattern)
+			exclargs = append(exclargs, arg)
+		}
+	}
+
+	if len(exclargs) > 0 {
+		cmdargs = append(cmdargs, exclargs...)
+	}
+
 	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexAdd")
