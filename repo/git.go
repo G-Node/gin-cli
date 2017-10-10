@@ -259,7 +259,7 @@ func GitAdd(filepaths []string) ([]string, error) {
 		return nil, nil
 	}
 
-	cmdargs := append([]string{"add"}, filepaths...)
+	cmdargs := append([]string{"add", "--verbose"}, filepaths...)
 	stdout, stderr, err := RunGitCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during GitAdd")
@@ -269,6 +269,7 @@ func GitAdd(filepaths []string) ([]string, error) {
 	}
 
 	added := strings.Split(stdout.String(), "\n")
+	util.LogWrite("Files added to git: %v", added)
 	return added, nil
 }
 
@@ -314,6 +315,7 @@ func AnnexAdd(filepaths []string) ([]string, error) {
 		}
 		added = append(added, outStruct.File)
 	}
+	util.LogWrite("Files added to annex: %v", added)
 
 	return added, nil
 }
