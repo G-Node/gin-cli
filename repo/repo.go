@@ -237,7 +237,10 @@ func (repocl *Client) Upload(paths []string) error {
 		return err
 	}
 
-	paths = util.ExpandPaths(paths)
+	paths, err = util.ExpandPaths(paths)
+	if err != nil {
+		return err
+	}
 
 	var gitpaths, annexpaths []string
 
