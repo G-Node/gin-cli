@@ -250,6 +250,9 @@ func (repocl *Client) Upload(paths []string) error {
 		annexpaths = paths
 	}
 
+	util.LogWrite("git paths: %v", gitpaths)
+	util.LogWrite("annex paths: %v", annexpaths)
+
 	if len(paths) > 0 {
 		_, err = GitAdd(gitpaths)
 		if err != nil {

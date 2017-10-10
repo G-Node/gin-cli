@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
@@ -249,6 +250,9 @@ func AnnexDrop(filepaths []string) error {
 	return nil
 }
 
+// GitAdd adds paths to git directly (not annex).
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// (git add)
 func GitAdd(filepaths []string) ([]string, error) {
 	if len(filepaths) == 0 {
 		util.LogWrite("No paths to add to git. Nothing to do.")
@@ -276,7 +280,7 @@ type AnnexAddResult struct {
 	Success bool   `json:"success"`
 }
 
-// AnnexAdd adds a path to the annex.
+// AnnexAdd adds paths to the annex.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex add)
 func AnnexAdd(filepaths []string) ([]string, error) {
@@ -645,7 +649,10 @@ func selectGitOrAnnex(paths []string) (gitpaths []string, annexpaths []string) {
 		util.LogWrite("Invalid minsize string found in config. Defaulting to 10 MiB")
 		minsize, _ = humanize.ParseBytes("10 MiB")
 	}
-	exclext := util.Config.Annex.Exclude
+	excludes := util.Config.Annex.Exclude
+
+	util.LogWrite("Using minsize %v", minsize)
+	util.LogWrite("Using exclude list %v", excludes)
 
 	var fsize uint64
 	for _, p := range paths {
@@ -657,13 +664,20 @@ func selectGitOrAnnex(paths []string) (gitpaths []string, annexpaths []string) {
 			fsize = uint64(fstat.Size())
 		}
 		if fsize < minsize {
-			for _, ext := range exclext {
-				if strings.HasSuffix(p, ext) {
+			for _, pattern := range excludes {
+				match, err := filepath.Match(pattern, p)
+				if match {
+					if err != nil {
+						util.LogWrite("Bad pattern found in annex exclusion list %s", excludes)
+						continue
+					}
 					gitpaths = append(gitpaths, p)
+					util.LogWrite("Adding %v to git paths", p)
 					continue
 				}
 			}
 		}
+		util.LogWrite("Adding %v to annex paths", p)
 		annexpaths = append(annexpaths, p)
 	}
 
