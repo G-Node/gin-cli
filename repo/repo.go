@@ -237,7 +237,7 @@ func (repocl *Client) Upload(paths []string) error {
 		return err
 	}
 
-	paths, err = util.ExpandPaths(paths)
+	paths, err = util.ExpandGlobs(paths)
 	if err != nil {
 		return err
 	}

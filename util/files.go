@@ -31,30 +31,11 @@ func PathSplit(path string) (string, string) {
 	return dir, filename
 }
 
-// ExpandPaths converts a list of path strings into a list of regular files.
-// This includes recursively traversing directories and expanding globs.
-func ExpandPaths(paths []string) ([]string, error) {
-	var globexppaths, finalpaths []string
-
-	// walker adds files to finalpaths
-	walker := func(path string, info os.FileInfo, err error) error {
-		if filepath.Base(path) == ".git" {
-			LogWrite("Ignoring .git directory")
-			return filepath.SkipDir
-		}
-		if info.IsDir() {
-			LogWrite("%s is a directory; descending", path)
-			return nil
-		}
-
-		LogWrite("Adding %s", path)
-		finalpaths = append(finalpaths, path)
-		return nil
-	}
-
+// ExpandGlobs expands a list of globs into paths (files and directories).
+func ExpandGlobs(paths []string) (globexppaths []string, err error) {
 	// expand potential globs
 	for _, p := range paths {
-		LogWrite("ExpandPaths: Checking for glob expansion for %s", p)
+		LogWrite("ExpandGlobs: Checking for glob expansion for %s", p)
 		exp, err := filepath.Glob(p)
 		if err != nil {
 			LogWrite(err.Error())
@@ -65,15 +46,5 @@ func ExpandPaths(paths []string) ([]string, error) {
 			globexppaths = append(globexppaths, exp...)
 		}
 	}
-
-	// traverse directories and list files (don't follow symlinks)
-	for _, p := range globexppaths {
-		LogWrite("ExpandPaths: Walking path %s", p)
-		err := filepath.Walk(p, walker)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return finalpaths, nil
+	return
 }
