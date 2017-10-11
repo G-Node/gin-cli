@@ -302,12 +302,9 @@ func AnnexAdd(filepaths []string) ([]string, error) {
 		exclargs = append(exclargs, sizefilterarg)
 	}
 
-	exclpatterns := util.Config.Annex.Exclude
-	if len(exclpatterns) > 0 {
-		for _, pattern := range exclpatterns {
-			arg := fmt.Sprintf("--exclude=%s", pattern)
-			exclargs = append(exclargs, arg)
-		}
+	for _, pattern := range util.Config.Annex.Exclude {
+		arg := fmt.Sprintf("--exclude=%s", pattern)
+		exclargs = append(exclargs, arg)
 	}
 
 	if len(exclargs) > 0 {
