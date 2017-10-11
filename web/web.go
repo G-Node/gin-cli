@@ -26,7 +26,10 @@ type UserToken struct {
 type Client struct {
 	Host string
 	UserToken
-	web *http.Client
+	web     *http.Client
+	KeyHost string
+	GitHost string
+	GitUser string
 }
 
 func urlJoin(parts ...string) string {

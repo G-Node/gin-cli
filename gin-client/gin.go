@@ -1,4 +1,4 @@
-package auth
+package ginclient
 
 import (
 	"encoding/json"
@@ -7,7 +7,6 @@ import (
 	"net/url"
 
 	"net/http"
-	"path"
 
 	"strings"
 
@@ -26,14 +25,15 @@ type GINUser struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-// Client is a client interface to the auth server. Embeds web.Client.
+// Client is a client interface to the GIN server. Embeds web.Client.
 type Client struct {
 	*web.Client
+	GitUser string
 }
 
-// NewClient returns a new client for the auth server.
+// NewClient returns a new client for the GIN server.
 func NewClient(host string) *Client {
-	return &Client{web.NewClient(host)}
+	return &Client{Client: web.NewClient(host)}
 }
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
@@ -192,15 +192,4 @@ func (authcl *Client) Login(username, password, clientID string) error {
 type AccessToken struct {
 	Name string `json:"name"`
 	Sha1 string `json:"sha1"`
-}
-
-func urlJoin(parts ...string) string {
-	// First part must be a valid URL
-	u, err := url.Parse(parts[0])
-	util.CheckErrorMsg(err, "Bad URL in urlJoin")
-
-	for _, part := range parts[1:] {
-		u.Path = path.Join(u.Path, part)
-	}
-	return u.String()
 }

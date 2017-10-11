@@ -1,4 +1,4 @@
-package repo
+package ginclient
 
 import (
 	"encoding/json"
@@ -19,21 +19,7 @@ import (
 	"github.com/gogits/go-gogs-client"
 	// its a bit unfortunate that we have that import now
 	// but its only temporary...
-	"github.com/G-Node/gin-cli/auth"
 )
-
-// Client is a client interface to the repo server. Embeds web.Client.
-type Client struct {
-	*web.Client
-	KeyHost string
-	GitHost string
-	GitUser string
-}
-
-// NewClient returns a new client for the repo server.
-func NewClient(host string) *Client {
-	return &Client{Client: web.NewClient(host)}
-}
 
 // Temporary (SSH key) file handling
 var privKeyFile util.TempFile
@@ -48,8 +34,7 @@ func (repocl *Client) MakeTempKeyPair() (*util.KeyPair, error) {
 
 	description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
-	authcl := auth.NewClient(repocl.KeyHost)
-	err = authcl.AddKey(pubkey, description, true)
+	err = repocl.AddKey(pubkey, description, true)
 	if err != nil {
 		return tempKeyPair, err
 	}
@@ -228,7 +213,7 @@ func (repocl *Client) DelRepo(name string) error {
 
 // Upload adds files to a repository and uploads them.
 func (repocl *Client) Upload(paths []string) error {
-	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
+	defer repocl.DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("Upload")
 
@@ -278,7 +263,7 @@ func (repocl *Client) Upload(paths []string) error {
 // DownloadRepo downloads the files in an already checked out repository.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (repocl *Client) DownloadRepo(content bool) error {
-	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
+	defer repocl.DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("DownloadRepo")
 
@@ -319,8 +304,7 @@ func (repocl *Client) RmContent(filepaths []string) error {
 // CloneRepo clones a remote repository and initialises annex.
 // Returns the name of the directory in which the repository is cloned.
 func (repocl *Client) CloneRepo(repoPath string) (string, error) {
-	authcl := auth.NewClient(repocl.Host)
-	defer authcl.DeleteTmpKeys()
+	defer repocl.DeleteTmpKeys()
 	defer CleanUpTemp()
 	util.LogWrite("CloneRepo")
 
@@ -354,7 +338,7 @@ func (repocl *Client) CloneRepo(repoPath string) (string, error) {
 	globalGitName, _, _ := RunGitCommand("config", "--global", "user.name")
 	globalGitEmail, _, _ := RunGitCommand("config", "--global", "user.Email")
 	if globalGitName.Len() == 0 && globalGitEmail.Len() == 0 {
-		info, err := authcl.RequestAccount(repocl.Username)
+		info, err := repocl.RequestAccount(repocl.Username)
 		name := info.FullName
 		if err != nil {
 			name = repocl.Username
@@ -616,7 +600,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 // ListFiles lists the files and directories specified by paths and their sync status.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (repocl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
-	defer auth.NewClient(repocl.Host).DeleteTmpKeys()
+	defer repocl.DeleteTmpKeys()
 	defer CleanUpTemp()
 	err := repocl.Connect()
 	if err != nil {
