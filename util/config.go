@@ -9,11 +9,10 @@ import (
 )
 
 type conf struct {
-	AuthHost string
-	RepoHost string
-	GitHost  string
-	GitUser  string
-	Bin      struct {
+	GinHost string
+	GitHost string
+	GitUser string
+	Bin     struct {
 		Git      string
 		GitAnnex string
 		SSH      string
@@ -36,10 +35,8 @@ func LoadConfig() error {
 	viper.SetDefault("bin.ssh", "ssh")
 
 	// Hosts
-	viper.SetDefault("auth.address", "https://web.gin.g-node.org")
-	viper.SetDefault("auth.port", "443")
-	viper.SetDefault("repo.address", "https://web.gin.g-node.org")
-	viper.SetDefault("repo.port", "443")
+	viper.SetDefault("gin.address", "https://web.gin.g-node.org")
+	viper.SetDefault("gin.port", "443")
 	viper.SetDefault("git.address", "gin.g-node.org")
 	viper.SetDefault("git.port", "22")
 	viper.SetDefault("git.user", "git")
@@ -76,13 +73,25 @@ func LoadConfig() error {
 	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
 	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
-	authAddress := viper.GetString("auth.address")
-	authPort := viper.GetInt("auth.port")
-	Config.AuthHost = fmt.Sprintf("%s:%d", authAddress, authPort)
+	var oldConfigHost string
+	if viper.IsSet("auth.address") || viper.IsSet("auth.port") {
+		fmt.Fprintln(os.Stderr, "Auth server address configuration is no longer used. Use gin.address and gin.port instead.")
+		oldConfigHost = fmt.Sprintf("%s:%d", viper.GetString("auth.address"), viper.GetInt("auth.port"))
+	}
 
-	repoAddress := viper.GetString("repo.address")
-	repoPort := viper.GetInt("repo.port")
-	Config.RepoHost = fmt.Sprintf("%s:%d", repoAddress, repoPort)
+	if viper.IsSet("repo.address") || viper.IsSet("repo.port") {
+		fmt.Fprintln(os.Stderr, "Repo server address configuration is no longer used. Use gin.address and gin.port instead.")
+		oldConfigHost = fmt.Sprintf("%s:%d", viper.GetString("repo.address"), viper.GetInt("repo.port"))
+	}
+
+	if !viper.IsSet("gin.address") && !viper.IsSet("gin.port") {
+		fmt.Fprintf(os.Stderr, "Using deprecated configuration value: %s. This will change in a future release.", oldConfigHost)
+		Config.GinHost = oldConfigHost
+	} else {
+		ginAddress := viper.GetString("gin.address")
+		ginPort := viper.GetInt("gin.port")
+		Config.GinHost = fmt.Sprintf("%s:%d", ginAddress, ginPort)
+	}
 
 	gitAddress := viper.GetString("git.address")
 	gitPort := viper.GetInt("git.port")

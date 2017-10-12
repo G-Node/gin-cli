@@ -28,6 +28,7 @@ type GINUser struct {
 // Client is a client interface to the GIN server. Embeds web.Client.
 type Client struct {
 	*web.Client
+	GitHost string
 	GitUser string
 }
 
