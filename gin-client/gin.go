@@ -167,7 +167,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	if err != nil {
 		return err
 	}
-	util.LogWrite("Got response: %s,%s", string(data), string(resp.StatusCode))
+	util.LogWrite("Got response: %s", resp.Status)
 	token := AccessToken{}
 	err = json.Unmarshal(data, &token)
 	if err != nil {
@@ -175,7 +175,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	}
 	gincl.Username = username
 	gincl.Token = token.Sha1
-	util.LogWrite("Login successful. Username: %s, %v", username, token)
+	util.LogWrite("Login successful. Username: %s", username)
 
 	err = gincl.StoreToken()
 	if err != nil {
