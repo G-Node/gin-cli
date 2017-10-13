@@ -237,8 +237,18 @@ func (repocl *Client) Upload(paths []string) error {
 		return err
 	}
 
+	paths, err = util.ExpandGlobs(paths)
+	if err != nil {
+		return err
+	}
+
 	if len(paths) > 0 {
+		// Run git annex add using exclusion filters and then add the rest to git
 		_, err = AnnexAdd(paths)
+		if err != nil {
+			return err
+		}
+		_, err = GitAdd(paths)
 		if err != nil {
 			return err
 		}

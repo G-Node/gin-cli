@@ -29,6 +29,7 @@ var Config conf
 
 // LoadConfig reads in the configuration and makes it available through Config package global
 func LoadConfig() error {
+	viper.SetTypeByDefaultValue(true)
 	// Binaries
 	viper.SetDefault("bin.git", "git")
 	viper.SetDefault("bin.gitannex", "git-annex")
@@ -44,7 +45,6 @@ func LoadConfig() error {
 	viper.SetDefault("git.user", "git")
 
 	// annex filters
-	viper.SetDefault("annex.exclude", [...]string{"*.md", "*.rst", "*.txt", "*.c", "*.cpp", "*.h", "*.hpp", "*.py", "*.go"})
 	viper.SetDefault("annex.minsize", "10M")
 
 	viper.SetConfigName("config")

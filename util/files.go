@@ -1,7 +1,6 @@
 package util
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -32,14 +31,20 @@ func PathSplit(path string) (string, string) {
 	return dir, filename
 }
 
-// DataSize returns the simplest representation of bytes as a string (with units)
-func DataSize(nbytes int) string {
-	units := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"}
-
-	lastPositive := nbytes
-	unitIdx := 0
-	for b, c := nbytes, 0; b > 0 && c < len(units); b, c = b>>10, c+1 {
-		lastPositive, unitIdx = b, c
+// ExpandGlobs expands a list of globs into paths (files and directories).
+func ExpandGlobs(paths []string) (globexppaths []string, err error) {
+	// expand potential globs
+	for _, p := range paths {
+		LogWrite("ExpandGlobs: Checking for glob expansion for %s", p)
+		exp, err := filepath.Glob(p)
+		if err != nil {
+			LogWrite(err.Error())
+			LogWrite("Bad file pattern %s", p)
+			return nil, err
+		}
+		if exp != nil {
+			globexppaths = append(globexppaths, exp...)
+		}
 	}
-	return fmt.Sprintf("%d %s", lastPositive, units[unitIdx])
+	return
 }

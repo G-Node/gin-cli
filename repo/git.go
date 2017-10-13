@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
+	"github.com/dustin/go-humanize"
 )
 
 // Workingdir sets the directory for shell commands
@@ -247,6 +250,29 @@ func AnnexDrop(filepaths []string) error {
 	return nil
 }
 
+// GitAdd adds paths to git directly (not annex).
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// (git add)
+func GitAdd(filepaths []string) ([]string, error) {
+	if len(filepaths) == 0 {
+		util.LogWrite("No paths to add to git. Nothing to do.")
+		return nil, nil
+	}
+
+	cmdargs := append([]string{"add", "--verbose"}, filepaths...)
+	stdout, stderr, err := RunGitCommand(cmdargs...)
+	if err != nil {
+		util.LogWrite("Error during GitAdd")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return nil, fmt.Errorf("Error adding files to repository")
+	}
+
+	added := strings.Split(stdout.String(), "\n")
+	util.LogWrite("Files added to git: %v", added)
+	return added, nil
+}
+
 // AnnexAddResult is used to store information about each added file, as returned from the annex command.
 type AnnexAddResult struct {
 	Command string `json:"command"`
@@ -255,12 +281,36 @@ type AnnexAddResult struct {
 	Success bool   `json:"success"`
 }
 
-// AnnexAdd adds a path to the annex.
+// AnnexAdd adds paths to the annex.
+// Files specified for exclusion in the configuration are ignored automatically.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex add)
 func AnnexAdd(filepaths []string) ([]string, error) {
+	if len(filepaths) == 0 {
+		util.LogWrite("No paths to add to annex. Nothing to do.")
+		return nil, nil
+	}
 	cmdargs := []string{"--json", "add"}
 	cmdargs = append(cmdargs, filepaths...)
+
+	// build exclusion argument list
+	// files < annex.minsize or matching exclusion extensions will not be annexed and
+	// will instead be handled by git
+	var exclargs []string
+	if util.Config.Annex.MinSize != "" {
+		sizefilterarg := fmt.Sprintf("--largerthan=%s", util.Config.Annex.MinSize)
+		exclargs = append(exclargs, sizefilterarg)
+	}
+
+	for _, pattern := range util.Config.Annex.Exclude {
+		arg := fmt.Sprintf("--exclude=%s", pattern)
+		exclargs = append(exclargs, arg)
+	}
+
+	if len(exclargs) > 0 {
+		cmdargs = append(cmdargs, exclargs...)
+	}
+
 	stdout, stderr, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexAdd")
@@ -285,6 +335,7 @@ func AnnexAdd(filepaths []string) ([]string, error) {
 		}
 		added = append(added, outStruct.File)
 	}
+	util.LogWrite("Files added to annex: %v", added)
 
 	return added, nil
 }
@@ -610,4 +661,47 @@ func RunAnnexCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	return stdout, stderr, err
+}
+
+// selectGitOrAnnex splits a list of paths into two: the first to be added to git proper and the second to be added to git annex.
+// The selection is made based on the file type (extension) and size, both of which are configurable.
+func selectGitOrAnnex(paths []string) (gitpaths []string, annexpaths []string) {
+	minsize, err := humanize.ParseBytes(util.Config.Annex.MinSize)
+	if err != nil {
+		util.LogWrite("Invalid minsize string found in config. Defaulting to 10 MiB")
+		minsize, _ = humanize.ParseBytes("10 MiB")
+	}
+	excludes := util.Config.Annex.Exclude
+
+	util.LogWrite("Using minsize %v", minsize)
+	util.LogWrite("Using exclude list %v", excludes)
+
+	var fsize uint64
+	for _, p := range paths {
+		fstat, err := os.Stat(p)
+		if err != nil {
+			util.LogWrite("Cannot stat file [%s]: %s", p, err.Error())
+			fsize = math.MaxUint64
+		} else {
+			fsize = uint64(fstat.Size())
+		}
+		if fsize < minsize {
+			for _, pattern := range excludes {
+				match, err := filepath.Match(pattern, p)
+				if match {
+					if err != nil {
+						util.LogWrite("Bad pattern found in annex exclusion list %s", excludes)
+						continue
+					}
+					gitpaths = append(gitpaths, p)
+					util.LogWrite("Adding %v to git paths", p)
+					continue
+				}
+			}
+		}
+		util.LogWrite("Adding %v to annex paths", p)
+		annexpaths = append(annexpaths, p)
+	}
+
+	return
 }
