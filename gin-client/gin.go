@@ -218,6 +218,8 @@ func (gincl *Client) Logout() {
 	err = os.Remove(privKeyFile)
 	if err != nil {
 		util.LogWrite("Error deleting key file")
+	} else {
+		util.LogWrite("Private key file deleted")
 	}
 
 	err = web.DeleteToken()

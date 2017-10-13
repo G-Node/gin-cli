@@ -13,7 +13,6 @@ import (
 
 	ginclient "github.com/G-Node/gin-cli/gin-client"
 	"github.com/G-Node/gin-cli/util"
-	"github.com/G-Node/gin-cli/web"
 	"github.com/docopt/docopt-go"
 	"github.com/howeyc/gopass"
 )
@@ -71,15 +70,13 @@ func logout(args []string) {
 	if len(args) > 0 {
 		util.Die(usage)
 	}
-	gincl := web.NewClient("") // host configuration unnecessary
+	gincl := ginclient.NewClient(util.Config.GinHost)
 	err := gincl.LoadToken()
 	if err != nil {
 		util.Die("You are not logged in.")
 	}
 
-	err = web.DeleteToken()
-	util.CheckErrorMsg(err, "Error deleting user token.")
-	util.LogWrite("Logged out. Token deleted.")
+	gincl.Logout()
 	fmt.Println("You have been logged out.")
 }
 
