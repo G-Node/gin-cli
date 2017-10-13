@@ -131,20 +131,33 @@ func (gincl *Client) AddKey(key, description string, force bool) error {
 	return nil
 }
 
-// DeletePubKey removes the given key from the current user's authorised keys.
-func (gincl *Client) DeletePubKey(key gogs.PublicKey) error {
+// DeletePubKey removes the key that matches the given description (title) from the current user's authorised keys.
+func (gincl *Client) DeletePubKey(description string) error {
 	err := gincl.LoadToken()
 	if err != nil {
 		return err
 	}
-	address := fmt.Sprintf("/api/v1/user/keys/%d", key.ID)
-	res, err := gincl.Delete(address)
+
+	keys, err := gincl.GetUserKeys()
 	if err != nil {
-		return err
-	} else if res.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("[Add key] Failed. Server returned %s", res.Status)
+		util.LogWrite("Error when getting user keys: %v", err)
 	}
-	web.CloseRes(res.Body)
+
+	for _, key := range keys {
+		if key.Title == description {
+			address := fmt.Sprintf("/api/v1/user/keys/%d", key.ID)
+			res, err := gincl.Delete(address)
+			if err != nil {
+				return err
+			} else if res.StatusCode != http.StatusNoContent {
+				return fmt.Errorf("[Del key] Failed. Server returned %s", res.Status)
+			}
+			web.CloseRes(res.Body)
+			// IDs are unique, so we can break after the first match
+			break
+		}
+	}
+
 	return nil
 }
 
@@ -191,11 +204,6 @@ func (gincl *Client) Login(username, password, clientID string) error {
 // 3. Delete the user token.
 func (gincl *Client) Logout() {
 	// 1. Delete public key
-	keys, err := gincl.GetUserKeys()
-	if err != nil {
-		util.LogWrite("Error when getting user keys: %v", err)
-	}
-
 	hostname, err := os.Hostname()
 	if err != nil {
 		util.LogWrite("Could not retrieve hostname")
@@ -203,16 +211,14 @@ func (gincl *Client) Logout() {
 	}
 
 	currentkeyname := fmt.Sprintf("%s@%s", gincl.Username, hostname)
-	for _, key := range keys {
-		util.LogWrite("key: %s", key.Title)
-		if key.Title == currentkeyname {
-			_ = gincl.DeletePubKey(key)
-		}
-	}
+	_ = gincl.DeletePubKey(currentkeyname)
 
 	// 2. Delete private key
 	privKeyFile := util.PrivKeyPath(gincl.UserToken.Username)
-	os.Remove(privKeyFile)
+	err = os.Remove(privKeyFile)
+	if err != nil {
+		util.LogWrite("Error deleting key file")
+	}
 
 	err = web.DeleteToken()
 	if err != nil {
