@@ -89,8 +89,8 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 // Clone downloads a repository and sets the remote fetch and push urls.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git clone ...)
-func (repocl *Client) Clone(repoPath string) error {
-	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repoPath)
+func (gincl *Client) Clone(repoPath string) error {
+	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 	stdout, stderr, err := RunGitCommand("clone", remotePath)
 	if err != nil {
 		util.LogWrite("Error during clone command")

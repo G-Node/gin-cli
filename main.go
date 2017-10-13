@@ -59,10 +59,10 @@ func login(args []string) {
 		util.Die("No password provided. Aborting.")
 	}
 
-	authcl := ginclient.NewClient(util.Config.GinHost)
-	err = authcl.Login(username, password, "gin-cli")
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	err = gincl.Login(username, password, "gin-cli")
 	util.CheckError(err)
-	info, err := authcl.RequestAccount(username)
+	info, err := gincl.RequestAccount(username)
 	util.CheckError(err)
 	fmt.Printf("Hello %s. You are now logged in.\n", info.UserName)
 }
@@ -71,8 +71,8 @@ func logout(args []string) {
 	if len(args) > 0 {
 		util.Die(usage)
 	}
-	authcl := web.NewClient("") // host configuration unnecessary
-	err := authcl.LoadToken()
+	gincl := web.NewClient("") // host configuration unnecessary
+	err := gincl.LoadToken()
 	if err != nil {
 		util.Die("You are not logged in.")
 	}
@@ -98,15 +98,15 @@ func createRepo(args []string) {
 		}
 	}
 	// TODO: Check name validity before sending to server?
-	repocl := ginclient.NewClient(util.Config.GinHost)
-	err := repocl.LoadToken()
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	err := gincl.LoadToken()
 	util.CheckError(err)
 
-	repocl.GitHost = util.Config.GitHost
-	repocl.GitUser = util.Config.GitUser
-	repoPath := fmt.Sprintf("%s/%s", repocl.Username, repoName)
+	gincl.GitHost = util.Config.GitHost
+	gincl.GitUser = util.Config.GitUser
+	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
 	fmt.Printf("Creating repository '%s'...", repoPath)
-	err = repocl.CreateRepo(repoName, repoDesc)
+	err = gincl.CreateRepo(repoName, repoDesc)
 	// Parse error message and make error nicer
 	util.CheckError(err)
 	fmt.Println(" done.")
@@ -124,11 +124,11 @@ func deleteRepo(args []string) {
 		repostr = args[0]
 	}
 
-	repocl := ginclient.NewClient(util.Config.GinHost)
-	err := repocl.LoadToken()
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	err := gincl.LoadToken()
 	util.CheckError(err)
 
-	repoinfo, err := repocl.GetRepo(repostr)
+	repoinfo, err := gincl.GetRepo(repostr)
 	util.CheckError(err)
 
 	if repoinfo.FullName != repostr {
@@ -145,7 +145,7 @@ func deleteRepo(args []string) {
 	fmt.Scanln(&confirmation)
 
 	if repoinfo.FullName == confirmation && repostr == confirmation {
-		err = repocl.DelRepo(repostr)
+		err = gincl.DelRepo(repostr)
 		util.CheckError(err)
 	} else {
 		util.Die("Confirmation does not match repository name. Cancelling.")
@@ -170,10 +170,10 @@ func getRepo(args []string) {
 		util.Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
 	}
 
-	repocl := ginclient.NewClient(util.Config.GinHost)
-	repocl.GitHost = util.Config.GitHost
-	repocl.GitUser = util.Config.GitUser
-	repoDir, err := repocl.CloneRepo(repostr)
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl.GitHost = util.Config.GitHost
+	gincl.GitUser = util.Config.GitUser
+	repoDir, err := gincl.CloneRepo(repostr)
 	util.CheckError(err)
 
 	ginclient.Workingdir = repoDir
@@ -193,11 +193,11 @@ func lsRepo(args []string) {
 		}
 	}
 
-	repocl := ginclient.NewClient(util.Config.GinHost)
-	repocl.GitHost = util.Config.GitHost
-	repocl.GitUser = util.Config.GitUser
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl.GitHost = util.Config.GitHost
+	gincl.GitUser = util.Config.GitUser
 
-	filesStatus, err := repocl.ListFiles(args...)
+	filesStatus, err := gincl.ListFiles(args...)
 	util.CheckError(err)
 
 	if short {
@@ -252,9 +252,9 @@ func upload(args []string) {
 	err := ginclient.AnnexLock(args...)
 	util.CheckError(err)
 
-	repocl := ginclient.NewClient(util.Config.GinHost)
-	repocl.GitHost = util.Config.GitHost
-	repocl.GitUser = util.Config.GitUser
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl.GitHost = util.Config.GitHost
+	gincl.GitUser = util.Config.GitUser
 
 	if len(args) == 0 {
 		fmt.Println("No files specified for upload. Synchronising metadata.")
@@ -263,7 +263,7 @@ func upload(args []string) {
 
 	fmt.Print("Uploading...")
 
-	err = repocl.Upload(args)
+	err = gincl.Upload(args)
 	util.CheckError(err)
 	fmt.Println("done!")
 }
@@ -283,11 +283,11 @@ func download(args []string) {
 		content = true
 	}
 
-	repocl := ginclient.NewClient(util.Config.GinHost)
-	repocl.GitHost = util.Config.GitHost
-	repocl.GitUser = util.Config.GitUser
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl.GitHost = util.Config.GitHost
+	gincl.GitUser = util.Config.GitUser
 	fmt.Print("Downloading...")
-	err = repocl.DownloadRepo(content)
+	err = gincl.DownloadRepo(content)
 	fmt.Println("done!")
 	util.CheckError(err)
 }
@@ -297,10 +297,10 @@ func getContent(args []string) {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 
-	repocl := ginclient.NewClient(util.Config.GinHost)
-	repocl.GitHost = util.Config.GitHost
-	repocl.GitUser = util.Config.GitUser
-	err := repocl.GetContent(args)
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl.GitHost = util.Config.GitHost
+	gincl.GitUser = util.Config.GitUser
+	err := gincl.GetContent(args)
 	util.CheckError(err)
 }
 
@@ -311,10 +311,10 @@ func remove(args []string) {
 	err := ginclient.AnnexLock(args...)
 	util.CheckError(err)
 
-	repocl := ginclient.NewClient(util.Config.GinHost)
-	repocl.GitHost = util.Config.GitHost
-	repocl.GitUser = util.Config.GitUser
-	err = repocl.RmContent(args)
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl.GitHost = util.Config.GitHost
+	gincl.GitUser = util.Config.GitUser
+	err = gincl.RmContent(args)
 	util.CheckError(err)
 }
 
@@ -338,8 +338,8 @@ func printKeys(args []string) {
 		}
 	}
 
-	authcl := ginclient.NewClient(util.Config.GinHost)
-	keys, err := authcl.GetUserKeys()
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	keys, err := gincl.GetUserKeys()
 	util.CheckError(err)
 
 	nkeys := len(keys)
@@ -369,8 +369,8 @@ func addKey(args []string) {
 	if len(args) != 2 {
 		util.Die(usage)
 	}
-	authcl := ginclient.NewClient(util.Config.GinHost)
-	err := authcl.LoadToken()
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	err := gincl.LoadToken()
 	if err != nil {
 		util.Die("This command requires login.")
 	}
@@ -386,10 +386,10 @@ func addKey(args []string) {
 	if len(strSlice) > 2 {
 		description = strings.TrimSpace(strSlice[2])
 	} else {
-		description = fmt.Sprintf("%s@%s", authcl.Username, strconv.FormatInt(time.Now().Unix(), 10))
+		description = fmt.Sprintf("%s@%s", gincl.Username, strconv.FormatInt(time.Now().Unix(), 10))
 	}
 
-	err = authcl.AddKey(string(keyBytes), description, false)
+	err = gincl.AddKey(string(keyBytes), description, false)
 	util.CheckError(err)
 	fmt.Printf("New key added '%s'\n", description)
 }
@@ -397,11 +397,11 @@ func addKey(args []string) {
 func printAccountInfo(args []string) {
 	var username string
 
-	authcl := ginclient.NewClient(util.Config.GinHost)
-	_ = authcl.LoadToken()
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	_ = gincl.LoadToken()
 
 	if len(args) == 0 {
-		username = authcl.Username
+		username = gincl.Username
 	} else {
 		username = args[0]
 	}
@@ -413,7 +413,7 @@ func printAccountInfo(args []string) {
 		fmt.Scanln(&username)
 	}
 
-	info, err := authcl.RequestAccount(username)
+	info, err := gincl.RequestAccount(username)
 	util.CheckError(err)
 
 	var outBuffer bytes.Buffer
@@ -430,11 +430,11 @@ func repos(args []string) {
 		util.Die(usage)
 	}
 	var arg string
-	repocl := ginclient.NewClient(util.Config.GinHost)
-	err := repocl.LoadToken()
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	err := gincl.LoadToken()
 	if len(args) == 0 {
 		if err == nil {
-			arg = repocl.Username
+			arg = gincl.Username
 		}
 	} else {
 		arg = args[0]
@@ -444,7 +444,7 @@ func repos(args []string) {
 			arg = "--shared-with-me"
 		}
 	}
-	repolist, err := repocl.ListRepos(arg)
+	repolist, err := gincl.ListRepos(arg)
 	util.CheckError(err)
 
 	if arg == "" || arg == "--public" {
@@ -452,9 +452,9 @@ func repos(args []string) {
 	} else if arg == "--shared-with-me" {
 		fmt.Print("Listing all accessible shared repositories:\n\n")
 	} else {
-		if repocl.Username == "" {
+		if gincl.Username == "" {
 			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s':\n\n", arg)
-		} else if arg == repocl.Username {
+		} else if arg == gincl.Username {
 			fmt.Print("Listing your repositories:\n\n")
 		} else {
 			fmt.Printf("Listing accessible repositories owned by '%s':\n\n", arg)

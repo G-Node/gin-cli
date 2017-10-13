@@ -38,14 +38,14 @@ func NewClient(host string) *Client {
 }
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
-func (authcl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
+func (gincl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
 	var keys []gogs.PublicKey
-	err := authcl.LoadToken()
+	err := gincl.LoadToken()
 	if err != nil {
 		return keys, fmt.Errorf("This command requires login")
 	}
 
-	res, err := authcl.Get("/api/v1/user/keys")
+	res, err := gincl.Get("/api/v1/user/keys")
 	if err != nil {
 		return keys, fmt.Errorf("Request for keys returned error")
 	} else if res.StatusCode != http.StatusOK {
@@ -63,9 +63,9 @@ func (authcl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
 }
 
 // RequestAccount requests a specific account by name.
-func (authcl *Client) RequestAccount(name string) (gogs.User, error) {
+func (gincl *Client) RequestAccount(name string) (gogs.User, error) {
 	var acc gogs.User
-	res, err := authcl.Get(fmt.Sprintf("/api/v1/users/%s", name))
+	res, err := gincl.Get(fmt.Sprintf("/api/v1/users/%s", name))
 	if err != nil {
 		return acc, err
 	} else if res.StatusCode == http.StatusNotFound {
@@ -85,13 +85,13 @@ func (authcl *Client) RequestAccount(name string) (gogs.User, error) {
 }
 
 // SearchAccount retrieves a list of accounts that match the query string.
-func (authcl *Client) SearchAccount(query string) ([]gin.Account, error) {
+func (gincl *Client) SearchAccount(query string) ([]gin.Account, error) {
 	var accs []gin.Account
 
 	params := url.Values{}
 	params.Add("q", query)
 	address := fmt.Sprintf("/api/accounts?%s", params.Encode())
-	res, err := authcl.Get(address)
+	res, err := gincl.Get(address)
 	if err != nil {
 		return accs, err
 	} else if res.StatusCode != http.StatusOK {
@@ -108,14 +108,14 @@ func (authcl *Client) SearchAccount(query string) ([]gin.Account, error) {
 }
 
 // AddKey adds the given key to the current user's authorised keys.
-func (authcl *Client) AddKey(key, description string, temp bool) error {
-	err := authcl.LoadToken()
+func (gincl *Client) AddKey(key, description string, temp bool) error {
+	err := gincl.LoadToken()
 	if err != nil {
 		return err
 	}
 	newkey := gogs.PublicKey{Key: key, Title: description}
 	address := fmt.Sprintf("/api/v1/user/keys")
-	res, err := authcl.Post(address, newkey)
+	res, err := gincl.Post(address, newkey)
 	if err != nil {
 		return err
 	} else if res.StatusCode != http.StatusCreated {
@@ -126,13 +126,13 @@ func (authcl *Client) AddKey(key, description string, temp bool) error {
 }
 
 // DeleteKey removes the given key from the current user's authorised keys.
-func (authcl *Client) DeleteKey(key gogs.PublicKey) error {
-	err := authcl.LoadToken()
+func (gincl *Client) DeleteKey(key gogs.PublicKey) error {
+	err := gincl.LoadToken()
 	if err != nil {
 		return err
 	}
 	address := fmt.Sprintf("/api/v1/user/keys/%d", key.ID)
-	res, err := authcl.Delete(address)
+	res, err := gincl.Delete(address)
 	if err != nil {
 		return err
 	} else if res.StatusCode != http.StatusNoContent {
@@ -142,8 +142,8 @@ func (authcl *Client) DeleteKey(key gogs.PublicKey) error {
 	return nil
 }
 
-func (authcl *Client) DeleteTmpKeys() error {
-	keys, err := authcl.GetUserKeys()
+func (gincl *Client) DeleteTmpKeys() error {
+	keys, err := gincl.GetUserKeys()
 	if err != nil {
 		util.LogWrite("Error when getting user keys: %v", err)
 		return err
@@ -152,17 +152,17 @@ func (authcl *Client) DeleteTmpKeys() error {
 		util.LogWrite("key: %s", key.Title)
 		if strings.Contains(key.Title, "tmpkey") {
 			// is logged
-			authcl.DeleteKey(key)
+			gincl.DeleteKey(key)
 		}
 	}
 	return err
 }
 
 // Login requests a token from the auth server and stores the username and token to file.
-func (authcl *Client) Login(username, password, clientID string) error {
+func (gincl *Client) Login(username, password, clientID string) error {
 	tokenCreate := &gogs.CreateAccessTokenOption{Name: "gin-cli"}
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
-	resp, err := authcl.PostBasicAuth(address, username, password, tokenCreate)
+	resp, err := gincl.PostBasicAuth(address, username, password, tokenCreate)
 	if err != nil {
 		if resp != nil {
 			return fmt.Errorf("[Login] Request failed: %s", resp.Status)
@@ -182,11 +182,11 @@ func (authcl *Client) Login(username, password, clientID string) error {
 	if err != nil {
 		return err
 	}
-	authcl.Username = username
-	authcl.Token = token.Sha1
+	gincl.Username = username
+	gincl.Token = token.Sha1
 	util.LogWrite("Login successful. Username: %s, %v", username, token)
 
-	return authcl.StoreToken()
+	return gincl.StoreToken()
 }
 
 // AccessToken represents a API access token.
