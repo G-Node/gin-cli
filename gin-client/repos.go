@@ -4,15 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
-	"time"
-
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
@@ -21,115 +15,35 @@ import (
 	// but its only temporary...
 )
 
-// Temporary (SSH key) file handling
-var privKeyFile util.TempFile
-
-// MakeTempKeyPair creates a temporary key pair and stores it in a temporary directory.
-// It also sets the global tempFile for use by the annex commands. The key pair is returned directly.
-func (gincl *Client) MakeTempKeyPair() (*util.KeyPair, error) {
-	tempKeyPair, err := util.MakeKeyPair()
+// MakeSessionKey creates a private+public key pair.
+// The private key is saved in the user's configuration directory, to be used for git commands.
+// The public key is added to the GIN server for the current logged in user.
+func (gincl *Client) MakeSessionKey() error {
+	keyPair, err := util.MakeKeyPair()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	description := fmt.Sprintf("tmpkey@%s", strconv.FormatInt(time.Now().Unix(), 10))
-	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(tempKeyPair.Public), description)
+	hostname, err := os.Hostname()
+	if err != nil {
+		util.LogWrite("Could not retrieve hostname")
+		hostname = "(unknown)"
+	}
+	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
+	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(keyPair.Public), description)
 	err = gincl.AddKey(pubkey, description, true)
 	if err != nil {
-		return tempKeyPair, err
+		return err
 	}
 
-	privKeyFile, err = util.SaveTempKeyFile(tempKeyPair.Private)
-	if err != nil {
-		return tempKeyPair, err
-	}
+	privKeyFile := util.PrivKeyPath(gincl.Username)
+	_ = ioutil.WriteFile(privKeyFile, []byte(keyPair.Private), 0600)
 
-	privKeyFile.Active = true
-
-	return tempKeyPair, nil
-}
-
-// CleanUpTemp deletes the temporary directory which holds the temporary private key if it exists.
-func CleanUpTemp() {
-	if privKeyFile.Active {
-		privKeyFile.Delete()
-	}
-}
-
-func publicKeyFile(file string) ssh.AuthMethod {
-	buffer, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil
-	}
-
-	key, err := ssh.ParsePrivateKey(buffer)
-	if err != nil {
-		return nil
-	}
-	return ssh.PublicKeys(key)
-}
-
-// Connect opens a connection to the git server. This is used to validate credentials
-// and generate temporary keys on demand, without performing a git operation.
-// On Unix systems, the function will attempt to use the system's SSH agent.
-// If no agent is running or the keys offered by the agent are not valid for the server,
-// a temporary key pair is generated, the public key is uploaded to the auth server,
-// and the private key is stored internally, to be used for subsequent functions.
-func (gincl *Client) Connect() error {
-	util.LogWrite("Checking connection to git server")
-	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
-	if err != nil {
-		// No agent running - use temp keys
-		util.LogWrite("No agent running. Setting up temporary keys")
-		_, err = gincl.MakeTempKeyPair()
-		if err != nil {
-			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
-		}
-		return nil
-	}
-
-	agent := ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers)
-
-	sshConfig := &ssh.ClientConfig{
-		User: gincl.GitUser,
-		Auth: []ssh.AuthMethod{
-			agent,
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-
-	util.LogWrite("Attempting connection with key from SSH agent")
-	connection, err := ssh.Dial("tcp", gincl.GitHost, sshConfig)
-	if err != nil && strings.Contains(err.Error(), "unable to authenticate") {
-		// Agent key authentication failed - use temp keys
-		util.LogWrite("Auth key authentication failed. Setting up temporary keys")
-		_, err = gincl.MakeTempKeyPair()
-		if err != nil {
-			return fmt.Errorf("Error while creating temporary key for connection: %s", err.Error())
-		}
-		return nil
-	}
-	// TODO: Attempt connection again after temp key is set up
-
-	if err != nil {
-		// Connection error (other than "unable to auth")
-		return fmt.Errorf("Failed to connect to git host: %s", err.Error())
-	}
-	defer connection.Close()
-
-	session, err := connection.NewSession()
-	util.LogWrite("Creating SSH session")
-	if err != nil {
-		return fmt.Errorf("Failed to create session: %s", err.Error())
-	}
-	defer session.Close()
-	util.LogWrite("Connection to git server OK")
 	return nil
 }
 
 // GetRepo retrieves the information of a repository.
 func (gincl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
-	defer CleanUpTemp()
 	util.LogWrite("GetRepo")
 	var repo gogs.Repository
 
@@ -213,16 +127,9 @@ func (gincl *Client) DelRepo(name string) error {
 
 // Upload adds files to a repository and uploads them.
 func (gincl *Client) Upload(paths []string) error {
-	defer gincl.DeleteTmpKeys()
-	defer CleanUpTemp()
 	util.LogWrite("Upload")
 
-	err := gincl.Connect()
-	if err != nil {
-		return err
-	}
-
-	paths, err = util.ExpandGlobs(paths)
+	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
 		return err
 	}
@@ -263,59 +170,36 @@ func (gincl *Client) Upload(paths []string) error {
 // DownloadRepo downloads the files in an already checked out repository.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) DownloadRepo(content bool) error {
-	defer gincl.DeleteTmpKeys()
-	defer CleanUpTemp()
 	util.LogWrite("DownloadRepo")
 
-	err := gincl.Connect()
-	if err != nil {
-		return err
-	}
-	err = AnnexPull(content)
+	err := AnnexPull(content)
 	return err
 }
 
 // GetContent retrieves the contents of placeholder files in a checked out repository.
 func (gincl *Client) GetContent(filepaths []string) error {
-	defer CleanUpTemp()
 	util.LogWrite("GetContent")
 
-	err := gincl.Connect()
-	if err != nil {
-		return err
-	}
-	err = AnnexGet(filepaths)
+	err := AnnexGet(filepaths)
 	return err
 }
 
 // RmContent removes the contents of local files, turning them into placeholders, but ONLY IF the content is available on a remote
 func (gincl *Client) RmContent(filepaths []string) error {
-	defer CleanUpTemp()
 	util.LogWrite("RmContent")
 
-	err := gincl.Connect()
-	if err != nil {
-		return err
-	}
-	err = AnnexDrop(filepaths)
+	err := AnnexDrop(filepaths)
 	return err
 }
 
 // CloneRepo clones a remote repository and initialises annex.
 // Returns the name of the directory in which the repository is cloned.
 func (gincl *Client) CloneRepo(repoPath string) (string, error) {
-	defer gincl.DeleteTmpKeys()
-	defer CleanUpTemp()
 	util.LogWrite("CloneRepo")
-
-	err := gincl.Connect()
-	if err != nil {
-		return "", err
-	}
 
 	_, repoName := splitRepoParts(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", repoPath)
-	err = gincl.Clone(repoPath)
+	err := gincl.Clone(repoPath)
 	if err != nil {
 		return "", err
 	}
@@ -330,7 +214,7 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 	Workingdir = repoName
 	hostname, err := os.Hostname()
 	if err != nil {
-		hostname = "localhost"
+		hostname = "(unknown)"
 	}
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 
@@ -338,14 +222,14 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 	globalGitName, _, _ := RunGitCommand("config", "--global", "user.name")
 	globalGitEmail, _, _ := RunGitCommand("config", "--global", "user.Email")
 	if globalGitName.Len() == 0 && globalGitEmail.Len() == 0 {
-		info, err := gincl.RequestAccount(gincl.Username)
+		info, ierr := gincl.RequestAccount(gincl.Username)
 		name := info.FullName
-		if err != nil {
+		if ierr != nil {
 			name = gincl.Username
 		}
 		// NOTE: Add user email too?
-		err = SetGitUser(name, "")
-		if err != nil {
+		ierr = SetGitUser(name, "")
+		if ierr != nil {
 			util.LogWrite("Failed to set local git user configuration")
 		}
 	}
@@ -600,12 +484,6 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 // ListFiles lists the files and directories specified by paths and their sync status.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
-	defer gincl.DeleteTmpKeys()
-	defer CleanUpTemp()
-	err := gincl.Connect()
-	if err != nil {
-		return nil, err
-	}
 	if IsDirect() {
 		return lfDirect(paths...)
 	}

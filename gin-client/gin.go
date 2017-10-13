@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"os"
 
 	"net/http"
-
-	"strings"
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
@@ -108,12 +107,19 @@ func (gincl *Client) SearchAccount(query string) ([]gin.Account, error) {
 }
 
 // AddKey adds the given key to the current user's authorised keys.
-func (gincl *Client) AddKey(key, description string, temp bool) error {
+// If force is enabled, any key which matches the new key's description will be overwritten.
+func (gincl *Client) AddKey(key, description string, force bool) error {
 	err := gincl.LoadToken()
 	if err != nil {
 		return err
 	}
 	newkey := gogs.PublicKey{Key: key, Title: description}
+
+	if force {
+		// Attempting to delete potential existing key that matches the title
+		_ = gincl.DeletePubKey(description)
+	}
+
 	address := fmt.Sprintf("/api/v1/user/keys")
 	res, err := gincl.Post(address, newkey)
 	if err != nil {
@@ -125,8 +131,8 @@ func (gincl *Client) AddKey(key, description string, temp bool) error {
 	return nil
 }
 
-// DeleteKey removes the given key from the current user's authorised keys.
-func (gincl *Client) DeleteKey(key gogs.PublicKey) error {
+// DeletePubKey removes the given key from the current user's authorised keys.
+func (gincl *Client) DeletePubKey(key gogs.PublicKey) error {
 	err := gincl.LoadToken()
 	if err != nil {
 		return err
@@ -142,23 +148,8 @@ func (gincl *Client) DeleteKey(key gogs.PublicKey) error {
 	return nil
 }
 
-func (gincl *Client) DeleteTmpKeys() error {
-	keys, err := gincl.GetUserKeys()
-	if err != nil {
-		util.LogWrite("Error when getting user keys: %v", err)
-		return err
-	}
-	for _, key := range keys {
-		util.LogWrite("key: %s", key.Title)
-		if strings.Contains(key.Title, "tmpkey") {
-			// is logged
-			gincl.DeleteKey(key)
-		}
-	}
-	return err
-}
-
 // Login requests a token from the auth server and stores the username and token to file.
+// It also generates a key pair for the user for use in git commands.
 func (gincl *Client) Login(username, password, clientID string) error {
 	tokenCreate := &gogs.CreateAccessTokenOption{Name: "gin-cli"}
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
@@ -186,7 +177,47 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	gincl.Token = token.Sha1
 	util.LogWrite("Login successful. Username: %s, %v", username, token)
 
-	return gincl.StoreToken()
+	err = gincl.StoreToken()
+	if err != nil {
+		return fmt.Errorf("Error while storing token: %s", err.Error())
+	}
+
+	return gincl.MakeSessionKey()
+}
+
+// Logout logs out the currently logged in user in 3 steps:
+// 1. Remove the public key matching the current hostname from the server.
+// 2. Delete the private key file from the local machine.
+// 3. Delete the user token.
+func (gincl *Client) Logout() {
+	// 1. Delete public key
+	keys, err := gincl.GetUserKeys()
+	if err != nil {
+		util.LogWrite("Error when getting user keys: %v", err)
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		util.LogWrite("Could not retrieve hostname")
+		hostname = "(unknown)"
+	}
+
+	currentkeyname := fmt.Sprintf("%s@%s", gincl.Username, hostname)
+	for _, key := range keys {
+		util.LogWrite("key: %s", key.Title)
+		if key.Title == currentkeyname {
+			_ = gincl.DeletePubKey(key)
+		}
+	}
+
+	// 2. Delete private key
+	privKeyFile := util.PrivKeyPath(gincl.UserToken.Username)
+	os.Remove(privKeyFile)
+
+	err = web.DeleteToken()
+	if err != nil {
+		util.LogWrite("Error deleting token file")
+	}
 }
 
 // AccessToken represents a API access token.
