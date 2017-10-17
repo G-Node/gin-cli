@@ -486,13 +486,13 @@ func DescribeIndexShort() (string, error) {
 	}
 	var changesBuffer bytes.Buffer
 	if statusmap["A"] > 0 {
-		_, _ = changesBuffer.WriteString(fmt.Sprintf("New files: %d", statusmap["A"]))
+		_, _ = changesBuffer.WriteString(fmt.Sprintf("New files: %d\n", statusmap["A"]))
 	}
 	if statusmap["M"] > 0 {
-		_, _ = changesBuffer.WriteString(fmt.Sprintf("Modified files: %d", statusmap["M"]))
+		_, _ = changesBuffer.WriteString(fmt.Sprintf("Modified files: %d\n", statusmap["M"]))
 	}
 	if statusmap["D"] > 0 {
-		_, _ = changesBuffer.WriteString(fmt.Sprintf("Deleted files: %d", statusmap["D"]))
+		_, _ = changesBuffer.WriteString(fmt.Sprintf("Deleted files: %d\n", statusmap["D"]))
 	}
 	return changesBuffer.String(), nil
 }
