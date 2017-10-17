@@ -9,11 +9,10 @@ import (
 )
 
 type conf struct {
-	AuthHost string
-	RepoHost string
-	GitHost  string
-	GitUser  string
-	Bin      struct {
+	GinHost string
+	GitHost string
+	GitUser string
+	Bin     struct {
 		Git      string
 		GitAnnex string
 		SSH      string
@@ -36,10 +35,11 @@ func LoadConfig() error {
 	viper.SetDefault("bin.ssh", "ssh")
 
 	// Hosts
-	viper.SetDefault("auth.address", "https://web.gin.g-node.org")
-	viper.SetDefault("auth.port", "443")
-	viper.SetDefault("repo.address", "https://web.gin.g-node.org")
-	viper.SetDefault("repo.port", "443")
+	// Disabling default gin.address for now and handling it manually in order to present deprecation message
+	// viper.SetDefault("gin.address", "https://web.gin.g-node.org")
+	viper.SetDefault("gin.port", "443")
+	defaultHost := "https://web.gin.g-node.org"
+
 	viper.SetDefault("git.address", "gin.g-node.org")
 	viper.SetDefault("git.port", "22")
 	viper.SetDefault("git.user", "git")
@@ -76,13 +76,32 @@ func LoadConfig() error {
 	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
 	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
-	authAddress := viper.GetString("auth.address")
-	authPort := viper.GetInt("auth.port")
-	Config.AuthHost = fmt.Sprintf("%s:%d", authAddress, authPort)
+	// ginAddress := viper.GetString("gin.address")
+	// ginPort := viper.GetInt("gin.port")
 
-	repoAddress := viper.GetString("repo.address")
-	repoPort := viper.GetInt("repo.port")
-	Config.RepoHost = fmt.Sprintf("%s:%d", repoAddress, repoPort)
+	var oldConfigHost string
+	if viper.IsSet("auth.address") || viper.IsSet("auth.port") {
+		fmt.Fprintln(os.Stderr, "Auth server address configuration is no longer used. Use gin.address and gin.port instead.")
+		oldConfigHost = fmt.Sprintf("%s:%d", viper.GetString("auth.address"), viper.GetInt("auth.port"))
+	}
+
+	if viper.IsSet("repo.address") || viper.IsSet("repo.port") {
+		fmt.Fprintln(os.Stderr, "Repo server address configuration is no longer used. Use gin.address and gin.port instead.")
+		oldConfigHost = fmt.Sprintf("%s:%d", viper.GetString("repo.address"), viper.GetInt("repo.port"))
+	}
+
+	// If the gin host is set use it. If it's not but an old config value is set, use that.
+	// If neither is set, use the bulit-in default.
+	if viper.IsSet("gin.address") {
+		ginAddress := viper.GetString("gin.address")
+		ginPort := viper.GetInt("gin.port")
+		Config.GinHost = fmt.Sprintf("%s:%d", ginAddress, ginPort)
+	} else if oldConfigHost != "" {
+		Config.GinHost = oldConfigHost
+		fmt.Fprintf(os.Stderr, "Using deprecated configuration value: %s. This will change in a future release.\n", oldConfigHost)
+	} else {
+		Config.GinHost = fmt.Sprintf("%s:%d", defaultHost, viper.GetInt("gin.port"))
+	}
 
 	gitAddress := viper.GetString("git.address")
 	gitPort := viper.GetInt("git.port")

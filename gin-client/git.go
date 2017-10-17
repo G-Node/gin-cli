@@ -1,4 +1,4 @@
-package repo
+package ginclient
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/web"
 	"github.com/dustin/go-humanize"
 )
 
@@ -89,8 +90,8 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 // Clone downloads a repository and sets the remote fetch and push urls.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git clone ...)
-func (repocl *Client) Clone(repoPath string) error {
-	remotePath := fmt.Sprintf("ssh://%s@%s/%s", repocl.GitUser, repocl.GitHost, repoPath)
+func (gincl *Client) Clone(repoPath string) error {
+	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 	stdout, stderr, err := RunGitCommand("clone", remotePath)
 	if err != nil {
 		util.LogWrite("Error during clone command")
@@ -634,10 +635,10 @@ func RunGitCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if privKeyFile.Active {
-		env := os.Environ()
-		cmd.Env = append(env, privKeyFile.GitSSHEnv())
-	}
+	env := os.Environ()
+	token := web.UserToken{}
+	_ = token.LoadToken()
+	cmd.Env = append(env, util.GitSSHEnv(token.Username))
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Run()
 	return stdout, stderr, err
@@ -649,10 +650,9 @@ func RunAnnexCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
 	gitannexbin := util.Config.Bin.GitAnnex
 	cmd := exec.Command(gitannexbin, args...)
 	cmd.Dir = Workingdir
-	annexsshopt := "annex.ssh-options=-o StrictHostKeyChecking=no"
-	if privKeyFile.Active {
-		annexsshopt = fmt.Sprintf("%s -i %s", annexsshopt, privKeyFile.FullPath())
-	}
+	token := web.UserToken{}
+	_ = token.LoadToken()
+	annexsshopt := util.AnnexSSHOpt(token.Username)
 	cmd.Args = append(cmd.Args, "-c", annexsshopt)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

@@ -166,14 +166,14 @@ func (ut *UserToken) StoreToken() error {
 	return nil
 }
 
-// DeleteToken deletes the token file if it exists. It essentially logs out the user.
+// DeleteToken deletes the token file if it exists (for finalising a logout).
 func DeleteToken() error {
 	path, err := util.ConfigPath(false)
 	if err != nil {
 		return fmt.Errorf("Could not delete token: Error accessing config directory.")
 	}
-	filepath := filepath.Join(path, "token")
-	err = os.Remove(filepath)
+	tokenpath := filepath.Join(path, "token")
+	err = os.Remove(tokenpath)
 	if err != nil {
 		return err
 	}

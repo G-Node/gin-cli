@@ -1,15 +1,13 @@
-package auth
+package ginclient
 
 import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"os"
 
 	"net/http"
-	"path"
-
-	"strings"
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
@@ -26,25 +24,27 @@ type GINUser struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-// Client is a client interface to the auth server. Embeds web.Client.
+// Client is a client interface to the GIN server. Embeds web.Client.
 type Client struct {
 	*web.Client
+	GitHost string
+	GitUser string
 }
 
-// NewClient returns a new client for the auth server.
+// NewClient returns a new client for the GIN server.
 func NewClient(host string) *Client {
-	return &Client{web.NewClient(host)}
+	return &Client{Client: web.NewClient(host)}
 }
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
-func (authcl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
+func (gincl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
 	var keys []gogs.PublicKey
-	err := authcl.LoadToken()
+	err := gincl.LoadToken()
 	if err != nil {
 		return keys, fmt.Errorf("This command requires login")
 	}
 
-	res, err := authcl.Get("/api/v1/user/keys")
+	res, err := gincl.Get("/api/v1/user/keys")
 	if err != nil {
 		return keys, fmt.Errorf("Request for keys returned error")
 	} else if res.StatusCode != http.StatusOK {
@@ -62,9 +62,9 @@ func (authcl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
 }
 
 // RequestAccount requests a specific account by name.
-func (authcl *Client) RequestAccount(name string) (gogs.User, error) {
+func (gincl *Client) RequestAccount(name string) (gogs.User, error) {
 	var acc gogs.User
-	res, err := authcl.Get(fmt.Sprintf("/api/v1/users/%s", name))
+	res, err := gincl.Get(fmt.Sprintf("/api/v1/users/%s", name))
 	if err != nil {
 		return acc, err
 	} else if res.StatusCode == http.StatusNotFound {
@@ -84,13 +84,13 @@ func (authcl *Client) RequestAccount(name string) (gogs.User, error) {
 }
 
 // SearchAccount retrieves a list of accounts that match the query string.
-func (authcl *Client) SearchAccount(query string) ([]gin.Account, error) {
+func (gincl *Client) SearchAccount(query string) ([]gin.Account, error) {
 	var accs []gin.Account
 
 	params := url.Values{}
 	params.Add("q", query)
 	address := fmt.Sprintf("/api/accounts?%s", params.Encode())
-	res, err := authcl.Get(address)
+	res, err := gincl.Get(address)
 	if err != nil {
 		return accs, err
 	} else if res.StatusCode != http.StatusOK {
@@ -107,14 +107,21 @@ func (authcl *Client) SearchAccount(query string) ([]gin.Account, error) {
 }
 
 // AddKey adds the given key to the current user's authorised keys.
-func (authcl *Client) AddKey(key, description string, temp bool) error {
-	err := authcl.LoadToken()
+// If force is enabled, any key which matches the new key's description will be overwritten.
+func (gincl *Client) AddKey(key, description string, force bool) error {
+	err := gincl.LoadToken()
 	if err != nil {
 		return err
 	}
 	newkey := gogs.PublicKey{Key: key, Title: description}
+
+	if force {
+		// Attempting to delete potential existing key that matches the title
+		_ = gincl.DeletePubKey(description)
+	}
+
 	address := fmt.Sprintf("/api/v1/user/keys")
-	res, err := authcl.Post(address, newkey)
+	res, err := gincl.Post(address, newkey)
 	if err != nil {
 		return err
 	} else if res.StatusCode != http.StatusCreated {
@@ -124,44 +131,42 @@ func (authcl *Client) AddKey(key, description string, temp bool) error {
 	return nil
 }
 
-// DeleteKey removes the given key from the current user's authorised keys.
-func (authcl *Client) DeleteKey(key gogs.PublicKey) error {
-	err := authcl.LoadToken()
+// DeletePubKey removes the key that matches the given description (title) from the current user's authorised keys.
+func (gincl *Client) DeletePubKey(description string) error {
+	err := gincl.LoadToken()
 	if err != nil {
 		return err
 	}
-	address := fmt.Sprintf("/api/v1/user/keys/%d", key.ID)
-	res, err := authcl.Delete(address)
+
+	keys, err := gincl.GetUserKeys()
 	if err != nil {
-		return err
-	} else if res.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("[Add key] Failed. Server returned %s", res.Status)
+		util.LogWrite("Error when getting user keys: %v", err)
 	}
-	web.CloseRes(res.Body)
+
+	for _, key := range keys {
+		if key.Title == description {
+			address := fmt.Sprintf("/api/v1/user/keys/%d", key.ID)
+			res, err := gincl.Delete(address)
+			if err != nil {
+				return err
+			} else if res.StatusCode != http.StatusNoContent {
+				return fmt.Errorf("[Del key] Failed. Server returned %s", res.Status)
+			}
+			web.CloseRes(res.Body)
+			// IDs are unique, so we can break after the first match
+			break
+		}
+	}
+
 	return nil
 }
 
-func (authcl *Client) DeleteTmpKeys() error {
-	keys, err := authcl.GetUserKeys()
-	if err != nil {
-		util.LogWrite("Error when getting user keys: %v", err)
-		return err
-	}
-	for _, key := range keys {
-		util.LogWrite("key: %s", key.Title)
-		if strings.Contains(key.Title, "tmpkey") {
-			// is logged
-			authcl.DeleteKey(key)
-		}
-	}
-	return err
-}
-
 // Login requests a token from the auth server and stores the username and token to file.
-func (authcl *Client) Login(username, password, clientID string) error {
+// It also generates a key pair for the user for use in git commands.
+func (gincl *Client) Login(username, password, clientID string) error {
 	tokenCreate := &gogs.CreateAccessTokenOption{Name: "gin-cli"}
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
-	resp, err := authcl.PostBasicAuth(address, username, password, tokenCreate)
+	resp, err := gincl.PostBasicAuth(address, username, password, tokenCreate)
 	if err != nil {
 		if resp != nil {
 			return fmt.Errorf("[Login] Request failed: %s", resp.Status)
@@ -175,32 +180,56 @@ func (authcl *Client) Login(username, password, clientID string) error {
 	if err != nil {
 		return err
 	}
-	util.LogWrite("Got response: %s,%s", string(data), string(resp.StatusCode))
+	util.LogWrite("Got response: %s", resp.Status)
 	token := AccessToken{}
 	err = json.Unmarshal(data, &token)
 	if err != nil {
 		return err
 	}
-	authcl.Username = username
-	authcl.Token = token.Sha1
-	util.LogWrite("Login successful. Username: %s, %v", username, token)
+	gincl.Username = username
+	gincl.Token = token.Sha1
+	util.LogWrite("Login successful. Username: %s", username)
 
-	return authcl.StoreToken()
+	err = gincl.StoreToken()
+	if err != nil {
+		return fmt.Errorf("Error while storing token: %s", err.Error())
+	}
+
+	return gincl.MakeSessionKey()
+}
+
+// Logout logs out the currently logged in user in 3 steps:
+// 1. Remove the public key matching the current hostname from the server.
+// 2. Delete the private key file from the local machine.
+// 3. Delete the user token.
+func (gincl *Client) Logout() {
+	// 1. Delete public key
+	hostname, err := os.Hostname()
+	if err != nil {
+		util.LogWrite("Could not retrieve hostname")
+		hostname = "(unknown)"
+	}
+
+	currentkeyname := fmt.Sprintf("%s@%s", gincl.Username, hostname)
+	_ = gincl.DeletePubKey(currentkeyname)
+
+	// 2. Delete private key
+	privKeyFile := util.PrivKeyPath(gincl.UserToken.Username)
+	err = os.Remove(privKeyFile)
+	if err != nil {
+		util.LogWrite("Error deleting key file")
+	} else {
+		util.LogWrite("Private key file deleted")
+	}
+
+	err = web.DeleteToken()
+	if err != nil {
+		util.LogWrite("Error deleting token file")
+	}
 }
 
 // AccessToken represents a API access token.
 type AccessToken struct {
 	Name string `json:"name"`
 	Sha1 string `json:"sha1"`
-}
-
-func urlJoin(parts ...string) string {
-	// First part must be a valid URL
-	u, err := url.Parse(parts[0])
-	util.CheckErrorMsg(err, "Bad URL in urlJoin")
-
-	for _, part := range parts[1:] {
-		u.Path = path.Join(u.Path, part)
-	}
-	return u.String()
 }
