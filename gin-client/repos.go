@@ -279,6 +279,8 @@ const (
 	RemoteChanges
 	// Unlocked indicates that a file is being tracked and is unlocked for editing
 	Unlocked
+	// Removed indicates that a (previously) tracked file has been deleted or moved
+	Removed
 	// Untracked indicates that a file is not being tracked by neither git nor git annex
 	Untracked
 )
@@ -298,6 +300,8 @@ func (fs FileStatus) Description() string {
 		return "Remotely modified (not downloaded)"
 	case fs == Unlocked:
 		return "Unlocked for editing"
+	case fs == Removed:
+		return "Removed"
 	case fs == Untracked:
 		return "Untracked"
 	default:
@@ -306,7 +310,7 @@ func (fs FileStatus) Description() string {
 }
 
 // Abbrev returns the two-letter abbrevation of the file status
-// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), UL (Unlocked), ?? (Untracked)
+// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), UL (Unlocked), RM (Removed), ?? (Untracked)
 func (fs FileStatus) Abbrev() string {
 	switch {
 	case fs == Synced:
@@ -321,6 +325,8 @@ func (fs FileStatus) Abbrev() string {
 		return "RC"
 	case fs == Unlocked:
 		return "UL"
+	case fs == Removed:
+		return "RM"
 	case fs == Untracked:
 		return "??"
 	default:
@@ -377,6 +383,8 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 			statuses[stat.File] = Untracked
 		} else if stat.Status == "M" {
 			statuses[stat.File] = Modified
+		} else if stat.Status == "D" {
+			statuses[stat.File] = Removed
 		}
 	}
 
@@ -414,6 +422,9 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 
 	// Collect untracked files
 	untrackedfiles := gitlsfiles("--others")
+
+	// Collect deleted files
+	deletedfiles := gitlsfiles("--deleted")
 
 	// Run whereis on cached files
 	wiResults, err := AnnexWhereis(cachedfiles)
@@ -482,6 +493,11 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	// Add untracked files to the map
 	for _, fname := range untrackedfiles {
 		statuses[fname] = Untracked
+	}
+
+	// Add deleted files to the map
+	for _, fname := range deletedfiles {
+		statuses[fname] = Removed
 	}
 
 	return statuses, nil
