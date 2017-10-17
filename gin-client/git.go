@@ -320,6 +320,39 @@ func GitAdd(filepaths []string) ([]string, error) {
 	return added, nil
 }
 
+// GitLsFiles lists all files known to git.
+// In direct mode, the bare flag is temporarily switched off before running the command.
+// Arguments passed to this function are directly passed on to the 'ls-files' command.
+// (git ls-files)
+func GitLsFiles(args []string) ([]string, error) {
+	if IsDirect() {
+		// Set bare false and revert at the end of the function
+		err := setBare(false)
+		if err != nil {
+			return nil, fmt.Errorf("Error during ls-files. Unable to toggle repository bare mode.")
+		}
+		defer setBare(true)
+	}
+
+	cmdargs := append([]string{"ls-files"}, args...)
+	stdout, stderr, err := RunGitCommand(cmdargs...)
+	if err != nil {
+		util.LogWrite("Error during GitLsFiles")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return nil, fmt.Errorf("Error listing files in repository")
+	}
+
+	var filelist []string
+	for _, fl := range strings.Split(stdout.String(), "\n") {
+		fl = strings.TrimSpace(fl)
+		if fl != "" {
+			filelist = append(filelist, fl)
+		}
+	}
+	return filelist, nil
+}
+
 // AnnexAddResult is used to store information about each added file, as returned from the annex command.
 type AnnexAddResult struct {
 	Command string `json:"command"`

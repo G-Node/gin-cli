@@ -388,6 +388,15 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		}
 	}
 
+	// Unmodified files that are checked into git (not annex) do not show up
+	// Need to unset 'bare' and run git ls-files and add only files that haven't been added yet
+	filelist, _ := GitLsFiles(paths)
+	for _, fname := range filelist {
+		if _, ok := statuses[fname]; !ok {
+			statuses[fname] = Synced
+		}
+	}
+
 	return statuses, nil
 }
 
