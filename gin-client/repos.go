@@ -403,37 +403,21 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
-	gitlsfiles := func(option string) []string {
-		gitargs := []string{"ls-files", option}
-		gitargs = append(gitargs, paths...)
-		stdout, stderr, err := RunGitCommand(gitargs...)
-		if err != nil {
-			util.LogWrite("Error during git ls-files %s", option)
-			util.LogWrite("[stdout]\r\n%s", stdout.String())
-			util.LogWrite("[stderr]\r\n%s", stderr.String())
-			// ignoring error and continuing
-		}
-		var fnames []string
-		for _, fname := range strings.Split(stdout.String(), "\n") {
-			// filter out emtpty lines
-			if len(fname) > 0 {
-				fnames = append(fnames, fname)
-			}
-		}
-		return fnames
-	}
-
 	// Collect checked in files
-	cachedfiles := gitlsfiles("--cached")
+	lsfilesargs := append([]string{"--cached"}, paths...)
+	cachedfiles, _ := GitLsFiles(lsfilesargs)
 
 	// Collect modified files
-	modifiedfiles := gitlsfiles("--modified")
+	lsfilesargs = append([]string{"--modified"}, paths...)
+	modifiedfiles, _ := GitLsFiles(lsfilesargs)
 
 	// Collect untracked files
-	untrackedfiles := gitlsfiles("--others")
+	lsfilesargs = append([]string{"--others"}, paths...)
+	untrackedfiles, _ := GitLsFiles(lsfilesargs)
 
 	// Collect deleted files
-	deletedfiles := gitlsfiles("--deleted")
+	lsfilesargs = append([]string{"--deleted"}, paths...)
+	deletedfiles, _ := GitLsFiles(lsfilesargs)
 
 	// Run whereis on cached files
 	wiResults, err := AnnexWhereis(cachedfiles)
