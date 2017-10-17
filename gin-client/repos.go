@@ -10,10 +10,13 @@ import (
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
+	"github.com/fatih/color"
 	"github.com/gogits/go-gogs-client"
 	// its a bit unfortunate that we have that import now
 	// but its only temporary...
 )
+
+var green = color.New(color.FgGreen)
 
 // MakeSessionKey creates a private+public key pair.
 // The private key is saved in the user's configuration directory, to be used for git commands.
@@ -203,7 +206,9 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("done.\n")
+	green.Println("OK")
+
+	fmt.Printf("Initialising local storage... ")
 
 	err = gincl.LoadToken()
 	if err != nil {
@@ -253,6 +258,7 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 			return "", err
 		}
 	}
+	green.Println("OK")
 
 	return repoName, nil
 }
