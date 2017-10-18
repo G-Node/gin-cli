@@ -195,9 +195,23 @@ def debianize(binfiles, annexsa_archive):
     For each Linux binary make a deb package with git annex standalone
     """
     debs = []
-    for bf in binfiles:
-        # debian packaged with annex standalone
-        with TemporaryDirectory(suffix="gin-linux") as tmp_dir:
+    with TemporaryDirectory(suffix="gin-linux") as tmp_dir:
+        cmd = ["docker", "run", "-i", "-v",
+               "{}:/debbuild/".format(tmp_dir),
+               "--name", "gin-deb-build",
+               "-d", "gin-deb", "bash"]
+        print("Starting debian docker container")
+        ret = call(cmd)
+        if ret > 0:
+            print("Container start failed", file=sys.stderr)
+            return
+
+        cmd = ["docker", "ps"]
+        print("docker ps")
+        call(cmd)
+
+        for bf in binfiles:
+            # debian packaged with annex standalone
             # create directory structure
             # pkg gin-cli_version
             # /opt
@@ -246,34 +260,30 @@ def debianize(binfiles, annexsa_archive):
                 print("Docker build failed", file=sys.stderr)
                 continue
 
-            cmd = ["docker", "run", "-v", "{}:/debbuild/".format(tmp_dir),
-                   "gin-deb", "/bin/bash", "-c",
-                   ("chown root:root -R /debbuild &&"
-                    " chmod go+rX,go-w -R /debbuild")]
+            cmd = ["docker", "exec", "-t", "gin-deb-build",
+                   "chown", "root:root",  "-R", "/debbuild"]
+            print("Fixing ownership for build dir")
+            call(cmd)
+
+            cmd = ["docker", "exec", "-t", "gin-deb-build",
+                   "chmod", "go+rX,go-w", "-R", "/debbuild"]
             print("Fixing permissions for build dir")
             call(cmd)
 
-            cmd = ["docker", "run",
-                   "-v", "{}:/debbuild/".format(tmp_dir),
-                   "gin-deb", "dpkg-deb", "--build",
+            cmd = ["docker", "exec", "-t", "gin-deb-build",
+                   "dpkg-deb", "--build",
                    "/debbuild/{}".format(pkgname)]
-            # call(["tree", "-L", "5", tmp_dir])
             print("Building deb package")
             ret = call(cmd)
-            # cmd = ["docker", "run",
-            #        "-v", "{}:/debbuild/".format(tmp_dir),
-            #        "gin-deb", "dpkg", "--contents",
-            #        "/debbuild/{}.deb".format(pkgname)]
-            # ret = call(cmd)
             if ret > 0:
                 print("Deb build failed", file=sys.stderr)
                 continue
 
             # revert ownership to allow deletion of tmp dir
             uid = os.getuid()
-            cmd = ["docker", "run", "-v", "{}:/debbuild/".format(tmp_dir),
-                   "gin-deb", "/bin/bash", "-c",
-                   "chown {}:{} -R /debbuild".format(uid, uid)]
+            cmd = ["docker", "exec", "-t", "gin-deb-build",
+                   "chown", f"{uid}:{uid}", "-R", "/debbuild"]
+            print("Reverting ownership changes")
             ret = call(cmd)
             if ret > 0:
                 print("Error occured while reverting ownership to user",
@@ -287,6 +297,20 @@ def debianize(binfiles, annexsa_archive):
             shutil.copy(debfilepath, debfiledest)
             debs.append(debfiledest)
             print("DONE")
+        # revert ownership to allow deletion of tmp dir
+        uid = os.getuid()
+        cmd = ["docker", "exec", "-t", "gin-deb-build",
+               "chown", f"{uid}:{uid}", "-R", "/debbuild"]
+        print("Reverting ownership changes")
+        ret = call(cmd)
+        if ret > 0:
+            print("Error occured while reverting ownership to user",
+                  file=sys.stderr)
+        print("Stopping and cleaning up docker container")
+        cmd = ["docker", "kill", "gin-deb-build"]
+        call(cmd)
+        cmd = ["docker", "container", "rm", "gin-deb-build"]
+        call(cmd)
     return debs
 
 
