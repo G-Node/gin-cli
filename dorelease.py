@@ -234,6 +234,11 @@ def debianize(binfiles, annexsa_archive):
     """
     debs = []
     with TemporaryDirectory(suffix="gin-linux") as tmp_dir:
+        cmd = ["docker", "build",
+               "-t", "gin-deb", "debdock/."]
+        print("Preparing docker image for debian build")
+        call(cmd)
+
         cmd = ["docker", "run", "-i", "-v",
                "{}:/debbuild/".format(tmp_dir),
                "--name", "gin-deb-build",
@@ -289,14 +294,6 @@ def debianize(binfiles, annexsa_archive):
             shutil.copytree("debdock/DEBIAN",
                             os.path.join(build_dir, "DEBIAN"))
             shutil.copy("README.md", opt_gin_dir)
-
-            cmd = ["docker", "build",
-                   "-t", "gin-deb", "debdock/."]
-            print("Preparing docker image for debian build")
-            ret = call(cmd)
-            if ret > 0:
-                print("Docker build failed", file=sys.stderr)
-                continue
 
             cmd = ["docker", "exec", "-t", "gin-deb-build",
                    "chown", "root:root", "-R", "/debbuild"]
