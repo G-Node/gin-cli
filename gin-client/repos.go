@@ -232,8 +232,7 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 		if ierr != nil {
 			name = gincl.Username
 		}
-		// NOTE: Add user email too?
-		ierr = SetGitUser(name, "")
+		ierr = SetGitUser(name, info.Email)
 		if ierr != nil {
 			util.LogWrite("Failed to set local git user configuration")
 		}
