@@ -131,11 +131,10 @@ def build():
            "-osarch={}".format(" ".join(platforms)),
            "-ldflags={}".format(ldflags)]
     print("Running {}".format(" ".join(cmd)))
-    ret = call(cmd)
-    print()
-    if ret > 0:
+    if call(cmd) > 0:
         die("Build failed")
 
+    print()
     print("--> Build succeeded")
     print("--> The following files were built:")
     ginfiles = glob(os.path.join(DESTDIR, "*", "gin"))
@@ -220,8 +219,7 @@ def package_linux_plain(binfiles):
         arc = os.path.join(PKGDIR, arc)
         cmd = ["tar", "-czf", arc, "-C", dirname, fname, "README.md"]
         print("Running {}".format(" ".join(cmd)))
-        ret = call(cmd)
-        if ret > 0:
+        if call(cmd) > 0:
             print(f"Failed to make tarball for {binf}", file=sys.stderr)
             continue
         archives.append(arc)
@@ -233,19 +231,19 @@ def debianize(binfiles, annexsa_archive):
     For each Linux binary make a deb package with git annex standalone.
     """
     debs = []
-    with TemporaryDirectory(suffix="gin-linux") as tmp_dir:
+    with TemporaryDirectory(suffix="gin-linux") as tmpdir:
         cmd = ["docker", "build",
                "-t", "gin-deb", "debdock/."]
         print("Preparing docker image for debian build")
         call(cmd)
 
+        contdir = "/debbuild/"
         cmd = ["docker", "run", "-i", "-v",
-               "{}:/debbuild/".format(tmp_dir),
+               "{}:{}".format(tmpdir, contdir),
                "--name", "gin-deb-build",
                "-d", "gin-deb", "bash"]
         print("Starting debian docker container")
-        ret = call(cmd)
-        if ret > 0:
+        if call(cmd) > 0:
             print("Container start failed", file=sys.stderr)
             return
 
@@ -266,81 +264,84 @@ def debianize(binfiles, annexsa_archive):
 
             # TODO: Update Debian control file version automatically
 
-            pkgname = "gin-cli-{}".format(VERSION["version"])
-            build_dir = os.path.join(tmp_dir, pkgname)
-            opt_dir = os.path.join(build_dir, "opt")
+            # create directory structure
+            pkgname = "gin-cli"
+            pkgnamever = "{}-{}".format(pkgname, VERSION["version"])
+            debmdsrc = os.path.join("debdock", "debian")
+            pkgdir = os.path.join(tmpdir, pkgname)
+            debcapdir = os.path.join(pkgdir, "DEBIAN")
+            opt_dir = os.path.join(pkgdir, "opt")
             opt_gin_dir = os.path.join(opt_dir, "gin")
             opt_gin_bin_dir = os.path.join(opt_gin_dir, "bin")
-            os.makedirs(opt_gin_bin_dir)
-            usr_local_bin_dir = os.path.join(build_dir, "usr", "local", "bin")
-            os.makedirs(usr_local_bin_dir)
+            usr_local_bin_dir = os.path.join(pkgdir, "usr", "local", "bin")
+            docdir = os.path.join(pkgdir, "usr", "share", "doc", pkgname)
 
+            os.makedirs(debcapdir)
+            os.makedirs(opt_gin_bin_dir)
+            os.makedirs(usr_local_bin_dir)
+            os.makedirs(docdir)
+
+            # copy binaries and program files
             shutil.copy(binf, opt_gin_bin_dir)
+            print(f"Copied {binf} to {opt_gin_bin_dir}")
             shutil.copy("gin.sh", opt_gin_bin_dir)
+            print(f"Copied gin.sh to {opt_gin_bin_dir}")
 
             link_path = os.path.join(usr_local_bin_dir, "gin")
             os.symlink("/opt/gin/bin/gin.sh", link_path)
 
+            shutil.copy("README.md", opt_gin_dir)
+
+            # copy debian package metadata files
+            shutil.copy(os.path.join(debmdsrc, "control"), debcapdir)
+            shutil.copy("LICENSE", os.path.join(docdir, "copyright"))
+            shutil.copy(os.path.join(debmdsrc, "changelog"), docdir)
+            shutil.copy(os.path.join(debmdsrc, "changelog.Debian"), docdir)
+
+            # gzip changelog and changelog.Debian
+            cmd = ["gzip", "--best", os.path.join(docdir, "changelog"),
+                   os.path.join(docdir, "changelog.Debian")]
+            if call(cmd) > 0:
+                print(f"Failed to gzip files in {docdir}", file=sys.stderr)
+
             # extract annex standalone into pkg/opt/gin
             cmd = ["tar", "-xzf", annexsa_archive, "-C", opt_gin_dir]
             print("Running {}".format(" ".join(cmd)))
-            ret = call(cmd)
-            if ret > 0:
+            if call(cmd) > 0:
                 print("Failed to extract git annex standalone [{}]".format(
                     annexsa_archive, file=sys.stderr
                 ))
                 continue
 
-            shutil.copytree("debdock/DEBIAN",
-                            os.path.join(build_dir, "DEBIAN"))
-            shutil.copy("README.md", opt_gin_dir)
+            dockerexec = ["docker", "exec", "-t", "gin-deb-build"]
 
-            cmd = ["docker", "exec", "-t", "gin-deb-build",
-                   "chown", "root:root", "-R", "/debbuild"]
-            print("Fixing ownership for build dir")
-            call(cmd)
-
-            cmd = ["docker", "exec", "-t", "gin-deb-build",
-                   "chmod", "go+rX,go-w", "-R", "/debbuild"]
+            cmd = dockerexec + ["chmod", "go+rX,go-w", "-R", contdir]
             print("Fixing permissions for build dir")
             call(cmd)
 
-            cmd = ["docker", "exec", "-t", "gin-deb-build",
-                   "dpkg-deb", "--build",
-                   "/debbuild/{}".format(pkgname)]
+            cmd = dockerexec + ["fakeroot",
+                                "dpkg-deb", "--build",
+                                os.path.join(contdir, pkgname)]
             print("Building deb package")
-            ret = call(cmd)
-            if ret > 0:
+            if call(cmd) > 0:
                 print("Deb build failed", file=sys.stderr)
                 continue
 
-            # revert ownership to allow deletion of tmp dir
-            uid = os.getuid()
-            cmd = ["docker", "exec", "-t", "gin-deb-build",
-                   "chown", f"{uid}:{uid}", "-R", "/debbuild"]
-            print("Reverting ownership changes")
-            ret = call(cmd)
-            if ret > 0:
-                print("Error occured while reverting ownership to user",
-                      file=sys.stderr)
+            debfilename = f"{pkgname}.deb"
+            cmd = dockerexec + ["lintian",
+                                os.path.join(contdir, debfilename)]
+            print("Running lintian on new deb file")
+            if call(cmd) > 0:
+                print("Deb file check exited with errors")
+                print("Ignoring since this is not a *proper* deb package")
 
-            debfilename = "{}.deb".format(pkgname)
-            debfilepath = os.path.join(tmp_dir, debfilename)
-            debfiledest = os.path.join(PKGDIR, debfilename)
+            debfilepath = os.path.join(tmpdir, debfilename)
+            debfiledest = os.path.join(PKGDIR, f"{pkgnamever}.deb")
             if os.path.exists(debfiledest):
                 os.remove(debfiledest)
             shutil.copy(debfilepath, debfiledest)
             debs.append(debfiledest)
             print("DONE")
-        # revert ownership to allow deletion of tmp dir
-        uid = os.getuid()
-        cmd = ["docker", "exec", "-t", "gin-deb-build",
-               "chown", f"{uid}:{uid}", "-R", "/debbuild"]
-        print("Reverting ownership changes")
-        ret = call(cmd)
-        if ret > 0:
-            print("Error occured while reverting ownership to user",
-                  file=sys.stderr)
         print("Stopping and cleaning up docker container")
         cmd = ["docker", "kill", "gin-deb-build"]
         call(cmd)
@@ -371,8 +372,7 @@ def package_mac_plain(binfiles):
         arc = os.path.join(PKGDIR, arc)
         cmd = ["tar", "-czf", arc, "-C", dirname, fname, "README.md"]
         print("Running {}".format(" ".join(cmd)))
-        ret = call(cmd)
-        if ret > 0:
+        if call(cmd) > 0:
             print(f"Failed to make tarball for {binf}", file=sys.stderr)
             continue
         archives.append(arc)
@@ -385,8 +385,8 @@ def winbundle(binfiles, git_pkg, annex_pkg):
     """
     winarchives = []
     for binf in binfiles:
-        with TemporaryDirectory(suffix="gin-windows") as tmp_dir:
-            pkgroot = os.path.join(tmp_dir, "gin")
+        with TemporaryDirectory(suffix="gin-windows") as tmpdir:
+            pkgroot = os.path.join(tmpdir, "gin")
             bindir = os.path.join(pkgroot, "bin")
             os.makedirs(bindir)
 
@@ -400,16 +400,14 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             # extract git portable and annex into git dir
             cmd = ["7z", "x", "-o{}".format(gitdir), git_pkg]
             print("Running {}".format(" ".join(cmd)))
-            ret = call(cmd, stdout=DEVNULL)
-            if ret > 0:
+            if call(cmd, stdout=DEVNULL) > 0:
                 print("Failed to extract git archive [{}]".format(git_pkg),
                       file=sys.stderr)
                 continue
 
             cmd = ["7z", "x", "-o{}".format(gitdir), annex_pkg]
             print("Running {}".format(" ".join(cmd)))
-            ret = call(cmd, stdout=DEVNULL)
-            if ret > 0:
+            if call(cmd, stdout=DEVNULL) > 0:
                 print("Failed to extract git archive [{}]".format(annex_pkg),
                       file=sys.stderr)
                 continue
@@ -427,12 +425,12 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             os.chdir(pkgroot)
             cmd = ["zip", "-r", arc_abs, "."]
             print("Running {} (from {})".format(" ".join(cmd), pkgroot))
-            ret = call(cmd, stdout=DEVNULL)
-            os.chdir(oldwd)
-            if ret > 0:
+            if call(cmd, stdout=DEVNULL) > 0:
                 print("Failed to create archive [{}]".format(arc),
                       file=sys.stderr)
+                os.chdir(oldwd)
                 continue
+            os.chdir(oldwd)
             winarchives.append(arc)
             print("DONE")
     return winarchives
@@ -460,7 +458,6 @@ def main():
 
     linux_pkgs = package_linux_plain(linux_bins)
     deb_pkgs = debianize(linux_bins, annexsa_file)
-    return
 
     rpm_pkgs = rpmify(linux_bins, annexsa_file)
 
