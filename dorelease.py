@@ -162,9 +162,18 @@ def download_annex_sa():
 def get_git_for_windows():
     """
     Download the (portable) git for windows package.
+    Relies on github API to find latest release.
     """
-    win_git_url = ("https://github.com/git-for-windows/git/releases/download/"
-                   "v2.13.3.windows.1/PortableGit-2.13.3-32-bit.7z.exe")
+    url = "https://api.github.com/repos/git-for-windows/git/releases/latest"
+    req = requests.get(url)
+    releases = json.loads(req.text)
+    assets = releases["assets"]
+    for asset in assets:
+        if "PortableGit" in asset["name"]:
+            win_git_url = asset["browser_download_url"]
+            break
+    else:
+        die("Could not find PortableGit download")
     return download(win_git_url)
 
 
