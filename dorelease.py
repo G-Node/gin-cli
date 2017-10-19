@@ -125,7 +125,6 @@ def build():
     ldflags = ("-X main.version={version} "
                "-X main.build={build:06d} "
                "-X main.commit={commit}").format(**VERSION)
-    # cmd = ["go", "build", "-ldflags", ldflags, "-o", "gin"]
     output = os.path.join(DESTDIR, "{{.OS}}-{{.Arch}}", "gin")
     cmd = ["gox", "-output={}".format(output),
            "-osarch={}".format(" ".join(platforms)),
@@ -158,33 +157,6 @@ def download_annex_sa():
     annex_sa_url = ("https://downloads.kitenet.net/git-annex/linux/current/"
                     "git-annex-standalone-amd64.tar.gz")
     return download(annex_sa_url)
-
-
-def get_appveyor_artifact_url():
-    """
-    Query Appveyor for the latest job artifacts. Return the URL for the
-    latest 32bit binary only.
-    """
-    apiurl = "https://ci.appveyor.com/api/"
-    account = "achilleas-k"
-    project_name = "gin-cli"
-
-    url = os.path.join(apiurl, "projects", account, project_name)
-    req = requests.get(url)
-
-    projects = json.loads(req.text)
-    buildinfo = projects["build"]
-    for job in buildinfo["jobs"]:
-        if job["status"] == "success":
-            artifacts_url = os.path.join(apiurl, "buildjobs", job["jobId"],
-                                         "artifacts")
-            req = requests.get(artifacts_url)
-            artifacts = json.loads(req.text)
-            if "ARCH=32" in job["name"]:
-                artfct = artifacts[0]
-                arturl = os.path.join(apiurl, "buildjobs", job["jobId"],
-                                      "artifacts", artfct["fileName"])
-                return arturl
 
 
 def get_git_for_windows():
