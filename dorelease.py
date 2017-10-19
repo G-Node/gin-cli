@@ -331,9 +331,9 @@ def debianize(binfiles, annexsa_archive):
             cmd = dockerexec + ["lintian",
                                 os.path.join(contdir, debfilename)]
             print("Running lintian on new deb file")
-            if call(cmd) > 0:
+            if call(cmd, stdout=open(os.devnull, "wb")) > 0:
                 print("Deb file check exited with errors")
-                print("Ignoring since this is not a *proper* deb package")
+                print("Ignoring for now")
 
             debfilepath = os.path.join(tmpdir, debfilename)
             debfiledest = os.path.join(PKGDIR, f"{pkgnamever}.deb")
@@ -341,7 +341,7 @@ def debianize(binfiles, annexsa_archive):
                 os.remove(debfiledest)
             shutil.copy(debfilepath, debfiledest)
             debs.append(debfiledest)
-            print("DONE")
+            print("Done")
         print("Stopping and cleaning up docker container")
         cmd = ["docker", "kill", "gin-deb-build"]
         call(cmd)
