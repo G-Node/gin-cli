@@ -14,6 +14,7 @@ import (
 	ginclient "github.com/G-Node/gin-cli/gin-client"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/docopt/docopt-go"
+	"github.com/fatih/color"
 	"github.com/howeyc/gopass"
 )
 
@@ -21,6 +22,8 @@ var version string
 var build string
 var commit string
 var verstr string
+
+var green = color.New(color.FgGreen)
 
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
@@ -102,11 +105,11 @@ func createRepo(args []string) {
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
-	fmt.Printf("Creating repository '%s'...", repoPath)
+	fmt.Printf("Creating repository '%s'... ", repoPath)
 	err = gincl.CreateRepo(repoName, repoDesc)
 	// Parse error message and make error nicer
 	util.CheckError(err)
-	fmt.Println(" done.")
+	green.Println("OK")
 
 	// Clone repository after creation
 	getRepo([]string{repoPath})
@@ -258,11 +261,11 @@ func upload(args []string) {
 		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
 	}
 
-	fmt.Print("Uploading...")
+	fmt.Print("Uploading... ")
 
 	err = gincl.Upload(args)
 	util.CheckError(err)
-	fmt.Println("done!")
+	green.Println("OK")
 }
 
 func download(args []string) {
@@ -285,7 +288,7 @@ func download(args []string) {
 	gincl.GitUser = util.Config.GitUser
 	fmt.Print("Downloading...")
 	err = gincl.DownloadRepo(content)
-	fmt.Println("done!")
+	green.Println("OK")
 	util.CheckError(err)
 }
 

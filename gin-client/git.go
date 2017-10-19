@@ -251,13 +251,49 @@ func AnnexDrop(filepaths []string) error {
 	return nil
 }
 
+func setBare(state bool) error {
+	var statestr string
+	if state {
+		statestr = "true"
+	} else {
+		statestr = "false"
+	}
+	stdout, stderr, err := RunGitCommand("config", "--local", "--bool", "core.bare", statestr)
+	if err != nil {
+		util.LogWrite("Error switching bare status to %s", statestr)
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+	}
+	return err
+}
+
 // GitAdd adds paths to git directly (not annex).
+// In direct mode, files that are already in the annex are explicitly ignored.
+// In indirect mode, adding annexed files to git has no effect.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git add)
 func GitAdd(filepaths []string) ([]string, error) {
 	if len(filepaths) == 0 {
 		util.LogWrite("No paths to add to git. Nothing to do.")
 		return nil, nil
+	}
+
+	if IsDirect() {
+		// Set bare false and revert at the end of the function
+		err := setBare(false)
+		if err != nil {
+			return nil, fmt.Errorf("Error adding files to repository. Unable to toggle repository bare mode.")
+		}
+		defer setBare(true)
+		whereisInfo, err := AnnexWhereis(filepaths)
+		if err != nil {
+			return nil, fmt.Errorf("Error querying file annex status.")
+		}
+		annexfiles := make([]string, len(whereisInfo))
+		for idx, wi := range whereisInfo {
+			annexfiles[idx] = wi.File
+		}
+		filepaths = util.FilterPaths(filepaths, annexfiles)
 	}
 
 	cmdargs := append([]string{"add", "--verbose"}, filepaths...)
@@ -269,9 +305,52 @@ func GitAdd(filepaths []string) ([]string, error) {
 		return nil, fmt.Errorf("Error adding files to repository")
 	}
 
-	added := strings.Split(stdout.String(), "\n")
+	var added []string
+	for _, line := range strings.Split(stdout.String(), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		line = strings.TrimPrefix(line, "add '")
+		line = strings.TrimSuffix(line, "'")
+		added = append(added, line)
+	}
+
 	util.LogWrite("Files added to git: %v", added)
 	return added, nil
+}
+
+// GitLsFiles lists all files known to git.
+// In direct mode, the bare flag is temporarily switched off before running the command.
+// Arguments passed to this function are directly passed on to the 'ls-files' command.
+// (git ls-files)
+func GitLsFiles(args []string) ([]string, error) {
+	if IsDirect() {
+		// Set bare false and revert at the end of the function
+		err := setBare(false)
+		if err != nil {
+			return nil, fmt.Errorf("Error during ls-files. Unable to toggle repository bare mode.")
+		}
+		defer setBare(true)
+	}
+
+	cmdargs := append([]string{"ls-files"}, args...)
+	stdout, stderr, err := RunGitCommand(cmdargs...)
+	if err != nil {
+		util.LogWrite("Error during GitLsFiles")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		return nil, fmt.Errorf("Error listing files in repository")
+	}
+
+	var filelist []string
+	for _, fl := range strings.Split(stdout.String(), "\n") {
+		fl = strings.TrimSpace(fl)
+		if fl != "" {
+			filelist = append(filelist, fl)
+		}
+	}
+	return filelist, nil
 }
 
 // AnnexAddResult is used to store information about each added file, as returned from the annex command.
@@ -440,13 +519,13 @@ func DescribeIndexShort() (string, error) {
 	}
 	var changesBuffer bytes.Buffer
 	if statusmap["A"] > 0 {
-		_, _ = changesBuffer.WriteString(fmt.Sprintf("New files: %d", statusmap["A"]))
+		_, _ = changesBuffer.WriteString(fmt.Sprintf("New files: %d\n", statusmap["A"]))
 	}
 	if statusmap["M"] > 0 {
-		_, _ = changesBuffer.WriteString(fmt.Sprintf("Modified files: %d", statusmap["M"]))
+		_, _ = changesBuffer.WriteString(fmt.Sprintf("Modified files: %d\n", statusmap["M"]))
 	}
 	if statusmap["D"] > 0 {
-		_, _ = changesBuffer.WriteString(fmt.Sprintf("Deleted files: %d", statusmap["D"]))
+		_, _ = changesBuffer.WriteString(fmt.Sprintf("Deleted files: %d\n", statusmap["D"]))
 	}
 	return changesBuffer.String(), nil
 }

@@ -4,10 +4,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/fatih/color"
 )
+
+var red = color.New(color.FgRed)
 
 //Die prints a message to stderr and exits the program.
 func Die(msg string) {
+	red.Fprintln(os.Stderr, "ERROR")
 	fmt.Fprintln(os.Stderr, msg)
 	os.Exit(1)
 }

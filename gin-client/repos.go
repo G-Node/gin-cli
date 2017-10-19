@@ -10,10 +10,13 @@ import (
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
+	"github.com/fatih/color"
 	"github.com/gogits/go-gogs-client"
 	// its a bit unfortunate that we have that import now
 	// but its only temporary...
 )
+
+var green = color.New(color.FgGreen)
 
 // MakeSessionKey creates a private+public key pair.
 // The private key is saved in the user's configuration directory, to be used for git commands.
@@ -203,7 +206,9 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("done.\n")
+	green.Println("OK")
+
+	fmt.Printf("Initialising local storage... ")
 
 	err = gincl.LoadToken()
 	if err != nil {
@@ -227,8 +232,7 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 		if ierr != nil {
 			name = gincl.Username
 		}
-		// NOTE: Add user email too?
-		ierr = SetGitUser(name, "")
+		ierr = SetGitUser(name, info.Email)
 		if ierr != nil {
 			util.LogWrite("Failed to set local git user configuration")
 		}
@@ -253,6 +257,7 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 			return "", err
 		}
 	}
+	green.Println("OK")
 
 	return repoName, nil
 }
@@ -273,6 +278,8 @@ const (
 	RemoteChanges
 	// Unlocked indicates that a file is being tracked and is unlocked for editing
 	Unlocked
+	// Removed indicates that a (previously) tracked file has been deleted or moved
+	Removed
 	// Untracked indicates that a file is not being tracked by neither git nor git annex
 	Untracked
 )
@@ -292,6 +299,8 @@ func (fs FileStatus) Description() string {
 		return "Remotely modified (not downloaded)"
 	case fs == Unlocked:
 		return "Unlocked for editing"
+	case fs == Removed:
+		return "Removed"
 	case fs == Untracked:
 		return "Untracked"
 	default:
@@ -300,7 +309,7 @@ func (fs FileStatus) Description() string {
 }
 
 // Abbrev returns the two-letter abbrevation of the file status
-// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), UL (Unlocked), ?? (Untracked)
+// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), UL (Unlocked), RM (Removed), ?? (Untracked)
 func (fs FileStatus) Abbrev() string {
 	switch {
 	case fs == Synced:
@@ -315,6 +324,8 @@ func (fs FileStatus) Abbrev() string {
 		return "RC"
 	case fs == Unlocked:
 		return "UL"
+	case fs == Removed:
+		return "RM"
 	case fs == Untracked:
 		return "??"
 	default:
@@ -371,6 +382,17 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 			statuses[stat.File] = Untracked
 		} else if stat.Status == "M" {
 			statuses[stat.File] = Modified
+		} else if stat.Status == "D" {
+			statuses[stat.File] = Removed
+		}
+	}
+
+	// Unmodified files that are checked into git (not annex) do not show up
+	// Need to unset 'bare' and run git ls-files and add only files that haven't been added yet
+	filelist, _ := GitLsFiles(paths)
+	for _, fname := range filelist {
+		if _, ok := statuses[fname]; !ok {
+			statuses[fname] = Synced
 		}
 	}
 
@@ -380,34 +402,21 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
-	gitlsfiles := func(option string) []string {
-		gitargs := []string{"ls-files", option}
-		gitargs = append(gitargs, paths...)
-		stdout, stderr, err := RunGitCommand(gitargs...)
-		if err != nil {
-			util.LogWrite("Error during git ls-files %s", option)
-			util.LogWrite("[stdout]\r\n%s", stdout.String())
-			util.LogWrite("[stderr]\r\n%s", stderr.String())
-			// ignoring error and continuing
-		}
-		var fnames []string
-		for _, fname := range strings.Split(stdout.String(), "\n") {
-			// filter out emtpty lines
-			if len(fname) > 0 {
-				fnames = append(fnames, fname)
-			}
-		}
-		return fnames
-	}
-
 	// Collect checked in files
-	cachedfiles := gitlsfiles("--cached")
+	lsfilesargs := append([]string{"--cached"}, paths...)
+	cachedfiles, _ := GitLsFiles(lsfilesargs)
 
 	// Collect modified files
-	modifiedfiles := gitlsfiles("--modified")
+	lsfilesargs = append([]string{"--modified"}, paths...)
+	modifiedfiles, _ := GitLsFiles(lsfilesargs)
 
 	// Collect untracked files
-	untrackedfiles := gitlsfiles("--others")
+	lsfilesargs = append([]string{"--others"}, paths...)
+	untrackedfiles, _ := GitLsFiles(lsfilesargs)
+
+	// Collect deleted files
+	lsfilesargs = append([]string{"--deleted"}, paths...)
+	deletedfiles, _ := GitLsFiles(lsfilesargs)
 
 	// Run whereis on cached files
 	wiResults, err := AnnexWhereis(cachedfiles)
@@ -476,6 +485,11 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	// Add untracked files to the map
 	for _, fname := range untrackedfiles {
 		statuses[fname] = Untracked
+	}
+
+	// Add deleted files to the map
+	for _, fname := range deletedfiles {
+		statuses[fname] = Removed
 	}
 
 	return statuses, nil
