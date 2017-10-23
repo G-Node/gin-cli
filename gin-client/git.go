@@ -784,3 +784,18 @@ func selectGitOrAnnex(paths []string) (gitpaths []string, annexpaths []string) {
 
 	return
 }
+
+// GetAnnexVersion returns the version string of the system's git-annex.
+func GetAnnexVersion() (string, error) {
+	stdout, stderr, err := RunAnnexCommand("version", "--raw")
+	if err != nil {
+		util.LogWrite("Error while checking git-annex version")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		if strings.Contains(stderr.String(), "command not found") {
+			return "", fmt.Errorf("Error: git-annex command not found")
+		}
+		return "", err
+	}
+	return stdout.String(), nil
+}
