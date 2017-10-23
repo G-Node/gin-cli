@@ -485,13 +485,14 @@ func help(args []string) {
 }
 
 func checkAnnexVersion(verstring string) {
+	errmsg := fmt.Sprintf("The GIN Client requires git-annex %s or newer", minAnnexVersion)
 	systemver, err := version.NewVersion(verstring)
 	if err != nil {
-		util.Die("Error while checking git-annex version. Is git-annex installed?")
+		util.Die(errmsg)
 	}
 	minver, _ := version.NewVersion(minAnnexVersion)
 	if systemver.LessThan(minver) {
-		util.Die(fmt.Sprintf("The GIN Client requires git-annex %s or newer", minver))
+		util.Die(errmsg)
 	}
 }
 
