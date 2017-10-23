@@ -96,7 +96,7 @@ func (gincl *Client) CreateRepo(name, description string) error {
 		return fmt.Errorf("[Create repository] This action requires login")
 	}
 
-	newrepo := gogs.Repository{Name: name, Description: description}
+	newrepo := gogs.Repository{Name: name, Description: description, Private: true}
 	util.LogWrite("Name: %s :: Description: %s", name, description)
 	res, err := gincl.Post("/api/v1/user/repos", newrepo)
 	if err != nil {
