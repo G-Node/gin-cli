@@ -61,8 +61,7 @@ def download(url, fname=None):
     try:
         req = requests.get(url, stream=True)
     except ConnError:
-        print("Error while trying to download {}".format(url),
-              file=sys.stderr)
+        print("Error while trying to download {}".format(url), file=sys.stderr)
         print("Skipping.", file=sys.stderr)
         return
     size = int(req.headers.get("content-length"))
@@ -79,7 +78,7 @@ def download(url, fname=None):
         for chunk in req.iter_content(chunk_size=256):
             dlfile.write(chunk)
             prog += len(chunk)
-            print("\r{:2.1f}%".format(prog/size*100), end="", flush=True)
+            print("\r{:2.1f}%".format(prog / size * 100), end="", flush=True)
         print("\nDone!")
     print()
     return fname
@@ -127,9 +126,10 @@ def build():
                "-X main.build={build:06d} "
                "-X main.commit={commit}").format(**VERSION)
     output = os.path.join(DESTDIR, "{{.OS}}-{{.Arch}}", "gin")
-    cmd = ["gox", "-output={}".format(output),
-           "-osarch={}".format(" ".join(platforms)),
-           "-ldflags={}".format(ldflags)]
+    cmd = [
+        "gox", "-output={}".format(output), "-osarch={}".format(
+            " ".join(platforms)), "-ldflags={}".format(ldflags)
+    ]
     print("Running {}".format(" ".join(cmd)))
     if call(cmd) > 0:
         die("Build failed")
@@ -214,16 +214,15 @@ def debianize(binfiles, annexsa_archive):
     """
     debs = []
     with TemporaryDirectory(suffix="gin-linux") as tmpdir:
-        cmd = ["docker", "build",
-               "-t", "gin-deb", "debdock/."]
+        cmd = ["docker", "build", "-t", "gin-deb", "debdock/."]
         print("Preparing docker image for debian build")
         call(cmd)
 
         contdir = "/debbuild/"
-        cmd = ["docker", "run", "-i", "-v",
-               "{}:{}".format(tmpdir, contdir),
-               "--name", "gin-deb-build",
-               "-d", "gin-deb", "bash"]
+        cmd = [
+            "docker", "run", "-i", "-v", "{}:{}".format(tmpdir, contdir),
+            "--name", "gin-deb-build", "-d", "gin-deb", "bash"
+        ]
         print("Starting debian docker container")
         if call(cmd) > 0:
             print("Container start failed", file=sys.stderr)
@@ -281,8 +280,11 @@ def debianize(binfiles, annexsa_archive):
             shutil.copy(os.path.join(debmdsrc, "changelog.Debian"), docdir)
 
             # gzip changelog and changelog.Debian
-            cmd = ["gzip", "--best", os.path.join(docdir, "changelog"),
-                   os.path.join(docdir, "changelog.Debian")]
+            cmd = [
+                "gzip", "--best",
+                os.path.join(docdir, "changelog"),
+                os.path.join(docdir, "changelog.Debian")
+            ]
             if call(cmd) > 0:
                 print(f"Failed to gzip files in {docdir}", file=sys.stderr)
 
@@ -291,8 +293,7 @@ def debianize(binfiles, annexsa_archive):
             print("Running {}".format(" ".join(cmd)))
             if call(cmd) > 0:
                 print("Failed to extract git annex standalone [{}]".format(
-                    annexsa_archive, file=sys.stderr
-                ))
+                    annexsa_archive, file=sys.stderr))
                 continue
 
             dockerexec = ["docker", "exec", "-t", "gin-deb-build"]
@@ -301,17 +302,17 @@ def debianize(binfiles, annexsa_archive):
             print("Fixing permissions for build dir")
             call(cmd)
 
-            cmd = dockerexec + ["fakeroot",
-                                "dpkg-deb", "--build",
-                                os.path.join(contdir, pkgname)]
+            cmd = dockerexec + [
+                "fakeroot", "dpkg-deb", "--build",
+                os.path.join(contdir, pkgname)
+            ]
             print("Building deb package")
             if call(cmd) > 0:
                 print("Deb build failed", file=sys.stderr)
                 continue
 
             debfilename = f"{pkgname}.deb"
-            cmd = dockerexec + ["lintian",
-                                os.path.join(contdir, debfilename)]
+            cmd = dockerexec + ["lintian", os.path.join(contdir, debfilename)]
             print("Running lintian on new deb file")
             if call(cmd, stdout=open(os.devnull, "wb")) > 0:
                 print("Deb file check exited with errors")
@@ -383,15 +384,17 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             cmd = ["7z", "x", "-o{}".format(gitdir), git_pkg]
             print("Running {}".format(" ".join(cmd)))
             if call(cmd, stdout=DEVNULL) > 0:
-                print("Failed to extract git archive [{}]".format(git_pkg),
-                      file=sys.stderr)
+                print(
+                    "Failed to extract git archive [{}]".format(git_pkg),
+                    file=sys.stderr)
                 continue
 
             cmd = ["7z", "x", "-o{}".format(gitdir), annex_pkg]
             print("Running {}".format(" ".join(cmd)))
             if call(cmd, stdout=DEVNULL) > 0:
-                print("Failed to extract git archive [{}]".format(annex_pkg),
-                      file=sys.stderr)
+                print(
+                    "Failed to extract git archive [{}]".format(annex_pkg),
+                    file=sys.stderr)
                 continue
             dirname, _ = os.path.split(binf)
             _, osarch = os.path.split(dirname)
@@ -408,8 +411,9 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             cmd = ["zip", "-r", arc_abs, "."]
             print("Running {} (from {})".format(" ".join(cmd), pkgroot))
             if call(cmd, stdout=DEVNULL) > 0:
-                print("Failed to create archive [{}]".format(arc),
-                      file=sys.stderr)
+                print(
+                    "Failed to create archive [{}]".format(arc),
+                    file=sys.stderr)
                 os.chdir(oldwd)
                 continue
             os.chdir(oldwd)
