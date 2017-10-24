@@ -34,6 +34,7 @@ install:
   - go get github.com/gogits/go-gogs-client
   - go get github.com/dustin/go-humanize
   - go get github.com/fatih/color
+  - go get github.com/hashicorp/go-version
   # import path symlink for forks
   - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -vs $(pwd) ${GOPATH}/src/github.com/G-Node/gin-cli; fi
 

@@ -15,13 +15,15 @@ import (
 	"github.com/G-Node/gin-cli/util"
 	"github.com/docopt/docopt-go"
 	"github.com/fatih/color"
+	version "github.com/hashicorp/go-version"
 	"github.com/howeyc/gopass"
 )
 
-var version string
+var gincliversion string
 var build string
 var commit string
 var verstr string
+var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 
 var green = color.New(color.FgGreen)
 
@@ -482,11 +484,23 @@ func help(args []string) {
 	fmt.Println(helptext)
 }
 
+func checkAnnexVersion(verstring string) {
+	errmsg := fmt.Sprintf("The GIN Client requires git-annex %s or newer", minAnnexVersion)
+	systemver, err := version.NewVersion(verstring)
+	if err != nil {
+		util.Die(errmsg)
+	}
+	minver, _ := version.NewVersion(minAnnexVersion)
+	if systemver.LessThan(minver) {
+		util.Die(errmsg)
+	}
+}
+
 func init() {
-	if version == "" {
+	if gincliversion == "" {
 		verstr = "GIN command line client [dev build]"
 	} else {
-		verstr = fmt.Sprintf("GIN command line client %s Build %s (%s)", version, build, commit)
+		verstr = fmt.Sprintf("GIN command line client %s Build %s (%s)", gincliversion, build, commit)
 	}
 }
 
@@ -503,6 +517,10 @@ func main() {
 
 	err = util.LoadConfig()
 	util.CheckError(err)
+
+	annexver, err := ginclient.GetAnnexVersion()
+	util.CheckError(err)
+	checkAnnexVersion(annexver)
 
 	switch command {
 	case "login":

@@ -39,6 +39,7 @@ build_script:
   - go get github.com/gogits/go-gogs-client
   - go get github.com/dustin/go-humanize
   - go get github.com/fatih/color
+  - go get github.com/hashicorp/go-version
   - go vet ./...
   - gofmt -s -l .
   - golint github.com/G-Node/gin-cli...
