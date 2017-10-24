@@ -1,0 +1,8 @@
+gin-cli (0.9) beta; urgency=low
+
+  * Release 0.9
+  * Automatically add files to git and git annex based on size.
+  * Configurable extension filter for selecting git or annex.
+  * Create SSH key on login and delete on logout.
+
+ -- Achilleas Koutsou <achilleas.k@gmail.com>  Tue, 19 Oct 2017 17:00:00 +0200

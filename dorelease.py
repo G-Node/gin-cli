@@ -1,4 +1,13 @@
-# -*- coding: utf-8 -*-
+# Copyright (c) 2017, German Neuroinformatics Node (G-Node)
+#
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted under the terms of the BSD License. See
+# LICENSE file in the root of the Project.
+"""
+Build gin-cli binaries and package them for distribution.
+"""
 import pickle
 import sys
 import os
@@ -7,58 +16,68 @@ import json
 import re
 from glob import glob
 from subprocess import check_output, call, DEVNULL
-import requests
-from requests.exceptions import ConnectionError
 from tempfile import TemporaryDirectory
+import requests
+from requests.exceptions import ConnectionError as ConnError
 
-destdir = "dist"
-pkgdir = os.path.join(destdir, "pkg")
+DESTDIR = "dist"
+PKGDIR = os.path.join(DESTDIR, "pkg")
 
-etagfile = os.path.join(destdir, "etags")
-etags = {}
+ETAGFILE = os.path.join(DESTDIR, "etags")
+ETAGS = {}  # type: dict
 
-version = {}
+VERSION = {}
 
 
 def load_etags():
+    """
+    Read in etags file and populates dictionary.
+    """
     try:
-        with open(etagfile, "rb") as fd:
-            etags.update(pickle.load(fd))
+        with open(ETAGFILE, "rb") as etagfile:
+            ETAGS.update(pickle.load(etagfile))
     except FileNotFoundError:
         # print("--> No etags file found. Skipping load.")
         pass
 
 
 def save_etags():
-    with open(etagfile, "wb") as fd:
-        pickle.dump(etags, fd)
+    """
+    Save (potentially new) etags to file.
+    """
+    with open(ETAGFILE, "wb") as etagfile:
+        pickle.dump(ETAGS, etagfile)
 
 
 def download(url, fname=None):
+    """
+    Download a URL if necessary. If the URL's etag matches the existing one,
+    the download is skipped.
+    """
     if fname is None:
         fname = url.split("/")[-1]
-    fname = os.path.join(destdir, "downloads", fname)
+    fname = os.path.join(DESTDIR, "downloads", fname)
     print("--> Downloading {} → {}".format(url, fname))
     try:
         req = requests.get(url, stream=True)
-    except ConnectionError:
+    except ConnError:
         print("Error while trying to download {}".format(url),
               file=sys.stderr)
         print("Skipping.", file=sys.stderr)
         return
     size = int(req.headers.get("content-length"))
-    et = req.headers.get("etag")
-    oldet = etags.get(url)
-    if et == oldet and os.path.exists(fname):
+    etag = req.headers.get("etag")
+    oldet = ETAGS.get(url)
+    if etag == oldet and os.path.exists(fname):
         fod_size = os.path.getsize(fname)
         if fod_size == size:
             print("File already downloaded. Skipping.", end="\n\n")
             return fname
-    etags[url] = et
+    ETAGS[url] = etag
     prog = 0
-    with open(fname, "wb") as fd:
+    with open(fname, "wb") as dlfile:
         for chunk in req.iter_content(chunk_size=256):
-            fd.write(chunk)
+            dlfile.write(chunk)
             prog += len(chunk)
             print("\r{:2.1f}%".format(prog/size*100), end="", flush=True)
         print("\nDone!")
@@ -67,11 +86,18 @@ def download(url, fname=None):
 
 
 def die(msg):
+    """
+    Exit the program with a given error message and exit status 1.
+    """
     print(msg, file=sys.stderr)
     sys.exit(1)
 
 
 def wait_for_ret():
+    """
+    Pause execution and wait for the user to hit return. If ctrl+c (interrupt)
+    is received instead, exit the program with status 1.
+    """
     try:
         input("Hit return to continue or ^C to cancel ...")
     except KeyboardInterrupt:
@@ -79,38 +105,39 @@ def wait_for_ret():
 
 
 def build():
+    """
+    Build binaries.
+    """
     platforms = ["linux/amd64", "windows/386", "darwin/amd64"]
     print("--> Building binary for [{}]".format(", ".join(platforms)))
-    verfile = "version"
-    with open(verfile) as fd:
-        verinfo = fd.read()
+    verfilename = "version"
+    with open(verfilename) as verfile:
+        verinfo = verfile.read()
 
-    version["version"] = re.search(r"version=([v0-9\.]+)", verinfo).group(1)
+    VERSION["version"] = re.search(r"version=([v0-9\.]+)", verinfo).group(1)
     cmd = ["git", "rev-list", "--count", "HEAD"]
-    version["build"] = int(check_output(cmd).strip().decode())
+    VERSION["build"] = int(check_output(cmd).strip().decode())
     cmd = ["git", "rev-parse", "HEAD"]
-    version["commit"] = check_output(cmd).strip().decode()
+    VERSION["commit"] = check_output(cmd).strip().decode()
     print(("Version: {version} "
            "Build: {build:06d} "
-           "Commit: {commit}").format(**version))
+           "Commit: {commit}").format(**VERSION))
     ldflags = ("-X main.version={version} "
                "-X main.build={build:06d} "
-               "-X main.commit={commit}").format(**version)
-    # cmd = ["go", "build", "-ldflags", ldflags, "-o", "gin"]
-    output = os.path.join(destdir, "{{.OS}}-{{.Arch}}", "gin")
+               "-X main.commit={commit}").format(**VERSION)
+    output = os.path.join(DESTDIR, "{{.OS}}-{{.Arch}}", "gin")
     cmd = ["gox", "-output={}".format(output),
            "-osarch={}".format(" ".join(platforms)),
            "-ldflags={}".format(ldflags)]
     print("Running {}".format(" ".join(cmd)))
-    ret = call(cmd)
-    print()
-    if ret > 0:
+    if call(cmd) > 0:
         die("Build failed")
 
+    print()
     print("--> Build succeeded")
     print("--> The following files were built:")
-    ginfiles = glob(os.path.join(destdir, "*", "gin"))
-    ginfiles.extend(glob(os.path.join(destdir, "*", "gin.exe")))
+    ginfiles = glob(os.path.join(DESTDIR, "*", "gin"))
+    ginfiles.extend(glob(os.path.join(DESTDIR, "*", "gin.exe")))
     print("\n".join(ginfiles), end="\n\n")
 
     plat = sys.platform
@@ -124,45 +151,36 @@ def build():
 
 
 def download_annex_sa():
+    """
+    Download annex standaline tarball.
+    """
     annex_sa_url = ("https://downloads.kitenet.net/git-annex/linux/current/"
                     "git-annex-standalone-amd64.tar.gz")
     return download(annex_sa_url)
 
 
-def get_appveyor_artifact_url():
-    """
-    Queries Appveyor for the latest job artifacts. Returns the URL for the
-    latest 32bit binary only.
-    """
-    apiurl = "https://ci.appveyor.com/api/"
-    account = "achilleas-k"
-    project_name = "gin-cli"
-
-    url = os.path.join(apiurl, "projects", account, project_name)
-    r = requests.get(url)
-
-    projects = json.loads(r.text)
-    build = projects["build"]
-    for job in build["jobs"]:
-        if job["status"] == "success":
-            artifacts_url = os.path.join(apiurl, "buildjobs", job["jobId"],
-                                         "artifacts")
-            r = requests.get(artifacts_url)
-            artifacts = json.loads(r.text)
-            if "ARCH=32" in job["name"]:
-                a = artifacts[0]
-                arturl = os.path.join(apiurl, "buildjobs", job["jobId"],
-                                      "artifacts", a["fileName"])
-                return arturl
-
-
 def get_git_for_windows():
-    win_git_url = ("https://github.com/git-for-windows/git/releases/download/"
-                   "v2.13.3.windows.1/PortableGit-2.13.3-32-bit.7z.exe")
+    """
+    Download the (portable) git for windows package.
+    Relies on github API to find latest release.
+    """
+    url = "https://api.github.com/repos/git-for-windows/git/releases/latest"
+    req = requests.get(url)
+    releases = json.loads(req.text)
+    assets = releases["assets"]
+    for asset in assets:
+        if "PortableGit" in asset["name"]:
+            win_git_url = asset["browser_download_url"]
+            break
+    else:
+        die("Could not find PortableGit download")
     return download(win_git_url)
 
 
 def get_git_annex_for_windows():
+    """
+    Download the git annex for windows installer.
+    """
     win_git_annex_url = ("https://downloads.kitenet.net/git-annex/windows/"
                          "current/git-annex-installer.exe")
     return download(win_git_annex_url)
@@ -170,21 +188,20 @@ def get_git_annex_for_windows():
 
 def package_linux_plain(binfiles):
     """
-    For each Linux binary make a tarball and include all related files
+    For each Linux binary make a tarball and include all related files.
     """
     archives = []
-    for bf in binfiles:
-        d, f = os.path.split(bf)
-        _, osarch = os.path.split(d)
+    for binf in binfiles:
+        dirname, fname = os.path.split(binf)
+        _, osarch = os.path.split(dirname)
         # simple binary archive
-        shutil.copy("README.md", d)
-        arc = "gin-cli-{}-{}.tar.gz".format(version["version"], osarch)
-        arc = os.path.join(pkgdir, arc)
-        cmd = ["tar", "-czf", arc, "-C", d, f, "README.md"]
+        shutil.copy("README.md", dirname)
+        arc = "gin-cli-{}-{}.tar.gz".format(VERSION["version"], osarch)
+        arc = os.path.join(PKGDIR, arc)
+        cmd = ["tar", "-czf", arc, "-C", dirname, fname, "README.md"]
         print("Running {}".format(" ".join(cmd)))
-        ret = call(cmd)
-        if ret > 0:
-            print("Failed to make tarball for {}".format(bf), file=sys.stderr)
+        if call(cmd) > 0:
+            print(f"Failed to make tarball for {binf}", file=sys.stderr)
             continue
         archives.append(arc)
     return archives
@@ -192,12 +209,31 @@ def package_linux_plain(binfiles):
 
 def debianize(binfiles, annexsa_archive):
     """
-    For each Linux binary make a deb package with git annex standalone
+    For each Linux binary make a deb package with git annex standalone.
     """
     debs = []
-    for bf in binfiles:
-        # debian packaged with annex standalone
-        with TemporaryDirectory(suffix="gin-linux") as tmp_dir:
+    with TemporaryDirectory(suffix="gin-linux") as tmpdir:
+        cmd = ["docker", "build",
+               "-t", "gin-deb", "debdock/."]
+        print("Preparing docker image for debian build")
+        call(cmd)
+
+        contdir = "/debbuild/"
+        cmd = ["docker", "run", "-i", "-v",
+               "{}:{}".format(tmpdir, contdir),
+               "--name", "gin-deb-build",
+               "-d", "gin-deb", "bash"]
+        print("Starting debian docker container")
+        if call(cmd) > 0:
+            print("Container start failed", file=sys.stderr)
+            return
+
+        cmd = ["docker", "ps"]
+        print("docker ps")
+        call(cmd)
+
+        for binf in binfiles:
+            # debian packaged with annex standalone
             # create directory structure
             # pkg gin-cli_version
             # /opt
@@ -209,109 +245,116 @@ def debianize(binfiles, annexsa_archive):
 
             # TODO: Update Debian control file version automatically
 
-            pkgname = "gin-cli-{}".format(version["version"])
-            build_dir = os.path.join(tmp_dir, pkgname)
-            opt_dir = os.path.join(build_dir, "opt")
+            # create directory structure
+            pkgname = "gin-cli"
+            pkgnamever = "{}-{}".format(pkgname, VERSION["version"])
+            debmdsrc = os.path.join("debdock", "debian")
+            pkgdir = os.path.join(tmpdir, pkgname)
+            debcapdir = os.path.join(pkgdir, "DEBIAN")
+            opt_dir = os.path.join(pkgdir, "opt")
             opt_gin_dir = os.path.join(opt_dir, "gin")
             opt_gin_bin_dir = os.path.join(opt_gin_dir, "bin")
-            os.makedirs(opt_gin_bin_dir)
-            usr_local_bin_dir = os.path.join(build_dir, "usr", "local", "bin")
-            os.makedirs(usr_local_bin_dir)
+            usr_local_bin_dir = os.path.join(pkgdir, "usr", "local", "bin")
+            docdir = os.path.join(pkgdir, "usr", "share", "doc", pkgname)
 
-            shutil.copy(bf, opt_gin_bin_dir)
+            os.makedirs(debcapdir)
+            os.makedirs(opt_gin_bin_dir)
+            os.makedirs(usr_local_bin_dir)
+            os.makedirs(docdir)
+
+            # copy binaries and program files
+            shutil.copy(binf, opt_gin_bin_dir)
+            print(f"Copied {binf} to {opt_gin_bin_dir}")
             shutil.copy("gin.sh", opt_gin_bin_dir)
+            print(f"Copied gin.sh to {opt_gin_bin_dir}")
 
             link_path = os.path.join(usr_local_bin_dir, "gin")
             os.symlink("/opt/gin/bin/gin.sh", link_path)
 
+            shutil.copy("README.md", opt_gin_dir)
+
+            # copy debian package metadata files
+            shutil.copy(os.path.join(debmdsrc, "control"), debcapdir)
+            shutil.copy("LICENSE", os.path.join(docdir, "copyright"))
+            shutil.copy(os.path.join(debmdsrc, "changelog"), docdir)
+            shutil.copy(os.path.join(debmdsrc, "changelog.Debian"), docdir)
+
+            # gzip changelog and changelog.Debian
+            cmd = ["gzip", "--best", os.path.join(docdir, "changelog"),
+                   os.path.join(docdir, "changelog.Debian")]
+            if call(cmd) > 0:
+                print(f"Failed to gzip files in {docdir}", file=sys.stderr)
+
             # extract annex standalone into pkg/opt/gin
             cmd = ["tar", "-xzf", annexsa_archive, "-C", opt_gin_dir]
             print("Running {}".format(" ".join(cmd)))
-            ret = call(cmd)
-            if ret > 0:
+            if call(cmd) > 0:
                 print("Failed to extract git annex standalone [{}]".format(
                     annexsa_archive, file=sys.stderr
                 ))
                 continue
 
-            shutil.copytree("debdock/DEBIAN",
-                            os.path.join(build_dir, "DEBIAN"))
-            shutil.copy("README.md", opt_gin_dir)
+            dockerexec = ["docker", "exec", "-t", "gin-deb-build"]
 
-            cmd = ["docker", "build",
-                   "-t", "gin-deb", "debdock/."]
-            print("Preparing docker image for debian build")
-            ret = call(cmd)
-            if ret > 0:
-                print("Docker build failed", file=sys.stderr)
-                continue
-
-            cmd = ["docker", "run", "-v", "{}:/debbuild/".format(tmp_dir),
-                   "gin-deb", "/bin/bash", "-c",
-                   ("chown root:root -R /debbuild &&"
-                    " chmod go+rX,go-w -R /debbuild")]
+            cmd = dockerexec + ["chmod", "go+rX,go-w", "-R", contdir]
             print("Fixing permissions for build dir")
             call(cmd)
 
-            cmd = ["docker", "run",
-                   "-v", "{}:/debbuild/".format(tmp_dir),
-                   "gin-deb", "dpkg-deb", "--build",
-                   "/debbuild/{}".format(pkgname)]
-            # call(["tree", "-L", "5", tmp_dir])
+            cmd = dockerexec + ["fakeroot",
+                                "dpkg-deb", "--build",
+                                os.path.join(contdir, pkgname)]
             print("Building deb package")
-            ret = call(cmd)
-            # cmd = ["docker", "run",
-            #        "-v", "{}:/debbuild/".format(tmp_dir),
-            #        "gin-deb", "dpkg", "--contents",
-            #        "/debbuild/{}.deb".format(pkgname)]
-            # ret = call(cmd)
-            if ret > 0:
+            if call(cmd) > 0:
                 print("Deb build failed", file=sys.stderr)
                 continue
 
-            # revert ownership to allow deletion of tmp dir
-            uid = os.getuid()
-            cmd = ["docker", "run", "-v", "{}:/debbuild/".format(tmp_dir),
-                   "gin-deb", "/bin/bash", "-c",
-                   "chown {}:{} -R /debbuild".format(uid, uid)]
-            ret = call(cmd)
-            if ret > 0:
-                print("Error occured while reverting ownership to user",
-                      file=sys.stderr)
+            debfilename = f"{pkgname}.deb"
+            cmd = dockerexec + ["lintian",
+                                os.path.join(contdir, debfilename)]
+            print("Running lintian on new deb file")
+            if call(cmd, stdout=open(os.devnull, "wb")) > 0:
+                print("Deb file check exited with errors")
+                print("Ignoring for now")
 
-            debfilename = "{}.deb".format(pkgname)
-            debfilepath = os.path.join(tmp_dir, debfilename)
-            debfiledest = os.path.join(pkgdir, debfilename)
+            debfilepath = os.path.join(tmpdir, debfilename)
+            debfiledest = os.path.join(PKGDIR, f"{pkgnamever}.deb")
             if os.path.exists(debfiledest):
                 os.remove(debfiledest)
             shutil.copy(debfilepath, debfiledest)
             debs.append(debfiledest)
-            print("DONE")
+            print("Done")
+        print("Stopping and cleaning up docker container")
+        cmd = ["docker", "kill", "gin-deb-build"]
+        call(cmd)
+        cmd = ["docker", "container", "rm", "gin-deb-build"]
+        call(cmd)
     return debs
 
 
 def rpmify(binfiles, annexsa_archive):
+    """
+    For each Linux binary make a rpm package with git annex standalone.
+    """
     return []
 
 
 def package_mac_plain(binfiles):
     """
-    For each Darwin binary make a tarball and include all related files
+    For each Darwin binary make a tarball and include all related files.
     """
     archives = []
-    for bf in binfiles:
-        d, f = os.path.split(bf)
-        _, osarch = os.path.split(d)
+    for binf in binfiles:
+        dirname, fname = os.path.split(binf)
+        _, osarch = os.path.split(dirname)
         osarch = osarch.replace("darwin", "macos")
         # simple binary archive
-        shutil.copy("README.md", d)
-        arc = "gin-cli-{}-{}.tar.gz".format(version["version"], osarch)
-        arc = os.path.join(pkgdir, arc)
-        cmd = ["tar", "-czf", arc, "-C", d, f, "README.md"]
+        shutil.copy("README.md", dirname)
+        arc = "gin-cli-{}-{}.tar.gz".format(VERSION["version"], osarch)
+        arc = os.path.join(PKGDIR, arc)
+        cmd = ["tar", "-czf", arc, "-C", dirname, fname, "README.md"]
         print("Running {}".format(" ".join(cmd)))
-        ret = call(cmd)
-        if ret > 0:
-            print("Failed to make tarball for {}".format(bf), file=sys.stderr)
+        if call(cmd) > 0:
+            print(f"Failed to make tarball for {binf}", file=sys.stderr)
             continue
         archives.append(arc)
     return archives
@@ -322,13 +365,13 @@ def winbundle(binfiles, git_pkg, annex_pkg):
     For each Windows binary make a zip and include git and git annex portable
     """
     winarchives = []
-    for bf in binfiles:
-        with TemporaryDirectory(suffix="gin-windows") as tmp_dir:
-            pkgroot = os.path.join(tmp_dir, "gin")
+    for binf in binfiles:
+        with TemporaryDirectory(suffix="gin-windows") as tmpdir:
+            pkgroot = os.path.join(tmpdir, "gin")
             bindir = os.path.join(pkgroot, "bin")
             os.makedirs(bindir)
 
-            shutil.copy(bf, bindir)
+            shutil.copy(binf, bindir)
             shutil.copy("README.md", pkgroot)
             shutil.copy("gin-shell.bat", pkgroot)
 
@@ -338,24 +381,22 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             # extract git portable and annex into git dir
             cmd = ["7z", "x", "-o{}".format(gitdir), git_pkg]
             print("Running {}".format(" ".join(cmd)))
-            ret = call(cmd, stdout=DEVNULL)
-            if ret > 0:
+            if call(cmd, stdout=DEVNULL) > 0:
                 print("Failed to extract git archive [{}]".format(git_pkg),
                       file=sys.stderr)
                 continue
 
             cmd = ["7z", "x", "-o{}".format(gitdir), annex_pkg]
             print("Running {}".format(" ".join(cmd)))
-            ret = call(cmd, stdout=DEVNULL)
-            if ret > 0:
+            if call(cmd, stdout=DEVNULL) > 0:
                 print("Failed to extract git archive [{}]".format(annex_pkg),
                       file=sys.stderr)
                 continue
-            d, f = os.path.split(bf)
-            _, osarch = os.path.split(d)
+            dirname, _ = os.path.split(binf)
+            _, osarch = os.path.split(dirname)
 
-            arc = "gin-cli-{}-{}.zip".format(version["version"], osarch)
-            arc = os.path.join(pkgdir, arc)
+            arc = "gin-cli-{}-{}.zip".format(VERSION["version"], osarch)
+            arc = os.path.join(PKGDIR, arc)
             print("Creating Windows zip file")
             # need to change paths before making zip file
             if os.path.exists(arc):
@@ -365,20 +406,23 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             os.chdir(pkgroot)
             cmd = ["zip", "-r", arc_abs, "."]
             print("Running {} (from {})".format(" ".join(cmd), pkgroot))
-            ret = call(cmd, stdout=DEVNULL)
-            os.chdir(oldwd)
-            if ret > 0:
+            if call(cmd, stdout=DEVNULL) > 0:
                 print("Failed to create archive [{}]".format(arc),
                       file=sys.stderr)
+                os.chdir(oldwd)
                 continue
+            os.chdir(oldwd)
             winarchives.append(arc)
             print("DONE")
     return winarchives
 
 
 def main():
-    os.makedirs(os.path.join(destdir, "downloads"), exist_ok=True)
-    os.makedirs(pkgdir, exist_ok=True)
+    """
+    Main
+    """
+    os.makedirs(os.path.join(DESTDIR, "downloads"), exist_ok=True)
+    os.makedirs(PKGDIR, exist_ok=True)
 
     binfiles = build()
     load_etags()
@@ -395,6 +439,7 @@ def main():
 
     linux_pkgs = package_linux_plain(linux_bins)
     deb_pkgs = debianize(linux_bins, annexsa_file)
+
     rpm_pkgs = rpmify(linux_bins, annexsa_file)
 
     mac_pkgs = package_mac_plain(darwin_bins)
@@ -402,15 +447,22 @@ def main():
     win_pkgs = winbundle(win_bins, win_git_file, win_git_annex_file)
 
     def printlist(lst):
+        """
+        Print a list of files.
+        """
         print("".join("> " + l + "\n" for l in lst))
 
     def link_latest(lst):
-        for l in lst:
-            latestname = l.replace(version["version"], "latest")
-            print("Linking {} to {}".format(l, latestname))
+        """
+        Create symlinks with the version part replaced by 'latest' for the
+        newly built packages.
+        """
+        for fname in lst:
+            latestname = fname.replace(VERSION["version"], "latest")
+            print("Linking {} to {}".format(fname, latestname))
             if os.path.exists(latestname):
                 os.unlink(latestname)
-            os.link(l, latestname)
+            os.link(fname, latestname)
 
     print("------------------------------------------------")
     print("The following archives and packages were created")
