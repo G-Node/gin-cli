@@ -114,7 +114,8 @@ def build():
     with open(verfilename) as verfile:
         verinfo = verfile.read()
 
-    VERSION["version"] = re.search(r"version=([v0-9\.]+)", verinfo).group(1)
+    VERSION["version"] = re.search(r"version=([0-9\.]+(dev){0,1})",
+                                   verinfo).group(1)
     cmd = ["git", "rev-list", "--count", "HEAD"]
     VERSION["build"] = int(check_output(cmd).strip().decode())
     cmd = ["git", "rev-parse", "HEAD"]
