@@ -122,7 +122,7 @@ def build():
     print(("Version: {version} "
            "Build: {build:06d} "
            "Commit: {commit}").format(**VERSION))
-    ldflags = ("-X main.version={version} "
+    ldflags = ("-X main.gincliversion={version} "
                "-X main.build={build:06d} "
                "-X main.commit={commit}").format(**VERSION)
     output = os.path.join(DESTDIR, "{{.OS}}-{{.Arch}}", "gin")
