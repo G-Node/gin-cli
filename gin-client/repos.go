@@ -17,6 +17,7 @@ import (
 )
 
 var green = color.New(color.FgGreen)
+var defaultHostname = "(unknown)"
 
 // MakeSessionKey creates a private+public key pair.
 // The private key is saved in the user's configuration directory, to be used for git commands.
@@ -30,7 +31,7 @@ func (gincl *Client) MakeSessionKey() error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		util.LogWrite("Could not retrieve hostname")
-		hostname = "(unknown)"
+		hostname = defaultHostname
 	}
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(keyPair.Public), description)
@@ -156,7 +157,7 @@ func (gincl *Client) Upload(paths []string) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		util.LogWrite("Could not retrieve hostname")
-		hostname = "(unknown)"
+		hostname = defaultHostname
 	}
 	if changes == "" {
 		changes = "No changes recorded"
@@ -219,7 +220,7 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 	Workingdir = repoName
 	hostname, err := os.Hostname()
 	if err != nil {
-		hostname = "(unknown)"
+		hostname = defaultHostname
 	}
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 

@@ -51,7 +51,7 @@ func CommitIfNew() (bool, error) {
 	// Create an empty initial commit and run annex sync to synchronise everything
 	hostname, err := os.Hostname()
 	if err != nil {
-		hostname = "(unknown)"
+		hostname = defaultHostname
 	}
 	commitargs := []string{"commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname)}
 	stdout, stderr, err := RunGitCommand(commitargs...)
