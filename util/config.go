@@ -82,9 +82,6 @@ func LoadConfig() error {
 	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
 	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
-	// ginAddress := viper.GetString("gin.address")
-	// ginPort := viper.GetInt("gin.port")
-
 	var oldConfigHost string
 	if viper.IsSet("auth.address") || viper.IsSet("auth.port") {
 		fmt.Fprintln(os.Stderr, "Auth server address configuration is no longer used. Use gin.address and gin.port instead.")
