@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -62,6 +63,11 @@ func LoadConfig() error {
 	LogWrite("Config path added %s", configpath)
 
 	err = viper.ReadInConfig()
+	if err != nil {
+		if !strings.Contains(err.Error(), "Not Found") {
+			LogError(err)
+		}
+	}
 	LogError(err)
 	fileused := viper.ConfigFileUsed()
 	if fileused != "" {
