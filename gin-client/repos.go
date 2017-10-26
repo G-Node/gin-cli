@@ -472,13 +472,15 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	}
 
 	// Check if modified files are actually annex unlocked instead
-	mdfilestatus, err := AnnexStatus(modifiedfiles...)
-	if err != nil {
-		util.LogWrite("Error during annex status while searching for unlocked files")
-	}
-	for _, stat := range mdfilestatus {
-		if stat.Status == "T" {
-			statuses[stat.File] = Unlocked
+	if len(modifiedfiles) > 0 {
+		mdfilestatus, err := AnnexStatus(modifiedfiles...)
+		if err != nil {
+			util.LogWrite("Error during annex status while searching for unlocked files")
+		}
+		for _, stat := range mdfilestatus {
+			if stat.Status == "T" {
+				statuses[stat.File] = Unlocked
+			}
 		}
 	}
 

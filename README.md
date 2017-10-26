@@ -3,6 +3,14 @@
 [![Build Status](https://travis-ci.org/G-Node/gin-cli.svg?branch=master)](https://travis-ci.org/G-Node/gin-cli)
 [![GoDoc](https://godoc.org/github.com/G-Node/gin-cli?status.svg)](http://godoc.org/github.com/G-Node/gin-cli)
 
+---
+
+[Tests](https://github.com/G-Node/gin-cli-test)
+
+[![Build Status](https://travis-ci.org/G-Node/gin-cli-test.svg?branch=master)](https://travis-ci.org/G-Node/gin-cli-test)
+
+---
+
 **G**-Node **In**frastructure command line client
 
 This package is a command line client for interfacing with repositories hosted on [GIN](https://gin.g-node.org).

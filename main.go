@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -496,6 +497,32 @@ func checkAnnexVersion(verstring string) {
 	}
 }
 
+func gitrun(args []string) {
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	err := gincl.LoadToken()
+	util.CheckError(err)
+
+	stdout, stderr, err := ginclient.RunGitCommand(args...)
+	fmt.Print(stdout.String())
+	fmt.Fprint(os.Stderr, stderr.String())
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func annexrun(args []string) {
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	err := gincl.LoadToken()
+	util.CheckError(err)
+
+	stdout, stderr, err := ginclient.RunAnnexCommand(args...)
+	fmt.Print(stdout.String())
+	fmt.Fprint(os.Stderr, stderr.String())
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
 func init() {
 	if gincliversion == "" {
 		verstr = "GIN command line client [dev build]"
@@ -557,6 +584,10 @@ func main() {
 		logout(cmdArgs)
 	case "help":
 		help(cmdArgs)
+	case "git":
+		gitrun(cmdArgs)
+	case "annex":
+		annexrun(cmdArgs)
 	default:
 		util.Die(usage)
 	}
