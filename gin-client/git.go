@@ -69,13 +69,8 @@ func CommitIfNew() (bool, error) {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsRepo() bool {
 	util.LogWrite("IsRepo '%s'?", Workingdir)
-	_, _, err := RunGitCommand("status")
+	_, _, err := RunGitCommand("rev-parse")
 	yes := err == nil
-	if !yes {
-		// Maybe it's an annex repo in direct mode?
-		_, _, err = RunAnnexCommand("status")
-		yes = err == nil
-	}
 	util.LogWrite("IsRepo: %v", yes)
 	return yes
 }
