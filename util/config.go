@@ -49,7 +49,15 @@ func LoadConfig() error {
 	viper.SetDefault("annex.minsize", "10M")
 
 	viper.SetConfigName("config")
-	// prioritise config files in the directory of the executable
+
+	// Highest priority config file is in the repository root
+	reporoot, err := FindRepoRoot(".")
+	if err == nil {
+		viper.AddConfigPath(reporoot)
+		LogWrite("Config path added %s", reporoot)
+	}
+
+	// Second prio config files in the directory of the executable
 	// this is useful for portable packaging
 	execloc, err := os.Executable()
 	execpath, _ := path.Split(execloc)
@@ -58,9 +66,9 @@ func LoadConfig() error {
 		LogWrite("Config path added %s", execpath)
 	}
 
-	configpath, _ := ConfigPath(false)
-	viper.AddConfigPath(configpath)
-	LogWrite("Config path added %s", configpath)
+	xdgconfpath, _ := ConfigPath(false)
+	viper.AddConfigPath(xdgconfpath)
+	LogWrite("Config path added %s", xdgconfpath)
 
 	err = viper.ReadInConfig()
 	if err != nil {
@@ -68,7 +76,6 @@ func LoadConfig() error {
 			LogError(err)
 		}
 	}
-	LogError(err)
 	fileused := viper.ConfigFileUsed()
 	if fileused != "" {
 		LogWrite("Loading config file %s", viper.ConfigFileUsed())
