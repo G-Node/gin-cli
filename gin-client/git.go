@@ -69,9 +69,9 @@ func CommitIfNew() (bool, error) {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsRepo() bool {
 	util.LogWrite("IsRepo '%s'?", Workingdir)
-	_, _, err := RunGitCommand("rev-parse")
+	_, err := util.FindRepoRoot(Workingdir)
 	yes := err == nil
-	util.LogWrite("IsRepo: %v", yes)
+	util.LogWrite("%v", yes)
 	return yes
 }
 
