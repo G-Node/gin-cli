@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strings"
+	"path/filepath"
 
 	"github.com/spf13/viper"
 )
@@ -46,39 +46,33 @@ func LoadConfig() error {
 	// annex filters
 	viper.SetDefault("annex.minsize", "10M")
 
-	viper.SetConfigName("config")
+	// configpaths is a prioritised list of locations for finding configuration files (priority is lowest to highest)
+	var configpaths []string
 
-	// Highest priority config file is in the repository root
-	reporoot, err := FindRepoRoot(".")
+	// Global xdg config path
+	xdgconfpath, err := ConfigPath(false)
 	if err == nil {
-		viper.AddConfigPath(reporoot)
-		LogWrite("Config path added %s", reporoot)
+		configpaths = append(configpaths, xdgconfpath)
 	}
-
 	// Second prio config files in the directory of the executable
 	// this is useful for portable packaging
 	execloc, err := os.Executable()
-	execpath, _ := path.Split(execloc)
 	if err == nil {
-		viper.AddConfigPath(execpath)
-		LogWrite("Config path added %s", execpath)
+		execpath, _ := path.Split(execloc)
+		configpaths = append(configpaths, execpath)
+	}
+	// Highest priority config file is in the repository root
+	reporoot, err := FindRepoRoot(".")
+	if err == nil {
+		configpaths = append(configpaths, reporoot)
 	}
 
-	xdgconfpath, _ := ConfigPath(false)
-	viper.AddConfigPath(xdgconfpath)
-	LogWrite("Config path added %s", xdgconfpath)
-
-	err = viper.ReadInConfig()
-	if err != nil {
-		if !strings.Contains(err.Error(), "Not Found") {
-			LogError(err)
-		}
-	}
-	fileused := viper.ConfigFileUsed()
-	if fileused != "" {
-		LogWrite("Loading config file %s", viper.ConfigFileUsed())
-	} else {
-		LogWrite("No config file found. Using defaults.")
+	configFileName := "config.yml"
+	for _, path := range configpaths {
+		confPath := filepath.Join(path, configFileName)
+		LogWrite("Reading config file %s", confPath)
+		viper.SetConfigFile(confPath)
+		_ = viper.MergeInConfig()
 	}
 
 	Config.Bin.Git = viper.GetString("bin.git")
