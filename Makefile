@@ -5,7 +5,7 @@ GIN=gin
 BUILDLOC=build
 
 # Install location
-INSTLOC=$(GOPATH)/bin/$(GIN)
+INSTLOC=$(GOPATH)/bin/
 
 # Build flags
 VERNUM=$(shell grep -o -E '[0-9.]+(dev){0,1}' version)
@@ -18,7 +18,7 @@ gin:
 	go build $(LDFLAGS) -o $(BUILDLOC)/$(GIN)
 
 install: gin
-	install $(BUILDLOC)/$(GIN) $(INSTLOC)
+	install $(BUILDLOC)/$(GIN) $(INSTLOC)/$(GIN)
 
 allplatforms: linux windows macos
 
@@ -35,4 +35,4 @@ clean:
 	rm -r $(BUILDLOC)
 
 uninstall:
-	rm $(INSTLOC)
+	rm $(INSTLOC)/$(GIN)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/spf13/viper"
 )
@@ -35,10 +36,8 @@ func LoadConfig() error {
 	viper.SetDefault("bin.ssh", "ssh")
 
 	// Hosts
-	// Disabling default gin.address for now and handling it manually in order to present deprecation message
-	// viper.SetDefault("gin.address", "https://web.gin.g-node.org")
+	viper.SetDefault("gin.address", "https://web.gin.g-node.org")
 	viper.SetDefault("gin.port", "443")
-	defaultHost := "https://web.gin.g-node.org"
 
 	viper.SetDefault("git.address", "gin.g-node.org")
 	viper.SetDefault("git.port", "22")
@@ -47,27 +46,33 @@ func LoadConfig() error {
 	// annex filters
 	viper.SetDefault("annex.minsize", "10M")
 
-	viper.SetConfigName("config")
-	// prioritise config files in the directory of the executable
+	// configpaths is a prioritised list of locations for finding configuration files (priority is lowest to highest)
+	var configpaths []string
+
+	// Global xdg config path
+	xdgconfpath, err := ConfigPath(false)
+	if err == nil {
+		configpaths = append(configpaths, xdgconfpath)
+	}
+	// Second prio config files in the directory of the executable
 	// this is useful for portable packaging
 	execloc, err := os.Executable()
-	execpath, _ := path.Split(execloc)
 	if err == nil {
-		viper.AddConfigPath(execpath)
-		LogWrite("Config path added %s", execpath)
+		execpath, _ := path.Split(execloc)
+		configpaths = append(configpaths, execpath)
+	}
+	// Highest priority config file is in the repository root
+	reporoot, err := FindRepoRoot(".")
+	if err == nil {
+		configpaths = append(configpaths, reporoot)
 	}
 
-	configpath, _ := ConfigPath(false)
-	viper.AddConfigPath(configpath)
-	LogWrite("Config path added %s", configpath)
-
-	err = viper.ReadInConfig()
-	LogError(err)
-	fileused := viper.ConfigFileUsed()
-	if fileused != "" {
-		LogWrite("Loading config file %s", viper.ConfigFileUsed())
-	} else {
-		LogWrite("No config file found. Using defaults.")
+	configFileName := "config.yml"
+	for _, path := range configpaths {
+		confPath := filepath.Join(path, configFileName)
+		LogWrite("Reading config file %s", confPath)
+		viper.SetConfigFile(confPath)
+		_ = viper.MergeInConfig()
 	}
 
 	Config.Bin.Git = viper.GetString("bin.git")
@@ -76,32 +81,9 @@ func LoadConfig() error {
 	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
 	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
-	// ginAddress := viper.GetString("gin.address")
-	// ginPort := viper.GetInt("gin.port")
-
-	var oldConfigHost string
-	if viper.IsSet("auth.address") || viper.IsSet("auth.port") {
-		fmt.Fprintln(os.Stderr, "Auth server address configuration is no longer used. Use gin.address and gin.port instead.")
-		oldConfigHost = fmt.Sprintf("%s:%d", viper.GetString("auth.address"), viper.GetInt("auth.port"))
-	}
-
-	if viper.IsSet("repo.address") || viper.IsSet("repo.port") {
-		fmt.Fprintln(os.Stderr, "Repo server address configuration is no longer used. Use gin.address and gin.port instead.")
-		oldConfigHost = fmt.Sprintf("%s:%d", viper.GetString("repo.address"), viper.GetInt("repo.port"))
-	}
-
-	// If the gin host is set use it. If it's not but an old config value is set, use that.
-	// If neither is set, use the bulit-in default.
-	if viper.IsSet("gin.address") {
-		ginAddress := viper.GetString("gin.address")
-		ginPort := viper.GetInt("gin.port")
-		Config.GinHost = fmt.Sprintf("%s:%d", ginAddress, ginPort)
-	} else if oldConfigHost != "" {
-		Config.GinHost = oldConfigHost
-		fmt.Fprintf(os.Stderr, "Using deprecated configuration value: %s. This will change in a future release.\n", oldConfigHost)
-	} else {
-		Config.GinHost = fmt.Sprintf("%s:%d", defaultHost, viper.GetInt("gin.port"))
-	}
+	ginAddress := viper.GetString("gin.address")
+	ginPort := viper.GetInt("gin.port")
+	Config.GinHost = fmt.Sprintf("%s:%d", ginAddress, ginPort)
 
 	gitAddress := viper.GetString("git.address")
 	gitPort := viper.GetInt("git.port")

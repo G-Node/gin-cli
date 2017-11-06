@@ -51,7 +51,7 @@ func CommitIfNew() (bool, error) {
 	// Create an empty initial commit and run annex sync to synchronise everything
 	hostname, err := os.Hostname()
 	if err != nil {
-		hostname = "(unknown)"
+		hostname = defaultHostname
 	}
 	commitargs := []string{"commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname)}
 	stdout, stderr, err := RunGitCommand(commitargs...)
@@ -69,14 +69,9 @@ func CommitIfNew() (bool, error) {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsRepo() bool {
 	util.LogWrite("IsRepo '%s'?", Workingdir)
-	_, _, err := RunGitCommand("status")
+	_, err := util.FindRepoRoot(Workingdir)
 	yes := err == nil
-	if !yes {
-		// Maybe it's an annex repo in direct mode?
-		_, _, err = RunAnnexCommand("status")
-		yes = err == nil
-	}
-	util.LogWrite("IsRepo: %v", yes)
+	util.LogWrite("%v", yes)
 	return yes
 }
 
