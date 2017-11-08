@@ -243,8 +243,6 @@ def debianize(binfiles, annexsa_archive):
             # /opt/gin/bin/gin.sh (shell script for running gin cmds)
             # /usr/local/gin -> /opt/gin/bin/gin.sh (symlink)
 
-            # TODO: Update Debian control file version automatically
-
             # create directory structure
             pkgname = "gin-cli"
             pkgnamever = "{}-{}".format(pkgname, VERSION["version"])
@@ -278,6 +276,15 @@ def debianize(binfiles, annexsa_archive):
             shutil.copy("LICENSE", os.path.join(docdir, "copyright"))
             shutil.copy(os.path.join(debmdsrc, "changelog"), docdir)
             shutil.copy(os.path.join(debmdsrc, "changelog.Debian"), docdir)
+
+            # TODO: Update changelog automatically
+            # Adding version number to debian control file
+            controlpath = os.path.join(debcapdir, "control")
+            with open(controlpath) as controlfile:
+                controllines = controlfile.read().format(**VERSION)
+
+            with open(controlpath, "w") as controlfile:
+                controlfile.write(controllines)
 
             # gzip changelog and changelog.Debian
             cmd = [
