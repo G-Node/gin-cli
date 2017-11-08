@@ -200,21 +200,20 @@ func (gincl *Client) RmContent(filepaths []string) error {
 // Returns the name of the directory in which the repository is cloned.
 func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 	util.LogWrite("CloneRepo")
+	err := gincl.LoadToken()
+	if err != nil {
+		return "", err
+	}
 
 	_, repoName := splitRepoParts(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", repoPath)
-	err := gincl.Clone(repoPath)
+	err = gincl.Clone(repoPath)
 	if err != nil {
 		return "", err
 	}
 	green.Println("OK")
 
 	fmt.Printf("Initialising local storage... ")
-
-	err = gincl.LoadToken()
-	if err != nil {
-		return "", err
-	}
 
 	// Following shell commands performed from within the repository root
 	Workingdir = repoName
