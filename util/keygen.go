@@ -67,7 +67,7 @@ func PrivKeyPath(user string) string {
 // AnnexSSHOpt returns a formatted string that can be used in git-annex commands that should
 // make use of the user's private key.
 func AnnexSSHOpt(user string) string {
-	return fmt.Sprintf("annex.ssh-options=-o StrictHostKeyChecking=no -i %s", PrivKeyPath(user))
+	return fmt.Sprintf("annex.ssh-options=-o IdentitiesOnly=yes -o StrictHostKeyChecking=no -i %s", PrivKeyPath(user))
 }
 
 // GitSSHOpt returns a formatted string that can be used in git commands that should make
@@ -86,5 +86,7 @@ func GitSSHEnv(user string) string {
 	sshbin = strings.Replace(sshbin, ossep, "/", -1)
 	keyfile := PrivKeyPath(user)
 	keyfile = strings.Replace(keyfile, ossep, "/", -1)
-	return fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o StrictHostKeyChecking=no", sshbin, keyfile)
+	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=no", sshbin, keyfile)
+	LogWrite("Added to env: %s", gitSSHCmd)
+	return gitSSHCmd
 }

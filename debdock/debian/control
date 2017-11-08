@@ -1,5 +1,5 @@
 Package: gin-cli
-Version: 0.9
+Version: {version}
 Section: base
 Priority: optional
 Architecture: amd64
