@@ -10,6 +10,7 @@
 
 # directories
 dist
+build
 
 # macOS junk
 .DS_Store
