@@ -1,3 +1,9 @@
+gin-cli (0.10); urgency=low
+
+  * Release 0.10
+  * Minor bug fixes and improvements.
+  * Improved the performance of `gin ls` when querying specific files.
+
 gin-cli (0.9) beta; urgency=low
 
   * Release 0.9
