@@ -205,18 +205,37 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 		return "", err
 	}
 
-	_, repoName := splitRepoParts(repoPath)
 	fmt.Printf("Fetching repository '%s'... ", repoPath)
 	err = gincl.Clone(repoPath)
 	if err != nil {
 		return "", err
 	}
 	green.Println("OK")
-
-	fmt.Printf("Initialising local storage... ")
-
-	// Following shell commands performed from within the repository root
+	_, repoName := splitRepoParts(repoPath)
 	Workingdir = repoName
+	return gincl.InitDir(repoPath)
+}
+
+// InitDir initialises the local directory with
+func (gincl *Client) InitDir(repoPath string) (string, error) {
+	fmt.Printf("Initialising local storage... ")
+	_, repoName := splitRepoParts(repoPath)
+	initerr := fmt.Errorf("Error initialising local directory")
+	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
+
+	if !IsRepo() {
+		stdout, stderr, err := RunGitCommand("init")
+		if err != nil {
+			util.LogWrite("Error during Init command")
+			util.LogWrite("[stdout]\r\n%s", stdout.String())
+			util.LogWrite("[stderr]\r\n%s", stderr.String())
+			return "", initerr
+		}
+		Workingdir = "."
+	} else {
+		// Following shell commands performed from within the repository root
+	}
+
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = defaultHostname
@@ -250,6 +269,24 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 		return "", err
 	}
 
+	err = AddRemote("origin", remotePath)
+	// Ignore if it already exists
+	if err != nil && !strings.Contains(err.Error(), "already exists") {
+		return "", initerr
+	}
+
+	if new {
+		// Push initial commit and set default remote
+		stdout, stderr, err := RunGitCommand("push", "--set-upstream", "origin", "master")
+		if err != nil {
+			util.LogWrite("Error during set upstream command")
+			util.LogWrite("[stdout]\r\n%s", stdout.String())
+			util.LogWrite("[stderr]\r\n%s", stderr.String())
+			return "", initerr
+		}
+
+	}
+
 	if new {
 		// Sync if an initial commit was created
 		err = AnnexSync(false)
@@ -257,8 +294,8 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 			return "", err
 		}
 	}
-	green.Println("OK")
 
+	green.Println("OK")
 	return repoName, nil
 }
 

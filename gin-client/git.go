@@ -35,6 +35,20 @@ func SetGitUser(name, email string) error {
 	return err
 }
 
+// AddRemote adds a remote named name for the repository at url.
+func AddRemote(name, url string) error {
+	stdout, stderr, err := RunGitCommand("remote", "add", name, url)
+	if err != nil {
+		util.LogWrite("Error during remote add command")
+		util.LogWrite("[stdout]\r\n%s", stdout.String())
+		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		if strings.Contains(stderr.String(), "already exists") {
+			return fmt.Errorf("Remote with name %s already exists", name)
+		}
+	}
+	return err
+}
+
 // CommitIfNew creates an empty initial git commit if the current repository is completely new.
 // Returns 'true' if (and only if) a commit was created.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
