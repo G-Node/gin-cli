@@ -213,6 +213,14 @@ def debianize(binfiles, annexsa_archive):
     For each Linux binary make a deb package with git annex standalone.
     """
     debs = []
+
+    def docker_cleanup():
+        print("Stopping and cleaning up docker container")
+        cmd = ["docker", "kill", "gin-deb-build"]
+        call(cmd)
+        cmd = ["docker", "container", "rm", "gin-deb-build"]
+        call(cmd)
+
     with TemporaryDirectory(suffix="gin-linux") as tmpdir:
         cmd = ["docker", "build", "-t", "gin-deb", "debdock/."]
         print("Preparing docker image for debian build")
@@ -226,6 +234,7 @@ def debianize(binfiles, annexsa_archive):
         print("Starting debian docker container")
         if call(cmd) > 0:
             print("Container start failed", file=sys.stderr)
+            docker_cleanup()
             return
 
         cmd = ["docker", "ps"]
@@ -332,11 +341,7 @@ def debianize(binfiles, annexsa_archive):
             shutil.copy(debfilepath, debfiledest)
             debs.append(debfiledest)
             print("Done")
-        print("Stopping and cleaning up docker container")
-        cmd = ["docker", "kill", "gin-deb-build"]
-        call(cmd)
-        cmd = ["docker", "container", "rm", "gin-deb-build"]
-        call(cmd)
+        docker_cleanup()
     return debs
 
 
@@ -462,7 +467,8 @@ def main():
         """
         Print a list of files.
         """
-        print("".join("> " + l + "\n" for l in lst))
+        if lst:
+            print("".join("> " + l + "\n" for l in lst))
 
     def link_latest(lst):
         """
