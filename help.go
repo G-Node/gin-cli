@@ -12,24 +12,60 @@ Options:
 	--version    Client version
 
 Commands:
-	login          [<username>]                | Login to the GIN services
-	logout                                     | Logout from the GIN services
-	create         [<name>] [<description>]    | Create a repository on the remote server and clone it
-	get            <repopath>                  | Retrieve (clone) a repository from the remote server
-	ls             [-s, --short] [<filenames>] | List the sync status of files in a local repository
-	unlock         [<filenames>]               | Unlock files for editing
-	lock           [<filenames>]               | Lock files
-	upload         [<filenames>]               | Upload local changes to a remote repository
-	download       [--content]                 | Download all new information from a remote repository
-	get-content    [<filenames>]               | Download the content of files from a remote repository
-	getc           [<filenames>]               | Synonym for get-content
-	remove-content [<filenames>]               | Remove the content of local files that have already been uploaded
-	rmc            [<filenames>]               | Synonym for remove-content
-	repos          [<username>]                | List available remote repositories
-	info           [<username>]                | Print user information
-	keys           [-v, --verbose]             | List the keys associated with the logged in user
-	keys           --add <filename>            | Add/upload a new public key to the GIN services
-	help           <command>                   | Get help for individual commands
+	login          [<username>]
+		 Login to the GIN services
+
+	logout
+		 Logout from the GIN services
+
+	create         [<name>] [<description>]
+		 Create a repository on the remote server and clone it
+
+	get            <repopath>
+		 Retrieve (clone) a repository from the remote server
+
+	ls             [-s, --short] [<filenames>]
+		 List the sync status of files in a local repository
+
+	unlock         [<filenames>]
+		 Unlock files for editing
+
+	lock           [<filenames>]
+		 Lock files
+
+	upload         [<filenames>]
+		 Upload local changes to a remote repository
+
+	download       [--content]
+		 Download all new information from a remote repository
+
+	get-content    [<filenames>]
+		 Download the content of files from a remote repository
+	
+	getc           [<filenames>]
+		 Synonym for get-content
+
+	remove-content [<filenames>]
+		 Remove the content of local files that have already been uploaded
+
+	rmc            [<filenames>]
+		 Synonym for remove-content
+
+	repos          [<username>]
+		 List available remote repositories
+
+	info           [<username>]
+		 Print user information
+
+	keys           [-v, --verbose]
+		 List the keys associated with the logged in user
+
+	keys           --add <filename>
+		 Add/upload a new public key to the GIN services
+
+	help           <command>
+		 Get help for individual commands
+
 
 Use 'help' followed by a command to see full description of the command.
 `
