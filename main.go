@@ -1,7 +1,5 @@
 package main
 
-// TODO: Nicer error handling. Print useful, descriptive messages.
-
 import (
 	"bytes"
 	"fmt"
@@ -500,11 +498,11 @@ func checkAnnexVersion(verstring string) {
 	errmsg := fmt.Sprintf("The GIN Client requires git-annex %s or newer", minAnnexVersion)
 	systemver, err := version.NewVersion(verstring)
 	if err != nil {
-		util.Die(errmsg)
+		util.Die(fmt.Sprintln("git-annex not found") + errmsg)
 	}
 	minver, _ := version.NewVersion(minAnnexVersion)
 	if systemver.LessThan(minver) {
-		util.Die(errmsg)
+		util.Die(errmsg + fmt.Sprintf("Found version %s", systemver))
 	}
 }
 
