@@ -221,7 +221,13 @@ def debianize(binfiles, annexsa_archive):
         cmd = ["docker", "container", "rm", "gin-deb-build"]
         call(cmd)
 
-    with TemporaryDirectory(suffix="gin-linux") as tmpdir:
+    # The default temporary root on macOS is /var/folders
+    # Docker currently has issues mounting directories under /var
+    # Forcing temporary directory to be rooted at /tmp instead
+    tmpprefix = None
+    if sys.platform == "darwin":
+        tmpprefix = "/tmp/"
+    with TemporaryDirectory(prefix=tmpprefix, suffix="gin-linux") as tmpdir:
         cmd = ["docker", "build", "-t", "gin-deb", "debdock/."]
         print("Preparing docker image for debian build")
         call(cmd)
