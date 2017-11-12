@@ -484,7 +484,7 @@ def main():
         for fname in lst:
             latestname = fname.replace(VERSION["version"], "latest")
             print("Linking {} to {}".format(fname, latestname))
-            if os.path.exists(latestname):
+            if os.path.lexists(latestname):
                 os.unlink(latestname)
             os.link(fname, latestname)
 
