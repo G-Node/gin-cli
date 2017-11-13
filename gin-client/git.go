@@ -698,57 +698,52 @@ func IsDirect() bool {
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsVersion6() bool {
-	stdout, stderr, err := RunGitCommand("config", "--local", "--get", "annex.version")
+	cmd, err := RunGitCommand("config", "--local", "--get", "annex.version")
 	if err != nil {
 		util.LogWrite("Error while checking repository annex version")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return false
 	}
-	ver := strings.TrimSpace(stdout.String())
+	// TODO: Buffered reading
+	stdout := cmd.OutPipe.ReadAll()
+	ver := strings.TrimSpace(stdout)
 	util.LogWrite("Annex version is %s", ver)
 	return ver == "6"
 }
 
 // Utility functions for shelling out
 
-// RunGitCommand executes an external git command with the provided arguments and returns stdout and stderr.
+// RunGitCommand executes an external git command with the provided arguments and returns a GinCmd struct.
+// The command is started with Start() before returning.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func RunGitCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
+func RunGitCommand(args ...string) (util.GinCmd, error) {
 	gitbin := util.Config.Bin.Git
-	cmd := exec.Command(gitbin)
+	cmd := util.Command(gitbin)
 	cmd.Dir = Workingdir
 	cmd.Args = append(cmd.Args, args...)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
 	env := os.Environ()
 	token := web.UserToken{}
 	_ = token.LoadToken()
 	cmd.Env = append(env, util.GitSSHEnv(token.Username))
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
-	err := cmd.Run()
-	return stdout, stderr, err
+	err := cmd.Start()
+	return cmd, err
 }
 
-// RunAnnexCommand executes a git annex command with the provided arguments and returns stdout and stderr.
+// RunAnnexCommand executes a git annex command with the provided arguments and returns a GinCmd struct.
+// The command is started with Start() before returning.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func RunAnnexCommand(args ...string) (bytes.Buffer, bytes.Buffer, error) {
+func RunAnnexCommand(args ...string) (util.GinCmd, error) {
 	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := exec.Command(gitannexbin, args...)
+	cmd := util.Command(gitannexbin, args...)
 	cmd.Dir = Workingdir
 	token := web.UserToken{}
 	_ = token.LoadToken()
 	annexsshopt := util.AnnexSSHOpt(token.Username)
 	cmd.Args = append(cmd.Args, "-c", annexsshopt)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
-	err := cmd.Run()
-	return stdout, stderr, err
+	err := cmd.Start()
+	return cmd, err
 }
 
 // selectGitOrAnnex splits a list of paths into two: the first to be added to git proper and the second to be added to git annex.
