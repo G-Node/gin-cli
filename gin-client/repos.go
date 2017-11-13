@@ -232,8 +232,6 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 			return "", initerr
 		}
 		Workingdir = "."
-	} else {
-		// Following shell commands performed from within the repository root
 	}
 
 	hostname, err := os.Hostname()
