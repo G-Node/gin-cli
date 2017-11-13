@@ -216,7 +216,7 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 	return gincl.InitDir(repoPath)
 }
 
-// InitDir initialises the local directory with
+// InitDir initialises the local directory with the default remote and annex configuration.
 func (gincl *Client) InitDir(repoPath string) (string, error) {
 	fmt.Printf("Initialising local storage... ")
 	_, repoName := splitRepoParts(repoPath)
