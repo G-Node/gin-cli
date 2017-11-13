@@ -5,7 +5,7 @@ GIN=gin
 BUILDLOC=build
 
 # Install location
-INSTLOC=$(GOPATH)/bin/
+INSTLOC=$(GOPATH)/bin
 
 # Build flags
 VERNUM=$(shell grep -o -E '[0-9.]+(dev){0,1}' version)
