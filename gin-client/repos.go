@@ -283,9 +283,6 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 			return "", initerr
 		}
 
-	}
-
-	if new {
 		// Sync if an initial commit was created
 		err = AnnexSync(false)
 		if err != nil {
