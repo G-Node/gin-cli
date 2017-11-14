@@ -581,6 +581,8 @@ func main() {
 		download(cmdArgs)
 	case "get-content":
 		getContent(cmdArgs)
+	case "getc":
+		getContent(cmdArgs)
 	case "remove-content":
 		remove(cmdArgs)
 	case "rmc":

@@ -22,6 +22,7 @@ Commands:
 	upload         [<filenames>]               | Upload local changes to a remote repository
 	download       [--content]                 | Download all new information from a remote repository
 	get-content    [<filenames>]               | Download the content of files from a remote repository
+	getc           [<filenames>]               | Synonym for get-content
 	remove-content [<filenames>]               | Remove the content of local files that have already been uploaded
 	rmc            [<filenames>]               | Synonym for remove-content
 	repos          [<username>]                | List available remote repositories
@@ -180,14 +181,14 @@ ARGUMENTS
 const lockHelp = `USAGE
 
 	gin lock [<filenames>]...
-	
+
 DESCRIPTION
 
 	Lock one or more files after editing. After unlocking files for editing,
 	using the 'unlock' command, it is recommended that they be locked again.
 	This records any changes made and prepares a file for upload to the GIN
 	server.
-	
+
 	Locked files are replaced by symbolic links in the working directory.
 
 	After performing an 'upload', 'download', or 'get', affected files are
@@ -211,7 +212,7 @@ DESCRIPTION
 	the GIN server. This command must be called from within the local
 	repository clone. Specific files or directories may be specified.
 	All changes made will be sent to the server, including addition of new
-	files, modifications and renaming of existing files, and file deletions. 
+	files, modifications and renaming of existing files, and file deletions.
 
 ARGUMENTS
 
@@ -258,7 +259,7 @@ ARGUMENTS
 `
 
 const rmcHelp = `USAGE
-	
+
 	gin remove-content [<filenames>]...
 	gin rmc [<filenames>]...
 
@@ -371,8 +372,9 @@ var cmdHelp = map[string]string{
 	"unlock":         unlockHelp,
 	"lock":           lockHelp,
 	"upload":         uploadHelp,
-	"get-content":    getContentHelp,
 	"download":       downloadHelp,
+	"get-content":    getContentHelp,
+	"getc":           getContentHelp,
 	"remove-content": rmcHelp,
 	"rmc":            rmcHelp,
 	"repos":          reposHelp,
