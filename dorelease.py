@@ -213,7 +213,21 @@ def debianize(binfiles, annexsa_archive):
     For each Linux binary make a deb package with git annex standalone.
     """
     debs = []
-    with TemporaryDirectory(suffix="gin-linux") as tmpdir:
+
+    def docker_cleanup():
+        print("Stopping and cleaning up docker container")
+        cmd = ["docker", "kill", "gin-deb-build"]
+        call(cmd)
+        cmd = ["docker", "container", "rm", "gin-deb-build"]
+        call(cmd)
+
+    # The default temporary root on macOS is /var/folders
+    # Docker currently has issues mounting directories under /var
+    # Forcing temporary directory to be rooted at /tmp instead
+    tmpprefix = None
+    if sys.platform == "darwin":
+        tmpprefix = "/tmp/"
+    with TemporaryDirectory(prefix=tmpprefix, suffix="gin-linux") as tmpdir:
         cmd = ["docker", "build", "-t", "gin-deb", "debdock/."]
         print("Preparing docker image for debian build")
         call(cmd)
@@ -226,6 +240,7 @@ def debianize(binfiles, annexsa_archive):
         print("Starting debian docker container")
         if call(cmd) > 0:
             print("Container start failed", file=sys.stderr)
+            docker_cleanup()
             return
 
         cmd = ["docker", "ps"]
@@ -332,11 +347,7 @@ def debianize(binfiles, annexsa_archive):
             shutil.copy(debfilepath, debfiledest)
             debs.append(debfiledest)
             print("Done")
-        print("Stopping and cleaning up docker container")
-        cmd = ["docker", "kill", "gin-deb-build"]
-        call(cmd)
-        cmd = ["docker", "container", "rm", "gin-deb-build"]
-        call(cmd)
+        docker_cleanup()
     return debs
 
 
@@ -462,7 +473,8 @@ def main():
         """
         Print a list of files.
         """
-        print("".join("> " + l + "\n" for l in lst))
+        if lst:
+            print("".join("> " + l + "\n" for l in lst))
 
     def link_latest(lst):
         """
@@ -472,7 +484,7 @@ def main():
         for fname in lst:
             latestname = fname.replace(VERSION["version"], "latest")
             print("Linking {} to {}".format(fname, latestname))
-            if os.path.exists(latestname):
+            if os.path.lexists(latestname):
                 os.unlink(latestname)
             os.link(fname, latestname)
 

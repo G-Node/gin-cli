@@ -88,6 +88,12 @@ func logout(args []string) {
 
 func createRepo(args []string) {
 	var repoName, repoDesc string
+	var here bool
+
+	if len(args) > 0 && args[0] == "--here" {
+		here = true
+		args = args[1:]
+	}
 
 	if len(args) == 0 {
 		fmt.Print("Repository name: ")
@@ -114,8 +120,15 @@ func createRepo(args []string) {
 	util.CheckError(err)
 	green.Println("OK")
 
-	// Clone repository after creation
-	getRepo([]string{repoPath})
+	if here {
+		// Init cwd
+		ginclient.Workingdir = "."
+		_, err = gincl.InitDir(repoPath)
+		util.CheckError(err)
+	} else {
+		// Clone repository after creation
+		getRepo([]string{repoPath})
+	}
 }
 
 func deleteRepo(args []string) {
@@ -176,10 +189,8 @@ func getRepo(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	repoDir, err := gincl.CloneRepo(repostr)
+	_, err := gincl.CloneRepo(repostr)
 	util.CheckError(err)
-
-	ginclient.Workingdir = repoDir
 }
 
 func lsRepo(args []string) {
