@@ -33,7 +33,7 @@ func (gincl *Client) MakeSessionKey() error {
 		util.LogWrite("Could not retrieve hostname")
 		hostname = defaultHostname
 	}
-	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
+	description := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(keyPair.Public), description)
 	err = gincl.AddKey(pubkey, description, true)
 	if err != nil {
