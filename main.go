@@ -511,9 +511,16 @@ func gitrun(args []string) {
 	err := gincl.LoadToken()
 	util.CheckError(err)
 
-	stdout, stderr, err := ginclient.RunGitCommand(args...)
-	fmt.Print(stdout.String())
-	fmt.Fprint(os.Stderr, stderr.String())
+	cmd, err := ginclient.RunGitCommand(args...)
+	for {
+		line, readerr := cmd.OutPipe.ReadLine()
+		if readerr != nil {
+			break
+		}
+		fmt.Print(line)
+	}
+	fmt.Print(cmd.ErrPipe.ReadAll())
+	err = cmd.Wait()
 	if err != nil {
 		os.Exit(1)
 	}
@@ -524,12 +531,18 @@ func annexrun(args []string) {
 	err := gincl.LoadToken()
 	util.CheckError(err)
 	cmd, err := ginclient.RunAnnexCommand(args...)
+	var line string
 	for {
-		line, err := cmd.Output.ReadLine()
+		line, err = cmd.OutPipe.ReadLine()
 		if err != nil {
 			break
 		}
 		fmt.Print(line)
+	}
+	fmt.Print(cmd.ErrPipe.ReadAll())
+	err = cmd.Wait()
+	if err != nil {
+		os.Exit(1)
 	}
 }
 
@@ -599,7 +612,7 @@ func main() {
 	case "git":
 		gitrun(cmdArgs)
 	case "annex":
-		annexrunp(cmdArgs)
+		annexrun(cmdArgs)
 	default:
 		util.Die(usage)
 	}

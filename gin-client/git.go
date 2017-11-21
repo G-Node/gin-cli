@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -27,22 +26,22 @@ func SetGitUser(name, email string) error {
 	if !IsRepo() {
 		return fmt.Errorf("Not a repository")
 	}
-	_, _, err := RunGitCommand("config", "--local", "user.name", name)
+	_, err := RunGitCommand("config", "--local", "user.name", name)
 	if err != nil {
 		return err
 	}
-	_, _, err = RunGitCommand("config", "--local", "user.email", email)
+	_, err = RunGitCommand("config", "--local", "user.email", email)
 	return err
 }
 
 // AddRemote adds a remote named name for the repository at url.
 func AddRemote(name, url string) error {
-	stdout, stderr, err := RunGitCommand("remote", "add", name, url)
+	cmd, err := RunGitCommand("remote", "add", name, url)
 	if err != nil {
+		stderr := cmd.ErrPipe.ReadAll()
 		util.LogWrite("Error during remote add command")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		if strings.Contains(stderr.String(), "already exists") {
+		cmd.LogStdOutErr()
+		if strings.Contains(stderr, "already exists") {
 			return fmt.Errorf("Remote with name %s already exists", name)
 		}
 	}
@@ -56,7 +55,7 @@ func CommitIfNew() (bool, error) {
 	if !IsRepo() {
 		return false, fmt.Errorf("Not a repository")
 	}
-	_, _, err := RunGitCommand("rev-parse", "HEAD")
+	_, err := RunGitCommand("rev-parse", "HEAD")
 	if err == nil {
 		// All good. No need to do anything
 		return false, nil
@@ -68,11 +67,10 @@ func CommitIfNew() (bool, error) {
 		hostname = defaultHostname
 	}
 	commitargs := []string{"commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname)}
-	stdout, stderr, err := RunGitCommand(commitargs...)
+	cmd, err := RunGitCommand(commitargs...)
 	if err != nil {
 		util.LogWrite("Error while creating initial commit")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return false, err
 	}
 	return true, nil
@@ -101,19 +99,19 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 // (git clone ...)
 func (gincl *Client) Clone(repoPath string) error {
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
-	stdout, stderr, err := RunGitCommand("clone", remotePath)
+	cmd, err := RunGitCommand("clone", remotePath)
 	if err != nil {
 		util.LogWrite("Error during clone command")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		repoOwner, repoName := splitRepoParts(repoPath)
 
-		if strings.Contains(stderr.String(), "Server returned non-OK status: 404") {
+		stderr := cmd.ErrPipe.ReadAll()
+		if strings.Contains(stderr, "Server returned non-OK status: 404") {
 			return fmt.Errorf("Error retrieving repository.\n"+
 				"Please make sure you typed the repository path correctly.\n"+
 				"Type 'gin repos %s' to see if the repository exists and if you have access to it.",
 				repoOwner)
-		} else if strings.Contains(stderr.String(), "already exists and is not an empty directory") {
+		} else if strings.Contains(stderr, "already exists and is not an empty directory") {
 			return fmt.Errorf("Error retrieving repository.\n"+
 				"'%s' already exists in the current directory and is not empty.", repoName)
 		} else {
@@ -132,20 +130,18 @@ func (gincl *Client) Clone(repoPath string) error {
 // (git annex init)
 func AnnexInit(description string) error {
 	args := []string{"init", description}
-	stdout, stderr, err := RunAnnexCommand(args...)
-	util.LogWrite("[stdout]\r\n%s", stdout.String())
-	util.LogWrite("[stderr]\r\n%s", stderr.String())
+	cmd, err := RunAnnexCommand(args...)
+	cmd.LogStdOutErr()
 	if err != nil {
 		initError := fmt.Errorf("Repository annex initialisation failed.")
 		util.LogWrite(initError.Error())
 		return initError
 	}
-	stdout, stderr, err = RunGitCommand("config", "annex.backends", "MD5")
+	cmd, err = RunGitCommand("config", "annex.backends", "MD5")
 	if err != nil {
 		util.LogWrite("Failed to set default annex backend MD5")
 		util.LogWrite("[Error]: %v", err)
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 	}
 	return nil
 }
@@ -158,12 +154,11 @@ func AnnexPull(content bool) error {
 	if content {
 		args = append(args, "--content")
 	}
-	stdout, stderr, err := RunAnnexCommand(args...)
+	cmd, err := RunAnnexCommand(args...)
 	if err != nil {
 		util.LogWrite("Error during AnnexPull.")
 		util.LogWrite("[Error]: %v", err)
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return fmt.Errorf("Error downloading files")
 	}
 	return nil
@@ -178,13 +173,12 @@ func AnnexSync(content bool) error {
 	if content {
 		args = append(args, "--content")
 	}
-	stdout, stderr, err := RunAnnexCommand(args...)
+	cmd, err := RunAnnexCommand(args...)
 
 	if err != nil {
 		util.LogWrite("Error during AnnexSync")
 		util.LogWrite("[Error]: %v", err)
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return fmt.Errorf("Error synchronising files")
 	}
 	return nil
@@ -200,13 +194,12 @@ func AnnexPush(paths []string, commitMsg string) error {
 	// }
 	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
 	// cmdargs = append(cmdargs, contarg...)
-	stdout, stderr, err := RunAnnexCommand(cmdargs...)
+	cmd, err := RunAnnexCommand(cmdargs...)
 
 	if err != nil {
 		util.LogWrite("Error during AnnexPush (sync --no-pull)")
 		util.LogWrite("[Error]: %v", err)
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return fmt.Errorf("Error uploading files")
 	}
 
@@ -214,13 +207,12 @@ func AnnexPush(paths []string, commitMsg string) error {
 	cmdargs = append(cmdargs, paths...)
 	// NOTE: Using origin which is the conventional default remote. This should be fixed.
 	cmdargs = append(cmdargs, "--to=origin")
-	stdout, stderr, err = RunAnnexCommand(cmdargs...)
+	cmd, err = RunAnnexCommand(cmdargs...)
 
 	if err != nil {
 		util.LogWrite("Error during AnnexPush (copy)")
 		util.LogWrite("[Error]: %v", err)
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return fmt.Errorf("Error uploading files")
 	}
 	return nil
@@ -232,12 +224,11 @@ func AnnexPush(paths []string, commitMsg string) error {
 func AnnexGet(filepaths []string) error {
 	// TODO: Print success for each file as it finishes
 	cmdargs := append([]string{"get"}, filepaths...)
-	stdout, stderr, err := RunAnnexCommand(cmdargs...)
+	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexGet")
 		util.LogWrite("[Error]: %v", err)
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return fmt.Errorf("Error downloading files")
 	}
 	return nil
@@ -249,12 +240,11 @@ func AnnexGet(filepaths []string) error {
 func AnnexDrop(filepaths []string) error {
 	// TODO: Print success for each file as it finishes
 	cmdargs := append([]string{"drop"}, filepaths...)
-	stdout, stderr, err := RunAnnexCommand(cmdargs...)
+	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexDrop")
 		util.LogWrite("[Error]: %v", err)
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return fmt.Errorf("Error removing files")
 	}
 	return nil
@@ -267,11 +257,10 @@ func setBare(state bool) error {
 	} else {
 		statestr = "false"
 	}
-	stdout, stderr, err := RunGitCommand("config", "--local", "--bool", "core.bare", statestr)
+	cmd, err := RunGitCommand("config", "--local", "--bool", "core.bare", statestr)
 	if err != nil {
 		util.LogWrite("Error switching bare status to %s", statestr)
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 	}
 	return err
 }
@@ -306,16 +295,17 @@ func GitAdd(filepaths []string) ([]string, error) {
 	}
 
 	cmdargs := append([]string{"add", "--verbose"}, filepaths...)
-	stdout, stderr, err := RunGitCommand(cmdargs...)
+	cmd, err := RunGitCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during GitAdd")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return nil, fmt.Errorf("Error adding files to repository")
 	}
 
 	var added []string
-	for _, line := range strings.Split(stdout.String(), "\n") {
+	// TODO: Buffered reading
+	stdout := cmd.OutPipe.ReadAll()
+	for _, line := range strings.Split(stdout, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -344,16 +334,17 @@ func GitLsFiles(args []string) ([]string, error) {
 	}
 
 	cmdargs := append([]string{"ls-files"}, args...)
-	stdout, stderr, err := RunGitCommand(cmdargs...)
+	cmd, err := RunGitCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during GitLsFiles")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return nil, fmt.Errorf("Error listing files in repository")
 	}
 
 	var filelist []string
-	for _, fl := range strings.Split(stdout.String(), "\n") {
+	// TODO: Buffered reading
+	stdout := cmd.OutPipe.ReadAll()
+	for _, fl := range strings.Split(stdout, "\n") {
 		fl = strings.TrimSpace(fl)
 		if fl != "" {
 			filelist = append(filelist, fl)
@@ -400,22 +391,23 @@ func AnnexAdd(filepaths []string) ([]string, error) {
 		cmdargs = append(cmdargs, exclargs...)
 	}
 
-	stdout, stderr, err := RunAnnexCommand(cmdargs...)
+	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexAdd")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return nil, fmt.Errorf("Error adding files to repository.")
 	}
 
 	var outStruct AnnexAddResult
-	files := bytes.Split(stdout.Bytes(), []byte("\n"))
+	// TODO: Buffered reading
+	stdout := cmd.OutPipe.ReadAll()
+	files := strings.Split(stdout, "\n")
 	added := make([]string, 0, len(files))
 	for _, f := range files {
 		if len(f) == 0 {
 			continue
 		}
-		err := json.Unmarshal(f, &outStruct)
+		err := json.Unmarshal([]byte(f), &outStruct)
 		if err != nil {
 			return nil, err
 		}
@@ -451,22 +443,23 @@ type AnnexWhereisResult struct {
 func AnnexWhereis(paths []string) ([]AnnexWhereisResult, error) {
 	cmdargs := []string{"whereis", "--json"}
 	cmdargs = append(cmdargs, paths...)
-	stdout, stderr, err := RunAnnexCommand(cmdargs...)
+	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return nil, fmt.Errorf("Error getting file status from server")
 	}
 
-	resultsJSON := bytes.Split(stdout.Bytes(), []byte("\n"))
+	// TODO: Buffered reading
+	stdout := cmd.OutPipe.ReadAll()
+	resultsJSON := strings.Split(stdout, "\n")
 	results := make([]AnnexWhereisResult, 0, len(resultsJSON))
 	for _, resJSON := range resultsJSON {
 		if len(resJSON) == 0 {
 			continue
 		}
 		var res AnnexWhereisResult
-		err := json.Unmarshal(resJSON, &res)
+		err := json.Unmarshal([]byte(resJSON), &res)
 		if err != nil {
 			return nil, err
 		}
@@ -486,15 +479,16 @@ type AnnexStatusResult struct {
 func AnnexStatus(paths ...string) ([]AnnexStatusResult, error) {
 	cmdargs := []string{"status", "--json"}
 	cmdargs = append(cmdargs, paths...)
-	stdout, stderr, err := RunAnnexCommand(cmdargs...)
+	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during DescribeChanges")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return nil, fmt.Errorf("Error retrieving file status")
 	}
 
-	files := bytes.Split(stdout.Bytes(), []byte("\n"))
+	// TODO: Buffered reading
+	stdout := cmd.OutPipe.ReadAll()
+	files := strings.Split(stdout, "\n")
 
 	statuses := make([]AnnexStatusResult, 0, len(files))
 	var outStruct AnnexStatusResult
@@ -503,7 +497,7 @@ func AnnexStatus(paths ...string) ([]AnnexStatusResult, error) {
 			// can return empty lines
 			continue
 		}
-		err := json.Unmarshal(f, &outStruct)
+		err := json.Unmarshal([]byte(f), &outStruct)
 		if err != nil {
 			return nil, err
 		}
@@ -602,11 +596,10 @@ func AnnexLock(paths ...string) error {
 	}
 	cmdargs := []string{"add"}
 	cmdargs = append(cmdargs, unlockedfiles...)
-	stdout, stderr, err := RunAnnexCommand(cmdargs...)
+	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexLock")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return fmt.Errorf("Error locking files")
 	}
 	return nil
@@ -618,11 +611,10 @@ func AnnexLock(paths ...string) error {
 func AnnexUnlock(paths ...string) error {
 	cmdargs := []string{"unlock"}
 	cmdargs = append(cmdargs, paths...)
-	stdout, stderr, err := RunAnnexCommand(cmdargs...)
+	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during AnnexUnlock")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return fmt.Errorf("Error unlocking files")
 	}
 	return nil
@@ -658,16 +650,17 @@ type AnnexInfoResult struct {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex info)
 func AnnexInfo() (AnnexInfoResult, error) {
-	stdout, stderr, err := RunAnnexCommand("info", "--json")
+	cmd, err := RunAnnexCommand("info", "--json")
 	if err != nil {
 		util.LogWrite("Error during AnnexInfo")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		return AnnexInfoResult{}, fmt.Errorf("Error retrieving annex info")
 	}
 
+	// TODO: Buffered reading
+	stdout := cmd.OutPipe.ReadAll()
 	var info AnnexInfoResult
-	err = json.Unmarshal(stdout.Bytes(), &info)
+	err = json.Unmarshal([]byte(stdout), &info)
 	return info, err
 }
 
@@ -681,12 +674,15 @@ func IsDirect() bool {
 	if mode, ok := modecache[Workingdir]; ok {
 		return mode
 	}
-	stdout, _, err := RunGitCommand("config", "--local", "annex.direct")
+	cmd, err := RunGitCommand("config", "--local", "annex.direct")
 	if err != nil {
-		// Don't cache this result
+		// Don't catch this result
 		return false
 	}
-	if strings.TrimSpace(stdout.String()) == "true" {
+
+	// TODO: Buffered reading
+	stdout := cmd.OutPipe.ReadAll()
+	if strings.TrimSpace(stdout) == "true" {
 		modecache[Workingdir] = true
 		return true
 	}
@@ -791,15 +787,17 @@ func selectGitOrAnnex(paths []string) (gitpaths []string, annexpaths []string) {
 
 // GetAnnexVersion returns the version string of the system's git-annex.
 func GetAnnexVersion() (string, error) {
-	stdout, stderr, err := RunAnnexCommand("version", "--raw")
+	cmd, err := RunAnnexCommand("version", "--raw")
 	if err != nil {
 		util.LogWrite("Error while checking git-annex version")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
-		if strings.Contains(stderr.String(), "command not found") {
+		cmd.LogStdOutErr()
+		if strings.Contains(cmd.ErrPipe.ReadAll(), "command not found") {
 			return "", fmt.Errorf("Error: git-annex command not found")
 		}
 		return "", err
 	}
-	return stdout.String(), nil
+
+	// TODO: Buffered reading
+	stdout := cmd.OutPipe.ReadAll()
+	return stdout, nil
 }

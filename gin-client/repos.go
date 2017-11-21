@@ -224,11 +224,10 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 
 	if !IsRepo() {
-		stdout, stderr, err := RunGitCommand("init")
+		cmd, err := RunGitCommand("init")
 		if err != nil {
 			util.LogWrite("Error during Init command")
-			util.LogWrite("[stdout]\r\n%s", stdout.String())
-			util.LogWrite("[stderr]\r\n%s", stderr.String())
+			cmd.LogStdOutErr()
 			return "", initerr
 		}
 		Workingdir = "."
@@ -241,9 +240,11 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 
 	// If there is no global git user.name or user.email set local ones
-	globalGitName, _, _ := RunGitCommand("config", "--global", "user.name")
-	globalGitEmail, _, _ := RunGitCommand("config", "--global", "user.Email")
-	if globalGitName.Len() == 0 && globalGitEmail.Len() == 0 {
+	cmd, _ := RunGitCommand("config", "--global", "user.name")
+	globalGitName := cmd.OutPipe.ReadAll()
+	cmd, _ = RunGitCommand("config", "--global", "user.Email")
+	globalGitEmail := cmd.OutPipe.ReadAll()
+	if len(globalGitName) == 0 && len(globalGitEmail) == 0 {
 		info, ierr := gincl.RequestAccount(gincl.Username)
 		name := info.FullName
 		if ierr != nil {
@@ -275,11 +276,10 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 
 	if new {
 		// Push initial commit and set default remote
-		stdout, stderr, err := RunGitCommand("push", "--set-upstream", "origin", "master")
+		cmd, err := RunGitCommand("push", "--set-upstream", "origin", "master")
 		if err != nil {
 			util.LogWrite("Error during set upstream command")
-			util.LogWrite("[stdout]\r\n%s", stdout.String())
-			util.LogWrite("[stderr]\r\n%s", stderr.String())
+			cmd.LogStdOutErr()
 			return "", initerr
 		}
 
@@ -473,15 +473,14 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	// If cached files are diff from upstream, mark as LocalChanges
 	diffargs := []string{"diff", "--name-only", "--relative", "@{upstream}"}
 	diffargs = append(diffargs, cachedfiles...)
-	stdout, stderr, err := RunGitCommand(diffargs...)
+	cmd, err := RunGitCommand(diffargs...)
 	if err != nil {
 		util.LogWrite("Error during diff command for status")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		// ignoring error and continuing
 	}
 
-	diffresults := strings.Split(stdout.String(), "\n")
+	diffresults := strings.Split(cmd.OutPipe.ReadAll(), "\n")
 	for _, fname := range diffresults {
 		// Two notes:
 		//		1. There will definitely be overlap here with the same status in annex (not a problem)
