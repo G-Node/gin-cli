@@ -225,8 +225,8 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 
 	if !IsRepo() {
 		cmd, err := RunGitCommand("init")
-		if err != nil {
-			util.LogWrite("Error during Init command")
+		if err != nil || cmd.Wait() != nil {
+			util.LogWrite("Error during Init command: %s", err.Error())
 			cmd.LogStdOutErr()
 			return "", initerr
 		}

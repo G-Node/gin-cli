@@ -100,7 +100,8 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 func (gincl *Client) Clone(repoPath string) error {
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 	cmd, err := RunGitCommand("clone", remotePath)
-	if err != nil {
+	// TODO: Parse output and print progress
+	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during clone command")
 		cmd.LogStdOutErr()
 		repoOwner, repoName := splitRepoParts(repoPath)
