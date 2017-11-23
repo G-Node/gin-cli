@@ -130,28 +130,44 @@ func (gincl *Client) DelRepo(name string) error {
 }
 
 // Upload adds files to a repository and uploads them.
-func (gincl *Client) Upload(paths []string) error {
+func (gincl *Client) Upload(paths []string, outchan chan<- string, errchan chan<- error) {
 	util.LogWrite("Upload")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
-		return err
+		errchan <- err
+		return
 	}
 
 	if len(paths) > 0 {
+		outchan <- "Preparing ...\n"
 		// Run git annex add using exclusion filters and then add the rest to git
-		_, err = AnnexAdd(paths)
-		if err != nil {
-			return err
+		annexfiles, ierr := AnnexAdd(paths)
+		if ierr != nil {
+			errchan <- ierr
+			return
 		}
-		_, err = GitAdd(paths)
-		if err != nil {
-			return err
+		if len(annexfiles) > 0 {
+			outchan <- "Added to large file store:\n"
+			outchan <- strings.Join(annexfiles, "\n")
+			outchan <- "\n"
+		}
+
+		gitfiles, ierr := GitAdd(paths)
+		if ierr != nil {
+			errchan <- ierr
+			return
+		}
+		if len(gitfiles) > 0 {
+			outchan <- "Added to small file store:\n"
+			outchan <- strings.Join(gitfiles, "\n")
+			outchan <- "\n"
 		}
 	}
 	changes, err := DescribeIndexShort()
 	if err != nil {
-		return err
+		errchan <- err
+		return
 	}
 	// add header commit line
 	hostname, err := os.Hostname()
@@ -161,14 +177,22 @@ func (gincl *Client) Upload(paths []string) error {
 	}
 	if changes == "" {
 		changes = "No changes recorded"
+		outchan <- "No new files have been added\n"
 	}
 	changes = fmt.Sprintf("gin upload from %s\n\n%s", hostname, changes)
 	if err != nil {
-		return err
+		errchan <- err
+		return
 	}
 
+	outchan <- "Uploading files: "
 	err = AnnexPush(paths, changes)
-	return err
+	if err != nil {
+		errchan <- err
+	}
+	close(outchan)
+	close(errchan)
+	return
 }
 
 // DownloadRepo downloads the files in an already checked out repository.

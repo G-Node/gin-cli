@@ -279,8 +279,18 @@ func upload(args []string) {
 
 	fmt.Print("Uploading... ")
 
-	err = gincl.Upload(args)
-	util.CheckError(err)
+	ulout := make(chan string)
+	ulerr := make(chan error)
+	go gincl.Upload(args, ulout, ulerr)
+	var out string
+	for ok := true; ok; {
+		select {
+		case out, ok = <-ulout:
+			fmt.Print(out)
+		case err, ok = <-ulerr:
+			util.CheckError(err)
+		}
+	}
 	_, _ = green.Println("OK")
 }
 
