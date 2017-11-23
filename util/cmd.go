@@ -55,3 +55,11 @@ func (cmd *GinCmd) LogStdOutErr() {
 	LogWrite("[stdout]\r\n%s", stdout)
 	LogWrite("[stderr]\r\n%s", stderr)
 }
+
+// Wait collects stdout and stderr from the command and then waits for the command to finish before returning.
+// Stdout and stderr are then available for reading through each pipe's respective cache.
+func (cmd *GinCmd) Wait() error {
+	_ = cmd.OutPipe.ReadAll()
+	_ = cmd.ErrPipe.ReadAll()
+	return cmd.Cmd.Wait()
+}
