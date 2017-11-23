@@ -121,8 +121,10 @@ func createRepo(args []string) {
 	if here {
 		// Init cwd
 		ginclient.Workingdir = "."
+		fmt.Printf("Initialising local storage... ")
 		_, err = gincl.InitDir(repoPath)
 		util.CheckError(err)
+		_, _ = green.Println("OK")
 	} else {
 		// Clone repository after creation
 		getRepo([]string{repoPath})
@@ -184,11 +186,13 @@ func getRepo(args []string) {
 		util.Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
 	}
 
+	fmt.Printf("Fetching repository '%s'... ", repostr)
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	_, err := gincl.CloneRepo(repostr)
 	util.CheckError(err)
+	_, _ = green.Println("OK")
 }
 
 func lsRepo(args []string) {

@@ -205,12 +205,10 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 		return "", err
 	}
 
-	fmt.Printf("Fetching repository '%s'... ", repoPath)
 	err = gincl.Clone(repoPath)
 	if err != nil {
 		return "", err
 	}
-	green.Println("OK")
 	_, repoName := splitRepoParts(repoPath)
 	Workingdir = repoName
 	return gincl.InitDir(repoPath)
@@ -218,7 +216,6 @@ func (gincl *Client) CloneRepo(repoPath string) (string, error) {
 
 // InitDir initialises the local directory with the default remote and annex configuration.
 func (gincl *Client) InitDir(repoPath string) (string, error) {
-	fmt.Printf("Initialising local storage... ")
 	_, repoName := splitRepoParts(repoPath)
 	initerr := fmt.Errorf("Error initialising local directory")
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
@@ -290,7 +287,6 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 		}
 	}
 
-	green.Println("OK")
 	return repoName, nil
 }
 
