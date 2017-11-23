@@ -116,7 +116,7 @@ func createRepo(args []string) {
 	err = gincl.CreateRepo(repoName, repoDesc)
 	// Parse error message and make error nicer
 	util.CheckError(err)
-	green.Println("OK")
+	_, _ = green.Println("OK")
 
 	if here {
 		// Init cwd
@@ -277,7 +277,7 @@ func upload(args []string) {
 
 	err = gincl.Upload(args)
 	util.CheckError(err)
-	green.Println("OK")
+	_, _ = green.Println("OK")
 }
 
 func download(args []string) {
@@ -300,7 +300,7 @@ func download(args []string) {
 	gincl.GitUser = util.Config.GitUser
 	fmt.Print("Downloading...")
 	err = gincl.DownloadRepo(content)
-	green.Println("OK")
+	_, _ = green.Println("OK")
 	util.CheckError(err)
 }
 
