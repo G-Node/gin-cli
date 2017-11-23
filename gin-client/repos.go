@@ -277,6 +277,7 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 	if new {
 		// Push initial commit and set default remote
 		cmd, err := RunGitCommand("push", "--set-upstream", "origin", "master")
+		// TODO: Parse output or wait for command to finish
 		if err != nil {
 			util.LogWrite("Error during set upstream command")
 			cmd.LogStdOutErr()
@@ -474,6 +475,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	diffargs := []string{"diff", "--name-only", "--relative", "@{upstream}"}
 	diffargs = append(diffargs, cachedfiles...)
 	cmd, err := RunGitCommand(diffargs...)
+	// TODO: Parse output or wait for command to finish
 	if err != nil {
 		util.LogWrite("Error during diff command for status")
 		cmd.LogStdOutErr()
