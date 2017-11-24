@@ -7,7 +7,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
@@ -239,10 +238,6 @@ func AnnexPush(paths []string, commitMsg string, outchan chan<- string) error {
 	outchan <- "Uploading\n"
 	var ulfilename string
 
-	cleanmultispace := func(str string) string {
-		re := regexp.MustCompile(`\s+`)
-		return re.ReplaceAllString(strings.TrimSpace(str), " ")
-	}
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
@@ -253,7 +248,7 @@ func AnnexPush(paths []string, commitMsg string, outchan chan<- string) error {
 			ulfilename = strings.TrimSpace(words[1])
 			outchan <- fmt.Sprintf("Uploading %s\n", ulfilename)
 		} else if strings.Contains(line, "%") {
-			line = cleanmultispace(line)
+			line = util.CleanSpaces(line)
 			words := strings.Split(line, " ")
 			progress := words[1]
 			rate := words[2]

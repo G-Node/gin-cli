@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"io"
 	"os/exec"
+	"regexp"
+	"strings"
 )
 
 // Reader extends bufio.Reader with convenience functions for reading and caching piped output.
@@ -99,4 +101,10 @@ func (cmd *GinCmd) Wait() error {
 	_ = cmd.OutPipe.ReadAll()
 	_ = cmd.ErrPipe.ReadAll()
 	return cmd.Cmd.Wait()
+}
+
+// CleanSpaces replaces multiple occurences of the space character with one and trims leading and trailing spaces from a string.
+func CleanSpaces(str string) string {
+	re := regexp.MustCompile(`\s+`)
+	return re.ReplaceAllString(strings.TrimSpace(str), " ")
 }
