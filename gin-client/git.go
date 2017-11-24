@@ -246,16 +246,14 @@ func AnnexPush(paths []string, commitMsg string, outchan chan<- string) error {
 		if strings.HasPrefix(line, "copy") {
 			words := strings.Split(line, " ")
 			ulfilename = strings.TrimSpace(words[1])
-			outchan <- fmt.Sprintf("Uploading %s\n", ulfilename)
+			outchan <- fmt.Sprintf("FILE %s", ulfilename)
 		} else if strings.Contains(line, "%") {
 			line = util.CleanSpaces(line)
 			words := strings.Split(line, " ")
 			progress := words[1]
+			outchan <- fmt.Sprintf("PROGRESS %s", progress)
 			rate := words[2]
-			outchan <- fmt.Sprintf("\r%s: %s (%s)", ulfilename, progress, rate)
-			if progress == "100%" {
-				outchan <- green.Sprint(" OK\n")
-			}
+			outchan <- fmt.Sprintf("RATE %s", rate)
 		}
 	}
 	if err != nil {
