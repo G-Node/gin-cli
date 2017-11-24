@@ -2,12 +2,14 @@ package util
 
 import (
 	"bufio"
+	"bytes"
+	"io"
 	"os/exec"
 )
 
 // Reader extends bufio.Reader with convenience functions for reading and caching piped output.
 type Reader struct {
-	*bufio.Reader
+	*bufio.Scanner
 	cache string
 }
 
@@ -23,15 +25,50 @@ func Command(name string, args ...string) GinCmd {
 	cmd := exec.Command(name, args...)
 	outpipe, _ := cmd.StdoutPipe()
 	errpipe, _ := cmd.StderrPipe()
-	outreader := bufio.NewReader(outpipe)
-	errreader := bufio.NewReader(errpipe)
+	outreader := bufio.NewScanner(outpipe)
+	errreader := bufio.NewScanner(errpipe)
+	outreader.Split(scanLinesCR)
+	errreader.Split(scanLinesCR)
 	var cout, cerr string
 	return GinCmd{cmd, &Reader{outreader, cout}, &Reader{errreader, cerr}}
 }
 
+// scanLinesCR is a modification of the default split function for the Scanner.
+// Instead of splitting just on new line (\n), it also splits on carriage return (\r).
+// Unlike most split functions, the delimiter is included in the returned data.
+func scanLinesCR(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	cridx := bytes.IndexByte(data, '\r')
+	nlidx := bytes.IndexByte(data, '\n')
+	idx := -1
+	if cridx >= 0 {
+		idx = cridx
+	}
+	if nlidx >= 0 && nlidx < cridx {
+		idx = nlidx
+	}
+	if idx >= 0 {
+		return idx + 1, data[0 : idx+1], nil
+	}
+	if atEOF {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
+}
+
 // ReadLine returns the next line in the buffer, delimited by '\n'.
-func (reader *Reader) ReadLine() (string, error) {
-	str, err := reader.ReadString('\n')
+func (reader *Reader) ReadLine() (str string, err error) {
+	ok := reader.Scan()
+	if ok {
+		str = reader.Text()
+	} else if err != nil {
+		err = reader.Err()
+	} else {
+		err = io.EOF
+	}
+
 	reader.cache += str
 	return str, err
 }

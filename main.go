@@ -277,8 +277,6 @@ func upload(args []string) {
 		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
 	}
 
-	fmt.Print("Uploading... ")
-
 	ulout := make(chan string)
 	ulerr := make(chan error)
 	go gincl.Upload(args, ulout, ulerr)
@@ -291,7 +289,7 @@ func upload(args []string) {
 			util.CheckError(err)
 		}
 	}
-	_, _ = green.Println("OK")
+	// _, _ = green.Println("OK")
 }
 
 func download(args []string) {

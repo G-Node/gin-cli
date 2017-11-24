@@ -140,28 +140,18 @@ func (gincl *Client) Upload(paths []string, outchan chan<- string, errchan chan<
 	}
 
 	if len(paths) > 0 {
-		outchan <- "Preparing ...\n"
+		outchan <- "Preparing files for upload ...\n"
 		// Run git annex add using exclusion filters and then add the rest to git
-		annexfiles, ierr := AnnexAdd(paths)
+		_, ierr := AnnexAdd(paths, outchan)
 		if ierr != nil {
 			errchan <- ierr
 			return
-		}
-		if len(annexfiles) > 0 {
-			outchan <- "Added to large file store:\n"
-			outchan <- strings.Join(annexfiles, "\n")
-			outchan <- "\n"
 		}
 
-		gitfiles, ierr := GitAdd(paths)
+		_, ierr = GitAdd(paths, outchan)
 		if ierr != nil {
 			errchan <- ierr
 			return
-		}
-		if len(gitfiles) > 0 {
-			outchan <- "Added to small file store:\n"
-			outchan <- strings.Join(gitfiles, "\n")
-			outchan <- "\n"
 		}
 	}
 	changes, err := DescribeIndexShort()
@@ -186,7 +176,7 @@ func (gincl *Client) Upload(paths []string, outchan chan<- string, errchan chan<
 	}
 
 	outchan <- "Uploading files: "
-	err = AnnexPush(paths, changes)
+	err = AnnexPush(paths, changes, outchan)
 	if err != nil {
 		errchan <- err
 	}

@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
@@ -204,7 +205,7 @@ func AnnexSync(content bool) error {
 // AnnexPush uploads all annexed files.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex sync --no-pull --content)
-func AnnexPush(paths []string, commitMsg string) error {
+func AnnexPush(paths []string, commitMsg string, outchan chan<- string) error {
 	// contarg := make([]string, len(paths))
 	// for idx, p := range paths {
 	// 	contarg[idx] = fmt.Sprintf("--content-of=%s", p)
@@ -213,6 +214,13 @@ func AnnexPush(paths []string, commitMsg string) error {
 	// cmdargs = append(cmdargs, contarg...)
 	cmd, err := RunAnnexCommand(cmdargs...)
 	// TODO: Parse output
+	outchan <- "Doing sync\n"
+	for {
+		_, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -228,6 +236,33 @@ func AnnexPush(paths []string, commitMsg string) error {
 	// NOTE: Using origin which is the conventional default remote. This should be fixed.
 	cmdargs = append(cmdargs, "--to=origin")
 	cmd, err = RunAnnexCommand(cmdargs...)
+	outchan <- "Uploading\n"
+	var ulfilename string
+
+	cleanmultispace := func(str string) string {
+		re := regexp.MustCompile(`\s+`)
+		return re.ReplaceAllString(strings.TrimSpace(str), " ")
+	}
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		if strings.HasPrefix(line, "copy") {
+			words := strings.Split(line, " ")
+			ulfilename = strings.TrimSpace(words[1])
+			outchan <- fmt.Sprintf("Uploading %s\n", ulfilename)
+		} else if strings.Contains(line, "%") {
+			line = cleanmultispace(line)
+			words := strings.Split(line, " ")
+			progress := words[1]
+			rate := words[2]
+			outchan <- fmt.Sprintf("\r%s: %s (%s)", ulfilename, progress, rate)
+			if progress == "100%" {
+				outchan <- green.Sprint(" OK\n")
+			}
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -301,7 +336,7 @@ func setBare(state bool) error {
 // In indirect mode, adding annexed files to git has no effect.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git add)
-func GitAdd(filepaths []string) ([]string, error) {
+func GitAdd(filepaths []string, outchan chan<- string) ([]string, error) {
 	if len(filepaths) == 0 {
 		util.LogWrite("No paths to add to git. Nothing to do.")
 		return nil, nil
@@ -331,6 +366,13 @@ func GitAdd(filepaths []string) ([]string, error) {
 		return nil, err
 	}
 	// TODO: Parse output
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		outchan <- line
+	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during GitAdd")
 		cmd.LogStdOutErr()
@@ -404,7 +446,7 @@ type AnnexAddResult struct {
 // Files specified for exclusion in the configuration are ignored automatically.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex add)
-func AnnexAdd(filepaths []string) ([]string, error) {
+func AnnexAdd(filepaths []string, outchan chan<- string) ([]string, error) {
 	if len(filepaths) == 0 {
 		util.LogWrite("No paths to add to annex. Nothing to do.")
 		return nil, nil
@@ -433,6 +475,13 @@ func AnnexAdd(filepaths []string) ([]string, error) {
 	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		return nil, err
+	}
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		outchan <- line
 	}
 	// TODO: Parse output or wait for command to finish
 	if err = cmd.Wait(); err != nil {
