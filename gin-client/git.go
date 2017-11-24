@@ -201,10 +201,18 @@ func AnnexSync(content bool) error {
 	return nil
 }
 
+type PushStatus struct {
+	Filename string
+	Progress string
+	Rate     string
+	Err      error
+}
+
 // AnnexPush uploads all annexed files.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex sync --no-pull --content)
-func AnnexPush(paths []string, commitMsg string, outchan chan<- string) error {
+func AnnexPush(paths []string, commitMsg string, outchan chan<- PushStatus) error {
+	defer close(outchan)
 	// contarg := make([]string, len(paths))
 	// for idx, p := range paths {
 	// 	contarg[idx] = fmt.Sprintf("--content-of=%s", p)
@@ -213,7 +221,7 @@ func AnnexPush(paths []string, commitMsg string, outchan chan<- string) error {
 	// cmdargs = append(cmdargs, contarg...)
 	cmd, err := RunAnnexCommand(cmdargs...)
 	// TODO: Parse output
-	outchan <- "Doing sync\n"
+	// outchan <- "Doing sync\n"
 	for {
 		_, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
@@ -235,9 +243,8 @@ func AnnexPush(paths []string, commitMsg string, outchan chan<- string) error {
 	// NOTE: Using origin which is the conventional default remote. This should be fixed.
 	cmdargs = append(cmdargs, "--to=origin")
 	cmd, err = RunAnnexCommand(cmdargs...)
-	outchan <- "Uploading\n"
-	var ulfilename string
-
+	// outchan <- "Uploading\n"
+	var status PushStatus
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
@@ -245,21 +252,18 @@ func AnnexPush(paths []string, commitMsg string, outchan chan<- string) error {
 		}
 		if strings.HasPrefix(line, "copy") {
 			words := strings.Split(line, " ")
-			ulfilename = strings.TrimSpace(words[1])
-			outchan <- fmt.Sprintf("FILE %s", ulfilename)
+			status.Filename = strings.TrimSpace(words[1])
+			// new file - reset Progress and Rate
+			status.Progress = ""
+			status.Rate = ""
 		} else if strings.Contains(line, "%") {
 			line = util.CleanSpaces(line)
 			words := strings.Split(line, " ")
-			progress := words[1]
-			outchan <- fmt.Sprintf("PROGRESS %s", progress)
-			rate := words[2]
-			outchan <- fmt.Sprintf("RATE %s", rate)
+			status.Progress = words[1]
+			status.Rate = words[2]
 		}
+		outchan <- status
 	}
-	if err != nil {
-		return err
-	}
-	// TODO: Parse output
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexPush (copy)")
 		util.LogWrite("[Error]: %v", err)

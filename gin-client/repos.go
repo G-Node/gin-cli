@@ -176,9 +176,28 @@ func (gincl *Client) Upload(paths []string, outchan chan<- string, errchan chan<
 	}
 
 	outchan <- "Uploading files: "
-	err = AnnexPush(paths, changes, outchan)
-	if err != nil {
-		errchan <- err
+	pushchan := make(chan PushStatus)
+	go AnnexPush(paths, changes, pushchan)
+	// if err != nil {
+	// 	errchan <- err
+	// }
+	var fname string
+	for {
+		stat, ok := <-pushchan
+		if !ok {
+			break
+		}
+		if stat.Err != nil {
+			errchan <- stat.Err
+		}
+		if stat.Filename != fname {
+			fname = stat.Filename
+			outchan <- "\n"
+		}
+		outchan <- fmt.Sprintf("\r%s: %s (%s)", stat.Filename, stat.Progress, stat.Rate)
+		if stat.Progress == "100%" {
+			outchan <- green.Sprint(" - OK")
+		}
 	}
 	close(outchan)
 	close(errchan)
