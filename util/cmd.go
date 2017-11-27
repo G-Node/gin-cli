@@ -47,6 +47,8 @@ func scanLinesCR(data []byte, atEOF bool) (advance int, token []byte, err error)
 	idx := -1
 	if cridx >= 0 {
 		idx = cridx
+	} else {
+		cridx = len(data) + 1
 	}
 	if nlidx >= 0 && nlidx < cridx {
 		idx = nlidx
@@ -72,7 +74,7 @@ func (reader *Reader) ReadLine() (str string, err error) {
 	}
 
 	reader.cache += str
-	return str, err
+	return
 }
 
 // ReadAll collects the buffer output until it reaches EOF and returns the entire output as a single string.
