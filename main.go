@@ -277,17 +277,30 @@ func upload(args []string) {
 		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
 	}
 
-	ulout := make(chan string)
-	ulerr := make(chan error)
-	go gincl.Upload(args, ulout, ulerr)
-	var out string
-	for ok := true; ok; {
-		select {
-		case out, ok = <-ulout:
-			fmt.Print(out)
-		case err, ok = <-ulerr:
-			util.CheckError(err)
+	uploadchan := make(chan ginclient.UploadStatus)
+	go gincl.Upload(args, uploadchan)
+	var fname string
+	for {
+		stat, ok := <-uploadchan
+		if !ok {
+			break
 		}
+		// TODO: Parse error
+		util.CheckError(stat.Err)
+		if stat.FileName != fname {
+			// New line if new file status
+			fmt.Println()
+			fname = stat.FileName
+		}
+		progress := stat.Progress
+		rate := stat.Rate
+		if len(rate) > 0 {
+			rate = fmt.Sprintf("(%s)", rate)
+		}
+		if progress == "100%" {
+			progress = green.Sprint("OK")
+		}
+		fmt.Printf("\r%s: %s %s     ", fname, progress, rate)
 	}
 	// _, _ = green.Println("OK")
 }

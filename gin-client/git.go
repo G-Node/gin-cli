@@ -201,27 +201,26 @@ func AnnexSync(content bool) error {
 	return nil
 }
 
+// PushStatus describes the status of the AnnexPush command.
 type PushStatus struct {
+	// The name of the file currently being uploaded.
 	FileName string
+	// Progress of the operation, if available.
 	Progress string
-	Rate     string
-	Err      error
+	// The data rate.
+	Rate string
+	Err  error
 }
 
 // AnnexPush uploads all annexed files.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull --content)
-func AnnexPush(paths []string, commitMsg string, outchan chan<- PushStatus) error {
-	defer close(outchan)
-	// contarg := make([]string, len(paths))
-	// for idx, p := range paths {
-	// 	contarg[idx] = fmt.Sprintf("--content-of=%s", p)
-	// }
+func AnnexPush(paths []string, commitMsg string, pushchan chan<- PushStatus) {
+	defer close(pushchan)
 	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
-	// cmdargs = append(cmdargs, contarg...)
 	cmd, err := RunAnnexCommand(cmdargs...)
 	// TODO: Parse output
-	// outchan <- "Doing sync\n"
 	for {
 		_, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
@@ -229,13 +228,15 @@ func AnnexPush(paths []string, commitMsg string, outchan chan<- PushStatus) erro
 		}
 	}
 	if err != nil {
-		return err
+		pushchan <- PushStatus{Err: err}
+		return
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexPush (sync --no-pull)")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		return fmt.Errorf("Error uploading files")
+		pushchan <- PushStatus{Err: fmt.Errorf("Error uploading files")}
+		return
 	}
 
 	cmdargs = []string{"copy"}
@@ -243,7 +244,10 @@ func AnnexPush(paths []string, commitMsg string, outchan chan<- PushStatus) erro
 	// NOTE: Using origin which is the conventional default remote. This should be fixed.
 	cmdargs = append(cmdargs, "--to=origin")
 	cmd, err = RunAnnexCommand(cmdargs...)
-	// outchan <- "Uploading\n"
+	if err != nil {
+		pushchan <- PushStatus{Err: err}
+		return
+	}
 	var status PushStatus
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
@@ -262,15 +266,15 @@ func AnnexPush(paths []string, commitMsg string, outchan chan<- PushStatus) erro
 			status.Progress = words[1]
 			status.Rate = words[2]
 		}
-		outchan <- status
+		pushchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexPush (copy)")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		return fmt.Errorf("Error uploading files")
+		pushchan <- PushStatus{Err: fmt.Errorf("Error uploading files")}
 	}
-	return nil
+	return
 }
 
 // AnnexGet retrieves the content of specified files.
@@ -328,71 +332,6 @@ func setBare(state bool) error {
 	return err
 }
 
-// GitAdd adds paths to git directly (not annex).
-// In direct mode, files that are already in the annex are explicitly ignored.
-// In indirect mode, adding annexed files to git has no effect.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-// (git add)
-func GitAdd(filepaths []string, outchan chan<- string) ([]string, error) {
-	if len(filepaths) == 0 {
-		util.LogWrite("No paths to add to git. Nothing to do.")
-		return nil, nil
-	}
-
-	if IsDirect() {
-		// Set bare false and revert at the end of the function
-		err := setBare(false)
-		if err != nil {
-			return nil, fmt.Errorf("Error adding files to repository. Unable to toggle repository bare mode.")
-		}
-		defer setBare(true)
-		whereisInfo, err := AnnexWhereis(filepaths)
-		if err != nil {
-			return nil, fmt.Errorf("Error querying file annex status.")
-		}
-		annexfiles := make([]string, len(whereisInfo))
-		for idx, wi := range whereisInfo {
-			annexfiles[idx] = wi.File
-		}
-		filepaths = util.FilterPaths(filepaths, annexfiles)
-	}
-
-	cmdargs := append([]string{"add", "--verbose"}, filepaths...)
-	cmd, err := RunGitCommand(cmdargs...)
-	if err != nil {
-		return nil, err
-	}
-	// TODO: Parse output
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
-		outchan <- line
-	}
-	if err = cmd.Wait(); err != nil {
-		util.LogWrite("Error during GitAdd")
-		cmd.LogStdOutErr()
-		return nil, fmt.Errorf("Error adding files to repository")
-	}
-
-	var added []string
-	// TODO: Buffered reading
-	stdout := cmd.OutPipe.ReadAll()
-	for _, line := range strings.Split(stdout, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		line = strings.TrimPrefix(line, "add '")
-		line = strings.TrimSuffix(line, "'")
-		added = append(added, line)
-	}
-
-	util.LogWrite("Files added to git: %v", added)
-	return added, nil
-}
-
 // GitLsFiles lists all files known to git.
 // In direct mode, the bare flag is temporarily switched off before running the command.
 // Arguments passed to this function are directly passed on to the 'ls-files' command.
@@ -431,22 +370,93 @@ func GitLsFiles(args []string) ([]string, error) {
 	return filelist, nil
 }
 
-// AnnexAddResult is used to store information about each added file, as returned from the annex command.
-type AnnexAddResult struct {
-	Command string `json:"command"`
-	File    string `json:"file"`
-	Key     string `json:"key"`
-	Success bool   `json:"success"`
+// AddStatus describes the status of the GitAdd and AnnexAdd functions.
+type AddStatus struct {
+	Err error
+}
+
+// GitAdd adds paths to git directly (not annex).
+// In direct mode, files that are already in the annex are explicitly ignored.
+// In indirect mode, adding annexed files to git has no effect.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'addchan' is closed when this function returns.
+// (git add)
+func GitAdd(filepaths []string, addchan chan<- AddStatus) {
+	defer close(addchan)
+	if len(filepaths) == 0 {
+		util.LogWrite("No paths to add to git. Nothing to do.")
+		return
+	}
+
+	if IsDirect() {
+		// Set bare false and revert at the end of the function
+		err := setBare(false)
+		if err != nil {
+			addchan <- AddStatus{Err: fmt.Errorf("Error adding files to repository. Unable to toggle repository bare mode.")}
+			return
+		}
+		defer setBare(true)
+		whereisInfo, err := AnnexWhereis(filepaths)
+		if err != nil {
+			addchan <- AddStatus{fmt.Errorf("Error querying file annex status.")}
+			return
+		}
+		annexfiles := make([]string, len(whereisInfo))
+		for idx, wi := range whereisInfo {
+			annexfiles[idx] = wi.File
+		}
+		filepaths = util.FilterPaths(filepaths, annexfiles)
+	}
+
+	cmdargs := append([]string{"add", "--verbose"}, filepaths...)
+	cmd, err := RunGitCommand(cmdargs...)
+	if err != nil {
+		addchan <- AddStatus{Err: err}
+		return
+	}
+	// TODO: Parse output
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		println(line)
+		addchan <- AddStatus{}
+	}
+	if err = cmd.Wait(); err != nil {
+		util.LogWrite("Error during GitAdd")
+		cmd.LogStdOutErr()
+		addchan <- AddStatus{Err: fmt.Errorf("Error adding files to repository")}
+	}
+
+	var added []string
+	// TODO: Buffered reading
+	stdout := cmd.OutPipe.ReadAll()
+	for _, line := range strings.Split(stdout, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		line = strings.TrimPrefix(line, "add '")
+		line = strings.TrimSuffix(line, "'")
+		added = append(added, line)
+		// Push file names to outchan
+	}
+
+	util.LogWrite("Files added to git: %v", added)
+	return
 }
 
 // AnnexAdd adds paths to the annex.
 // Files specified for exclusion in the configuration are ignored automatically.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'addchan' is closed when this function returns.
 // (git annex add)
-func AnnexAdd(filepaths []string, outchan chan<- string) ([]string, error) {
+func AnnexAdd(filepaths []string, addchan chan<- AddStatus) {
+	defer close(addchan)
 	if len(filepaths) == 0 {
 		util.LogWrite("No paths to add to annex. Nothing to do.")
-		return nil, nil
+		return
 	}
 	cmdargs := []string{"--json", "add"}
 	cmdargs = append(cmdargs, filepaths...)
@@ -471,43 +481,42 @@ func AnnexAdd(filepaths []string, outchan chan<- string) ([]string, error) {
 
 	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
-		return nil, err
+		addchan <- AddStatus{Err: err}
+		return
 	}
+	// AnnexAddResult is used to store information about each added file, as returned from the annex command.
+	type AnnexAddResult struct {
+		Command string `json:"command"`
+		File    string `json:"file"`
+		Key     string `json:"key"`
+		Success bool   `json:"success"`
+	}
+
+	var outStruct AnnexAddResult
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
 		}
-		outchan <- line
+		// Send file name
+		err = json.Unmarshal([]byte(line), &outStruct)
+		if err != nil {
+			addchan <- AddStatus{Err: err}
+			return
+		}
+		if outStruct.Success {
+			// Send file name to outchan
+			println("Added ", outStruct.File)
+		} else {
+			addchan <- AddStatus{Err: fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)}
+		}
 	}
-	// TODO: Parse output or wait for command to finish
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexAdd")
 		cmd.LogStdOutErr()
-		return nil, fmt.Errorf("Error adding files to repository.")
+		addchan <- AddStatus{Err: fmt.Errorf("Error adding files to repository.")}
 	}
-
-	var outStruct AnnexAddResult
-	// TODO: Buffered reading
-	stdout := cmd.OutPipe.ReadAll()
-	files := strings.Split(stdout, "\n")
-	added := make([]string, 0, len(files))
-	for _, f := range files {
-		if len(f) == 0 {
-			continue
-		}
-		err := json.Unmarshal([]byte(f), &outStruct)
-		if err != nil {
-			return nil, err
-		}
-		if !outStruct.Success {
-			return nil, fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)
-		}
-		added = append(added, outStruct.File)
-	}
-	util.LogWrite("Files added to annex: %v", added)
-
-	return added, nil
+	return
 }
 
 // AnnexWhereisResult holds the JSON output of a "git annex whereis" command

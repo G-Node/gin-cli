@@ -129,34 +129,69 @@ func (gincl *Client) DelRepo(name string) error {
 	return nil
 }
 
+// UploadStatus describes the status of the upload command.
+type UploadStatus struct {
+	// The name of the file currently being prepared or uploaded.
+	FileName string
+	// The state of the operation (Preparing or Uploading).
+	State string
+	// Progress of the operation, if available (only for Uploading).
+	Progress string
+	// The data rate (only for Uploading).
+	Rate string
+	// Errors
+	Err error
+}
+
 // Upload adds files to a repository and uploads them.
-func (gincl *Client) Upload(paths []string, outchan chan<- string, errchan chan<- error) {
+// The status channel 'uploadchan' is closed when this function returns.
+func (gincl *Client) Upload(paths []string, uploadchan chan<- UploadStatus) {
+	defer close(uploadchan)
 	util.LogWrite("Upload")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
-		errchan <- err
+		uploadchan <- UploadStatus{Err: err}
 		return
 	}
 
 	if len(paths) > 0 {
-		outchan <- "Preparing files for upload ...\n"
 		// Run git annex add using exclusion filters and then add the rest to git
-		_, ierr := AnnexAdd(paths, outchan)
-		if ierr != nil {
-			errchan <- ierr
-			return
+		addchan := make(chan AddStatus)
+		AnnexAdd(paths, addchan)
+		for {
+			addstat, ok := <-addchan
+			if !ok {
+				break
+			}
+			println("Addstat error")
+			println(addstat.Err.Error())
+			if addstat.Err != nil {
+				uploadchan <- UploadStatus{Err: addstat.Err}
+				return
+			}
+			// Send UploadStatus
 		}
 
-		_, ierr = GitAdd(paths, outchan)
-		if ierr != nil {
-			errchan <- ierr
-			return
+		addchan = make(chan AddStatus)
+		GitAdd(paths, addchan)
+		addstat, ok := <-addchan
+		for {
+			if !ok {
+				break
+			}
+			if addstat.Err != nil {
+				uploadchan <- UploadStatus{Err: addstat.Err}
+				return
+			}
+			// Send UploadSTatus
 		}
+
 	}
+
 	changes, err := DescribeIndexShort()
 	if err != nil {
-		errchan <- err
+		uploadchan <- UploadStatus{Err: err}
 		return
 	}
 	// add header commit line
@@ -167,40 +202,25 @@ func (gincl *Client) Upload(paths []string, outchan chan<- string, errchan chan<
 	}
 	if changes == "" {
 		changes = "No changes recorded"
-		outchan <- "No new files have been added\n"
 	}
 	changes = fmt.Sprintf("gin upload from %s\n\n%s", hostname, changes)
 	if err != nil {
-		errchan <- err
+		uploadchan <- UploadStatus{Err: err}
 		return
 	}
 
-	outchan <- "Uploading files: "
 	pushchan := make(chan PushStatus)
 	go AnnexPush(paths, changes, pushchan)
-	// if err != nil {
-	// 	errchan <- err
-	// }
-	var fname string
 	for {
 		stat, ok := <-pushchan
 		if !ok {
 			break
 		}
 		if stat.Err != nil {
-			errchan <- stat.Err
+			uploadchan <- UploadStatus{Err: err}
 		}
-		if stat.FileName != fname {
-			fname = stat.FileName
-			outchan <- "\n"
-		}
-		outchan <- fmt.Sprintf("\r%s: %s (%s)", stat.FileName, stat.Progress, stat.Rate)
-		if stat.Progress == "100%" {
-			outchan <- green.Sprint(" - OK")
-		}
+		uploadchan <- UploadStatus{FileName: stat.FileName, Progress: stat.Progress, Rate: stat.Rate, State: "Uploading", Err: nil}
 	}
-	close(outchan)
-	close(errchan)
 	return
 }
 
