@@ -190,11 +190,11 @@ func (gincl *Client) Upload(paths []string, outchan chan<- string, errchan chan<
 		if stat.Err != nil {
 			errchan <- stat.Err
 		}
-		if stat.Filename != fname {
-			fname = stat.Filename
+		if stat.FileName != fname {
+			fname = stat.FileName
 			outchan <- "\n"
 		}
-		outchan <- fmt.Sprintf("\r%s: %s (%s)", stat.Filename, stat.Progress, stat.Rate)
+		outchan <- fmt.Sprintf("\r%s: %s (%s)", stat.FileName, stat.Progress, stat.Rate)
 		if stat.Progress == "100%" {
 			outchan <- green.Sprint(" - OK")
 		}

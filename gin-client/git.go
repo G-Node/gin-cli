@@ -202,7 +202,7 @@ func AnnexSync(content bool) error {
 }
 
 type PushStatus struct {
-	Filename string
+	FileName string
 	Progress string
 	Rate     string
 	Err      error
@@ -252,7 +252,7 @@ func AnnexPush(paths []string, commitMsg string, outchan chan<- PushStatus) erro
 		}
 		if strings.HasPrefix(line, "copy") {
 			words := strings.Split(line, " ")
-			status.Filename = strings.TrimSpace(words[1])
+			status.FileName = strings.TrimSpace(words[1])
 			// new file - reset Progress and Rate
 			status.Progress = ""
 			status.Rate = ""
