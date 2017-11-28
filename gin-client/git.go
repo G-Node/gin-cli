@@ -220,12 +220,14 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- PushStatus) {
 	defer close(pushchan)
 	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
 	cmd, err := RunAnnexCommand(cmdargs...)
-	// TODO: Parse output
+	util.LogWrite("annex sync output")
 	for {
-		_, rerr := cmd.OutPipe.ReadLine()
+		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
 		}
+		// TODO: Parse git output to return git file upload status
+		util.LogWrite(line)
 	}
 	if err != nil {
 		pushchan <- PushStatus{Err: err}
@@ -372,7 +374,9 @@ func GitLsFiles(args []string) ([]string, error) {
 
 // AddStatus describes the status of the GitAdd and AnnexAdd functions.
 type AddStatus struct {
-	Err error
+	FileName string
+	Success  bool
+	Err      error
 }
 
 // GitAdd adds paths to git directly (not annex).
@@ -398,7 +402,7 @@ func GitAdd(filepaths []string, addchan chan<- AddStatus) {
 		defer setBare(true)
 		whereisInfo, err := AnnexWhereis(filepaths)
 		if err != nil {
-			addchan <- AddStatus{fmt.Errorf("Error querying file annex status.")}
+			addchan <- AddStatus{Err: fmt.Errorf("Error querying file annex status.")}
 			return
 		}
 		annexfiles := make([]string, len(whereisInfo))
@@ -420,30 +424,17 @@ func GitAdd(filepaths []string, addchan chan<- AddStatus) {
 		if rerr != nil {
 			break
 		}
-		println(line)
-		addchan <- AddStatus{}
+		fname := strings.TrimSpace(line)
+		fname = strings.TrimPrefix(fname, "add '")
+		fname = strings.TrimSuffix(fname, "'")
+		util.LogWrite("%s added to git", fname)
+		addchan <- AddStatus{FileName: fname}
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during GitAdd")
 		cmd.LogStdOutErr()
 		addchan <- AddStatus{Err: fmt.Errorf("Error adding files to repository")}
 	}
-
-	var added []string
-	// TODO: Buffered reading
-	stdout := cmd.OutPipe.ReadAll()
-	for _, line := range strings.Split(stdout, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		line = strings.TrimPrefix(line, "add '")
-		line = strings.TrimSuffix(line, "'")
-		added = append(added, line)
-		// Push file names to outchan
-	}
-
-	util.LogWrite("Files added to git: %v", added)
 	return
 }
 
@@ -484,31 +475,32 @@ func AnnexAdd(filepaths []string, addchan chan<- AddStatus) {
 		addchan <- AddStatus{Err: err}
 		return
 	}
-	// AnnexAddResult is used to store information about each added file, as returned from the annex command.
-	type AnnexAddResult struct {
+
+	var annexAddRes struct {
 		Command string `json:"command"`
 		File    string `json:"file"`
 		Key     string `json:"key"`
 		Success bool   `json:"success"`
 	}
 
-	var outStruct AnnexAddResult
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
 		}
 		// Send file name
-		err = json.Unmarshal([]byte(line), &outStruct)
+		err = json.Unmarshal([]byte(line), &annexAddRes)
 		if err != nil {
 			addchan <- AddStatus{Err: err}
 			return
 		}
-		if outStruct.Success {
+		if annexAddRes.Success {
 			// Send file name to outchan
-			println("Added ", outStruct.File)
+			util.LogWrite("%s added to annex", annexAddRes.File)
+			addchan <- AddStatus{FileName: annexAddRes.File, Success: annexAddRes.Success}
 		} else {
-			addchan <- AddStatus{Err: fmt.Errorf("Error adding files to repository: Failed to add %s", outStruct.File)}
+			util.LogWrite("Error adding %s", annexAddRes.File)
+			addchan <- AddStatus{Err: fmt.Errorf("Error adding files to repository: Failed to add %s", annexAddRes.File)}
 		}
 	}
 	if err = cmd.Wait(); err != nil {

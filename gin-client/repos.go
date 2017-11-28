@@ -133,7 +133,7 @@ func (gincl *Client) DelRepo(name string) error {
 type UploadStatus struct {
 	// The name of the file currently being prepared or uploaded.
 	FileName string
-	// The state of the operation (Preparing or Uploading).
+	// The state of the operation (Added or Uploading).
 	State string
 	// Progress of the operation, if available (only for Uploading).
 	Progress string
@@ -158,25 +158,24 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- UploadStatus) {
 	if len(paths) > 0 {
 		// Run git annex add using exclusion filters and then add the rest to git
 		addchan := make(chan AddStatus)
-		AnnexAdd(paths, addchan)
+		go AnnexAdd(paths, addchan)
 		for {
 			addstat, ok := <-addchan
 			if !ok {
 				break
 			}
-			println("Addstat error")
-			println(addstat.Err.Error())
 			if addstat.Err != nil {
 				uploadchan <- UploadStatus{Err: addstat.Err}
 				return
 			}
 			// Send UploadStatus
+			uploadchan <- UploadStatus{FileName: addstat.FileName, State: "Added"}
 		}
 
 		addchan = make(chan AddStatus)
-		GitAdd(paths, addchan)
-		addstat, ok := <-addchan
+		go GitAdd(paths, addchan)
 		for {
+			addstat, ok := <-addchan
 			if !ok {
 				break
 			}
@@ -184,7 +183,8 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- UploadStatus) {
 				uploadchan <- UploadStatus{Err: addstat.Err}
 				return
 			}
-			// Send UploadSTatus
+			// Send UploadStatus
+			uploadchan <- UploadStatus{FileName: addstat.FileName, State: "Added"}
 		}
 
 	}

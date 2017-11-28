@@ -290,8 +290,10 @@ func upload(args []string) {
 		util.CheckError(stat.Err)
 		if stat.FileName != fname {
 			// New line if new file status
-			fmt.Println()
-			prevlinelength = 0
+			if fname != "" {
+				fmt.Println()
+				prevlinelength = 0
+			}
 			fname = stat.FileName
 		}
 		progress := stat.Progress
@@ -299,11 +301,11 @@ func upload(args []string) {
 		if len(rate) > 0 {
 			rate = fmt.Sprintf("(%s)", rate)
 		}
-		if progress == "100%" {
+		if progress == "100%" || stat.State == "Added" {
 			progress = green.Sprint("OK")
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
-		prevlinelength, _ = fmt.Printf("\r%s: %s %s", fname, progress, rate)
+		prevlinelength, _ = fmt.Printf("\r%s %s: %s %s", stat.State, fname, progress, rate)
 	}
 	fmt.Println()
 }
