@@ -221,6 +221,8 @@ def debianize(binfiles, annexsa_archive):
         cmd = ["docker", "container", "rm", "gin-deb-build"]
         call(cmd)
 
+    docker_cleanup()
+
     # The default temporary root on macOS is /var/folders
     # Docker currently has issues mounting directories under /var
     # Forcing temporary directory to be rooted at /tmp instead
