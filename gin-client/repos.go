@@ -129,15 +129,15 @@ func (gincl *Client) DelRepo(name string) error {
 	return nil
 }
 
-// UploadStatus describes the status of the upload command.
-type UploadStatus struct {
-	// The name of the file currently being prepared or uploaded.
+// RepoFileStatus describes the status of files when being added to the repo or transfered to/from remotes.
+type RepoFileStatus struct {
+	// The name of the file.
 	FileName string
-	// The state of the operation (Added or Uploading).
+	// The state of the operation (Added, Uploading, or Downloading).
 	State string
-	// Progress of the operation, if available (only for Uploading).
+	// Progress of the operation, if available. This is empty when the State is "Added"
 	Progress string
-	// The data rate (only for Uploading).
+	// The data rate. This is empty when the State is "Added"
 	Rate string
 	// Errors
 	Err error
@@ -145,13 +145,13 @@ type UploadStatus struct {
 
 // Upload adds files to a repository and uploads them.
 // The status channel 'uploadchan' is closed when this function returns.
-func (gincl *Client) Upload(paths []string, uploadchan chan<- UploadStatus) {
+func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 	defer close(uploadchan)
 	util.LogWrite("Upload")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
-		uploadchan <- UploadStatus{Err: err}
+		uploadchan <- RepoFileStatus{Err: err}
 		return
 	}
 
@@ -165,11 +165,11 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- UploadStatus) {
 				break
 			}
 			if addstat.Err != nil {
-				uploadchan <- UploadStatus{Err: addstat.Err}
+				uploadchan <- RepoFileStatus{Err: addstat.Err}
 				return
 			}
 			// Send UploadStatus
-			uploadchan <- UploadStatus{FileName: addstat.FileName, State: "Added"}
+			uploadchan <- RepoFileStatus{FileName: addstat.FileName, State: "Added"}
 		}
 
 		addchan = make(chan AddStatus)
@@ -180,18 +180,18 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- UploadStatus) {
 				break
 			}
 			if addstat.Err != nil {
-				uploadchan <- UploadStatus{Err: addstat.Err}
+				uploadchan <- RepoFileStatus{Err: addstat.Err}
 				return
 			}
 			// Send UploadStatus
-			uploadchan <- UploadStatus{FileName: addstat.FileName, State: "Added"}
+			uploadchan <- RepoFileStatus{FileName: addstat.FileName, State: "Added"}
 		}
 
 	}
 
 	changes, err := DescribeIndexShort()
 	if err != nil {
-		uploadchan <- UploadStatus{Err: err}
+		uploadchan <- RepoFileStatus{Err: err}
 		return
 	}
 	// add header commit line
@@ -205,11 +205,11 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- UploadStatus) {
 	}
 	changes = fmt.Sprintf("gin upload from %s\n\n%s", hostname, changes)
 	if err != nil {
-		uploadchan <- UploadStatus{Err: err}
+		uploadchan <- RepoFileStatus{Err: err}
 		return
 	}
 
-	pushchan := make(chan PushStatus)
+	pushchan := make(chan TransferStatus)
 	go AnnexPush(paths, changes, pushchan)
 	for {
 		stat, ok := <-pushchan
@@ -217,9 +217,36 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- UploadStatus) {
 			break
 		}
 		if stat.Err != nil {
-			uploadchan <- UploadStatus{Err: err}
+			uploadchan <- RepoFileStatus{Err: err}
 		}
-		uploadchan <- UploadStatus{FileName: stat.FileName, Progress: stat.Progress, Rate: stat.Rate, State: "Uploading", Err: nil}
+		uploadchan <- RepoFileStatus{FileName: stat.FileName, Progress: stat.Progress, Rate: stat.Rate, State: "Uploading", Err: nil}
+	}
+	return
+}
+
+// GetContent downloads the contents of placeholder files in a checked out repository.
+// The status channel 'downloadchan' is closed when this function returns.
+func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatus) {
+	defer close(getcontchan)
+	util.LogWrite("GetContent")
+
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		getcontchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	getchan := make(chan TransferStatus)
+	go AnnexGet(paths, getchan)
+	for {
+		stat, ok := <-getchan
+		if !ok {
+			break
+		}
+		if stat.Err != nil {
+			getcontchan <- RepoFileStatus{Err: err}
+		}
+		getcontchan <- RepoFileStatus{FileName: stat.FileName, Progress: stat.Progress, Rate: stat.Rate, State: "Downloading", Err: nil}
 	}
 	return
 }

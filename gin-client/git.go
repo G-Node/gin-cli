@@ -201,8 +201,8 @@ func AnnexSync(content bool) error {
 	return nil
 }
 
-// PushStatus describes the status of the AnnexPush command.
-type PushStatus struct {
+// TransferStatus describes the status (progress and rate) of a file tranfer (upload or download).
+type TransferStatus struct {
 	// The name of the file currently being uploaded.
 	FileName string
 	// Progress of the operation, if available.
@@ -216,7 +216,7 @@ type PushStatus struct {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull --content)
-func AnnexPush(paths []string, commitMsg string, pushchan chan<- PushStatus) {
+func AnnexPush(paths []string, commitMsg string, pushchan chan<- TransferStatus) {
 	defer close(pushchan)
 	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
 	cmd, err := RunAnnexCommand(cmdargs...)
@@ -230,14 +230,14 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- PushStatus) {
 		util.LogWrite(line)
 	}
 	if err != nil {
-		pushchan <- PushStatus{Err: err}
+		pushchan <- TransferStatus{Err: err}
 		return
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexPush (sync --no-pull)")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		pushchan <- PushStatus{Err: fmt.Errorf("Error uploading files")}
+		pushchan <- TransferStatus{Err: fmt.Errorf("Error uploading files")}
 		return
 	}
 
@@ -247,10 +247,10 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- PushStatus) {
 	cmdargs = append(cmdargs, "--to=origin")
 	cmd, err = RunAnnexCommand(cmdargs...)
 	if err != nil {
-		pushchan <- PushStatus{Err: err}
+		pushchan <- TransferStatus{Err: err}
 		return
 	}
-	var status PushStatus
+	var status TransferStatus
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
@@ -279,7 +279,7 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- PushStatus) {
 		util.LogWrite("Error during AnnexPush (copy)")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		pushchan <- PushStatus{Err: fmt.Errorf("Error uploading files")}
+		pushchan <- TransferStatus{Err: fmt.Errorf("Error uploading files")}
 	}
 	return
 }
@@ -287,21 +287,47 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- PushStatus) {
 // AnnexGet retrieves the content of specified files.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex get)
-func AnnexGet(filepaths []string) error {
-	// TODO: Print success for each file as it finishes
+func AnnexGet(filepaths []string, pushchan chan<- TransferStatus) {
+	defer close(pushchan)
 	cmdargs := append([]string{"get"}, filepaths...)
 	cmd, err := RunAnnexCommand(cmdargs...)
-	// TODO: Parse output or wait for command to finish
 	if err != nil {
-		return err
+		pushchan <- TransferStatus{Err: err}
+		return
+	}
+	var status TransferStatus
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		line = util.CleanSpaces(line)
+		if strings.HasPrefix(line, "get") {
+			words := strings.Split(line, " ")
+			status.FileName = strings.TrimSpace(words[1])
+			// new file - reset Progress and Rate
+			status.Progress = ""
+			status.Rate = ""
+			if !strings.HasSuffix(line, "ok") {
+				// if the copy line ends with ok, the file is already done (no upload needed)
+				// so we shouldn't send the status to the caller
+				pushchan <- status
+			}
+		} else if strings.Contains(line, "%") {
+			words := strings.Split(line, " ")
+			status.Progress = words[1]
+			status.Rate = words[2]
+			pushchan <- status
+		}
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexGet")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		return fmt.Errorf("Error downloading files")
+		pushchan <- TransferStatus{Err: fmt.Errorf("Error downloading files")}
 	}
-	return nil
+	cmd.LogStdOutErr()
+	return
 }
 
 // AnnexDrop drops the content of specified files.

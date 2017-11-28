@@ -277,7 +277,7 @@ func upload(args []string) {
 		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
 	}
 
-	uploadchan := make(chan ginclient.UploadStatus)
+	uploadchan := make(chan ginclient.RepoFileStatus)
 	go gincl.Upload(args, uploadchan)
 	var fname string
 	prevlinelength := 0 // used to clear lines before overwriting
@@ -342,8 +342,37 @@ func getContent(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	err := ginclient.AnnexGet(args)
-	util.CheckError(err)
+	getcchan := make(chan ginclient.RepoFileStatus)
+	go gincl.GetContent(args, getcchan)
+	var fname string
+	prevlinelength := 0 // used to clear lines before overwriting
+	for {
+		stat, ok := <-getcchan
+		if !ok {
+			break
+		}
+		// TODO: Parse error
+		util.CheckError(stat.Err)
+		if stat.FileName != fname {
+			// New line if new file status
+			if fname != "" {
+				fmt.Println()
+				prevlinelength = 0
+			}
+			fname = stat.FileName
+		}
+		progress := stat.Progress
+		rate := stat.Rate
+		if len(rate) > 0 {
+			rate = fmt.Sprintf("(%s)", rate)
+		}
+		if progress == "100%" {
+			progress = green.Sprint("OK")
+		}
+		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
+		prevlinelength, _ = fmt.Printf("\r%s %s: %s %s", stat.State, fname, progress, rate)
+	}
+	fmt.Println()
 }
 
 func remove(args []string) {
