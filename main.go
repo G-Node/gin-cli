@@ -537,6 +537,7 @@ func gitrun(args []string) {
 	util.CheckError(err)
 
 	cmd, err := ginclient.RunGitCommand(args...)
+	util.CheckError(err)
 	for {
 		line, readerr := cmd.OutPipe.ReadLine()
 		if readerr != nil {
@@ -556,6 +557,7 @@ func annexrun(args []string) {
 	err := gincl.LoadToken()
 	util.CheckError(err)
 	cmd, err := ginclient.RunAnnexCommand(args...)
+	util.CheckError(err)
 	var line string
 	for {
 		line, err = cmd.OutPipe.ReadLine()
