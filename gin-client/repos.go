@@ -157,34 +157,26 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 
 	if len(paths) > 0 {
 		// Run git annex add using exclusion filters and then add the rest to git
-		addchan := make(chan AddStatus)
+		addchan := make(chan RepoFileStatus)
 		go AnnexAdd(paths, addchan)
 		for {
 			addstat, ok := <-addchan
 			if !ok {
 				break
 			}
-			if addstat.Err != nil {
-				uploadchan <- RepoFileStatus{Err: addstat.Err}
-				return
-			}
 			// Send UploadStatus
-			uploadchan <- RepoFileStatus{FileName: addstat.FileName, State: "Added"}
+			uploadchan <- addstat
 		}
 
-		addchan = make(chan AddStatus)
+		addchan = make(chan RepoFileStatus)
 		go GitAdd(paths, addchan)
 		for {
 			addstat, ok := <-addchan
 			if !ok {
 				break
 			}
-			if addstat.Err != nil {
-				uploadchan <- RepoFileStatus{Err: addstat.Err}
-				return
-			}
 			// Send UploadStatus
-			uploadchan <- RepoFileStatus{FileName: addstat.FileName, State: "Added"}
+			uploadchan <- addstat
 		}
 
 	}
@@ -209,17 +201,14 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 		return
 	}
 
-	pushchan := make(chan TransferStatus)
-	go AnnexPush(paths, changes, pushchan)
+	annexpushchan := make(chan RepoFileStatus)
+	go AnnexPush(paths, changes, annexpushchan)
 	for {
-		stat, ok := <-pushchan
+		stat, ok := <-annexpushchan
 		if !ok {
 			break
 		}
-		if stat.Err != nil {
-			uploadchan <- RepoFileStatus{Err: err}
-		}
-		uploadchan <- RepoFileStatus{FileName: stat.FileName, Progress: stat.Progress, Rate: stat.Rate, State: "Uploading", Err: nil}
+		uploadchan <- stat
 	}
 	return
 }
@@ -236,17 +225,14 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatu
 		return
 	}
 
-	getchan := make(chan TransferStatus)
-	go AnnexGet(paths, getchan)
+	annexgetchan := make(chan RepoFileStatus)
+	go AnnexGet(paths, annexgetchan)
 	for {
-		stat, ok := <-getchan
+		stat, ok := <-annexgetchan
 		if !ok {
 			break
 		}
-		if stat.Err != nil {
-			getcontchan <- RepoFileStatus{Err: err}
-		}
-		getcontchan <- RepoFileStatus{FileName: stat.FileName, Progress: stat.Progress, Rate: stat.Rate, State: "Downloading", Err: nil}
+		getcontchan <- stat
 	}
 	return
 }
