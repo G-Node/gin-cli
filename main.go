@@ -327,7 +327,7 @@ func download(args []string) {
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	fmt.Print("Downloading...")
-	err = gincl.DownloadRepo(content)
+	err = ginclient.AnnexPull(content)
 	_, _ = green.Println("OK")
 	util.CheckError(err)
 }
@@ -340,7 +340,7 @@ func getContent(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	err := gincl.GetContent(args)
+	err := ginclient.AnnexGet(args)
 	util.CheckError(err)
 }
 
@@ -354,7 +354,7 @@ func remove(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	err = gincl.RmContent(args)
+	err = ginclient.AnnexDrop(args)
 	util.CheckError(err)
 }
 

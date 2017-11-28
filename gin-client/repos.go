@@ -224,31 +224,6 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- UploadStatus) {
 	return
 }
 
-// DownloadRepo downloads the files in an already checked out repository.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-func (gincl *Client) DownloadRepo(content bool) error {
-	util.LogWrite("DownloadRepo")
-
-	err := AnnexPull(content)
-	return err
-}
-
-// GetContent retrieves the contents of placeholder files in a checked out repository.
-func (gincl *Client) GetContent(filepaths []string) error {
-	util.LogWrite("GetContent")
-
-	err := AnnexGet(filepaths)
-	return err
-}
-
-// RmContent removes the contents of local files, turning them into placeholders, but ONLY IF the content is available on a remote
-func (gincl *Client) RmContent(filepaths []string) error {
-	util.LogWrite("RmContent")
-
-	err := AnnexDrop(filepaths)
-	return err
-}
-
 // CloneRepo clones a remote repository and initialises annex.
 // Returns the name of the directory in which the repository is cloned.
 func (gincl *Client) CloneRepo(repoPath string) (string, error) {
