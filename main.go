@@ -280,6 +280,7 @@ func upload(args []string) {
 	uploadchan := make(chan ginclient.UploadStatus)
 	go gincl.Upload(args, uploadchan)
 	var fname string
+	prevlinelength := 0 // used to clear lines before overwriting
 	for {
 		stat, ok := <-uploadchan
 		if !ok {
@@ -290,6 +291,7 @@ func upload(args []string) {
 		if stat.FileName != fname {
 			// New line if new file status
 			fmt.Println()
+			prevlinelength = 0
 			fname = stat.FileName
 		}
 		progress := stat.Progress
@@ -300,9 +302,10 @@ func upload(args []string) {
 		if progress == "100%" {
 			progress = green.Sprint("OK")
 		}
-		fmt.Printf("\r%s: %s %s     ", fname, progress, rate)
+		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
+		prevlinelength, _ = fmt.Printf("\r%s: %s %s", fname, progress, rate)
 	}
-	// _, _ = green.Println("OK")
+	fmt.Println()
 }
 
 func download(args []string) {
