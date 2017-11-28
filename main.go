@@ -329,9 +329,37 @@ func download(args []string) {
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	fmt.Print("Downloading...")
-	err = ginclient.AnnexPull(content)
-	_, _ = green.Println("OK")
-	util.CheckError(err)
+	dlchan := make(chan ginclient.RepoFileStatus)
+	go gincl.Download(content, dlchan)
+	var fname string
+	prevlinelength := 0 // used to clear lines before overwriting
+	for {
+		stat, ok := <-dlchan
+		if !ok {
+			break
+		}
+		// TODO: Parse error
+		util.CheckError(stat.Err)
+		if stat.FileName != fname {
+			// New line if new file status
+			if fname != "" {
+				fmt.Println()
+				prevlinelength = 0
+			}
+			fname = stat.FileName
+		}
+		progress := stat.Progress
+		rate := stat.Rate
+		if len(rate) > 0 {
+			rate = fmt.Sprintf("(%s)", rate)
+		}
+		if progress == "100%" {
+			progress = green.Sprint("OK")
+		}
+		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
+		prevlinelength, _ = fmt.Printf("\r%s %s: %s %s", stat.State, fname, progress, rate)
+	}
+	fmt.Println()
 }
 
 func getContent(args []string) {

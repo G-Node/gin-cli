@@ -162,23 +162,55 @@ func AnnexInit(description string) error {
 	return nil
 }
 
-// AnnexPull downloads all annexed files.
+// AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
+// The satus channel 'pullchan' is closed when this function returns.
 // (git annex sync --no-push [--content])
-func AnnexPull(content bool) error {
+func AnnexPull(content bool, pullchan chan<- RepoFileStatus) {
+	defer close(pullchan)
 	args := []string{"sync", "--no-push"}
 	if content {
 		args = append(args, "--content")
 	}
 	cmd, err := RunAnnexCommand(args...)
-	// TODO: Parse output
+	if err != nil {
+		pullchan <- RepoFileStatus{Err: err}
+		return
+	}
+	var status RepoFileStatus
+	status.State = "Downloading"
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		line = util.CleanSpaces(line)
+		if strings.HasPrefix(line, "get") {
+			words := strings.Split(line, " ")
+			status.FileName = strings.TrimSpace(words[1])
+			// new file - reset Progress and Rate
+			status.Progress = ""
+			status.Rate = ""
+			if !strings.HasSuffix(line, "ok") {
+				// if the copy line ends with ok, the file is already done (no upload needed)
+				// so we shouldn't send the status to the caller
+				pullchan <- status
+			}
+		} else if strings.Contains(line, "%") {
+			words := strings.Split(line, " ")
+			status.Progress = words[1]
+			status.Rate = words[2]
+			pullchan <- status
+		}
+	}
+
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexPull.")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		return fmt.Errorf("Error downloading files")
+		pullchan <- RepoFileStatus{Err: fmt.Errorf("Error downloading files")}
 	}
-	return nil
+	return
 }
 
 // AnnexSync synchronises the local repository with the remote.
@@ -209,7 +241,11 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- RepoFileStatus)
 	defer close(pushchan)
 	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
 	cmd, err := RunAnnexCommand(cmdargs...)
-	util.LogWrite("annex sync output")
+	if err != nil {
+		pushchan <- RepoFileStatus{Err: err}
+		return
+	}
+	util.LogWrite("annex sync output") // remove me
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
@@ -217,10 +253,6 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- RepoFileStatus)
 		}
 		// TODO: Parse git output to return git file upload status
 		util.LogWrite(line)
-	}
-	if err != nil {
-		pushchan <- RepoFileStatus{Err: err}
-		return
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexPush (sync --no-pull)")
@@ -276,16 +308,18 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- RepoFileStatus)
 
 // AnnexGet retrieves the content of specified files.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'getchan' is closed when this function returns.
 // (git annex get)
-func AnnexGet(filepaths []string, pushchan chan<- RepoFileStatus) {
-	defer close(pushchan)
+func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
+	defer close(getchan)
 	cmdargs := append([]string{"get"}, filepaths...)
 	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
-		pushchan <- RepoFileStatus{Err: err}
+		getchan <- RepoFileStatus{Err: err}
 		return
 	}
 	var status RepoFileStatus
+	status.State = "Downloading"
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
@@ -301,20 +335,20 @@ func AnnexGet(filepaths []string, pushchan chan<- RepoFileStatus) {
 			if !strings.HasSuffix(line, "ok") {
 				// if the copy line ends with ok, the file is already done (no upload needed)
 				// so we shouldn't send the status to the caller
-				pushchan <- status
+				getchan <- status
 			}
 		} else if strings.Contains(line, "%") {
 			words := strings.Split(line, " ")
 			status.Progress = words[1]
 			status.Rate = words[2]
-			pushchan <- status
+			getchan <- status
 		}
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexGet")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		pushchan <- RepoFileStatus{Err: fmt.Errorf("Error downloading files")}
+		getchan <- RepoFileStatus{Err: fmt.Errorf("Error downloading files")}
 	}
 	cmd.LogStdOutErr()
 	return

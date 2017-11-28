@@ -214,7 +214,7 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 }
 
 // GetContent downloads the contents of placeholder files in a checked out repository.
-// The status channel 'downloadchan' is closed when this function returns.
+// The status channel 'getcontchan' is closed when this function returns.
 func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatus) {
 	defer close(getcontchan)
 	util.LogWrite("GetContent")
@@ -233,6 +233,25 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatu
 			break
 		}
 		getcontchan <- stat
+	}
+	return
+}
+
+// Download downloads changes and placeholder files in an already checked out repository.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'downloadchan' is closed when this function returns.
+func (gincl *Client) Download(content bool, downloadchan chan<- RepoFileStatus) {
+	defer close(downloadchan)
+	util.LogWrite("Download")
+
+	downloadstatus := make(chan RepoFileStatus)
+	go AnnexPull(content, downloadstatus)
+	for {
+		stat, ok := <-downloadstatus
+		if !ok {
+			break
+		}
+		downloadchan <- stat
 	}
 	return
 }
