@@ -256,19 +256,24 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- PushStatus) {
 		if rerr != nil {
 			break
 		}
+		line = util.CleanSpaces(line)
 		if strings.HasPrefix(line, "copy") {
 			words := strings.Split(line, " ")
 			status.FileName = strings.TrimSpace(words[1])
 			// new file - reset Progress and Rate
 			status.Progress = ""
 			status.Rate = ""
+			if !strings.HasSuffix(line, "ok") {
+				// if the copy line ends with ok, the file is already done (no upload needed)
+				// so we shouldn't send the status to the caller
+				pushchan <- status
+			}
 		} else if strings.Contains(line, "%") {
-			line = util.CleanSpaces(line)
 			words := strings.Split(line, " ")
 			status.Progress = words[1]
 			status.Rate = words[2]
+			pushchan <- status
 		}
-		pushchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexPush (copy)")
