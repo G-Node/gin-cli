@@ -261,28 +261,11 @@ func unlock(args []string) {
 	util.CheckError(err)
 }
 
-func upload(args []string) {
-	if !ginclient.IsRepo() {
-		util.Die("This command must be run from inside a gin repository.")
-	}
-	err := ginclient.AnnexLock(args...)
-	util.CheckError(err)
-
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	gincl.GitHost = util.Config.GitHost
-	gincl.GitUser = util.Config.GitUser
-
-	if len(args) == 0 {
-		fmt.Println("No files specified for upload. Synchronising metadata.")
-		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
-	}
-
-	uploadchan := make(chan ginclient.RepoFileStatus)
-	go gincl.Upload(args, uploadchan)
+func printProgress(statuschan chan ginclient.RepoFileStatus) {
 	var fname string
 	prevlinelength := 0 // used to clear lines before overwriting
 	for {
-		stat, ok := <-uploadchan
+		stat, ok := <-statuschan
 		if !ok {
 			break
 		}
@@ -310,6 +293,27 @@ func upload(args []string) {
 	fmt.Println()
 }
 
+func upload(args []string) {
+	if !ginclient.IsRepo() {
+		util.Die("This command must be run from inside a gin repository.")
+	}
+	err := ginclient.AnnexLock(args...)
+	util.CheckError(err)
+
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl.GitHost = util.Config.GitHost
+	gincl.GitUser = util.Config.GitUser
+
+	if len(args) == 0 {
+		fmt.Println("No files specified for upload. Synchronising metadata.")
+		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
+	}
+
+	uploadchan := make(chan ginclient.RepoFileStatus)
+	go gincl.Upload(args, uploadchan)
+	printProgress(uploadchan)
+}
+
 func download(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
@@ -328,38 +332,15 @@ func download(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	fmt.Print("Downloading...")
 	dlchan := make(chan ginclient.RepoFileStatus)
-	go gincl.Download(content, dlchan)
-	var fname string
-	prevlinelength := 0 // used to clear lines before overwriting
-	for {
-		stat, ok := <-dlchan
-		if !ok {
-			break
-		}
-		// TODO: Parse error
-		util.CheckError(stat.Err)
-		if stat.FileName != fname {
-			// New line if new file status
-			if fname != "" {
-				fmt.Println()
-				prevlinelength = 0
-			}
-			fname = stat.FileName
-		}
-		progress := stat.Progress
-		rate := stat.Rate
-		if len(rate) > 0 {
-			rate = fmt.Sprintf("(%s)", rate)
-		}
-		if progress == "100%" {
-			progress = green.Sprint("OK")
-		}
-		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
-		prevlinelength, _ = fmt.Printf("\r%s %s: %s %s", stat.State, fname, progress, rate)
+	if !content {
+		fmt.Print("Downloading...")
 	}
-	fmt.Println()
+	go gincl.Download(content, dlchan)
+	printProgress(dlchan)
+	if !content {
+		_, _ = green.Println("OK")
+	}
 }
 
 func getContent(args []string) {
@@ -372,35 +353,7 @@ func getContent(args []string) {
 	gincl.GitUser = util.Config.GitUser
 	getcchan := make(chan ginclient.RepoFileStatus)
 	go gincl.GetContent(args, getcchan)
-	var fname string
-	prevlinelength := 0 // used to clear lines before overwriting
-	for {
-		stat, ok := <-getcchan
-		if !ok {
-			break
-		}
-		// TODO: Parse error
-		util.CheckError(stat.Err)
-		if stat.FileName != fname {
-			// New line if new file status
-			if fname != "" {
-				fmt.Println()
-				prevlinelength = 0
-			}
-			fname = stat.FileName
-		}
-		progress := stat.Progress
-		rate := stat.Rate
-		if len(rate) > 0 {
-			rate = fmt.Sprintf("(%s)", rate)
-		}
-		if progress == "100%" {
-			progress = green.Sprint("OK")
-		}
-		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
-		prevlinelength, _ = fmt.Printf("\r%s %s: %s %s", stat.State, fname, progress, rate)
-	}
-	fmt.Println()
+	printProgress(getcchan)
 }
 
 func remove(args []string) {
