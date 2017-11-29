@@ -249,21 +249,26 @@ func AnnexPull(content bool, pullchan chan<- RepoFileStatus) {
 // AnnexSync synchronises the local repository with the remote.
 // Optionally synchronises content if content=True
 // Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'syncchan' is closed when this function returns.
 // (git annex sync [--content])
-func AnnexSync(content bool) error {
+func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 	args := []string{"sync"}
 	if content {
 		args = append(args, "--content")
 	}
 	cmd, err := RunAnnexCommand(args...)
-	// TODO: Parse output
+	var status RepoFileStatus
+	status.State = "Synchronising repository"
+	syncchan <- status
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexSync")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		return fmt.Errorf("Error synchronising files")
+		syncchan <- RepoFileStatus{Err: fmt.Errorf("File synchronisation failed")}
 	}
-	return nil
+	status.Progress = "100%"
+	syncchan <- status
+	return
 }
 
 // AnnexPush uploads all annexed files.

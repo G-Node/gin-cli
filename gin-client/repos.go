@@ -403,7 +403,9 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		}
 
 		// Sync if an initial commit was created
-		err = AnnexSync(false)
+		syncchan := make(chan RepoFileStatus)
+		go AnnexSync(false, syncchan)
+		<-syncchan // wait for channel to close
 		if err != nil {
 			initchan <- RepoFileStatus{Err: initerr}
 			return
