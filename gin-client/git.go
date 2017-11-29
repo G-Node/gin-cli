@@ -426,6 +426,7 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 			util.LogWrite("Error dropping %s", annexDropRes.File)
 			status.Err = fmt.Errorf("Failed")
 		}
+		status.Progress = "100%"
 		dropchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
@@ -543,6 +544,7 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		status.FileName = fname
 		util.LogWrite("%s added to git", fname)
 		// Error conditions?
+		status.Progress = "100%"
 		addchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
@@ -618,6 +620,7 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			util.LogWrite("Error adding %s", annexAddRes.File)
 			status.Err = fmt.Errorf("Failed")
 		}
+		status.Progress = "100%"
 		addchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
