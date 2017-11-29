@@ -111,11 +111,41 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 
 // Clone downloads a repository and sets the remote fetch and push urls.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'clonechan' is closed when this function returns.
 // (git clone ...)
-func (gincl *Client) Clone(repoPath string) error {
+func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
+	defer close(clonechan)
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
-	cmd, err := RunGitCommand("clone", remotePath)
-	// TODO: Parse output and print progress
+	cmd, err := RunGitCommand("clone", "--progress", remotePath)
+	if err != nil {
+		clonechan <- RepoFileStatus{Err: err}
+		return
+	}
+	var status RepoFileStatus
+	status.State = "Downloading repository"
+	for {
+		// git clone progress prints to stderr
+		line, rerr := cmd.ErrPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		line = util.CleanSpaces(line)
+		status.FileName = repoPath
+		if strings.HasPrefix(line, "Receiving objects") {
+			words := strings.Split(line, " ")
+			if len(words) > 2 {
+				status.Progress = words[2]
+			}
+			if len(words) > 8 {
+				rate := fmt.Sprintf("%s%s", words[7], words[8])
+				if strings.HasSuffix(rate, ",") {
+					rate = strings.TrimSuffix(rate, ",")
+				}
+				status.Rate = rate
+			}
+		}
+		clonechan <- status
+	}
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during clone command")
 		cmd.LogStdOutErr()
@@ -123,18 +153,21 @@ func (gincl *Client) Clone(repoPath string) error {
 
 		stderr := cmd.ErrPipe.ReadAll()
 		if strings.Contains(stderr, "Server returned non-OK status: 404") {
-			return fmt.Errorf("Error retrieving repository.\n"+
+			clonechan <- RepoFileStatus{Err: fmt.Errorf("Repository download failed.\n"+
 				"Please make sure you typed the repository path correctly.\n"+
 				"Type 'gin repos %s' to see if the repository exists and if you have access to it.",
-				repoOwner)
+				repoOwner)}
 		} else if strings.Contains(stderr, "already exists and is not an empty directory") {
-			return fmt.Errorf("Error retrieving repository.\n"+
-				"'%s' already exists in the current directory and is not empty.", repoName)
+			clonechan <- RepoFileStatus{Err: fmt.Errorf("Repository download failed.\n"+
+				"'%s' already exists in the current directory and is not empty.", repoName)}
 		} else {
-			return fmt.Errorf("Error retrieving repository.\nAn unknown error occured.")
+			clonechan <- RepoFileStatus{Err: fmt.Errorf("Repository download failed.\nAn unknown error occured.")}
 		}
 	}
-	return nil
+	// Progress doesn't show 100% if cloning an empty repository, so let's force it
+	status.Progress = "100%"
+	clonechan <- status
+	return
 }
 
 // **************** //
@@ -245,7 +278,6 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- RepoFileStatus)
 		pushchan <- RepoFileStatus{Err: err}
 		return
 	}
-	util.LogWrite("annex sync output") // remove me
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {

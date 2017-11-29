@@ -134,6 +134,7 @@ type RepoFileStatus struct {
 	// The name of the file.
 	FileName string
 	// The state of the operation (Added, Uploading, or Downloading).
+	// TODO: Use enum
 	State string
 	// Progress of the operation, if available. This is empty when the State is "Added"
 	Progress string
@@ -281,38 +282,63 @@ func (gincl *Client) Download(content bool, downloadchan chan<- RepoFileStatus) 
 }
 
 // CloneRepo clones a remote repository and initialises annex.
-// Returns the name of the directory in which the repository is cloned.
-func (gincl *Client) CloneRepo(repoPath string) (string, error) {
+// The status channel 'clonechan' is closed when this function returns.
+func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus) {
+	defer close(clonechan)
 	util.LogWrite("CloneRepo")
 	err := gincl.LoadToken()
 	if err != nil {
-		return "", err
+		clonechan <- RepoFileStatus{Err: err}
+		return
 	}
 
-	err = gincl.Clone(repoPath)
-	if err != nil {
-		return "", err
+	clonestatus := make(chan RepoFileStatus)
+	go gincl.Clone(repoPath, clonestatus)
+	for {
+		stat, ok := <-clonestatus
+		if !ok {
+			break
+		}
+		clonechan <- stat
 	}
 	_, repoName := splitRepoParts(repoPath)
 	Workingdir = repoName
-	return gincl.InitDir(repoPath)
+
+	initstatus := make(chan RepoFileStatus)
+	go gincl.InitDir(repoPath, initstatus)
+	for {
+		stat, ok := <-initstatus
+		if !ok {
+			break
+		}
+		clonechan <- stat
+	}
+	return
 }
 
 // InitDir initialises the local directory with the default remote and annex configuration.
-func (gincl *Client) InitDir(repoPath string) (string, error) {
-	_, repoName := splitRepoParts(repoPath)
+// The status channel 'initchan' is closed when this function returns.
+func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
+	defer close(initchan)
 	initerr := fmt.Errorf("Error initialising local directory")
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 
+	var stat RepoFileStatus
+	stat.State = "Initialising local storage"
+	initchan <- stat
 	if !IsRepo() {
 		cmd, err := RunGitCommand("init")
+
 		if err != nil || cmd.Wait() != nil {
 			util.LogWrite("Error during Init command: %s", err.Error())
 			cmd.LogStdOutErr()
-			return "", initerr
+			initchan <- RepoFileStatus{Err: initerr}
+			return
 		}
 		Workingdir = "."
 	}
+	stat.Progress = "10%"
+	initchan <- stat
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -336,24 +362,35 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 			util.LogWrite("Failed to set local git user configuration")
 		}
 	}
+	stat.Progress = "20%"
+	initchan <- stat
 
 	// If there are no commits, create the initial commit.
 	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
 	new, err := CommitIfNew()
 	if err != nil {
-		return "", err
+		initchan <- RepoFileStatus{Err: err}
+		return
 	}
+	stat.Progress = "40%"
+	initchan <- stat
 
 	err = AnnexInit(description)
 	if err != nil {
-		return "", err
+		initchan <- RepoFileStatus{Err: err}
+		return
 	}
+	stat.Progress = "60%"
+	initchan <- stat
 
 	err = AddRemote("origin", remotePath)
 	// Ignore if it already exists
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
-		return "", initerr
+		initchan <- RepoFileStatus{Err: err}
+		return
 	}
+	stat.Progress = "80%"
+	initchan <- stat
 
 	if new {
 		// Push initial commit and set default remote
@@ -361,17 +398,20 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 		if err != nil || cmd.Wait() != nil {
 			util.LogWrite("Error during set upstream command")
 			cmd.LogStdOutErr()
-			return "", initerr
+			initchan <- RepoFileStatus{Err: initerr}
+			return
 		}
 
 		// Sync if an initial commit was created
 		err = AnnexSync(false)
 		if err != nil {
-			return "", err
+			initchan <- RepoFileStatus{Err: initerr}
+			return
 		}
 	}
-
-	return repoName, nil
+	stat.Progress = "100%"
+	initchan <- stat
+	return
 }
 
 // FileStatus represents the state a file is in with respect to local and remote changes.
