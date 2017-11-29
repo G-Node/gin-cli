@@ -248,16 +248,20 @@ func lock(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	err := ginclient.AnnexLock(args...)
-	util.CheckError(err)
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	lockchan := make(chan ginclient.RepoFileStatus)
+	go gincl.LockContent(args, lockchan)
+	printProgress(lockchan)
 }
 
 func unlock(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	err := ginclient.AnnexUnlock(args...)
-	util.CheckError(err)
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	unlockchan := make(chan ginclient.RepoFileStatus)
+	go gincl.UnlockContent(args, unlockchan)
+	printProgress(unlockchan)
 }
 
 func printProgress(statuschan chan ginclient.RepoFileStatus) {
@@ -311,8 +315,7 @@ func upload(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	err := ginclient.AnnexLock(args...)
-	util.CheckError(err)
+	lock(args)
 
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
@@ -332,8 +335,7 @@ func download(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	err := ginclient.AnnexLock()
-	util.CheckError(err)
+	lock(args)
 
 	var content bool
 	if len(args) > 0 {
@@ -374,9 +376,7 @@ func remove(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	err := ginclient.AnnexLock(args...)
-	util.CheckError(err)
-
+	lock(args)
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser

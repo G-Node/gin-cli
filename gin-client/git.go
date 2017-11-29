@@ -817,16 +817,22 @@ func makeFileList(header string, fnames []string) string {
 // Note that this function uses 'git annex add' to lock files, but only if they are marked as unlocked (T) by git annex.
 // Attempting to lock an untracked file, or a file in any state other than T will have no effect.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'lockchan' is closed when this function returns.
 // (git annex add)
-func AnnexLock(paths ...string) error {
+func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
+	defer close(lockchan)
 	// Annex lock doesn't work like it used to. It's better to instead annex add, but only the files that are already known to annex.
 	// To find these files, we can do a 'git-annex status paths...'and look for Type changes (T)
-	statuses, err := AnnexStatus(paths...)
+	var status RepoFileStatus
+	status.State = "Locking"
+	statuses, err := AnnexStatus(filepaths...)
 	if err != nil {
-		return err
+		lockchan <- RepoFileStatus{Err: err}
+		return
 	}
-	unlockedfiles := make([]string, 0, len(paths))
+	unlockedfiles := make([]string, 0, len(filepaths))
 	for _, stat := range statuses {
+		// make AnnexStatus a routine and do this asynchronously
 		if stat.Status == "T" {
 			unlockedfiles = append(unlockedfiles, stat.File)
 		}
@@ -834,33 +840,104 @@ func AnnexLock(paths ...string) error {
 
 	if len(unlockedfiles) == 0 {
 		util.LogWrite("No files to lock")
-		return nil
+		status.Progress = "100%"
+		return
 	}
-	cmdargs := []string{"add"}
+	cmdargs := []string{"add", "--json"}
 	cmdargs = append(cmdargs, unlockedfiles...)
 	cmd, err := RunAnnexCommand(cmdargs...)
-	// TODO: Parse output
+	if err != nil {
+		lockchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	var annexAddRes struct {
+		Command string `json:"command"`
+		File    string `json:"file"`
+		Key     string `json:"key"`
+		Success bool   `json:"success"`
+	}
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		// Send file name
+		err = json.Unmarshal([]byte(line), &annexAddRes)
+		if err != nil {
+			lockchan <- RepoFileStatus{Err: err}
+			return
+		}
+		status.FileName = annexAddRes.File
+		if annexAddRes.Success {
+			util.LogWrite("%s locked", annexAddRes.File)
+		} else {
+			util.LogWrite("Error locking %s", annexAddRes.File)
+			status.Err = fmt.Errorf("Failed")
+		}
+		status.Progress = "100%"
+		lockchan <- status
+	}
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexLock")
 		cmd.LogStdOutErr()
-		return fmt.Errorf("Error locking files")
+		lockchan <- RepoFileStatus{Err: fmt.Errorf("Error locking files")}
 	}
-	return nil
+	status.Progress = "100%"
+	return
 }
 
 // AnnexUnlock unlocks the specified files and directory contents if they are annexed
 // Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'unlockchan' is closed when this function returns.
 // (git annex unlock)
-func AnnexUnlock(paths ...string) error {
-	cmdargs := []string{"unlock"}
-	cmdargs = append(cmdargs, paths...)
+func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
+	defer close(unlockchan)
+	cmdargs := []string{"unlock", "--json"}
+	cmdargs = append(cmdargs, filepaths...)
 	cmd, err := RunAnnexCommand(cmdargs...)
+	if err != nil {
+		unlockchan <- RepoFileStatus{Err: err}
+		return
+	}
+	var status RepoFileStatus
+	status.State = "Unlocking"
+
+	var annexUnlockRes struct {
+		Command string `json:"command"`
+		File    string `json:"file"`
+		Key     string `json:"key"`
+		Success bool   `json:"success"`
+		Note    string `json:"note"`
+	}
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		// Send file name
+		err = json.Unmarshal([]byte(line), &annexUnlockRes)
+		if err != nil {
+			unlockchan <- RepoFileStatus{Err: err}
+			return
+		}
+		status.FileName = annexUnlockRes.File
+		if annexUnlockRes.Success {
+			util.LogWrite("%s unlocked", annexUnlockRes.File)
+		} else {
+			util.LogWrite("Error unlocking %s", annexUnlockRes.File)
+			status.Err = fmt.Errorf("Failed")
+		}
+		status.Progress = "100%"
+		unlockchan <- status
+	}
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexUnlock")
 		cmd.LogStdOutErr()
-		return fmt.Errorf("Error unlocking files")
+		unlockchan <- RepoFileStatus{Err: fmt.Errorf("Error unlocking files")}
 	}
-	return nil
+	status.Progress = "100%"
+	return
 }
 
 // AnnexInfoResult holds the information returned by AnnexInfo

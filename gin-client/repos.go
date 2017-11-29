@@ -263,6 +263,54 @@ func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- RepoFileStatus
 	return
 }
 
+// LockContent locks local files, turning them into symlinks (if supported by the filesystem).
+// The status channel 'lockchan' is closed when this function returns.
+func (gincl *Client) LockContent(paths []string, lcchan chan<- RepoFileStatus) {
+	defer close(lcchan)
+	util.LogWrite("LockContent")
+
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		lcchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	lockchan := make(chan RepoFileStatus)
+	go AnnexLock(paths, lockchan)
+	for {
+		stat, ok := <-lockchan
+		if !ok {
+			break
+		}
+		lcchan <- stat
+	}
+	return
+}
+
+// UnlockContent unlocks local files turning them into normal files, if the content is locally available.
+// The status channel 'unlockchan' is closed when this function returns.
+func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- RepoFileStatus) {
+	defer close(ulcchan)
+	util.LogWrite("UnlockContent")
+
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		ulcchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	unlockchan := make(chan RepoFileStatus)
+	go AnnexUnlock(paths, unlockchan)
+	for {
+		stat, ok := <-unlockchan
+		if !ok {
+			break
+		}
+		ulcchan <- stat
+	}
+	return
+}
+
 // Download downloads changes and placeholder files in an already checked out repository.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'downloadchan' is closed when this function returns.
