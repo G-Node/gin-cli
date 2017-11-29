@@ -113,7 +113,7 @@ func createRepo(args []string) {
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
-	fmt.Printf("Creating repository '%s'... ", repoPath)
+	fmt.Printf("Creating repository '%s' ", repoPath)
 	err = gincl.CreateRepo(repoName, repoDesc)
 	// Parse error message and make error nicer
 	util.CheckError(err)
@@ -286,16 +286,25 @@ func printProgress(statuschan chan ginclient.RepoFileStatus) {
 			rate = fmt.Sprintf("(%s)", rate)
 		}
 		if stat.Err == nil {
-			if (stat.State != "Downloading" && stat.State != "Uploading") || progress == "100%" {
+			if progress == "100%" {
 				progress = green.Sprint("OK")
 			}
 		} else if stat.Err.Error() == "Failed" {
 			progress = red.Sprint("Failed")
 		} else {
-			progress = fmt.Sprintf("%s: %s", red.Sprint("Error"), stat.Err.Error())
+			errmsg := fmt.Sprintf("%s: %s", red.Sprint("Error"), stat.Err.Error())
+			fmt.Printf("%s %s %s\n", stat.State, stat.FileName, errmsg)
+			continue
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
-		prevlinelength, _ = fmt.Printf("\r%s %s: %s %s", stat.State, fname, progress, rate)
+		prevlinelength, _ = fmt.Printf("\r%s ", stat.State)
+		if len(stat.FileName) > 0 {
+			// skip filename print if empty
+			length, _ := fmt.Printf("%s ", stat.FileName)
+			prevlinelength += length
+		}
+		length, _ := fmt.Printf("%s %s", progress, rate)
+		prevlinelength += length
 	}
 	fmt.Println()
 }
