@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
@@ -363,7 +364,6 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		}
 	}
 	stat.Progress = "20%"
-	initchan <- stat
 
 	// If there are no commits, create the initial commit.
 	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
@@ -372,7 +372,7 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		initchan <- RepoFileStatus{Err: err}
 		return
 	}
-	stat.Progress = "40%"
+	stat.Progress = "30%"
 	initchan <- stat
 
 	err = AnnexInit(description)
@@ -380,7 +380,7 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		initchan <- RepoFileStatus{Err: err}
 		return
 	}
-	stat.Progress = "60%"
+	stat.Progress = "40%"
 	initchan <- stat
 
 	err = AddRemote("origin", remotePath)
@@ -389,7 +389,7 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		initchan <- RepoFileStatus{Err: err}
 		return
 	}
-	stat.Progress = "80%"
+	stat.Progress = "50%"
 	initchan <- stat
 
 	if new {
@@ -405,7 +405,21 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		// Sync if an initial commit was created
 		syncchan := make(chan RepoFileStatus)
 		go AnnexSync(false, syncchan)
-		<-syncchan // wait for channel to close
+		for {
+			syncstat, ok := <-syncchan
+			if !ok {
+				break
+			}
+			if len(syncstat.Progress) > 0 {
+				progstr := strings.TrimSuffix(syncstat.Progress, "%")
+				progint, converr := strconv.ParseInt(progstr, 10, 32)
+				if converr != nil {
+					continue
+				}
+				stat.Progress = fmt.Sprintf("%d%%", 50+progint/2)
+			}
+			initchan <- stat
+		}
 		if err != nil {
 			initchan <- RepoFileStatus{Err: initerr}
 			return

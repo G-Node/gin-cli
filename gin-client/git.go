@@ -252,6 +252,7 @@ func AnnexPull(content bool, pullchan chan<- RepoFileStatus) {
 // The status channel 'syncchan' is closed when this function returns.
 // (git annex sync [--content])
 func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
+	defer close(syncchan)
 	args := []string{"sync"}
 	if content {
 		args = append(args, "--content")
@@ -260,6 +261,30 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 	var status RepoFileStatus
 	status.State = "Synchronising repository"
 	syncchan <- status
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		line = util.CleanSpaces(line)
+		if strings.HasPrefix(line, "copy") || strings.HasPrefix(line, "get") {
+			words := strings.Split(line, " ")
+			status.FileName = strings.TrimSpace(words[1])
+			// new file - reset Progress and Rate
+			status.Progress = ""
+			status.Rate = ""
+			if !strings.HasSuffix(line, "ok") {
+				// if the copy line ends with ok, the file is already done (no upload needed)
+				// so we shouldn't send the status to the caller
+				syncchan <- status
+			}
+		} else if strings.Contains(line, "%") {
+			words := strings.Split(line, " ")
+			status.Progress = words[1]
+			status.Rate = words[2]
+			syncchan <- status
+		}
+	}
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexSync")
 		util.LogWrite("[Error]: %v", err)
