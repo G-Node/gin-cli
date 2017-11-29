@@ -237,6 +237,30 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatu
 	return
 }
 
+// RemoveContent removes the contents of local files, turning them into placeholders but only if the content is available on a remote.
+// The status channel 'rmcchan' is closed when this function returns.
+func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- RepoFileStatus) {
+	defer close(rmcchan)
+	util.LogWrite("RemoveContent")
+
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		rmcchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	dropchan := make(chan RepoFileStatus)
+	go AnnexDrop(paths, dropchan)
+	for {
+		stat, ok := <-dropchan
+		if !ok {
+			break
+		}
+		rmcchan <- stat
+	}
+	return
+}
+
 // Download downloads changes and placeholder files in an already checked out repository.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'downloadchan' is closed when this function returns.

@@ -25,6 +25,7 @@ var verstr string
 var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 
 var green = color.New(color.FgGreen)
+var red = color.New(color.FgRed)
 
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
@@ -270,7 +271,7 @@ func printProgress(statuschan chan ginclient.RepoFileStatus) {
 			break
 		}
 		// TODO: Parse error
-		util.CheckError(stat.Err)
+		// util.CheckError(stat.Err)
 		if stat.FileName != fname {
 			// New line if new file status
 			if fname != "" {
@@ -284,8 +285,14 @@ func printProgress(statuschan chan ginclient.RepoFileStatus) {
 		if len(rate) > 0 {
 			rate = fmt.Sprintf("(%s)", rate)
 		}
-		if progress == "100%" || stat.State == "Added" {
-			progress = green.Sprint("OK")
+		if stat.Err == nil {
+			if (stat.State != "Downloading" && stat.State != "Uploading") || progress == "100%" {
+				progress = green.Sprint("OK")
+			}
+		} else if stat.Err.Error() == "Failed" {
+			progress = red.Sprint("Failed")
+		} else {
+			progress = fmt.Sprintf("%s: %s", red.Sprint("Error"), stat.Err.Error())
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
 		prevlinelength, _ = fmt.Printf("\r%s %s: %s %s", stat.State, fname, progress, rate)
@@ -366,8 +373,9 @@ func remove(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	err = ginclient.AnnexDrop(args)
-	util.CheckError(err)
+	rmchan := make(chan ginclient.RepoFileStatus)
+	go gincl.RemoveContent(args, rmchan)
+	printProgress(rmchan)
 }
 
 func keys(args []string) {

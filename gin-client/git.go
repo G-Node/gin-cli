@@ -356,22 +356,53 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 
 // AnnexDrop drops the content of specified files.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'dropchan' is closed when this function returns.
 // (git annex drop)
-func AnnexDrop(filepaths []string) error {
-	// TODO: Print success for each file as it finishes
-	cmdargs := append([]string{"drop"}, filepaths...)
+func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
+	defer close(dropchan)
+	cmdargs := append([]string{"drop", "--json"}, filepaths...)
 	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
-		return err
+		dropchan <- RepoFileStatus{Err: err}
+		return
 	}
-	// TODO: Parse output
+	var status RepoFileStatus
+	var annexDropRes struct {
+		Command string `json:"command"`
+		File    string `json:"file"`
+		Key     string `json:"key"`
+		Success bool   `json:"success"`
+		Note    string `json:"note"`
+	}
+
+	status.State = "Removing content"
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		// Send file name
+		err = json.Unmarshal([]byte(line), &annexDropRes)
+		if err != nil {
+			dropchan <- RepoFileStatus{Err: err}
+			return
+		}
+		status.FileName = annexDropRes.File
+		if annexDropRes.Success {
+			util.LogWrite("%s content dropped", annexDropRes.File)
+		} else {
+			util.LogWrite("Error dropping %s", annexDropRes.File)
+			status.Err = fmt.Errorf("Failed")
+		}
+		dropchan <- status
+	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexDrop")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		return fmt.Errorf("Error removing files")
+		// dropchan <- RepoFileStatus{Err: fmt.Errorf("Error removing files")}
 	}
-	return nil
+	return
 }
 
 func setBare(state bool) error {
@@ -467,6 +498,8 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		return
 	}
 	// TODO: Parse output
+	var status RepoFileStatus
+	status.State = "Adding"
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
@@ -475,8 +508,10 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		fname := strings.TrimSpace(line)
 		fname = strings.TrimPrefix(fname, "add '")
 		fname = strings.TrimSuffix(fname, "'")
+		status.FileName = fname
 		util.LogWrite("%s added to git", fname)
-		addchan <- RepoFileStatus{FileName: fname, State: "Added"}
+		// Error conditions?
+		addchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during GitAdd")
@@ -530,7 +565,8 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		Key     string `json:"key"`
 		Success bool   `json:"success"`
 	}
-
+	var status RepoFileStatus
+	status.State = "Adding"
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
@@ -542,19 +578,20 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			addchan <- RepoFileStatus{Err: err}
 			return
 		}
+		status.FileName = annexAddRes.File
 		if annexAddRes.Success {
 			// Send file name to outchan
 			util.LogWrite("%s added to annex", annexAddRes.File)
-			addchan <- RepoFileStatus{FileName: annexAddRes.File, State: "Added"}
 		} else {
 			util.LogWrite("Error adding %s", annexAddRes.File)
-			addchan <- RepoFileStatus{Err: fmt.Errorf("Error adding files to repository: Failed to add %s", annexAddRes.File)}
+			status.Err = fmt.Errorf("Failed")
 		}
+		addchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexAdd")
 		cmd.LogStdOutErr()
-		addchan <- RepoFileStatus{Err: fmt.Errorf("Error adding files to repository.")}
+		// addchan <- RepoFileStatus{Err: fmt.Errorf("Error adding files to repository.")}
 	}
 	return
 }
