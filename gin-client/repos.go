@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
@@ -33,7 +34,7 @@ func (gincl *Client) MakeSessionKey() error {
 		util.LogWrite("Could not retrieve hostname")
 		hostname = defaultHostname
 	}
-	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
+	description := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(keyPair.Public), description)
 	err = gincl.AddKey(pubkey, description, true)
 	if err != nil {
@@ -129,29 +130,63 @@ func (gincl *Client) DelRepo(name string) error {
 	return nil
 }
 
+// RepoFileStatus describes the status of files when being added to the repo or transfered to/from remotes.
+type RepoFileStatus struct {
+	// The name of the file.
+	FileName string
+	// The state of the operation (Added, Uploading, or Downloading).
+	// TODO: Use enum
+	State string
+	// Progress of the operation, if available. This is empty when the State is "Added"
+	Progress string
+	// The data rate. This is empty when the State is "Added"
+	Rate string
+	// Errors
+	Err error
+}
+
 // Upload adds files to a repository and uploads them.
-func (gincl *Client) Upload(paths []string) error {
+// The status channel 'uploadchan' is closed when this function returns.
+func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
+	defer close(uploadchan)
 	util.LogWrite("Upload")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
-		return err
+		uploadchan <- RepoFileStatus{Err: err}
+		return
 	}
 
 	if len(paths) > 0 {
 		// Run git annex add using exclusion filters and then add the rest to git
-		_, err = AnnexAdd(paths)
-		if err != nil {
-			return err
+		addchan := make(chan RepoFileStatus)
+		go AnnexAdd(paths, addchan)
+		for {
+			addstat, ok := <-addchan
+			if !ok {
+				break
+			}
+			// Send UploadStatus
+			uploadchan <- addstat
 		}
-		_, err = GitAdd(paths)
-		if err != nil {
-			return err
+
+		addchan = make(chan RepoFileStatus)
+		go GitAdd(paths, addchan)
+		for {
+			addstat, ok := <-addchan
+			if !ok {
+				break
+			}
+			// Send UploadStatus
+			uploadchan <- addstat
 		}
+
 	}
+
 	changes, err := DescribeIndexShort()
 	if err != nil {
-		return err
+		uploadchan <- RepoFileStatus{Err: err}
+		return
 	}
 	// add header commit line
 	hostname, err := os.Hostname()
@@ -164,75 +199,195 @@ func (gincl *Client) Upload(paths []string) error {
 	}
 	changes = fmt.Sprintf("gin upload from %s\n\n%s", hostname, changes)
 	if err != nil {
-		return err
+		uploadchan <- RepoFileStatus{Err: err}
+		return
 	}
 
-	err = AnnexPush(paths, changes)
-	return err
+	annexpushchan := make(chan RepoFileStatus)
+	go AnnexPush(paths, changes, annexpushchan)
+	for {
+		stat, ok := <-annexpushchan
+		if !ok {
+			break
+		}
+		uploadchan <- stat
+	}
+	return
 }
 
-// DownloadRepo downloads the files in an already checked out repository.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-func (gincl *Client) DownloadRepo(content bool) error {
-	util.LogWrite("DownloadRepo")
-
-	err := AnnexPull(content)
-	return err
-}
-
-// GetContent retrieves the contents of placeholder files in a checked out repository.
-func (gincl *Client) GetContent(filepaths []string) error {
+// GetContent downloads the contents of placeholder files in a checked out repository.
+// The status channel 'getcontchan' is closed when this function returns.
+func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatus) {
+	defer close(getcontchan)
 	util.LogWrite("GetContent")
 
-	err := AnnexGet(filepaths)
-	return err
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		getcontchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	annexgetchan := make(chan RepoFileStatus)
+	go AnnexGet(paths, annexgetchan)
+	for {
+		stat, ok := <-annexgetchan
+		if !ok {
+			break
+		}
+		getcontchan <- stat
+	}
+	return
 }
 
-// RmContent removes the contents of local files, turning them into placeholders, but ONLY IF the content is available on a remote
-func (gincl *Client) RmContent(filepaths []string) error {
-	util.LogWrite("RmContent")
+// RemoveContent removes the contents of local files, turning them into placeholders but only if the content is available on a remote.
+// The status channel 'rmcchan' is closed when this function returns.
+func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- RepoFileStatus) {
+	defer close(rmcchan)
+	util.LogWrite("RemoveContent")
 
-	err := AnnexDrop(filepaths)
-	return err
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		rmcchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	dropchan := make(chan RepoFileStatus)
+	go AnnexDrop(paths, dropchan)
+	for {
+		stat, ok := <-dropchan
+		if !ok {
+			break
+		}
+		rmcchan <- stat
+	}
+	return
+}
+
+// LockContent locks local files, turning them into symlinks (if supported by the filesystem).
+// The status channel 'lockchan' is closed when this function returns.
+func (gincl *Client) LockContent(paths []string, lcchan chan<- RepoFileStatus) {
+	defer close(lcchan)
+	util.LogWrite("LockContent")
+
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		lcchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	lockchan := make(chan RepoFileStatus)
+	go AnnexLock(paths, lockchan)
+	for {
+		stat, ok := <-lockchan
+		if !ok {
+			break
+		}
+		lcchan <- stat
+	}
+	return
+}
+
+// UnlockContent unlocks local files turning them into normal files, if the content is locally available.
+// The status channel 'unlockchan' is closed when this function returns.
+func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- RepoFileStatus) {
+	defer close(ulcchan)
+	util.LogWrite("UnlockContent")
+
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		ulcchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	unlockchan := make(chan RepoFileStatus)
+	go AnnexUnlock(paths, unlockchan)
+	for {
+		stat, ok := <-unlockchan
+		if !ok {
+			break
+		}
+		ulcchan <- stat
+	}
+	return
+}
+
+// Download downloads changes and placeholder files in an already checked out repository.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'downloadchan' is closed when this function returns.
+func (gincl *Client) Download(content bool, downloadchan chan<- RepoFileStatus) {
+	defer close(downloadchan)
+	util.LogWrite("Download")
+
+	downloadstatus := make(chan RepoFileStatus)
+	go AnnexPull(content, downloadstatus)
+	for {
+		stat, ok := <-downloadstatus
+		if !ok {
+			break
+		}
+		downloadchan <- stat
+	}
+	return
 }
 
 // CloneRepo clones a remote repository and initialises annex.
-// Returns the name of the directory in which the repository is cloned.
-func (gincl *Client) CloneRepo(repoPath string) (string, error) {
+// The status channel 'clonechan' is closed when this function returns.
+func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus) {
+	defer close(clonechan)
 	util.LogWrite("CloneRepo")
 	err := gincl.LoadToken()
 	if err != nil {
-		return "", err
+		clonechan <- RepoFileStatus{Err: err}
+		return
 	}
 
-	fmt.Printf("Fetching repository '%s'... ", repoPath)
-	err = gincl.Clone(repoPath)
-	if err != nil {
-		return "", err
+	clonestatus := make(chan RepoFileStatus)
+	go gincl.Clone(repoPath, clonestatus)
+	for {
+		stat, ok := <-clonestatus
+		if !ok {
+			break
+		}
+		clonechan <- stat
 	}
-	green.Println("OK")
 	_, repoName := splitRepoParts(repoPath)
 	Workingdir = repoName
-	return gincl.InitDir(repoPath)
+
+	initstatus := make(chan RepoFileStatus)
+	go gincl.InitDir(repoPath, initstatus)
+	for {
+		stat, ok := <-initstatus
+		if !ok {
+			break
+		}
+		clonechan <- stat
+	}
+	return
 }
 
 // InitDir initialises the local directory with the default remote and annex configuration.
-func (gincl *Client) InitDir(repoPath string) (string, error) {
-	fmt.Printf("Initialising local storage... ")
-	_, repoName := splitRepoParts(repoPath)
+// The status channel 'initchan' is closed when this function returns.
+func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
+	defer close(initchan)
 	initerr := fmt.Errorf("Error initialising local directory")
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 
+	var stat RepoFileStatus
+	stat.State = "Initialising local storage"
+	initchan <- stat
 	if !IsRepo() {
-		stdout, stderr, err := RunGitCommand("init")
-		if err != nil {
-			util.LogWrite("Error during Init command")
-			util.LogWrite("[stdout]\r\n%s", stdout.String())
-			util.LogWrite("[stderr]\r\n%s", stderr.String())
-			return "", initerr
+		cmd, err := RunGitCommand("init")
+
+		if err != nil || cmd.Wait() != nil {
+			util.LogWrite("Error during Init command: %s", err.Error())
+			cmd.LogStdOutErr()
+			initchan <- RepoFileStatus{Err: initerr}
+			return
 		}
 		Workingdir = "."
 	}
+	stat.Progress = "10%"
+	initchan <- stat
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -241,9 +396,11 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 
 	// If there is no global git user.name or user.email set local ones
-	globalGitName, _, _ := RunGitCommand("config", "--global", "user.name")
-	globalGitEmail, _, _ := RunGitCommand("config", "--global", "user.Email")
-	if globalGitName.Len() == 0 && globalGitEmail.Len() == 0 {
+	cmd, _ := RunGitCommand("config", "--global", "user.name")
+	globalGitName := cmd.OutPipe.ReadAll()
+	cmd, _ = RunGitCommand("config", "--global", "user.Email")
+	globalGitEmail := cmd.OutPipe.ReadAll()
+	if len(globalGitName) == 0 && len(globalGitEmail) == 0 {
 		info, ierr := gincl.RequestAccount(gincl.Username)
 		name := info.FullName
 		if ierr != nil {
@@ -254,44 +411,71 @@ func (gincl *Client) InitDir(repoPath string) (string, error) {
 			util.LogWrite("Failed to set local git user configuration")
 		}
 	}
+	stat.Progress = "20%"
 
 	// If there are no commits, create the initial commit.
 	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
 	new, err := CommitIfNew()
 	if err != nil {
-		return "", err
+		initchan <- RepoFileStatus{Err: err}
+		return
 	}
+	stat.Progress = "30%"
+	initchan <- stat
 
 	err = AnnexInit(description)
 	if err != nil {
-		return "", err
+		initchan <- RepoFileStatus{Err: err}
+		return
 	}
+	stat.Progress = "40%"
+	initchan <- stat
 
 	err = AddRemote("origin", remotePath)
 	// Ignore if it already exists
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
-		return "", initerr
+		initchan <- RepoFileStatus{Err: err}
+		return
 	}
+	stat.Progress = "50%"
+	initchan <- stat
 
 	if new {
 		// Push initial commit and set default remote
-		stdout, stderr, err := RunGitCommand("push", "--set-upstream", "origin", "master")
-		if err != nil {
+		cmd, err := RunGitCommand("push", "--set-upstream", "origin", "master")
+		if err != nil || cmd.Wait() != nil {
 			util.LogWrite("Error during set upstream command")
-			util.LogWrite("[stdout]\r\n%s", stdout.String())
-			util.LogWrite("[stderr]\r\n%s", stderr.String())
-			return "", initerr
+			cmd.LogStdOutErr()
+			initchan <- RepoFileStatus{Err: initerr}
+			return
 		}
 
 		// Sync if an initial commit was created
-		err = AnnexSync(false)
+		syncchan := make(chan RepoFileStatus)
+		go AnnexSync(false, syncchan)
+		for {
+			syncstat, ok := <-syncchan
+			if !ok {
+				break
+			}
+			if len(syncstat.Progress) > 0 {
+				progstr := strings.TrimSuffix(syncstat.Progress, "%")
+				progint, converr := strconv.ParseInt(progstr, 10, 32)
+				if converr != nil {
+					continue
+				}
+				stat.Progress = fmt.Sprintf("%d%%", 50+progint/2)
+			}
+			initchan <- stat
+		}
 		if err != nil {
-			return "", err
+			initchan <- RepoFileStatus{Err: initerr}
+			return
 		}
 	}
-
-	green.Println("OK")
-	return repoName, nil
+	stat.Progress = "100%"
+	initchan <- stat
+	return
 }
 
 // FileStatus represents the state a file is in with respect to local and remote changes.
@@ -473,15 +657,14 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	// If cached files are diff from upstream, mark as LocalChanges
 	diffargs := []string{"diff", "--name-only", "--relative", "@{upstream}"}
 	diffargs = append(diffargs, cachedfiles...)
-	stdout, stderr, err := RunGitCommand(diffargs...)
-	if err != nil {
+	cmd, err := RunGitCommand(diffargs...)
+	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during diff command for status")
-		util.LogWrite("[stdout]\r\n%s", stdout.String())
-		util.LogWrite("[stderr]\r\n%s", stderr.String())
+		cmd.LogStdOutErr()
 		// ignoring error and continuing
 	}
 
-	diffresults := strings.Split(stdout.String(), "\n")
+	diffresults := strings.Split(cmd.OutPipe.ReadAll(), "\n")
 	for _, fname := range diffresults {
 		// Two notes:
 		//		1. There will definitely be overlap here with the same status in annex (not a problem)

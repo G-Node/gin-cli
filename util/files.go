@@ -34,18 +34,28 @@ func PathSplit(path string) (string, string) {
 
 // ExpandGlobs expands a list of globs into paths (files and directories).
 func ExpandGlobs(paths []string) (globexppaths []string, err error) {
+	if len(paths) == 0 {
+		// Nothing to do
+		globexppaths = paths
+		return
+	}
 	// expand potential globs
 	for _, p := range paths {
 		LogWrite("ExpandGlobs: Checking for glob expansion for %s", p)
-		exp, err := filepath.Glob(p)
-		if err != nil {
-			LogWrite(err.Error())
+		exp, globerr := filepath.Glob(p)
+		if globerr != nil {
+			LogWrite(globerr.Error())
 			LogWrite("Bad file pattern %s", p)
-			return nil, err
+			return nil, globerr
 		}
 		if exp != nil {
 			globexppaths = append(globexppaths, exp...)
 		}
+	}
+	if len(globexppaths) == 0 {
+		// Invalid paths
+		LogWrite("ExpandGlobs: No files matched")
+		err = fmt.Errorf("No files matched %v", paths)
 	}
 	return
 }

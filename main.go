@@ -1,7 +1,5 @@
 package main
 
-// TODO: Nicer error handling. Print useful, descriptive messages.
-
 import (
 	"bytes"
 	"fmt"
@@ -27,6 +25,7 @@ var verstr string
 var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 
 var green = color.New(color.FgGreen)
+var red = color.New(color.FgRed)
 
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
@@ -114,17 +113,18 @@ func createRepo(args []string) {
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
-	fmt.Printf("Creating repository '%s'... ", repoPath)
+	fmt.Printf("Creating repository '%s' ", repoPath)
 	err = gincl.CreateRepo(repoName, repoDesc)
 	// Parse error message and make error nicer
 	util.CheckError(err)
-	green.Println("OK")
+	_, _ = green.Println("OK")
 
 	if here {
 		// Init cwd
 		ginclient.Workingdir = "."
-		_, err = gincl.InitDir(repoPath)
-		util.CheckError(err)
+		initchan := make(chan ginclient.RepoFileStatus)
+		go gincl.InitDir(repoPath, initchan)
+		printProgress(initchan)
 	} else {
 		// Clone repository after creation
 		getRepo([]string{repoPath})
@@ -189,8 +189,9 @@ func getRepo(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	_, err := gincl.CloneRepo(repostr)
-	util.CheckError(err)
+	clonechan := make(chan ginclient.RepoFileStatus)
+	go gincl.CloneRepo(repostr, clonechan)
+	printProgress(clonechan)
 }
 
 func lsRepo(args []string) {
@@ -247,24 +248,87 @@ func lock(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	err := ginclient.AnnexLock(args...)
-	util.CheckError(err)
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	lockchan := make(chan ginclient.RepoFileStatus)
+	go gincl.LockContent(args, lockchan)
+	printProgress(lockchan)
 }
 
 func unlock(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	err := ginclient.AnnexUnlock(args...)
-	util.CheckError(err)
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	unlockchan := make(chan ginclient.RepoFileStatus)
+	go gincl.UnlockContent(args, unlockchan)
+	printProgress(unlockchan)
+}
+
+func printProgress(statuschan chan ginclient.RepoFileStatus) {
+	var fname string
+	prevlinelength := 0 // used to clear lines before overwriting
+	nerrors := 0
+	for {
+		stat, ok := <-statuschan
+		if !ok {
+			break
+		}
+		// TODO: Parse error
+		// util.CheckError(stat.Err)
+		if stat.FileName != fname {
+			// New line if new file status
+			if fname != "" {
+				fmt.Println()
+				prevlinelength = 0
+			}
+			fname = stat.FileName
+		}
+		progress := stat.Progress
+		rate := stat.Rate
+		if len(rate) > 0 {
+			rate = fmt.Sprintf("(%s)", rate)
+		}
+		if stat.Err == nil {
+			if progress == "100%" {
+				progress = green.Sprint("OK")
+			}
+		} else if stat.Err.Error() == "Failed" {
+			progress = red.Sprint("Failed")
+			nerrors++
+		} else {
+			errmsg := fmt.Sprintf("%s: %s", red.Sprint("Error"), stat.Err.Error())
+			fmt.Printf("%s %s %s\n", stat.State, stat.FileName, errmsg)
+			nerrors++
+			continue
+		}
+		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
+		prevlinelength, _ = fmt.Printf("\r%s ", stat.State)
+		if len(stat.FileName) > 0 {
+			// skip filename print if empty
+			length, _ := fmt.Printf("%s ", stat.FileName)
+			prevlinelength += length
+		}
+		length, _ := fmt.Printf("%s %s", progress, rate)
+		prevlinelength += length
+	}
+	if prevlinelength > 0 {
+		fmt.Println()
+	}
+	if nerrors > 0 {
+		// Exit with error message and failed exit status
+		var plural string
+		if nerrors > 1 {
+			plural = "s"
+		}
+		util.Die(fmt.Sprintf("%d operation%s failed", nerrors, plural))
+	}
 }
 
 func upload(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	err := ginclient.AnnexLock(args...)
-	util.CheckError(err)
+	lock(args)
 
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
@@ -275,19 +339,16 @@ func upload(args []string) {
 		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
 	}
 
-	fmt.Print("Uploading... ")
-
-	err = gincl.Upload(args)
-	util.CheckError(err)
-	green.Println("OK")
+	uploadchan := make(chan ginclient.RepoFileStatus)
+	go gincl.Upload(args, uploadchan)
+	printProgress(uploadchan)
 }
 
 func download(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	err := ginclient.AnnexLock()
-	util.CheckError(err)
+	lock(args)
 
 	var content bool
 	if len(args) > 0 {
@@ -300,10 +361,15 @@ func download(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	fmt.Print("Downloading...")
-	err = gincl.DownloadRepo(content)
-	green.Println("OK")
-	util.CheckError(err)
+	dlchan := make(chan ginclient.RepoFileStatus)
+	if !content {
+		fmt.Print("Downloading...")
+	}
+	go gincl.Download(content, dlchan)
+	printProgress(dlchan)
+	if !content {
+		_, _ = green.Println("OK")
+	}
 }
 
 func getContent(args []string) {
@@ -314,22 +380,24 @@ func getContent(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	err := gincl.GetContent(args)
-	util.CheckError(err)
+	getcchan := make(chan ginclient.RepoFileStatus)
+	go gincl.GetContent(args, getcchan)
+	printProgress(getcchan)
 }
 
 func remove(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	err := ginclient.AnnexLock(args...)
-	util.CheckError(err)
-
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	err = gincl.RmContent(args)
-	util.CheckError(err)
+	lockchan := make(chan ginclient.RepoFileStatus)
+	go gincl.LockContent(args, lockchan)
+	printProgress(lockchan)
+	rmchan := make(chan ginclient.RepoFileStatus)
+	go gincl.RemoveContent(args, rmchan)
+	printProgress(rmchan)
 }
 
 func keys(args []string) {
@@ -500,11 +568,11 @@ func checkAnnexVersion(verstring string) {
 	errmsg := fmt.Sprintf("The GIN Client requires git-annex %s or newer", minAnnexVersion)
 	systemver, err := version.NewVersion(verstring)
 	if err != nil {
-		util.Die(errmsg)
+		util.Die(fmt.Sprintln("git-annex not found") + errmsg)
 	}
 	minver, _ := version.NewVersion(minAnnexVersion)
 	if systemver.LessThan(minver) {
-		util.Die(errmsg)
+		util.Die(errmsg + fmt.Sprintf("Found version %s", systemver))
 	}
 }
 
@@ -513,9 +581,17 @@ func gitrun(args []string) {
 	err := gincl.LoadToken()
 	util.CheckError(err)
 
-	stdout, stderr, err := ginclient.RunGitCommand(args...)
-	fmt.Print(stdout.String())
-	fmt.Fprint(os.Stderr, stderr.String())
+	cmd, err := ginclient.RunGitCommand(args...)
+	util.CheckError(err)
+	for {
+		line, readerr := cmd.OutPipe.ReadLine()
+		if readerr != nil {
+			break
+		}
+		fmt.Print(line)
+	}
+	fmt.Print(cmd.ErrPipe.ReadAll())
+	err = cmd.Wait()
 	if err != nil {
 		os.Exit(1)
 	}
@@ -525,10 +601,18 @@ func annexrun(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	err := gincl.LoadToken()
 	util.CheckError(err)
-
-	stdout, stderr, err := ginclient.RunAnnexCommand(args...)
-	fmt.Print(stdout.String())
-	fmt.Fprint(os.Stderr, stderr.String())
+	cmd, err := ginclient.RunAnnexCommand(args...)
+	util.CheckError(err)
+	var line string
+	for {
+		line, err = cmd.OutPipe.ReadLine()
+		if err != nil {
+			break
+		}
+		fmt.Print(line)
+	}
+	fmt.Print(cmd.ErrPipe.ReadAll())
+	err = cmd.Wait()
 	if err != nil {
 		os.Exit(1)
 	}
@@ -580,6 +664,8 @@ func main() {
 	case "download":
 		download(cmdArgs)
 	case "get-content":
+		getContent(cmdArgs)
+	case "getc":
 		getContent(cmdArgs)
 	case "remove-content":
 		remove(cmdArgs)

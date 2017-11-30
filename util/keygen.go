@@ -22,7 +22,7 @@ type KeyPair struct {
 // KeyFile holds the absolute path and filename of the current logged in user's key file.
 type KeyFile struct {
 	Dir      string
-	Filename string
+	FileName string
 	Active   bool
 }
 
