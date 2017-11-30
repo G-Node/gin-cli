@@ -52,8 +52,7 @@ func login(args []string) {
 			util.Die("Cancelled.")
 		}
 		if err == gopass.ErrMaxLengthExceeded {
-			errmsg := fmt.Sprintf("%s Input too long.", red.Sprintf("ERROR"))
-			util.Die(errmsg)
+			util.Die("Input too long")
 		}
 		util.Die(err.Error())
 	}
@@ -565,15 +564,17 @@ func help(args []string) {
 	fmt.Println(helptext)
 }
 
-func checkAnnexVersion(verstring string) {
+func checkAnnexVersion() {
 	errmsg := fmt.Sprintf("The GIN Client requires git-annex %s or newer", minAnnexVersion)
+	verstring, err := ginclient.GetAnnexVersion()
+	util.CheckError(err)
 	systemver, err := version.NewVersion(verstring)
 	if err != nil {
-		util.Die(fmt.Sprintln("git-annex not found") + errmsg)
+		util.Die(fmt.Sprintf("%s\nVersion %s not understood", errmsg, verstring))
 	}
 	minver, _ := version.NewVersion(minAnnexVersion)
 	if systemver.LessThan(minver) {
-		util.Die(errmsg + fmt.Sprintf("Found version %s", systemver))
+		util.Die(fmt.Sprintf("%s\nFound version %s", errmsg, verstring))
 	}
 }
 
@@ -640,10 +641,7 @@ func main() {
 
 	err = util.LoadConfig()
 	util.CheckError(err)
-
-	annexver, err := ginclient.GetAnnexVersion()
-	util.CheckError(err)
-	checkAnnexVersion(annexver)
+	checkAnnexVersion()
 
 	switch command {
 	case "login":
