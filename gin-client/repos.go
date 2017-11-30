@@ -133,16 +133,32 @@ func (gincl *Client) DelRepo(name string) error {
 // RepoFileStatus describes the status of files when being added to the repo or transfered to/from remotes.
 type RepoFileStatus struct {
 	// The name of the file.
-	FileName string
+	FileName string `json:"filename"`
 	// The state of the operation (Added, Uploading, or Downloading).
 	// TODO: Use enum
-	State string
+	State string `json:"state"`
 	// Progress of the operation, if available. This is empty when the State is "Added"
-	Progress string
+	Progress string `json:"progress"`
 	// The data rate. This is empty when the State is "Added"
-	Rate string
+	Rate string `json:"rate"`
 	// Errors
-	Err error
+	Err error `json:"err"`
+}
+
+// MarshalJSON overrides the default marshalling of RepoFileStatus to return the error string for the Err field.
+func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
+	type Alias RepoFileStatus
+	errmsg := ""
+	if s.Err != nil {
+		errmsg = s.Err.Error()
+	}
+	return json.Marshal(struct {
+		Alias
+		Err string `json:"err"`
+	}{
+		Alias: Alias(s),
+		Err:   errmsg,
+	})
 }
 
 // Upload adds files to a repository and uploads them.
