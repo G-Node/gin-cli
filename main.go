@@ -267,6 +267,7 @@ func unlock(args []string) {
 func printProgress(statuschan chan ginclient.RepoFileStatus) {
 	var fname string
 	prevlinelength := 0 // used to clear lines before overwriting
+	nerrors := 0
 	for {
 		stat, ok := <-statuschan
 		if !ok {
@@ -293,9 +294,11 @@ func printProgress(statuschan chan ginclient.RepoFileStatus) {
 			}
 		} else if stat.Err.Error() == "Failed" {
 			progress = red.Sprint("Failed")
+			nerrors++
 		} else {
 			errmsg := fmt.Sprintf("%s: %s", red.Sprint("Error"), stat.Err.Error())
 			fmt.Printf("%s %s %s\n", stat.State, stat.FileName, errmsg)
+			nerrors++
 			continue
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
@@ -309,6 +312,14 @@ func printProgress(statuschan chan ginclient.RepoFileStatus) {
 		prevlinelength += length
 	}
 	fmt.Println()
+	if nerrors > 0 {
+		// Exit with error message and failed exit status
+		var plural string
+		if nerrors > 1 {
+			plural = "s"
+		}
+		util.Die(fmt.Sprintf("%d operation%s failed", nerrors, plural))
+	}
 }
 
 func upload(args []string) {

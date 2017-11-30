@@ -864,6 +864,7 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 		status.FileName = annexAddRes.File
 		if annexAddRes.Success {
 			util.LogWrite("%s locked", annexAddRes.File)
+			status.Err = nil
 		} else {
 			util.LogWrite("Error locking %s", annexAddRes.File)
 			status.Err = fmt.Errorf("Failed")
