@@ -24,7 +24,7 @@ Commands:
 	get            <repopath>
 		 Retrieve (clone) a repository from the remote server
 
-	ls             [-s, --short] [<filenames>]
+	ls             [-s, --short, --json] [<filenames>]
 		 List the sync status of files in a local repository
 
 	unlock         [<filenames>]
@@ -163,7 +163,7 @@ EXAMPLES
 
 const lsHelp = `USAGE
 
-	gin ls [--short, -s] [<filenames>]...
+	gin ls [--short, -s, --json] [<filenames>]...
 
 DESCRIPTION
 
@@ -186,6 +186,9 @@ ARGUMENTS
 
 	--short, -s
 		Print listing in short form.
+
+	--json
+		Print listing in json format (uses short form abbrevations).
 
 	<filenames>
 		One or more directories or files to list.
