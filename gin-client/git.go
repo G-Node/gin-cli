@@ -832,8 +832,6 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 
 	if len(unlockedfiles) == 0 {
 		util.LogWrite("No files to lock")
-		status.State = "Nothing to do"
-		lockchan <- status
 		return
 	}
 	cmdargs := []string{"add", "--json"}

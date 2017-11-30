@@ -311,7 +311,9 @@ func printProgress(statuschan chan ginclient.RepoFileStatus) {
 		length, _ := fmt.Printf("%s %s", progress, rate)
 		prevlinelength += length
 	}
-	fmt.Println()
+	if prevlinelength > 0 {
+		fmt.Println()
+	}
 	if nerrors > 0 {
 		// Exit with error message and failed exit status
 		var plural string
@@ -387,10 +389,12 @@ func remove(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	lock(args)
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
+	lockchan := make(chan ginclient.RepoFileStatus)
+	go gincl.LockContent(args, lockchan)
+	printProgress(lockchan)
 	rmchan := make(chan ginclient.RepoFileStatus)
 	go gincl.RemoveContent(args, rmchan)
 	printProgress(rmchan)
