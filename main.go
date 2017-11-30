@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -200,10 +201,16 @@ func lsRepo(args []string) {
 	}
 
 	var short bool
+	var jsonout bool
 	for idx, arg := range args {
 		if arg == "-s" || arg == "--short" {
 			args = append(args[:idx], args[idx+1:]...)
 			short = true
+			break
+		}
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
 			break
 		}
 	}
@@ -219,6 +226,18 @@ func lsRepo(args []string) {
 		for fname, status := range filesStatus {
 			fmt.Printf("%s %s\n", status.Abbrev(), fname)
 		}
+	} else if jsonout {
+		type fstat struct {
+			FileName string `json:"filename"`
+			Status   string `json:"status"`
+		}
+		var statuses []fstat
+		for fname, status := range filesStatus {
+			statuses = append(statuses, fstat{FileName: fname, Status: status.Abbrev()})
+		}
+		jsonbytes, err := json.Marshal(statuses)
+		util.CheckError(err)
+		fmt.Println(string(jsonbytes))
 	} else {
 		// Files are printed separated by status and sorted by name
 		statFiles := make(map[ginclient.FileStatus][]string)
