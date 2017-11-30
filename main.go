@@ -570,7 +570,15 @@ func checkAnnexVersion() {
 	util.CheckError(err)
 	systemver, err := version.NewVersion(verstring)
 	if err != nil {
-		util.Die(fmt.Sprintf("%s\nVersion %s not understood", errmsg, verstring))
+		// Special case for neurodebian git-annex version
+		// The versionn string contains a tilde as a separator for the arch suffix
+		// Cutting off the suffix and checking again
+		verstring = strings.Split(verstring, "~")[0]
+		systemver, err = version.NewVersion(verstring)
+	}
+	if err != nil {
+		// Can't figure out the version. Giving up.
+		util.Die(fmt.Sprintf("%s\ngit-annex version %s not understood", errmsg, verstring))
 	}
 	minver, _ := version.NewVersion(minAnnexVersion)
 	if systemver.LessThan(minver) {
