@@ -197,7 +197,7 @@ func AnnexInit(description string) error {
 
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-// The satus channel 'pullchan' is closed when this function returns.
+// The status channel 'pullchan' is closed when this function returns.
 // (git annex sync --no-push [--content])
 func AnnexPull(content bool, pullchan chan<- RepoFileStatus) {
 	defer close(pullchan)
@@ -241,7 +241,6 @@ func AnnexPull(content bool, pullchan chan<- RepoFileStatus) {
 		util.LogWrite("Error during AnnexPull.")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		pullchan <- RepoFileStatus{Err: fmt.Errorf("Error downloading files")}
 	}
 	return
 }
@@ -289,7 +288,6 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 		util.LogWrite("Error during AnnexSync")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		syncchan <- RepoFileStatus{Err: fmt.Errorf("File synchronisation failed")}
 	}
 	status.Progress = "100%"
 	syncchan <- status
@@ -320,7 +318,6 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- RepoFileStatus)
 		util.LogWrite("Error during AnnexPush (sync --no-pull)")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		pushchan <- RepoFileStatus{Err: fmt.Errorf("Error uploading files")}
 		return
 	}
 
@@ -363,7 +360,6 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- RepoFileStatus)
 		util.LogWrite("Error during AnnexPush (copy)")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		pushchan <- RepoFileStatus{Err: fmt.Errorf("Error uploading files")}
 	}
 	return
 }
@@ -410,9 +406,7 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 		util.LogWrite("Error during AnnexGet")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		getchan <- RepoFileStatus{Err: fmt.Errorf("Error downloading files")}
 	}
-	cmd.LogStdOutErr()
 	return
 }
 
@@ -452,6 +446,7 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 		status.FileName = annexDropRes.File
 		if annexDropRes.Success {
 			util.LogWrite("%s content dropped", annexDropRes.File)
+			status.Err = nil
 		} else {
 			util.LogWrite("Error dropping %s", annexDropRes.File)
 			status.Err = fmt.Errorf("Failed")
@@ -463,7 +458,6 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 		util.LogWrite("Error during AnnexDrop")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
-		// dropchan <- RepoFileStatus{Err: fmt.Errorf("Error removing files")}
 	}
 	return
 }
@@ -580,7 +574,6 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during GitAdd")
 		cmd.LogStdOutErr()
-		addchan <- RepoFileStatus{Err: fmt.Errorf("Error adding files to repository")}
 	}
 	return
 }
@@ -644,8 +637,8 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		}
 		status.FileName = annexAddRes.File
 		if annexAddRes.Success {
-			// Send file name to outchan
 			util.LogWrite("%s added to annex", annexAddRes.File)
+			status.Err = nil
 		} else {
 			util.LogWrite("Error adding %s", annexAddRes.File)
 			status.Err = fmt.Errorf("Failed")
@@ -656,7 +649,6 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexAdd")
 		cmd.LogStdOutErr()
-		// addchan <- RepoFileStatus{Err: fmt.Errorf("Error adding files to repository.")}
 	}
 	return
 }
@@ -840,7 +832,8 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 
 	if len(unlockedfiles) == 0 {
 		util.LogWrite("No files to lock")
-		status.Progress = "100%"
+		status.State = "Nothing to do"
+		lockchan <- status
 		return
 	}
 	cmdargs := []string{"add", "--json"}
@@ -881,7 +874,6 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexLock")
 		cmd.LogStdOutErr()
-		lockchan <- RepoFileStatus{Err: fmt.Errorf("Error locking files")}
 	}
 	status.Progress = "100%"
 	return
@@ -924,6 +916,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 		status.FileName = annexUnlockRes.File
 		if annexUnlockRes.Success {
 			util.LogWrite("%s unlocked", annexUnlockRes.File)
+			status.Err = nil
 		} else {
 			util.LogWrite("Error unlocking %s", annexUnlockRes.File)
 			status.Err = fmt.Errorf("Failed")
@@ -934,7 +927,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexUnlock")
 		cmd.LogStdOutErr()
-		unlockchan <- RepoFileStatus{Err: fmt.Errorf("Error unlocking files")}
+		return
 	}
 	status.Progress = "100%"
 	return
@@ -996,7 +989,7 @@ func IsDirect() bool {
 	}
 	cmd, err := RunGitCommand("config", "--local", "annex.direct")
 	if err != nil || cmd.Wait() != nil {
-		// Don't catch this result
+		// Don't cache this result
 		return false
 	}
 

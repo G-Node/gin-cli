@@ -10,7 +10,7 @@ import (
 
 var red = color.New(color.FgRed)
 
-//Die prints a message to stderr and exits the program.
+//Die prints a message to stderr and exits the program with status 1.
 func Die(msg string) {
 	_, _ = red.Fprint(os.Stderr, "ERROR ")
 	fmt.Fprintln(os.Stderr, msg)
