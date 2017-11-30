@@ -52,7 +52,8 @@ func login(args []string) {
 			util.Die("Cancelled.")
 		}
 		if err == gopass.ErrMaxLengthExceeded {
-			util.Die("[Error] Input too long.")
+			errmsg := fmt.Sprintf("%s Input too long.", red.Sprintf("ERROR"))
+			util.Die(errmsg)
 		}
 		util.Die(err.Error())
 	}
