@@ -1099,15 +1099,16 @@ func selectGitOrAnnex(paths []string) (gitpaths []string, annexpaths []string) {
 func GetAnnexVersion() (string, error) {
 	cmd, err := RunAnnexCommand("version", "--raw")
 	if err != nil {
-		util.LogWrite("Error while checking git-annex version")
+		util.LogWrite("Error while preparing git-annex version command")
+		if strings.Contains(err.Error(), "executable file not found") ||
+			strings.Contains(err.Error(), "no such file or directory") {
+			return "", fmt.Errorf("git-annex executable '%s' not found", util.Config.Bin.GitAnnex)
+		}
 		return "", err
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error while checking git-annex version")
 		cmd.LogStdOutErr()
-		if strings.Contains(cmd.ErrPipe.ReadAll(), "command not found") {
-			return "", fmt.Errorf("Error: git-annex command not found")
-		}
 		return "", err
 	}
 
