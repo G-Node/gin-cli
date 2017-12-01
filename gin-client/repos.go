@@ -11,13 +11,11 @@ import (
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
-	"github.com/fatih/color"
 	"github.com/gogits/go-gogs-client"
 	// its a bit unfortunate that we have that import now
 	// but its only temporary...
 )
 
-var green = color.New(color.FgGreen)
 var defaultHostname = "(unknown)"
 
 // MakeSessionKey creates a private+public key pair.

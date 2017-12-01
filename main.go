@@ -25,8 +25,8 @@ var commit string
 var verstr string
 var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 
-var green = color.New(color.FgGreen)
-var red = color.New(color.FgRed)
+var green = color.New(color.FgGreen).SprintFunc()
+var red = color.New(color.FgRed).SprintFunc()
 
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
@@ -118,7 +118,7 @@ func createRepo(args []string) {
 	err = gincl.CreateRepo(repoName, repoDesc)
 	// Parse error message and make error nicer
 	util.CheckError(err)
-	_, _ = green.Println("OK")
+	fmt.Println(green("OK"))
 
 	if here {
 		// Init cwd
@@ -339,13 +339,13 @@ func printProgress(statuschan chan ginclient.RepoFileStatus, jsonout bool) {
 		}
 		if stat.Err == nil {
 			if progress == "100%" {
-				progress = green.Sprint("OK")
+				progress = green("OK")
 			}
 		} else if stat.Err.Error() == "Failed" {
-			progress = red.Sprint("Failed")
+			progress = red("Failed")
 			nerrors++
 		} else {
-			errmsg := fmt.Sprintf("%s: %s", red.Sprint("Error"), stat.Err.Error())
+			errmsg := fmt.Sprintf("%s: %s", red("Error"), stat.Err.Error())
 			fmt.Printf("%s %s %s\n", stat.State, stat.FileName, errmsg)
 			nerrors++
 			continue
@@ -437,7 +437,8 @@ func download(args []string) {
 	go gincl.Download(content, dlchan)
 	printProgress(dlchan, jsonout)
 	if !content && !jsonout {
-		_, _ = green.Println("OK")
+		fmt.Println(green("OK"))
+
 	}
 }
 
