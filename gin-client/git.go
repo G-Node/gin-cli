@@ -536,7 +536,7 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			return
 		}
 		defer setBare(true)
-		wichan := make(chan AnnexWhereisResult)
+		wichan := make(chan AnnexWhereisInfo)
 		go AnnexWhereis(filepaths, wichan)
 		var annexfiles []string
 		for {
@@ -657,8 +657,8 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	return
 }
 
-// AnnexWhereisResult holds the JSON output of a "git annex whereis" command
-type AnnexWhereisResult struct {
+// AnnexWhereisInfo holds the output of a "git annex whereis" command
+type AnnexWhereisInfo struct {
 	File      string   `json:"file"`
 	Command   string   `json:"command"`
 	Note      string   `json:"note"`
@@ -678,7 +678,7 @@ type AnnexWhereisResult struct {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The output channel 'wichan' is closed when this function returns.
 // (git annex whereis)
-func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisResult) {
+func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisInfo) {
 	defer close(wichan)
 	cmdargs := []string{"whereis", "--json"}
 	cmdargs = append(cmdargs, paths...)
@@ -686,11 +686,11 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisResult) {
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
 		cmd.LogStdOutErr()
-		wichan <- AnnexWhereisResult{Err: fmt.Errorf("Failed to run annex whereis: %s", err.Error())}
+		wichan <- AnnexWhereisInfo{Err: fmt.Errorf("Failed to run annex whereis: %s", err.Error())}
 		return
 	}
 
-	var res AnnexWhereisResult
+	var res AnnexWhereisInfo
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
@@ -703,15 +703,15 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisResult) {
 	return
 }
 
-// AnnexStatusResult for getting the (annex) status of individual files
-type AnnexStatusResult struct {
+// AnnexStatusInfo for getting the (annex) status of individual files
+type AnnexStatusInfo struct {
 	Status string `json:"status"`
 	File   string `json:"file"`
 }
 
 // AnnexStatus returns the status of a file or files in a directory
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func AnnexStatus(paths ...string) ([]AnnexStatusResult, error) {
+func AnnexStatus(paths ...string) ([]AnnexStatusInfo, error) {
 	cmdargs := []string{"status", "--json"}
 	cmdargs = append(cmdargs, paths...)
 	cmd, err := RunAnnexCommand(cmdargs...)
@@ -726,8 +726,8 @@ func AnnexStatus(paths ...string) ([]AnnexStatusResult, error) {
 	stdout := cmd.OutPipe.ReadAll()
 	files := strings.Split(stdout, "\n")
 
-	statuses := make([]AnnexStatusResult, 0, len(files))
-	var outStruct AnnexStatusResult
+	statuses := make([]AnnexStatusInfo, 0, len(files))
+	var outStruct AnnexStatusInfo
 	for _, f := range files {
 		if len(f) == 0 {
 			// can return empty lines

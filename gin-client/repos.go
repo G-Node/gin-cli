@@ -584,7 +584,7 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
-	wichan := make(chan AnnexWhereisResult)
+	wichan := make(chan AnnexWhereisInfo)
 	go AnnexWhereis(paths, wichan)
 	for {
 		wiInfo, ok := <-wichan
@@ -657,7 +657,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	deletedfiles, _ := GitLsFiles(lsfilesargs)
 
 	// Run whereis on cached files
-	wichan := make(chan AnnexWhereisResult)
+	wichan := make(chan AnnexWhereisInfo)
 	go AnnexWhereis(cachedfiles, wichan)
 	for {
 		wiInfo, ok := <-wichan
