@@ -671,7 +671,7 @@ type AnnexWhereisInfo struct {
 		Description string   `json:"description"`
 	}
 	Key string `json:"key"`
-	Err error
+	Err error  `json:"err"`
 }
 
 // AnnexWhereis returns information about annexed files in the repository
@@ -686,19 +686,19 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisInfo) {
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
 		cmd.LogStdOutErr()
-		wichan <- AnnexWhereisInfo{Err: fmt.Errorf("Failed to run annex whereis: %s", err.Error())}
+		wichan <- AnnexWhereisInfo{Err: fmt.Errorf("Failed to run git-annex whereis: %s", err.Error())}
 		return
 	}
 
-	var res AnnexWhereisInfo
+	var info AnnexWhereisInfo
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
 		}
-		jsonerr := json.Unmarshal([]byte(line), &res)
-		res.Err = jsonerr
-		wichan <- res
+		jsonerr := json.Unmarshal([]byte(line), &info)
+		info.Err = jsonerr
+		wichan <- info
 	}
 	return
 }
