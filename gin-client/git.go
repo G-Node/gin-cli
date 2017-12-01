@@ -707,39 +707,37 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisInfo) {
 type AnnexStatusInfo struct {
 	Status string `json:"status"`
 	File   string `json:"file"`
+	Err    error  `json:"err"`
 }
 
 // AnnexStatus returns the status of a file or files in a directory
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func AnnexStatus(paths ...string) ([]AnnexStatusInfo, error) {
+// The output channel 'statuschan' is closed when this function returns.
+// (git annex status)
+func AnnexStatus(paths []string, statuschan chan<- AnnexStatusInfo) {
+	defer close(statuschan)
 	cmdargs := []string{"status", "--json"}
 	cmdargs = append(cmdargs, paths...)
 	cmd, err := RunAnnexCommand(cmdargs...)
 	// TODO: Parse output
-	if err != nil || cmd.Wait() != nil {
-		util.LogWrite("Error during DescribeChanges")
+	if err != nil {
+		util.LogWrite("Error setting up git-annex status")
 		cmd.LogStdOutErr()
-		return nil, fmt.Errorf("Error retrieving file status")
+		statuschan <- AnnexStatusInfo{Err: fmt.Errorf("Failed to run git-annex status: %s", err.Error())}
+		return
 	}
 
-	// TODO: Buffered reading
-	stdout := cmd.OutPipe.ReadAll()
-	files := strings.Split(stdout, "\n")
-
-	statuses := make([]AnnexStatusInfo, 0, len(files))
-	var outStruct AnnexStatusInfo
-	for _, f := range files {
-		if len(f) == 0 {
-			// can return empty lines
-			continue
+	var status AnnexStatusInfo
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
 		}
-		err := json.Unmarshal([]byte(f), &outStruct)
-		if err != nil {
-			return nil, err
-		}
-		statuses = append(statuses, outStruct)
+		jsonerr := json.Unmarshal([]byte(line), &status)
+		status.Err = jsonerr
+		statuschan <- status
 	}
-	return statuses, nil
+	return
 }
 
 // DescribeIndexShort returns a string which represents a condensed form of the git (annex) index.
