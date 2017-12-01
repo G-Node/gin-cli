@@ -614,14 +614,24 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		// AnnexStatus with no arguments defaults to root directory, so we should use "." instead
 		asargs = []string{"."}
 	}
-	annexstatuses, _ := AnnexStatus(asargs...)
-	for _, stat := range annexstatuses {
-		if stat.Status == "?" {
-			statuses[stat.File] = Untracked
-		} else if stat.Status == "M" {
-			statuses[stat.File] = Modified
-		} else if stat.Status == "D" {
-			statuses[stat.File] = Removed
+
+	statuschan := make(chan AnnexStatusInfo)
+	go AnnexStatus(asargs, statuschan)
+	for {
+		item, ok := <-statuschan
+		if !ok {
+			break
+		}
+		if item.Err != nil {
+			// listchan <- RepoFileStatus{Err: item.Err}
+			return nil, item.Err
+		}
+		if item.Status == "?" {
+			statuses[item.File] = Untracked
+		} else if item.Status == "M" {
+			statuses[item.File] = Modified
+		} else if item.Status == "D" {
+			statuses[item.File] = Removed
 		}
 	}
 
@@ -716,13 +726,19 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 
 	// Check if modified files are actually annex unlocked instead
 	if len(modifiedfiles) > 0 {
-		mdfilestatus, err := AnnexStatus(modifiedfiles...)
-		if err != nil {
-			util.LogWrite("Error during annex status while searching for unlocked files")
-		}
-		for _, stat := range mdfilestatus {
-			if stat.Status == "T" {
-				statuses[stat.File] = Unlocked
+		statuschan := make(chan AnnexStatusInfo)
+		go AnnexStatus(modifiedfiles, statuschan)
+		for {
+			item, ok := <-statuschan
+			if !ok {
+				break
+			}
+			if item.Err != nil {
+				util.LogWrite("Error during annex status while searching for unlocked files")
+				// lockchan <- RepoFileStatus{Err: item.Err}
+			}
+			if item.Status == "T" {
+				statuses[item.File] = Unlocked
 			}
 		}
 	}

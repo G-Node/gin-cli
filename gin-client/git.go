@@ -745,15 +745,20 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusInfo) {
 // The description is composed of the file count for each status: added, modified, deleted
 func DescribeIndexShort() (string, error) {
 	// TODO: 'git annex status' doesn't list added (A) files wnen in direct mode.
-	statuses, err := AnnexStatus()
-	if err != nil {
-		return "", err
-	}
-
+	statuschan := make(chan AnnexStatusInfo)
+	go AnnexStatus([]string{""}, statuschan)
 	statusmap := make(map[string]int)
-	for _, item := range statuses {
+	for {
+		item, ok := <-statuschan
+		if !ok {
+			break
+		}
+		if item.Err != nil {
+			return "", item.Err
+		}
 		statusmap[item.Status]++
 	}
+
 	var changesBuffer bytes.Buffer
 	if statusmap["A"] > 0 {
 		_, _ = changesBuffer.WriteString(fmt.Sprintf("New files: %d\n", statusmap["A"]))
@@ -772,13 +777,17 @@ func DescribeIndexShort() (string, error) {
 // The resulting message can be used to inform the user of changes
 // that are about to be uploaded and as a long commit message.
 func DescribeIndex() (string, error) {
-	statuses, err := AnnexStatus()
-	if err != nil {
-		return "", err
-	}
-
+	statuschan := make(chan AnnexStatusInfo)
+	go AnnexStatus([]string{""}, statuschan)
 	statusmap := make(map[string][]string)
-	for _, item := range statuses {
+	for {
+		item, ok := <-statuschan
+		if !ok {
+			break
+		}
+		if item.Err != nil {
+			return "", item.Err
+		}
 		statusmap[item.Status] = append(statusmap[item.Status], item.File)
 	}
 
@@ -817,16 +826,20 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 	// To find these files, we can do a 'git-annex status paths...'and look for Type changes (T)
 	var status RepoFileStatus
 	status.State = "Locking"
-	statuses, err := AnnexStatus(filepaths...)
-	if err != nil {
-		lockchan <- RepoFileStatus{Err: err}
-		return
-	}
+
+	statuschan := make(chan AnnexStatusInfo)
+	go AnnexStatus(filepaths, statuschan)
 	unlockedfiles := make([]string, 0, len(filepaths))
-	for _, stat := range statuses {
-		// make AnnexStatus a routine and do this asynchronously
-		if stat.Status == "T" {
-			unlockedfiles = append(unlockedfiles, stat.File)
+	for {
+		item, ok := <-statuschan
+		if !ok {
+			break
+		}
+		if item.Err != nil {
+			lockchan <- RepoFileStatus{Err: item.Err}
+		}
+		if item.Status == "T" {
+			unlockedfiles = append(unlockedfiles, item.File)
 		}
 	}
 
