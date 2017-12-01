@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -124,7 +125,7 @@ func createRepo(args []string) {
 		ginclient.Workingdir = "."
 		initchan := make(chan ginclient.RepoFileStatus)
 		go gincl.InitDir(repoPath, initchan)
-		printProgress(initchan)
+		printProgress(initchan, false)
 	} else {
 		// Clone repository after creation
 		getRepo([]string{repoPath})
@@ -175,6 +176,15 @@ func isValidRepoPath(path string) bool {
 }
 
 func getRepo(args []string) {
+	var jsonout bool
+	for idx, arg := range args {
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
+			break
+		}
+	}
+
 	var repostr string
 	if len(args) != 1 {
 		util.Die(usage)
@@ -191,7 +201,7 @@ func getRepo(args []string) {
 	gincl.GitUser = util.Config.GitUser
 	clonechan := make(chan ginclient.RepoFileStatus)
 	go gincl.CloneRepo(repostr, clonechan)
-	printProgress(clonechan)
+	printProgress(clonechan, jsonout)
 }
 
 func lsRepo(args []string) {
@@ -200,10 +210,16 @@ func lsRepo(args []string) {
 	}
 
 	var short bool
+	var jsonout bool
 	for idx, arg := range args {
 		if arg == "-s" || arg == "--short" {
 			args = append(args[:idx], args[idx+1:]...)
 			short = true
+			break
+		}
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
 			break
 		}
 	}
@@ -219,6 +235,18 @@ func lsRepo(args []string) {
 		for fname, status := range filesStatus {
 			fmt.Printf("%s %s\n", status.Abbrev(), fname)
 		}
+	} else if jsonout {
+		type fstat struct {
+			FileName string `json:"filename"`
+			Status   string `json:"status"`
+		}
+		var statuses []fstat
+		for fname, status := range filesStatus {
+			statuses = append(statuses, fstat{FileName: fname, Status: status.Abbrev()})
+		}
+		jsonbytes, err := json.Marshal(statuses)
+		util.CheckError(err)
+		fmt.Println(string(jsonbytes))
 	} else {
 		// Files are printed separated by status and sorted by name
 		statFiles := make(map[ginclient.FileStatus][]string)
@@ -245,26 +273,42 @@ func lsRepo(args []string) {
 }
 
 func lock(args []string) {
+	var jsonout bool
+	for idx, arg := range args {
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
+			break
+		}
+	}
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
-	printProgress(lockchan)
+	printProgress(lockchan, jsonout)
 }
 
 func unlock(args []string) {
+	var jsonout bool
+	for idx, arg := range args {
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
+			break
+		}
+	}
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	unlockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.UnlockContent(args, unlockchan)
-	printProgress(unlockchan)
+	printProgress(unlockchan, jsonout)
 }
 
-func printProgress(statuschan chan ginclient.RepoFileStatus) {
+func printProgress(statuschan chan ginclient.RepoFileStatus, jsonout bool) {
 	var fname string
 	prevlinelength := 0 // used to clear lines before overwriting
 	nerrors := 0
@@ -272,6 +316,11 @@ func printProgress(statuschan chan ginclient.RepoFileStatus) {
 		stat, ok := <-statuschan
 		if !ok {
 			break
+		}
+		if jsonout {
+			j, _ := json.Marshal(stat)
+			fmt.Println(string(j))
+			continue
 		}
 		// TODO: Parse error
 		// util.CheckError(stat.Err)
@@ -325,6 +374,14 @@ func printProgress(statuschan chan ginclient.RepoFileStatus) {
 }
 
 func upload(args []string) {
+	var jsonout bool
+	for idx, arg := range args {
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
+			break
+		}
+	}
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -341,10 +398,18 @@ func upload(args []string) {
 
 	uploadchan := make(chan ginclient.RepoFileStatus)
 	go gincl.Upload(args, uploadchan)
-	printProgress(uploadchan)
+	printProgress(uploadchan, jsonout)
 }
 
 func download(args []string) {
+	var jsonout bool
+	for idx, arg := range args {
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
+			break
+		}
+	}
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -362,17 +427,25 @@ func download(args []string) {
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	dlchan := make(chan ginclient.RepoFileStatus)
-	if !content {
+	if !content && !jsonout {
 		fmt.Print("Downloading...")
 	}
 	go gincl.Download(content, dlchan)
-	printProgress(dlchan)
-	if !content {
+	printProgress(dlchan, jsonout)
+	if !content && !jsonout {
 		_, _ = green.Println("OK")
 	}
 }
 
 func getContent(args []string) {
+	var jsonout bool
+	for idx, arg := range args {
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
+			break
+		}
+	}
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -382,10 +455,18 @@ func getContent(args []string) {
 	gincl.GitUser = util.Config.GitUser
 	getcchan := make(chan ginclient.RepoFileStatus)
 	go gincl.GetContent(args, getcchan)
-	printProgress(getcchan)
+	printProgress(getcchan, jsonout)
 }
 
 func remove(args []string) {
+	var jsonout bool
+	for idx, arg := range args {
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
+			break
+		}
+	}
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -394,10 +475,10 @@ func remove(args []string) {
 	gincl.GitUser = util.Config.GitUser
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
-	printProgress(lockchan)
+	printProgress(lockchan, jsonout)
 	rmchan := make(chan ginclient.RepoFileStatus)
 	go gincl.RemoveContent(args, rmchan)
-	printProgress(rmchan)
+	printProgress(rmchan, jsonout)
 }
 
 func keys(args []string) {
