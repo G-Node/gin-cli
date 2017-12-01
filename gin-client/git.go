@@ -667,38 +667,36 @@ type AnnexWhereisResult struct {
 		Description string   `json:"description"`
 	}
 	Key string `json:"key"`
+	Err error
 }
 
 // AnnexWhereis returns information about annexed files in the repository
 // Setting the Workingdir package global affects the working directory in which the command is executed.
+// The output channel 'wichan' is closed when this function returns.
 // (git annex whereis)
-func AnnexWhereis(paths []string) ([]AnnexWhereisResult, error) {
+func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisResult) {
+	defer close(wichan)
 	cmdargs := []string{"whereis", "--json"}
 	cmdargs = append(cmdargs, paths...)
 	cmd, err := RunAnnexCommand(cmdargs...)
-	// TODO: Parse output
-	if err != nil || cmd.Wait() != nil {
+	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
 		cmd.LogStdOutErr()
-		return nil, fmt.Errorf("Error getting file status from server")
+		wichan <- AnnexWhereisResult{Err: fmt.Errorf("Failed to run annex whereis: %s", err.Error())}
+		return
 	}
 
-	// TODO: Buffered reading
-	stdout := cmd.OutPipe.ReadAll()
-	resultsJSON := strings.Split(stdout, "\n")
-	results := make([]AnnexWhereisResult, 0, len(resultsJSON))
-	for _, resJSON := range resultsJSON {
-		if len(resJSON) == 0 {
-			continue
+	var res AnnexWhereisResult
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
 		}
-		var res AnnexWhereisResult
-		err := json.Unmarshal([]byte(resJSON), &res)
-		if err != nil {
-			return nil, err
-		}
-		results = append(results, res)
+		jsonerr := json.Unmarshal([]byte(line), &res)
+		res.Err = jsonerr
+		wichan <- res
 	}
-	return results, nil
+	return
 }
 
 // AnnexStatusResult for getting the (annex) status of individual files
