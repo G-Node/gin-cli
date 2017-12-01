@@ -345,20 +345,14 @@ func printProgress(statuschan chan ginclient.RepoFileStatus, jsonout bool) {
 			progress = red("Failed")
 			nerrors++
 		} else {
-			errmsg := fmt.Sprintf("%s: %s", red("Error"), stat.Err.Error())
-			fmt.Printf("%s %s %s\n", stat.State, stat.FileName, errmsg)
+			msg := fmt.Sprintf("%s %s %s: %s", stat.State, stat.FileName, red("Error"), stat.Err.Error())
+			fmt.Fprintln(color.Output, util.CleanSpaces(msg))
 			nerrors++
 			continue
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
-		prevlinelength, _ = fmt.Printf("\r%s ", stat.State)
-		if len(stat.FileName) > 0 {
-			// skip filename print if empty
-			length, _ := fmt.Printf("%s ", stat.FileName)
-			prevlinelength += length
-		}
-		length, _ := fmt.Printf("%s %s", progress, rate)
-		prevlinelength += length
+		msg := fmt.Sprintf("%s %s %s %s", stat.State, stat.FileName, progress, rate)
+		prevlinelength, _ = fmt.Fprintf(color.Output, "\r%s", util.CleanSpaces(msg))
 	}
 	if prevlinelength > 0 {
 		fmt.Println()
