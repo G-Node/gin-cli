@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"io"
 	"os/exec"
-	"regexp"
 	"strings"
 )
 

@@ -12,7 +12,7 @@ var red = color.New(color.FgRed).SprintFunc()
 
 //Die prints a message to stderr and exits the program with status 1.
 func Die(msg string) {
-	fmt.Fprintf(os.Stderr, "%s %s\n", red("ERROR"), msg)
+	fmt.Fprintf(color.Error, "%s %s\n", red("ERROR"), msg)
 	os.Exit(1)
 }
 

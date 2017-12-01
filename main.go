@@ -437,8 +437,7 @@ func download(args []string) {
 	go gincl.Download(content, dlchan)
 	printProgress(dlchan, jsonout)
 	if !content && !jsonout {
-		fmt.Println(green("OK"))
-
+		fmt.Fprintln(color.Output, green("OK"))
 	}
 }
 
