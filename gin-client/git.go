@@ -536,14 +536,18 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			return
 		}
 		defer setBare(true)
-		whereisInfo, err := AnnexWhereis(filepaths)
-		if err != nil {
-			addchan <- RepoFileStatus{Err: fmt.Errorf("Error querying file annex status.")}
-			return
-		}
-		annexfiles := make([]string, len(whereisInfo))
-		for idx, wi := range whereisInfo {
-			annexfiles[idx] = wi.File
+		wichan := make(chan AnnexWhereisResult)
+		go AnnexWhereis(filepaths, wichan)
+		var annexfiles []string
+		for {
+			wiInfo, ok := <-wichan
+			if !ok {
+				break
+			}
+			if wiInfo.Err != nil {
+				continue
+			}
+			annexfiles = append(annexfiles, wiInfo.File)
 		}
 		filepaths = util.FilterPaths(filepaths, annexfiles)
 	}

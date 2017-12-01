@@ -584,14 +584,22 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
-	wiResults, _ := AnnexWhereis(paths)
-	for _, status := range wiResults {
-		fname := status.File
-		for _, remote := range status.Whereis {
+	wichan := make(chan AnnexWhereisResult)
+	go AnnexWhereis(paths, wichan)
+	for {
+		wiInfo, ok := <-wichan
+		if !ok {
+			break
+		}
+		if wiInfo.Err != nil {
+			continue
+		}
+		fname := wiInfo.File
+		for _, remote := range wiInfo.Whereis {
 			// if no remotes are "here", the file is NoContent
 			statuses[fname] = NoContent
 			if remote.Here {
-				if len(status.Whereis) > 1 {
+				if len(wiInfo.Whereis) > 1 {
 					statuses[fname] = Synced
 				} else {
 					statuses[fname] = LocalChanges
@@ -649,21 +657,27 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	deletedfiles, _ := GitLsFiles(lsfilesargs)
 
 	// Run whereis on cached files
-	wiResults, err := AnnexWhereis(cachedfiles)
-	if err == nil {
-		for _, status := range wiResults {
-			fname := status.File
-			for _, remote := range status.Whereis {
-				// if no remotes are "here", the file is NoContent
-				statuses[fname] = NoContent
-				if remote.Here {
-					if len(status.Whereis) > 1 {
-						statuses[fname] = Synced
-					} else {
-						statuses[fname] = LocalChanges
-					}
-					break
+	wichan := make(chan AnnexWhereisResult)
+	go AnnexWhereis(cachedfiles, wichan)
+	for {
+		wiInfo, ok := <-wichan
+		if !ok {
+			break
+		}
+		if wiInfo.Err != nil {
+			continue
+		}
+		fname := wiInfo.File
+		for _, remote := range wiInfo.Whereis {
+			// if no remotes are "here", the file is NoContent
+			statuses[fname] = NoContent
+			if remote.Here {
+				if len(wiInfo.Whereis) > 1 {
+					statuses[fname] = Synced
+				} else {
+					statuses[fname] = LocalChanges
 				}
+				break
 			}
 		}
 	}
