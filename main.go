@@ -385,7 +385,6 @@ func upload(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	lock(args)
 
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
@@ -396,6 +395,9 @@ func upload(args []string) {
 		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
 	}
 
+	lockchan := make(chan ginclient.RepoFileStatus)
+	go gincl.LockContent(args, lockchan)
+	printProgress(lockchan, jsonout)
 	uploadchan := make(chan ginclient.RepoFileStatus)
 	go gincl.Upload(args, uploadchan)
 	printProgress(uploadchan, jsonout)
@@ -413,7 +415,6 @@ func download(args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	lock(args)
 
 	var content bool
 	if len(args) > 0 {
@@ -426,6 +427,9 @@ func download(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
+	lockchan := make(chan ginclient.RepoFileStatus)
+	go gincl.LockContent([]string{}, lockchan)
+	printProgress(lockchan, jsonout)
 	dlchan := make(chan ginclient.RepoFileStatus)
 	if !content && !jsonout {
 		fmt.Print("Downloading...")
