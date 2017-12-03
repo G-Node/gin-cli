@@ -479,40 +479,32 @@ func setBare(state bool) error {
 
 // GitLsFiles lists all files known to git.
 // In direct mode, the bare flag is temporarily switched off before running the command.
-// Arguments passed to this function are directly passed on to the 'ls-files' command.
+// The output channel 'lschan' is closed when this function returns.
 // (git ls-files)
-func GitLsFiles(args []string) ([]string, error) {
-	if IsDirect() {
-		// Set bare false and revert at the end of the function
-		err := setBare(false)
-		if err != nil {
-			return nil, fmt.Errorf("Error during ls-files. Unable to toggle repository bare mode.")
-		}
-		defer setBare(true)
-	}
-
+func GitLsFiles(args []string, lschan chan<- string) {
+	defer close(lschan)
 	cmdargs := append([]string{"ls-files"}, args...)
 	cmd, err := RunGitCommand(cmdargs...)
-	// TODO: Parse output
 	if err != nil {
-		return nil, err
+		util.LogWrite("ls-files command set up failed: %s", err.Error())
+		return
 	}
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		line = strings.TrimSpace(line)
+		if line != "" {
+			lschan <- line
+		}
+	}
+
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during GitLsFiles")
 		cmd.LogStdOutErr()
-		return nil, fmt.Errorf("Error listing files in repository")
 	}
-
-	var filelist []string
-	// TODO: Buffered reading
-	stdout := cmd.OutPipe.ReadAll()
-	for _, fl := range strings.Split(stdout, "\n") {
-		fl = strings.TrimSpace(fl)
-		if fl != "" {
-			filelist = append(filelist, fl)
-		}
-	}
-	return filelist, nil
+	return
 }
 
 // GitAdd adds paths to git directly (not annex).
