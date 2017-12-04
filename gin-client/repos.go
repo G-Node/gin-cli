@@ -736,6 +736,10 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 // ListFiles lists the files and directories specified by paths and their sync status.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		return nil, err
+	}
 	if IsDirect() {
 		return lfDirect(paths...)
 	}
