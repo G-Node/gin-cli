@@ -583,9 +583,10 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	}
 
 	// Unmodified files that are checked into git (not annex) do not show up
-	// Need to unset 'bare' and run git ls-files and add only files that haven't been added yet
-	filelist, _ := GitLsFiles(paths)
-	for _, fname := range filelist {
+	// Need to run git ls-files and add only files that haven't been added yet
+	lschan := make(chan string)
+	go GitLsFiles(paths, lschan)
+	for fname := range lschan {
 		if _, ok := statuses[fname]; !ok {
 			statuses[fname] = Synced
 		}
@@ -597,21 +598,58 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
+	cachedchan := make(chan string)
+	var cachedfiles, modifiedfiles, untrackedfiles, deletedfiles []string
 	// Collect checked in files
 	lsfilesargs := append([]string{"--cached"}, paths...)
-	cachedfiles, _ := GitLsFiles(lsfilesargs)
+	go GitLsFiles(lsfilesargs, cachedchan)
 
 	// Collect modified files
+	modifiedchan := make(chan string)
 	lsfilesargs = append([]string{"--modified"}, paths...)
-	modifiedfiles, _ := GitLsFiles(lsfilesargs)
+	go GitLsFiles(lsfilesargs, modifiedchan)
 
 	// Collect untracked files
+	otherschan := make(chan string)
 	lsfilesargs = append([]string{"--others"}, paths...)
-	untrackedfiles, _ := GitLsFiles(lsfilesargs)
+	go GitLsFiles(lsfilesargs, otherschan)
 
 	// Collect deleted files
+	deletedchan := make(chan string)
 	lsfilesargs = append([]string{"--deleted"}, paths...)
-	deletedfiles, _ := GitLsFiles(lsfilesargs)
+	go GitLsFiles(lsfilesargs, deletedchan)
+
+	for {
+		select {
+		case fname, ok := <-cachedchan:
+			if ok {
+				cachedfiles = append(cachedfiles, fname)
+			} else {
+				cachedchan = nil
+			}
+		case fname, ok := <-modifiedchan:
+			if ok {
+				modifiedfiles = append(modifiedfiles, fname)
+			} else {
+				modifiedchan = nil
+			}
+		case fname, ok := <-otherschan:
+			if ok {
+				untrackedfiles = append(untrackedfiles, fname)
+			} else {
+				otherschan = nil
+			}
+		case fname, ok := <-deletedchan:
+			if ok {
+				deletedfiles = append(deletedfiles, fname)
+			} else {
+				deletedchan = nil
+			}
+		}
+		if cachedchan == nil && modifiedchan == nil && otherschan == nil && deletedchan == nil {
+			break
+		}
+	}
 
 	// Run whereis on cached files
 	wichan := make(chan AnnexWhereisInfo)
