@@ -175,26 +175,17 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 		// Run git annex add using exclusion filters and then add the rest to git
 		addchan := make(chan RepoFileStatus)
 		go AnnexAdd(paths, addchan)
-		for {
-			addstat, ok := <-addchan
-			if !ok {
-				break
-			}
+		for addstat := range addchan {
 			// Send UploadStatus
 			uploadchan <- addstat
 		}
 
 		addchan = make(chan RepoFileStatus)
 		go GitAdd(paths, addchan)
-		for {
-			addstat, ok := <-addchan
-			if !ok {
-				break
-			}
+		for addstat := range addchan {
 			// Send UploadStatus
 			uploadchan <- addstat
 		}
-
 	}
 
 	changes, err := DescribeIndexShort()
@@ -219,11 +210,7 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 
 	annexpushchan := make(chan RepoFileStatus)
 	go AnnexPush(paths, changes, annexpushchan)
-	for {
-		stat, ok := <-annexpushchan
-		if !ok {
-			break
-		}
+	for stat := range annexpushchan {
 		uploadchan <- stat
 	}
 	return
@@ -243,11 +230,7 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatu
 
 	annexgetchan := make(chan RepoFileStatus)
 	go AnnexGet(paths, annexgetchan)
-	for {
-		stat, ok := <-annexgetchan
-		if !ok {
-			break
-		}
+	for stat := range annexgetchan {
 		getcontchan <- stat
 	}
 	return
@@ -267,11 +250,7 @@ func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- RepoFileStatus
 
 	dropchan := make(chan RepoFileStatus)
 	go AnnexDrop(paths, dropchan)
-	for {
-		stat, ok := <-dropchan
-		if !ok {
-			break
-		}
+	for stat := range dropchan {
 		rmcchan <- stat
 	}
 	return
@@ -291,11 +270,7 @@ func (gincl *Client) LockContent(paths []string, lcchan chan<- RepoFileStatus) {
 
 	lockchan := make(chan RepoFileStatus)
 	go AnnexLock(paths, lockchan)
-	for {
-		stat, ok := <-lockchan
-		if !ok {
-			break
-		}
+	for stat := range lockchan {
 		lcchan <- stat
 	}
 	return
@@ -315,11 +290,7 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- RepoFileStatus
 
 	unlockchan := make(chan RepoFileStatus)
 	go AnnexUnlock(paths, unlockchan)
-	for {
-		stat, ok := <-unlockchan
-		if !ok {
-			break
-		}
+	for stat := range unlockchan {
 		ulcchan <- stat
 	}
 	return
@@ -334,11 +305,7 @@ func (gincl *Client) Download(content bool, downloadchan chan<- RepoFileStatus) 
 
 	downloadstatus := make(chan RepoFileStatus)
 	go AnnexPull(content, downloadstatus)
-	for {
-		stat, ok := <-downloadstatus
-		if !ok {
-			break
-		}
+	for stat := range downloadstatus {
 		downloadchan <- stat
 	}
 	return
@@ -357,11 +324,7 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 
 	clonestatus := make(chan RepoFileStatus)
 	go gincl.Clone(repoPath, clonestatus)
-	for {
-		stat, ok := <-clonestatus
-		if !ok {
-			break
-		}
+	for stat := range clonestatus {
 		clonechan <- stat
 	}
 	_, repoName := splitRepoParts(repoPath)
@@ -369,11 +332,7 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 
 	initstatus := make(chan RepoFileStatus)
 	go gincl.InitDir(repoPath, initstatus)
-	for {
-		stat, ok := <-initstatus
-		if !ok {
-			break
-		}
+	for stat := range initstatus {
 		clonechan <- stat
 	}
 	return
@@ -467,11 +426,7 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		// Sync if an initial commit was created
 		syncchan := make(chan RepoFileStatus)
 		go AnnexSync(false, syncchan)
-		for {
-			syncstat, ok := <-syncchan
-			if !ok {
-				break
-			}
+		for syncstat := range syncchan {
 			if len(syncstat.Progress) > 0 {
 				progstr := strings.TrimSuffix(syncstat.Progress, "%")
 				progint, converr := strconv.ParseInt(progstr, 10, 32)
@@ -586,11 +541,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 
 	wichan := make(chan AnnexWhereisInfo)
 	go AnnexWhereis(paths, wichan)
-	for {
-		wiInfo, ok := <-wichan
-		if !ok {
-			break
-		}
+	for wiInfo := range wichan {
 		if wiInfo.Err != nil {
 			continue
 		}
@@ -617,11 +568,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 
 	statuschan := make(chan AnnexStatusInfo)
 	go AnnexStatus(asargs, statuschan)
-	for {
-		item, ok := <-statuschan
-		if !ok {
-			break
-		}
+	for item := range statuschan {
 		if item.Err != nil {
 			// listchan <- RepoFileStatus{Err: item.Err}
 			return nil, item.Err
@@ -669,11 +616,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	// Run whereis on cached files
 	wichan := make(chan AnnexWhereisInfo)
 	go AnnexWhereis(cachedfiles, wichan)
-	for {
-		wiInfo, ok := <-wichan
-		if !ok {
-			break
-		}
+	for wiInfo := range wichan {
 		if wiInfo.Err != nil {
 			continue
 		}
@@ -728,11 +671,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	if len(modifiedfiles) > 0 {
 		statuschan := make(chan AnnexStatusInfo)
 		go AnnexStatus(modifiedfiles, statuschan)
-		for {
-			item, ok := <-statuschan
-			if !ok {
-				break
-			}
+		for item := range statuschan {
 			if item.Err != nil {
 				util.LogWrite("Error during annex status while searching for unlocked files")
 				// lockchan <- RepoFileStatus{Err: item.Err}

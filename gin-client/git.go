@@ -531,11 +531,7 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		wichan := make(chan AnnexWhereisInfo)
 		go AnnexWhereis(filepaths, wichan)
 		var annexfiles []string
-		for {
-			wiInfo, ok := <-wichan
-			if !ok {
-				break
-			}
+		for wiInfo := range wichan {
 			if wiInfo.Err != nil {
 				continue
 			}
@@ -740,11 +736,7 @@ func DescribeIndexShort() (string, error) {
 	statuschan := make(chan AnnexStatusInfo)
 	go AnnexStatus([]string{""}, statuschan)
 	statusmap := make(map[string]int)
-	for {
-		item, ok := <-statuschan
-		if !ok {
-			break
-		}
+	for item := range statuschan {
 		if item.Err != nil {
 			return "", item.Err
 		}
@@ -772,11 +764,7 @@ func DescribeIndex() (string, error) {
 	statuschan := make(chan AnnexStatusInfo)
 	go AnnexStatus([]string{""}, statuschan)
 	statusmap := make(map[string][]string)
-	for {
-		item, ok := <-statuschan
-		if !ok {
-			break
-		}
+	for item := range statuschan {
 		if item.Err != nil {
 			return "", item.Err
 		}
@@ -822,11 +810,7 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 	statuschan := make(chan AnnexStatusInfo)
 	go AnnexStatus(filepaths, statuschan)
 	unlockedfiles := make([]string, 0, len(filepaths))
-	for {
-		item, ok := <-statuschan
-		if !ok {
-			break
-		}
+	for item := range statuschan {
 		if item.Err != nil {
 			lockchan <- RepoFileStatus{Err: item.Err}
 		}
