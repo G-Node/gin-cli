@@ -308,7 +308,7 @@ func unlock(args []string) {
 	printProgress(unlockchan, jsonout)
 }
 
-func printProgress(statuschan chan ginclient.RepoFileStatus, jsonout bool) {
+func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 	var fname string
 	prevlinelength := 0 // used to clear lines before overwriting
 	nerrors := 0
