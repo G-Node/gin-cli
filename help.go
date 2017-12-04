@@ -253,6 +253,9 @@ DESCRIPTION
 	All changes made will be sent to the server, including addition of new
 	files, modifications and renaming of existing files, and file deletions.
 
+	If no arguments are specified, only changes to files already being tracked
+	are uploaded.
+
 ARGUMENTS
 
 	<filenames>

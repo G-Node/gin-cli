@@ -384,11 +384,6 @@ func upload(args []string) {
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 
-	if len(args) == 0 {
-		fmt.Println("No files specified for upload. Synchronising metadata.")
-		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
-	}
-
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
 	printProgress(lockchan, jsonout)
