@@ -312,11 +312,7 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 	var fname string
 	prevlinelength := 0 // used to clear lines before overwriting
 	nerrors := 0
-	for {
-		stat, ok := <-statuschan
-		if !ok {
-			break
-		}
+	for stat := range statuschan {
 		if jsonout {
 			j, _ := json.Marshal(stat)
 			fmt.Println(string(j))
