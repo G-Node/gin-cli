@@ -223,6 +223,7 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatu
 	util.LogWrite("GetContent")
 
 	paths, err := util.ExpandGlobs(paths)
+
 	if err != nil {
 		getcontchan <- RepoFileStatus{Err: err}
 		return
@@ -539,7 +540,7 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
-	wichan := make(chan AnnexWhereisInfo)
+	wichan := make(chan AnnexWhereisRes)
 	go AnnexWhereis(paths, wichan)
 	for wiInfo := range wichan {
 		if wiInfo.Err != nil {
@@ -566,7 +567,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		asargs = []string{"."}
 	}
 
-	statuschan := make(chan AnnexStatusInfo)
+	statuschan := make(chan AnnexStatusRes)
 	go AnnexStatus(asargs, statuschan)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -652,7 +653,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	}
 
 	// Run whereis on cached files
-	wichan := make(chan AnnexWhereisInfo)
+	wichan := make(chan AnnexWhereisRes)
 	go AnnexWhereis(cachedfiles, wichan)
 	for wiInfo := range wichan {
 		if wiInfo.Err != nil {
@@ -707,7 +708,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 
 	// Check if modified files are actually annex unlocked instead
 	if len(modifiedfiles) > 0 {
-		statuschan := make(chan AnnexStatusInfo)
+		statuschan := make(chan AnnexStatusRes)
 		go AnnexStatus(modifiedfiles, statuschan)
 		for item := range statuschan {
 			if item.Err != nil {
