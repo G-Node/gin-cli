@@ -702,6 +702,35 @@ func annexrun(args []string) {
 	}
 }
 
+func printversion(args []string) {
+	var jsonout bool
+	for idx, arg := range args {
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
+			break
+		}
+	}
+	if len(args) > 0 {
+		util.Die(usage)
+	}
+	if jsonout {
+		verjson := struct {
+			Version string `json:"version"`
+			Build   string `json:"build"`
+			Commit  string `json:"commit"`
+		}{
+			gincliversion,
+			build,
+			commit,
+		}
+		verjsonstr, _ := json.Marshal(verjson)
+		fmt.Println(string(verjsonstr))
+	} else {
+		fmt.Println(verstr)
+	}
+}
+
 func init() {
 	if gincliversion == "" {
 		verstr = "GIN command line client [dev build]"
@@ -766,6 +795,8 @@ func main() {
 		gitrun(cmdArgs)
 	case "annex":
 		annexrun(cmdArgs)
+	case "version":
+		printversion(cmdArgs)
 	default:
 		util.Die(usage)
 	}
