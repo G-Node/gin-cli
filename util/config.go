@@ -6,8 +6,11 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/shibukawa/configdir"
 	"github.com/spf13/viper"
 )
+
+var configDirs = configdir.New("g-node", "gin")
 
 type conf struct {
 	GinHost string
@@ -95,4 +98,30 @@ func LoadConfig() error {
 	LogWrite("%+v", Config)
 
 	return nil
+}
+
+// ConfigPath returns the configuration path where configuration files should be stored.
+func ConfigPath(create bool) (string, error) {
+	path := configDirs.QueryFolders(configdir.Global)[0].Path
+	var err error
+	if create {
+		err = os.MkdirAll(path, 0777)
+		if err != nil {
+			return "", fmt.Errorf("Error creating directory %s", path)
+		}
+	}
+	return path, err
+}
+
+// CachePath returns the path where gin cache files (logs) should be stored.
+func CachePath(create bool) (string, error) {
+	path := configDirs.QueryCacheFolder().Path
+	var err error
+	if create {
+		err = os.MkdirAll(path, 0777)
+		if err != nil {
+			return "", fmt.Errorf("Error creating directory %s", path)
+		}
+	}
+	return path, err
 }

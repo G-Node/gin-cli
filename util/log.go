@@ -12,13 +12,14 @@ var logger *log.Logger
 
 // LogInit initialises the log file and logger.
 func LogInit() error {
-	dataPath, err := DataPath(true)
+
+	cachepath, err := CachePath(true)
 	if err != nil {
 		return err
 	}
 
 	// TODO: Log rotation
-	fullPath := path.Join(dataPath, "gin.log")
+	fullPath := path.Join(cachepath, "gin.log")
 	logfile, err = os.OpenFile(fullPath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		return fmt.Errorf("Error creating file %s", fullPath)
