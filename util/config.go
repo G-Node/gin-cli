@@ -60,18 +60,18 @@ func moveOldFiles(newpath string) {
 	}
 
 	if len(movemessages) > 0 {
-		fmt.Println("NOTICE: Configuration directory changed.")
-		fmt.Println("The location of the configuration directory has changed.")
-		fmt.Print("Any existing config file, token, and key have been moved to the new location.\n\n")
+		fmt.Fprintln(os.Stderr, "NOTICE: Configuration directory changed.")
+		fmt.Fprintln(os.Stderr, "The location of the configuration directory has changed.")
+		fmt.Fprint(os.Stderr, "Any existing config file, token, and key have been moved to the new location.\n\n")
 		for _, msg := range movemessages {
-			fmt.Println("\t", msg)
+			fmt.Fprintln(os.Stderr, "\t", msg)
 		}
 		if moveconflicts {
-			fmt.Print("\nSome files were renamed to avoid overwriting new ones.\nYou may want to review the contents of the new configuration directory:\n\n")
-			fmt.Println("\t", newpath)
+			fmt.Fprint(os.Stderr, "\nSome files were renamed to avoid overwriting new ones.\nYou may want to review the contents of the new configuration directory:\n\n")
+			fmt.Fprintln(os.Stderr, "\t", newpath)
 		}
-		fmt.Println("\nThis message should not appear again.")
-		fmt.Println("END OF NOTICE")
+		fmt.Fprintln(os.Stderr, "\nThis message should not appear again.")
+		fmt.Fprintln(os.Stderr, "END OF NOTICE")
 
 		// Make sure old config directory is empty and remove
 		files, _ := ioutil.ReadDir(oldpath)
