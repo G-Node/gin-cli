@@ -78,6 +78,9 @@ func moveOldFiles(newpath string) {
 		if len(files) == 0 {
 			os.Remove(oldpath)
 		}
+		// Pause for the user to notice
+		fmt.Print("Press the Enter key to continue")
+		fmt.Scanln()
 	}
 }
 
