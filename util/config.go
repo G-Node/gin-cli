@@ -52,10 +52,10 @@ func LoadConfig() error {
 	// configpaths is a prioritised list of locations for finding configuration files (priority is lowest to highest)
 	var configpaths []string
 
-	// Global xdg config path
-	xdgconfpath, err := ConfigPath(false)
+	// Global (user) config path
+	userconfigpath, err := ConfigPath(false)
 	if err == nil {
-		configpaths = append(configpaths, xdgconfpath)
+		configpaths = append(configpaths, userconfigpath)
 	}
 	// Second prio config files in the directory of the executable
 	// this is useful for portable packaging
