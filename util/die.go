@@ -8,12 +8,13 @@ import (
 	"github.com/fatih/color"
 )
 
-var red = color.New(color.FgRed)
+var red = color.New(color.FgRed).SprintFunc()
 
 //Die prints a message to stderr and exits the program with status 1.
 func Die(msg string) {
-	_, _ = red.Fprint(os.Stderr, "ERROR ")
-	fmt.Fprintln(os.Stderr, msg)
+	// fmt.Fprintf(color.Error, "%s %s\n", red("ERROR"), msg)
+	// Swap the line above for the line below when (if) https://github.com/fatih/color/pull/87 gets merged
+	fmt.Fprintf(os.Stderr, "%s %s\n", "ERROR", msg)
 	os.Exit(1)
 }
 

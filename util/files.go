@@ -48,9 +48,11 @@ func ExpandGlobs(paths []string) (globexppaths []string, err error) {
 			LogWrite("Bad file pattern %s", p)
 			return nil, globerr
 		}
-		if exp != nil {
-			globexppaths = append(globexppaths, exp...)
+		if exp == nil {
+			LogWrite("ExpandGlobs: No files matched")
+			return nil, fmt.Errorf("No files matched %v", p)
 		}
+		globexppaths = append(globexppaths, exp...)
 	}
 	if len(globexppaths) == 0 {
 		// Invalid paths

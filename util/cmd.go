@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"io"
 	"os/exec"
-	"regexp"
 	"strings"
 )
 
@@ -107,6 +106,5 @@ func (cmd *GinCmd) Wait() error {
 
 // CleanSpaces replaces multiple occurences of the space character with one and trims leading and trailing spaces from a string.
 func CleanSpaces(str string) string {
-	re := regexp.MustCompile(`\s+`)
-	return re.ReplaceAllString(strings.TrimSpace(str), " ")
+	return strings.Join(strings.Fields(str), " ")
 }

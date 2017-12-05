@@ -11,13 +11,11 @@ import (
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
-	"github.com/fatih/color"
 	"github.com/gogits/go-gogs-client"
 	// its a bit unfortunate that we have that import now
 	// but its only temporary...
 )
 
-var green = color.New(color.FgGreen)
 var defaultHostname = "(unknown)"
 
 // MakeSessionKey creates a private+public key pair.
@@ -177,26 +175,17 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 		// Run git annex add using exclusion filters and then add the rest to git
 		addchan := make(chan RepoFileStatus)
 		go AnnexAdd(paths, addchan)
-		for {
-			addstat, ok := <-addchan
-			if !ok {
-				break
-			}
+		for addstat := range addchan {
 			// Send UploadStatus
 			uploadchan <- addstat
 		}
 
 		addchan = make(chan RepoFileStatus)
 		go GitAdd(paths, addchan)
-		for {
-			addstat, ok := <-addchan
-			if !ok {
-				break
-			}
+		for addstat := range addchan {
 			// Send UploadStatus
 			uploadchan <- addstat
 		}
-
 	}
 
 	changes, err := DescribeIndexShort()
@@ -221,11 +210,7 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 
 	annexpushchan := make(chan RepoFileStatus)
 	go AnnexPush(paths, changes, annexpushchan)
-	for {
-		stat, ok := <-annexpushchan
-		if !ok {
-			break
-		}
+	for stat := range annexpushchan {
 		uploadchan <- stat
 	}
 	return
@@ -238,6 +223,7 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatu
 	util.LogWrite("GetContent")
 
 	paths, err := util.ExpandGlobs(paths)
+
 	if err != nil {
 		getcontchan <- RepoFileStatus{Err: err}
 		return
@@ -245,11 +231,7 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatu
 
 	annexgetchan := make(chan RepoFileStatus)
 	go AnnexGet(paths, annexgetchan)
-	for {
-		stat, ok := <-annexgetchan
-		if !ok {
-			break
-		}
+	for stat := range annexgetchan {
 		getcontchan <- stat
 	}
 	return
@@ -269,11 +251,7 @@ func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- RepoFileStatus
 
 	dropchan := make(chan RepoFileStatus)
 	go AnnexDrop(paths, dropchan)
-	for {
-		stat, ok := <-dropchan
-		if !ok {
-			break
-		}
+	for stat := range dropchan {
 		rmcchan <- stat
 	}
 	return
@@ -293,11 +271,7 @@ func (gincl *Client) LockContent(paths []string, lcchan chan<- RepoFileStatus) {
 
 	lockchan := make(chan RepoFileStatus)
 	go AnnexLock(paths, lockchan)
-	for {
-		stat, ok := <-lockchan
-		if !ok {
-			break
-		}
+	for stat := range lockchan {
 		lcchan <- stat
 	}
 	return
@@ -317,11 +291,7 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- RepoFileStatus
 
 	unlockchan := make(chan RepoFileStatus)
 	go AnnexUnlock(paths, unlockchan)
-	for {
-		stat, ok := <-unlockchan
-		if !ok {
-			break
-		}
+	for stat := range unlockchan {
 		ulcchan <- stat
 	}
 	return
@@ -336,11 +306,7 @@ func (gincl *Client) Download(content bool, downloadchan chan<- RepoFileStatus) 
 
 	downloadstatus := make(chan RepoFileStatus)
 	go AnnexPull(content, downloadstatus)
-	for {
-		stat, ok := <-downloadstatus
-		if !ok {
-			break
-		}
+	for stat := range downloadstatus {
 		downloadchan <- stat
 	}
 	return
@@ -359,11 +325,7 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 
 	clonestatus := make(chan RepoFileStatus)
 	go gincl.Clone(repoPath, clonestatus)
-	for {
-		stat, ok := <-clonestatus
-		if !ok {
-			break
-		}
+	for stat := range clonestatus {
 		clonechan <- stat
 	}
 	_, repoName := splitRepoParts(repoPath)
@@ -371,11 +333,7 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 
 	initstatus := make(chan RepoFileStatus)
 	go gincl.InitDir(repoPath, initstatus)
-	for {
-		stat, ok := <-initstatus
-		if !ok {
-			break
-		}
+	for stat := range initstatus {
 		clonechan <- stat
 	}
 	return
@@ -469,11 +427,7 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		// Sync if an initial commit was created
 		syncchan := make(chan RepoFileStatus)
 		go AnnexSync(false, syncchan)
-		for {
-			syncstat, ok := <-syncchan
-			if !ok {
-				break
-			}
+		for syncstat := range syncchan {
 			if len(syncstat.Progress) > 0 {
 				progstr := strings.TrimSuffix(syncstat.Progress, "%")
 				progint, converr := strconv.ParseInt(progstr, 10, 32)
@@ -586,14 +540,18 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
-	wiResults, _ := AnnexWhereis(paths)
-	for _, status := range wiResults {
-		fname := status.File
-		for _, remote := range status.Whereis {
+	wichan := make(chan AnnexWhereisRes)
+	go AnnexWhereis(paths, wichan)
+	for wiInfo := range wichan {
+		if wiInfo.Err != nil {
+			continue
+		}
+		fname := wiInfo.File
+		for _, remote := range wiInfo.Whereis {
 			// if no remotes are "here", the file is NoContent
 			statuses[fname] = NoContent
 			if remote.Here {
-				if len(status.Whereis) > 1 {
+				if len(wiInfo.Whereis) > 1 {
 					statuses[fname] = Synced
 				} else {
 					statuses[fname] = LocalChanges
@@ -608,21 +566,28 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		// AnnexStatus with no arguments defaults to root directory, so we should use "." instead
 		asargs = []string{"."}
 	}
-	annexstatuses, _ := AnnexStatus(asargs...)
-	for _, stat := range annexstatuses {
-		if stat.Status == "?" {
-			statuses[stat.File] = Untracked
-		} else if stat.Status == "M" {
-			statuses[stat.File] = Modified
-		} else if stat.Status == "D" {
-			statuses[stat.File] = Removed
+
+	statuschan := make(chan AnnexStatusRes)
+	go AnnexStatus(asargs, statuschan)
+	for item := range statuschan {
+		if item.Err != nil {
+			// listchan <- RepoFileStatus{Err: item.Err}
+			return nil, item.Err
+		}
+		if item.Status == "?" {
+			statuses[item.File] = Untracked
+		} else if item.Status == "M" {
+			statuses[item.File] = Modified
+		} else if item.Status == "D" {
+			statuses[item.File] = Removed
 		}
 	}
 
 	// Unmodified files that are checked into git (not annex) do not show up
-	// Need to unset 'bare' and run git ls-files and add only files that haven't been added yet
-	filelist, _ := GitLsFiles(paths)
-	for _, fname := range filelist {
+	// Need to run git ls-files and add only files that haven't been added yet
+	lschan := make(chan string)
+	go GitLsFiles(paths, lschan)
+	for fname := range lschan {
 		if _, ok := statuses[fname]; !ok {
 			statuses[fname] = Synced
 		}
@@ -634,38 +599,77 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
+	cachedchan := make(chan string)
+	var cachedfiles, modifiedfiles, untrackedfiles, deletedfiles []string
 	// Collect checked in files
 	lsfilesargs := append([]string{"--cached"}, paths...)
-	cachedfiles, _ := GitLsFiles(lsfilesargs)
+	go GitLsFiles(lsfilesargs, cachedchan)
 
 	// Collect modified files
+	modifiedchan := make(chan string)
 	lsfilesargs = append([]string{"--modified"}, paths...)
-	modifiedfiles, _ := GitLsFiles(lsfilesargs)
+	go GitLsFiles(lsfilesargs, modifiedchan)
 
 	// Collect untracked files
+	otherschan := make(chan string)
 	lsfilesargs = append([]string{"--others"}, paths...)
-	untrackedfiles, _ := GitLsFiles(lsfilesargs)
+	go GitLsFiles(lsfilesargs, otherschan)
 
 	// Collect deleted files
+	deletedchan := make(chan string)
 	lsfilesargs = append([]string{"--deleted"}, paths...)
-	deletedfiles, _ := GitLsFiles(lsfilesargs)
+	go GitLsFiles(lsfilesargs, deletedchan)
+
+	for {
+		select {
+		case fname, ok := <-cachedchan:
+			if ok {
+				cachedfiles = append(cachedfiles, fname)
+			} else {
+				cachedchan = nil
+			}
+		case fname, ok := <-modifiedchan:
+			if ok {
+				modifiedfiles = append(modifiedfiles, fname)
+			} else {
+				modifiedchan = nil
+			}
+		case fname, ok := <-otherschan:
+			if ok {
+				untrackedfiles = append(untrackedfiles, fname)
+			} else {
+				otherschan = nil
+			}
+		case fname, ok := <-deletedchan:
+			if ok {
+				deletedfiles = append(deletedfiles, fname)
+			} else {
+				deletedchan = nil
+			}
+		}
+		if cachedchan == nil && modifiedchan == nil && otherschan == nil && deletedchan == nil {
+			break
+		}
+	}
 
 	// Run whereis on cached files
-	wiResults, err := AnnexWhereis(cachedfiles)
-	if err == nil {
-		for _, status := range wiResults {
-			fname := status.File
-			for _, remote := range status.Whereis {
-				// if no remotes are "here", the file is NoContent
-				statuses[fname] = NoContent
-				if remote.Here {
-					if len(status.Whereis) > 1 {
-						statuses[fname] = Synced
-					} else {
-						statuses[fname] = LocalChanges
-					}
-					break
+	wichan := make(chan AnnexWhereisRes)
+	go AnnexWhereis(cachedfiles, wichan)
+	for wiInfo := range wichan {
+		if wiInfo.Err != nil {
+			continue
+		}
+		fname := wiInfo.File
+		for _, remote := range wiInfo.Whereis {
+			// if no remotes are "here", the file is NoContent
+			statuses[fname] = NoContent
+			if remote.Here {
+				if len(wiInfo.Whereis) > 1 {
+					statuses[fname] = Synced
+				} else {
+					statuses[fname] = LocalChanges
 				}
+				break
 			}
 		}
 	}
@@ -704,13 +708,15 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 
 	// Check if modified files are actually annex unlocked instead
 	if len(modifiedfiles) > 0 {
-		mdfilestatus, err := AnnexStatus(modifiedfiles...)
-		if err != nil {
-			util.LogWrite("Error during annex status while searching for unlocked files")
-		}
-		for _, stat := range mdfilestatus {
-			if stat.Status == "T" {
-				statuses[stat.File] = Unlocked
+		statuschan := make(chan AnnexStatusRes)
+		go AnnexStatus(modifiedfiles, statuschan)
+		for item := range statuschan {
+			if item.Err != nil {
+				util.LogWrite("Error during annex status while searching for unlocked files")
+				// lockchan <- RepoFileStatus{Err: item.Err}
+			}
+			if item.Status == "T" {
+				statuses[item.File] = Unlocked
 			}
 		}
 	}
@@ -731,6 +737,10 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 // ListFiles lists the files and directories specified by paths and their sync status.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		return nil, err
+	}
 	if IsDirect() {
 		return lfDirect(paths...)
 	}

@@ -25,8 +25,8 @@ var commit string
 var verstr string
 var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 
-var green = color.New(color.FgGreen)
-var red = color.New(color.FgRed)
+var green = color.New(color.FgGreen).SprintFunc()
+var red = color.New(color.FgRed).SprintFunc()
 
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
@@ -118,7 +118,7 @@ func createRepo(args []string) {
 	err = gincl.CreateRepo(repoName, repoDesc)
 	// Parse error message and make error nicer
 	util.CheckError(err)
-	_, _ = green.Println("OK")
+	fmt.Println(green("OK"))
 
 	if here {
 		// Init cwd
@@ -308,15 +308,11 @@ func unlock(args []string) {
 	printProgress(unlockchan, jsonout)
 }
 
-func printProgress(statuschan chan ginclient.RepoFileStatus, jsonout bool) {
+func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 	var fname string
 	prevlinelength := 0 // used to clear lines before overwriting
 	nerrors := 0
-	for {
-		stat, ok := <-statuschan
-		if !ok {
-			break
-		}
+	for stat := range statuschan {
 		if jsonout {
 			j, _ := json.Marshal(stat)
 			fmt.Println(string(j))
@@ -339,26 +335,20 @@ func printProgress(statuschan chan ginclient.RepoFileStatus, jsonout bool) {
 		}
 		if stat.Err == nil {
 			if progress == "100%" {
-				progress = green.Sprint("OK")
+				progress = green("OK")
 			}
 		} else if stat.Err.Error() == "Failed" {
-			progress = red.Sprint("Failed")
+			progress = red("Failed")
 			nerrors++
 		} else {
-			errmsg := fmt.Sprintf("%s: %s", red.Sprint("Error"), stat.Err.Error())
-			fmt.Printf("%s %s %s\n", stat.State, stat.FileName, errmsg)
+			msg := fmt.Sprintf("%s %s %s: %s", stat.State, stat.FileName, red("Error"), stat.Err.Error())
+			fmt.Fprintln(color.Output, util.CleanSpaces(msg))
 			nerrors++
 			continue
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
-		prevlinelength, _ = fmt.Printf("\r%s ", stat.State)
-		if len(stat.FileName) > 0 {
-			// skip filename print if empty
-			length, _ := fmt.Printf("%s ", stat.FileName)
-			prevlinelength += length
-		}
-		length, _ := fmt.Printf("%s %s", progress, rate)
-		prevlinelength += length
+		msg := fmt.Sprintf("%s %s %s %s", stat.State, stat.FileName, progress, rate)
+		prevlinelength, _ = fmt.Fprintf(color.Output, "\r%s", util.CleanSpaces(msg))
 	}
 	if prevlinelength > 0 {
 		fmt.Println()
@@ -389,11 +379,6 @@ func upload(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-
-	if len(args) == 0 {
-		fmt.Println("No files specified for upload. Synchronising metadata.")
-		fmt.Printf("To upload all files under the current directory, use:\n\n\tgin upload .\n\n")
-	}
 
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
@@ -437,7 +422,7 @@ func download(args []string) {
 	go gincl.Download(content, dlchan)
 	printProgress(dlchan, jsonout)
 	if !content && !jsonout {
-		_, _ = green.Println("OK")
+		fmt.Fprintln(color.Output, green("OK"))
 	}
 }
 
@@ -713,6 +698,35 @@ func annexrun(args []string) {
 	}
 }
 
+func printversion(args []string) {
+	var jsonout bool
+	for idx, arg := range args {
+		if arg == "--json" {
+			args = append(args[:idx], args[idx+1:]...)
+			jsonout = true
+			break
+		}
+	}
+	if len(args) > 0 {
+		util.Die(usage)
+	}
+	if jsonout {
+		verjson := struct {
+			Version string `json:"version"`
+			Build   string `json:"build"`
+			Commit  string `json:"commit"`
+		}{
+			gincliversion,
+			build,
+			commit,
+		}
+		verjsonstr, _ := json.Marshal(verjson)
+		fmt.Println(string(verjsonstr))
+	} else {
+		fmt.Println(verstr)
+	}
+}
+
 func init() {
 	if gincliversion == "" {
 		verstr = "GIN command line client [dev build]"
@@ -777,6 +791,8 @@ func main() {
 		gitrun(cmdArgs)
 	case "annex":
 		annexrun(cmdArgs)
+	case "version":
+		printversion(cmdArgs)
 	default:
 		util.Die(usage)
 	}
