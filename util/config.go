@@ -41,13 +41,14 @@ func moveOldFiles(newpath string) {
 		for _, file := range files {
 			oldfilename := file.Name()
 			oldfilepath := path.Join(oldpath, oldfilename)
-			fmt.Printf("Found %s\n", oldfilename)
 			newfilepath := path.Join(newpath, oldfilename)
 			for counter := 0; ; counter++ {
 				if _, operr := os.Stat(newfilepath); os.IsNotExist(operr) {
 					ConfigPath(true)
 					os.Rename(oldfilepath, newfilepath)
-					movemessages = append(movemessages, fmt.Sprintf("%s -> %s", oldfilepath, newfilepath))
+					msg := fmt.Sprintf("%s -> %s", oldfilepath, newfilepath)
+					movemessages = append(movemessages, msg)
+					LogWrite("Moving old config file: %s", msg)
 					break
 				} else {
 					// File already exists - rename to old and place alongside
