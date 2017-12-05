@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,8 +31,60 @@ type conf struct {
 // Config makes the configuration options available after LoadConfig is called
 var Config conf
 
+func moveOldFiles(newpath string) {
+	// move old files and clear old config path
+	var movemessages []string
+	moveconflicts := false
+	oldpath, _ := OldConfigPath(false)
+	if _, operr := os.Stat(oldpath); !os.IsNotExist(operr) {
+		files, _ := ioutil.ReadDir(oldpath)
+		for _, file := range files {
+			oldfilename := file.Name()
+			oldfilepath := path.Join(oldpath, oldfilename)
+			fmt.Printf("Found %s\n", oldfilename)
+			newfilepath := path.Join(newpath, oldfilename)
+			for counter := 0; ; counter++ {
+				if _, operr := os.Stat(newfilepath); os.IsNotExist(operr) {
+					ConfigPath(true)
+					os.Rename(oldfilepath, newfilepath)
+					movemessages = append(movemessages, fmt.Sprintf("%s -> %s", oldfilepath, newfilepath))
+					break
+				} else {
+					// File already exists - rename to old and place alongside
+					newfilepath = path.Join(newpath, fmt.Sprintf("%s.old.%d", oldfilename, counter))
+					moveconflicts = true
+				}
+			}
+		}
+	}
+
+	if len(movemessages) > 0 {
+		fmt.Println("NOTICE: Configuration directory changed.")
+		fmt.Println("The location of the configuration directory has changed.")
+		fmt.Print("Any existing config file, token, and key have been moved to the new location.\n\n")
+		for _, msg := range movemessages {
+			fmt.Println("\t", msg)
+		}
+		if moveconflicts {
+			fmt.Print("\nSome files were renamed to avoid overwriting new ones.\nYou may want to review the contents of the new configuration directory:\n\n")
+			fmt.Println("\t", newpath)
+		}
+		fmt.Println("\nThis message should not appear again.")
+		fmt.Println("END OF NOTICE")
+
+		// Make sure old config directory is empty and remove
+		files, _ := ioutil.ReadDir(oldpath)
+		if len(files) == 0 {
+			os.Remove(oldpath)
+		}
+	}
+}
+
 // LoadConfig reads in the configuration and makes it available through Config package global
 func LoadConfig() error {
+	userconfigpath, err := ConfigPath(false)
+	moveOldFiles(userconfigpath)
+
 	viper.SetTypeByDefaultValue(true)
 	// Binaries
 	viper.SetDefault("bin.git", "git")
@@ -53,7 +106,6 @@ func LoadConfig() error {
 	var configpaths []string
 
 	// Global (user) config path
-	userconfigpath, err := ConfigPath(false)
 	if err == nil {
 		configpaths = append(configpaths, userconfigpath)
 	}
