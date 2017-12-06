@@ -2,12 +2,16 @@ package util
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 
+	"github.com/shibukawa/configdir"
 	"github.com/spf13/viper"
 )
+
+var configDirs = configdir.New("g-node", "gin")
 
 type conf struct {
 	GinHost string
@@ -27,8 +31,64 @@ type conf struct {
 // Config makes the configuration options available after LoadConfig is called
 var Config conf
 
+func moveOldFiles(newpath string) {
+	// move old files and clear old config path
+	var movemessages []string
+	moveconflicts := false
+	oldpath, _ := OldConfigPath(false)
+	if _, operr := os.Stat(oldpath); !os.IsNotExist(operr) {
+		files, _ := ioutil.ReadDir(oldpath)
+		for _, file := range files {
+			oldfilename := file.Name()
+			oldfilepath := path.Join(oldpath, oldfilename)
+			newfilepath := path.Join(newpath, oldfilename)
+			for counter := 0; ; counter++ {
+				if _, operr := os.Stat(newfilepath); os.IsNotExist(operr) {
+					ConfigPath(true)
+					os.Rename(oldfilepath, newfilepath)
+					msg := fmt.Sprintf("%s -> %s", oldfilepath, newfilepath)
+					movemessages = append(movemessages, msg)
+					LogWrite("Moving old config file: %s", msg)
+					break
+				} else {
+					// File already exists - rename to old and place alongside
+					newfilepath = path.Join(newpath, fmt.Sprintf("%s.old.%d", oldfilename, counter))
+					moveconflicts = true
+				}
+			}
+		}
+	}
+
+	if len(movemessages) > 0 {
+		fmt.Fprintln(os.Stderr, "NOTICE: Configuration directory changed.")
+		fmt.Fprintln(os.Stderr, "The location of the configuration directory has changed.")
+		fmt.Fprint(os.Stderr, "Any existing config file, token, and key have been moved to the new location.\n\n")
+		for _, msg := range movemessages {
+			fmt.Fprintln(os.Stderr, "\t", msg)
+		}
+		if moveconflicts {
+			fmt.Fprint(os.Stderr, "\nSome files were renamed to avoid overwriting new ones.\nYou may want to review the contents of the new configuration directory:\n\n")
+			fmt.Fprintln(os.Stderr, "\t", newpath)
+		}
+		fmt.Fprintln(os.Stderr, "\nThis message should not appear again.")
+		fmt.Fprintln(os.Stderr, "END OF NOTICE")
+
+		// Make sure old config directory is empty and remove
+		files, _ := ioutil.ReadDir(oldpath)
+		if len(files) == 0 {
+			os.Remove(oldpath)
+		}
+		// Pause for the user to notice
+		fmt.Print("Press the Enter key to continue")
+		fmt.Scanln()
+	}
+}
+
 // LoadConfig reads in the configuration and makes it available through Config package global
 func LoadConfig() error {
+	userconfigpath, err := ConfigPath(false)
+	moveOldFiles(userconfigpath)
+
 	viper.SetTypeByDefaultValue(true)
 	// Binaries
 	viper.SetDefault("bin.git", "git")
@@ -49,10 +109,9 @@ func LoadConfig() error {
 	// configpaths is a prioritised list of locations for finding configuration files (priority is lowest to highest)
 	var configpaths []string
 
-	// Global xdg config path
-	xdgconfpath, err := ConfigPath(false)
+	// Global (user) config path
 	if err == nil {
-		configpaths = append(configpaths, xdgconfpath)
+		configpaths = append(configpaths, userconfigpath)
 	}
 	// Second prio config files in the directory of the executable
 	// this is useful for portable packaging
@@ -95,4 +154,30 @@ func LoadConfig() error {
 	LogWrite("%+v", Config)
 
 	return nil
+}
+
+// ConfigPath returns the configuration path where configuration files should be stored.
+func ConfigPath(create bool) (string, error) {
+	path := configDirs.QueryFolders(configdir.Global)[0].Path
+	var err error
+	if create {
+		err = os.MkdirAll(path, 0777)
+		if err != nil {
+			return "", fmt.Errorf("Error creating directory %s", path)
+		}
+	}
+	return path, err
+}
+
+// CachePath returns the path where gin cache files (logs) should be stored.
+func CachePath(create bool) (string, error) {
+	path := configDirs.QueryCacheFolder().Path
+	var err error
+	if create {
+		err = os.MkdirAll(path, 0777)
+		if err != nil {
+			return "", fmt.Errorf("Error creating directory %s", path)
+		}
+	}
+	return path, err
 }

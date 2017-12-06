@@ -40,6 +40,7 @@ build_script:
   - go get github.com/dustin/go-humanize
   - go get github.com/fatih/color
   - go get github.com/hashicorp/go-version
+  - go get github.com/shibukawa/configdir
   - go vet ./...
   - gofmt -s -l .
   - golint github.com/G-Node/gin-cli...

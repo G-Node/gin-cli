@@ -11,9 +11,8 @@ import (
 
 var suffix = "gin"
 
-// ConfigPath returns the configuration path where configuration files should be stored.
-func ConfigPath(create bool) (string, error) {
-	// TODO: Handle Windows paths
+// OldConfigPath is the old deprecated config path function. It's used to move the old configuration file to the new location.
+func OldConfigPath(create bool) (string, error) {
 	var path string
 	var err error
 
@@ -38,9 +37,8 @@ func ConfigPath(create bool) (string, error) {
 	return path, err
 }
 
-// DataPath returns the data path where gin data files (such as transaction logs) should be stored.
-func DataPath(create bool) (string, error) {
-	// TODO: Handle Windows paths
+// OldDataPath is the old deprecated data path function. It's used to move the old log file to the new location.
+func OldDataPath(create bool) (string, error) {
 	var path string
 	var err error
 
