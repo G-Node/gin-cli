@@ -31,12 +31,14 @@ var red = color.New(color.FgRed).SprintFunc()
 // requirelogin prompts for login if the user is not already logged in.
 // It only checks if a local token exists and does not confirm its validity with the server.
 // The function should be called at the start of any command that requires being logged in to run.
-func requirelogin(gincl *ginclient.Client) {
+func requirelogin(gincl *ginclient.Client, prompt bool) {
 	err := gincl.LoadToken()
-	if err != nil {
-		login([]string{})
+	if prompt {
+		if err != nil {
+			login([]string{})
+		}
+		err = gincl.LoadToken()
 	}
-	err = gincl.LoadToken()
 	util.CheckError(err)
 }
 
@@ -100,7 +102,7 @@ func logout(args []string) {
 
 func createRepo(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl)
+	requirelogin(gincl, true)
 
 	var repoName, repoDesc string
 	var here bool
@@ -145,7 +147,7 @@ func createRepo(args []string) {
 
 func deleteRepo(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl)
+	requirelogin(gincl, true)
 	var repostr, confirmation string
 
 	if len(args) == 0 {
@@ -185,9 +187,6 @@ func isValidRepoPath(path string) bool {
 }
 
 func getRepo(args []string) {
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl)
-
 	var jsonout bool
 	for idx, arg := range args {
 		if arg == "--json" {
@@ -196,6 +195,8 @@ func getRepo(args []string) {
 			break
 		}
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 
 	var repostr string
 	if len(args) != 1 {
@@ -375,8 +376,6 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 }
 
 func upload(args []string) {
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl)
 	var jsonout bool
 	for idx, arg := range args {
 		if arg == "--json" {
@@ -385,6 +384,8 @@ func upload(args []string) {
 			break
 		}
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -401,8 +402,6 @@ func upload(args []string) {
 }
 
 func download(args []string) {
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl)
 	var jsonout bool
 	for idx, arg := range args {
 		if arg == "--json" {
@@ -411,6 +410,8 @@ func download(args []string) {
 			break
 		}
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -440,8 +441,6 @@ func download(args []string) {
 }
 
 func getContent(args []string) {
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl)
 	var jsonout bool
 	for idx, arg := range args {
 		if arg == "--json" {
@@ -450,6 +449,8 @@ func getContent(args []string) {
 			break
 		}
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -462,8 +463,6 @@ func getContent(args []string) {
 }
 
 func remove(args []string) {
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl)
 	var jsonout bool
 	for idx, arg := range args {
 		if arg == "--json" {
@@ -472,6 +471,8 @@ func remove(args []string) {
 			break
 		}
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -495,7 +496,7 @@ func keys(args []string) {
 
 func printKeys(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl)
+	requirelogin(gincl, true)
 	printFull := false
 	if len(args) > 1 {
 		util.Die(usage)
@@ -535,7 +536,7 @@ func printKeys(args []string) {
 
 func addKey(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl)
+	requirelogin(gincl, true)
 	if len(args) != 2 {
 		util.Die(usage)
 	}
@@ -599,7 +600,7 @@ func repos(args []string) {
 		util.Die(usage)
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl)
+	requirelogin(gincl, true)
 	var arg string
 	if len(args) == 0 {
 		arg = gincl.Username
