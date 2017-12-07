@@ -39,11 +39,6 @@ func NewClient(host string) *Client {
 // GetUserKeys fetches the public keys that the user has added to the auth server.
 func (gincl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
 	var keys []gogs.PublicKey
-	err := gincl.LoadToken()
-	if err != nil {
-		return keys, fmt.Errorf("This command requires login")
-	}
-
 	res, err := gincl.Get("/api/v1/user/keys")
 	if err != nil {
 		return keys, fmt.Errorf("Request for keys returned error")
@@ -109,10 +104,6 @@ func (gincl *Client) SearchAccount(query string) ([]gin.Account, error) {
 // AddKey adds the given key to the current user's authorised keys.
 // If force is enabled, any key which matches the new key's description will be overwritten.
 func (gincl *Client) AddKey(key, description string, force bool) error {
-	err := gincl.LoadToken()
-	if err != nil {
-		return err
-	}
 	newkey := gogs.PublicKey{Key: key, Title: description}
 
 	if force {
@@ -133,11 +124,6 @@ func (gincl *Client) AddKey(key, description string, force bool) error {
 
 // DeletePubKey removes the key that matches the given description (title) from the current user's authorised keys.
 func (gincl *Client) DeletePubKey(description string) error {
-	err := gincl.LoadToken()
-	if err != nil {
-		return err
-	}
-
 	keys, err := gincl.GetUserKeys()
 	if err != nil {
 		util.LogWrite("Error when getting user keys: %v", err)

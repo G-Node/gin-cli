@@ -91,11 +91,6 @@ func (gincl *Client) ListRepos(user string) ([]gogs.Repository, error) {
 // CreateRepo creates a repository on the server.
 func (gincl *Client) CreateRepo(name, description string) error {
 	util.LogWrite("Creating repository")
-	err := gincl.LoadToken()
-	if err != nil {
-		return fmt.Errorf("[Create repository] This action requires login")
-	}
-
 	newrepo := gogs.Repository{Name: name, Description: description, Private: true}
 	util.LogWrite("Name: %s :: Description: %s", name, description)
 	res, err := gincl.Post("/api/v1/user/repos", newrepo)
@@ -112,11 +107,6 @@ func (gincl *Client) CreateRepo(name, description string) error {
 // DelRepo deletes a repository from the server.
 func (gincl *Client) DelRepo(name string) error {
 	util.LogWrite("Deleting repository")
-	err := gincl.LoadToken()
-	if err != nil {
-		return fmt.Errorf("[Delete repository] This action requires login")
-	}
-
 	res, err := gincl.Delete(fmt.Sprintf("/api/v1/repos/%s", name))
 	if err != nil {
 		return err
@@ -317,12 +307,6 @@ func (gincl *Client) Download(content bool, downloadchan chan<- RepoFileStatus) 
 func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus) {
 	defer close(clonechan)
 	util.LogWrite("CloneRepo")
-	err := gincl.LoadToken()
-	if err != nil {
-		clonechan <- RepoFileStatus{Err: err}
-		return
-	}
-
 	clonestatus := make(chan RepoFileStatus)
 	go gincl.Clone(repoPath, clonestatus)
 	for stat := range clonestatus {
