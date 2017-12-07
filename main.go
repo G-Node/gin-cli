@@ -36,6 +36,8 @@ func requirelogin(gincl *ginclient.Client) {
 	if err != nil {
 		login([]string{})
 	}
+	err = gincl.LoadToken()
+	util.CheckError(err)
 }
 
 // login requests credentials, performs login with auth server, and stores the token.
