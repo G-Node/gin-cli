@@ -118,7 +118,7 @@ func createRepo(args []string) {
 	err = gincl.CreateRepo(repoName, repoDesc)
 	// Parse error message and make error nicer
 	util.CheckError(err)
-	fmt.Println(green("OK"))
+	fmt.Fprintln(color.Output, green("OK"))
 
 	if here {
 		// Init cwd
