@@ -437,6 +437,11 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 		if rerr != nil {
 			break
 		}
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			// Empty line output. Ignore
+			continue
+		}
 		// Send file name
 		err = json.Unmarshal([]byte(line), &annexDropRes)
 		if err != nil {
@@ -621,6 +626,11 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		if rerr != nil {
 			break
 		}
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			// Empty line output. Ignore
+			continue
+		}
 		// Send file name
 		err = json.Unmarshal([]byte(line), &annexAddRes)
 		if err != nil {
@@ -684,6 +694,11 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisRes) {
 		if rerr != nil {
 			break
 		}
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			// Empty line output. Ignore
+			continue
+		}
 		jsonerr := json.Unmarshal([]byte(line), &info)
 		info.Err = jsonerr
 		wichan <- info
@@ -720,6 +735,11 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
+		}
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			// Empty line output. Ignore
+			continue
 		}
 		jsonerr := json.Unmarshal([]byte(line), &status)
 		status.Err = jsonerr
@@ -842,6 +862,11 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 		if rerr != nil {
 			break
 		}
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			// Empty line output. Ignore
+			continue
+		}
 		// Send file name
 		err = json.Unmarshal([]byte(line), &annexAddRes)
 		if err != nil {
@@ -894,6 +919,11 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
+		}
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			// Empty line output. Ignore
+			continue
 		}
 		// Send file name
 		err = json.Unmarshal([]byte(line), &annexUnlockRes)
@@ -958,9 +988,13 @@ func AnnexInfo() (AnnexInfoRes, error) {
 		return AnnexInfoRes{}, fmt.Errorf("Error retrieving annex info")
 	}
 
-	// TODO: Buffered reading
 	stdout := cmd.OutPipe.ReadAll()
+	stdout = strings.TrimSpace(stdout)
 	var info AnnexInfoRes
+	if len(stdout) == 0 {
+		// empty output - error?
+		return info, nil
+	}
 	err = json.Unmarshal([]byte(stdout), &info)
 	return info, err
 }
