@@ -28,6 +28,20 @@ var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 var green = color.New(color.FgGreen).SprintFunc()
 var red = color.New(color.FgRed).SprintFunc()
 
+// requirelogin prompts for login if the user is not already logged in.
+// It only checks if a local token exists and does not confirm its validity with the server.
+// The function should be called at the start of any command that requires being logged in to run.
+func requirelogin(gincl *ginclient.Client, prompt bool) {
+	err := gincl.LoadToken()
+	if prompt {
+		if err != nil {
+			login([]string{})
+		}
+		err = gincl.LoadToken()
+	}
+	util.CheckError(err)
+}
+
 // login requests credentials, performs login with auth server, and stores the token.
 func login(args []string) {
 	var username string
@@ -87,6 +101,9 @@ func logout(args []string) {
 }
 
 func createRepo(args []string) {
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, true)
+
 	var repoName, repoDesc string
 	var here bool
 
@@ -107,18 +124,14 @@ func createRepo(args []string) {
 		}
 	}
 	// TODO: Check name validity before sending to server?
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	err := gincl.LoadToken()
-	util.CheckError(err)
-
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
 	fmt.Printf("Creating repository '%s' ", repoPath)
-	err = gincl.CreateRepo(repoName, repoDesc)
+	err := gincl.CreateRepo(repoName, repoDesc)
 	// Parse error message and make error nicer
 	util.CheckError(err)
-	fmt.Println(green("OK"))
+	fmt.Fprintln(color.Output, green("OK"))
 
 	if here {
 		// Init cwd
@@ -133,6 +146,8 @@ func createRepo(args []string) {
 }
 
 func deleteRepo(args []string) {
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, true)
 	var repostr, confirmation string
 
 	if len(args) == 0 {
@@ -140,10 +155,6 @@ func deleteRepo(args []string) {
 	} else {
 		repostr = args[0]
 	}
-
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	err := gincl.LoadToken()
-	util.CheckError(err)
 
 	repoinfo, err := gincl.GetRepo(repostr)
 	util.CheckError(err)
@@ -184,6 +195,8 @@ func getRepo(args []string) {
 			break
 		}
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 
 	var repostr string
 	if len(args) != 1 {
@@ -196,7 +209,6 @@ func getRepo(args []string) {
 		util.Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
 	}
 
-	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	clonechan := make(chan ginclient.RepoFileStatus)
@@ -372,11 +384,12 @@ func upload(args []string) {
 			break
 		}
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 
-	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 
@@ -397,6 +410,8 @@ func download(args []string) {
 			break
 		}
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -409,7 +424,6 @@ func download(args []string) {
 		content = true
 	}
 
-	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	lockchan := make(chan ginclient.RepoFileStatus)
@@ -435,11 +449,12 @@ func getContent(args []string) {
 			break
 		}
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 
-	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	getcchan := make(chan ginclient.RepoFileStatus)
@@ -456,10 +471,11 @@ func remove(args []string) {
 			break
 		}
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	lockchan := make(chan ginclient.RepoFileStatus)
@@ -479,6 +495,8 @@ func keys(args []string) {
 }
 
 func printKeys(args []string) {
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, true)
 	printFull := false
 	if len(args) > 1 {
 		util.Die(usage)
@@ -490,7 +508,6 @@ func printKeys(args []string) {
 		}
 	}
 
-	gincl := ginclient.NewClient(util.Config.GinHost)
 	keys, err := gincl.GetUserKeys()
 	util.CheckError(err)
 
@@ -518,10 +535,11 @@ func printKeys(args []string) {
 }
 
 func addKey(args []string) {
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, true)
 	if len(args) != 2 {
 		util.Die(usage)
 	}
-	gincl := ginclient.NewClient(util.Config.GinHost)
 	err := gincl.LoadToken()
 	if err != nil {
 		util.Die("This command requires login.")
@@ -550,7 +568,7 @@ func printAccountInfo(args []string) {
 	var username string
 
 	gincl := ginclient.NewClient(util.Config.GinHost)
-	_ = gincl.LoadToken()
+	_ = gincl.LoadToken() // does not REQUIRE login
 
 	if len(args) == 0 {
 		username = gincl.Username
@@ -581,13 +599,11 @@ func repos(args []string) {
 	if len(args) > 1 {
 		util.Die(usage)
 	}
-	var arg string
 	gincl := ginclient.NewClient(util.Config.GinHost)
-	err := gincl.LoadToken()
+	requirelogin(gincl, true)
+	var arg string
 	if len(args) == 0 {
-		if err == nil {
-			arg = gincl.Username
-		}
+		arg = gincl.Username
 	} else {
 		arg = args[0]
 		if arg == "-p" {
