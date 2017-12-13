@@ -600,6 +600,9 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		exclargs = append(exclargs, arg)
 	}
 
+	// explicitly exclude config file
+	exclargs = append(exclargs, "--exclude=config.yml")
+
 	if len(exclargs) > 0 {
 		cmdargs = append(cmdargs, exclargs...)
 	}
