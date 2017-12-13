@@ -120,11 +120,6 @@ func LoadConfig() error {
 		execpath, _ := path.Split(execloc)
 		configpaths = append(configpaths, execpath)
 	}
-	// Highest priority config file is in the repository root
-	reporoot, err := FindRepoRoot(".")
-	if err == nil {
-		configpaths = append(configpaths, reporoot)
-	}
 
 	configFileName := "config.yml"
 	for _, path := range configpaths {
@@ -137,8 +132,6 @@ func LoadConfig() error {
 	Config.Bin.Git = viper.GetString("bin.git")
 	Config.Bin.GitAnnex = viper.GetString("bin.gitannex")
 	Config.Bin.SSH = viper.GetString("bin.ssh")
-	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
-	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
 	ginAddress := viper.GetString("gin.address")
 	ginPort := viper.GetInt("gin.port")
@@ -149,6 +142,17 @@ func LoadConfig() error {
 	Config.GitHost = fmt.Sprintf("%s:%d", gitAddress, gitPort)
 
 	Config.GitUser = viper.GetString("git.user")
+
+	// Highest priority config file is in the repository root for excludes
+	reporoot, err := FindRepoRoot(".")
+	if err == nil {
+		confPath := filepath.Join(reporoot, configFileName)
+		viper.SetConfigFile(confPath)
+		_ = viper.MergeInConfig()
+	}
+
+	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
+	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
 	LogWrite("Configuration values")
 	LogWrite("%+v", Config)
