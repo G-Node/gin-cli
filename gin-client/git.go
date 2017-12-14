@@ -4,14 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
-	"github.com/dustin/go-humanize"
 )
 
 // Workingdir sets the directory for shell commands
@@ -603,6 +600,9 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		exclargs = append(exclargs, arg)
 	}
 
+	// explicitly exclude config file
+	exclargs = append(exclargs, "--exclude=config.yml")
+
 	if len(exclargs) > 0 {
 		cmdargs = append(cmdargs, exclargs...)
 	}
@@ -1073,49 +1073,6 @@ func RunAnnexCommand(args ...string) (util.GinCmd, error) {
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Start()
 	return cmd, err
-}
-
-// selectGitOrAnnex splits a list of paths into two: the first to be added to git proper and the second to be added to git annex.
-// The selection is made based on the file type (extension) and size, both of which are configurable.
-func selectGitOrAnnex(paths []string) (gitpaths []string, annexpaths []string) {
-	minsize, err := humanize.ParseBytes(util.Config.Annex.MinSize)
-	if err != nil {
-		util.LogWrite("Invalid minsize string found in config. Defaulting to 10 MiB")
-		minsize, _ = humanize.ParseBytes("10 MiB")
-	}
-	excludes := util.Config.Annex.Exclude
-
-	util.LogWrite("Using minsize %v", minsize)
-	util.LogWrite("Using exclude list %v", excludes)
-
-	var fsize uint64
-	for _, p := range paths {
-		fstat, err := os.Stat(p)
-		if err != nil {
-			util.LogWrite("Cannot stat file [%s]: %s", p, err.Error())
-			fsize = math.MaxUint64
-		} else {
-			fsize = uint64(fstat.Size())
-		}
-		if fsize < minsize {
-			for _, pattern := range excludes {
-				match, err := filepath.Match(pattern, p)
-				if match {
-					if err != nil {
-						util.LogWrite("Bad pattern found in annex exclusion list %s", excludes)
-						continue
-					}
-					gitpaths = append(gitpaths, p)
-					util.LogWrite("Adding %v to git paths", p)
-					continue
-				}
-			}
-		}
-		util.LogWrite("Adding %v to annex paths", p)
-		annexpaths = append(annexpaths, p)
-	}
-
-	return
 }
 
 // GetAnnexVersion returns the version string of the system's git-annex.

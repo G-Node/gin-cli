@@ -91,7 +91,7 @@ func (gincl *Client) ListRepos(user string) ([]gogs.Repository, error) {
 // CreateRepo creates a repository on the server.
 func (gincl *Client) CreateRepo(name, description string) error {
 	util.LogWrite("Creating repository")
-	newrepo := gogs.Repository{Name: name, Description: description, Private: true}
+	newrepo := gogs.CreateRepoOption{Name: name, Description: description, Private: true}
 	util.LogWrite("Name: %s :: Description: %s", name, description)
 	res, err := gincl.Post("/api/v1/user/repos", newrepo)
 	if err != nil {
