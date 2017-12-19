@@ -280,7 +280,7 @@ def debianize(binfiles, annexsa_archive):
             # copy binaries and program files
             shutil.copy(binf, opt_gin_bin_dir)
             print(f"Copied {binf} to {opt_gin_bin_dir}")
-            shutil.copy("gin.sh", opt_gin_bin_dir)
+            shutil.copy("scripts/gin.sh", opt_gin_bin_dir)
             print(f"Copied gin.sh to {opt_gin_bin_dir}")
 
             link_path = os.path.join(usr_local_bin_dir, "gin")
@@ -395,7 +395,7 @@ def winbundle(binfiles, git_pkg, annex_pkg):
 
             shutil.copy(binf, bindir)
             shutil.copy("README.md", pkgroot)
-            shutil.copy("gin-shell.bat", pkgroot)
+            shutil.copy("scripts/gin-shell.bat", pkgroot)
 
             gitdir = os.path.join(pkgroot, "git")
             os.makedirs(gitdir)
