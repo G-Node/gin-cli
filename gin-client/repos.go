@@ -356,12 +356,12 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 	// If there is no global git user.name or user.email set local ones
 	cmd, _ := RunGitCommand("config", "--global", "user.name")
 	globalGitName := cmd.OutPipe.ReadAll()
-	cmd, _ = RunGitCommand("config", "--global", "user.Email")
+	cmd, _ = RunGitCommand("config", "--global", "user.email")
 	globalGitEmail := cmd.OutPipe.ReadAll()
 	if len(globalGitName) == 0 && len(globalGitEmail) == 0 {
 		info, ierr := gincl.RequestAccount(gincl.Username)
 		name := info.FullName
-		if ierr != nil {
+		if ierr != nil || name == "" {
 			name = gincl.Username
 		}
 		ierr = SetGitUser(name, info.Email)
