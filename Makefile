@@ -8,7 +8,7 @@ BUILDLOC = build
 INSTLOC = $(GOPATH)/bin
 
 # Build flags
-VERNUM = $(shell grep -o -E '[0-9.]+(dev){0,1}' version)
+VERNUM = $(shell grep -o -E '[0-9.]+(dev|beta){0,1}' version)
 ncommits = $(shell git rev-list --count HEAD)
 BUILDNUM = $(shell printf '%06d' $(ncommits))
 COMMITHASH = $(shell git rev-parse HEAD)
