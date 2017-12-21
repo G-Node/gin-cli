@@ -97,7 +97,7 @@ func (gincl *Client) CreateRepo(name, description string) error {
 	if err != nil {
 		return err
 	} else if res.StatusCode != http.StatusCreated {
-		return fmt.Errorf("[Create repository] Failed. Server returned %s", res.Status)
+		return fmt.Errorf("[Create repository] Failed. Server returned %d", res.StatusCode)
 	}
 	web.CloseRes(res.Body)
 	util.LogWrite("Repository created")
@@ -122,12 +122,11 @@ func (gincl *Client) DelRepo(name string) error {
 type RepoFileStatus struct {
 	// The name of the file.
 	FileName string `json:"filename"`
-	// The state of the operation (Added, Uploading, or Downloading).
-	// TODO: Use enum
+	// The state of the operation.
 	State string `json:"state"`
-	// Progress of the operation, if available. This is empty when the State is "Added"
+	// Progress of the operation, if available. If partial progress isn't available or applicable, this will be empty.
 	Progress string `json:"progress"`
-	// The data rate. This is empty when the State is "Added"
+	// The data rate, if available.
 	Rate string `json:"rate"`
 	// Errors
 	Err error `json:"err"`
