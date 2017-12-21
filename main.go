@@ -129,7 +129,6 @@ func createRepo(args []string) {
 	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
 	fmt.Printf("Creating repository '%s' ", repoPath)
 	err := gincl.CreateRepo(repoName, repoDesc)
-	// Parse error message and make error nicer
 	util.CheckError(err)
 	fmt.Fprintln(color.Output, green("OK"))
 
@@ -537,9 +536,7 @@ func addKey(args []string) {
 		util.Die(usage)
 	}
 	err := gincl.LoadToken()
-	if err != nil {
-		util.Die("This command requires login.")
-	}
+	util.CheckError(err)
 
 	filename := args[1]
 
