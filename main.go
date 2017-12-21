@@ -325,6 +325,7 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 	prevlinelength := 0 // used to clear lines before overwriting
 	nerrors := 0
 	for stat := range statuschan {
+		var msgparts []string
 		if jsonout {
 			j, _ := json.Marshal(stat)
 			fmt.Println(string(j))
@@ -340,27 +341,22 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			}
 			fname = stat.FileName
 		}
-		progress := stat.Progress
-		rate := stat.Rate
-		if len(rate) > 0 {
-			rate = fmt.Sprintf("(%s)", rate)
-		}
+		msgparts = append(msgparts, stat.State, stat.FileName)
 		if stat.Err == nil {
-			if progress == "100%" {
-				progress = green("OK")
+			if stat.Progress == "100%" {
+				msgparts = append(msgparts, green("OK"))
+			} else {
+				msgparts = append(msgparts, stat.Progress, stat.Rate)
 			}
 		} else if stat.Err.Error() == "Failed" {
-			progress = red("Failed")
+			msgparts = append(msgparts, red("Failed"))
 			nerrors++
 		} else {
-			msg := fmt.Sprintf("%s %s %s: %s", stat.State, stat.FileName, red("Error"), stat.Err.Error())
-			fmt.Fprintln(color.Output, util.CleanSpaces(msg))
+			msgparts = append(msgparts, red("Error"), "\n", stat.Err.Error())
 			nerrors++
-			continue
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
-		msg := fmt.Sprintf("%s %s %s %s", stat.State, stat.FileName, progress, rate)
-		prevlinelength, _ = fmt.Fprintf(color.Output, "\r%s", util.CleanSpaces(msg))
+		prevlinelength, _ = fmt.Fprintf(color.Output, "\r%s", util.CleanSpaces(strings.Join(msgparts, " ")))
 	}
 	if prevlinelength > 0 {
 		fmt.Println()
