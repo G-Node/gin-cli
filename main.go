@@ -126,7 +126,6 @@ func createRepo(args []string) {
 			repoDesc = args[1]
 		}
 	}
-	// TODO: Check name validity before sending to server?
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
@@ -350,11 +349,11 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			} else {
 				msgparts = append(msgparts, stat.Progress, stat.Rate)
 			}
-		} else if stat.Err.Error() == "Failed" {
-			msgparts = append(msgparts, red("Failed"))
-			nerrors++
+			// } else if stat.Err.Error() == "Failed" {
+			// 	msgparts = append(msgparts, red("Failed"))
+			// 	nerrors++
 		} else {
-			msgparts = append(msgparts, red("Error"), "\n", stat.Err.Error())
+			msgparts = append(msgparts, stat.Err.Error())
 			nerrors++
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
