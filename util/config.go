@@ -35,7 +35,7 @@ func moveOldFiles(newpath string) {
 	// move old files and clear old config path
 	var movemessages []string
 	moveconflicts := false
-	oldpath, _ := OldConfigPath(false)
+	oldpath, _ := OldConfigPath()
 	if _, operr := os.Stat(oldpath); !os.IsNotExist(operr) {
 		files, _ := ioutil.ReadDir(oldpath)
 		for _, file := range files {

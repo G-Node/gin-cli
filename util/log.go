@@ -14,7 +14,7 @@ var logger *log.Logger
 // LogInit initialises the log file and logger.
 func LogInit() error {
 	// move old log and clear old log path
-	oldpath, _ := OldDataPath(false)
+	oldpath, _ := OldDataPath()
 
 	cachepath, err := CachePath(true)
 	if err != nil {
