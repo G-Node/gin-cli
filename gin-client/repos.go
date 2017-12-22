@@ -47,57 +47,86 @@ func (gincl *Client) MakeSessionKey() error {
 
 // GetRepo retrieves the information of a repository.
 func (gincl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
+	fn := fmt.Sprintf("GetRepo(%s)", repoPath)
 	util.LogWrite("GetRepo")
 	var repo gogs.Repository
 
 	res, err := gincl.Get(fmt.Sprintf("/api/v1/repos/%s", repoPath))
 	if err != nil {
-		return repo, err
-	} else if res.StatusCode == http.StatusNotFound {
-		return repo, fmt.Errorf("Not found. Check repository owner and name.")
-	} else if res.StatusCode == http.StatusUnauthorized {
-		return repo, fmt.Errorf("You are not authorised to access repository.")
-	} else if res.StatusCode != http.StatusOK {
-		return repo, fmt.Errorf("Server returned %s", res.Body)
+		return repo, err // return error from Get() directly
+	}
+	switch code := res.StatusCode; {
+	case code == http.StatusNotFound:
+		return repo, ginerror{UError: res.Status, Origin: fn, Description: fmt.Sprintf("repository '%s' does not exist", repoPath)}
+	case code == http.StatusUnauthorized:
+		return repo, ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
+	case code == http.StatusInternalServerError:
+		return repo, ginerror{UError: res.Status, Origin: fn, Description: "server error"}
+	case code != http.StatusOK:
+		return repo, ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 	defer web.CloseRes(res.Body)
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := ioutil.ReadAll(res.Body) // ignore potential read error on res.Body; catch later when trying to unmarshal
 	if err != nil {
-		return repo, err
+		return repo, ginerror{UError: err.Error(), Origin: fn, Description: "failed to read response body"}
 	}
 	err = json.Unmarshal(b, &repo)
-	return repo, err
+	if err != nil {
+		return repo, ginerror{UError: err.Error(), Origin: fn, Description: "failed to parse response body"}
+	}
+	return repo, nil
 }
 
 // ListRepos gets a list of repositories (public or user specific)
 func (gincl *Client) ListRepos(user string) ([]gogs.Repository, error) {
+	fn := fmt.Sprintf("ListRepos(%s)", user)
 	util.LogWrite("Retrieving repo list")
 	var repoList []gogs.Repository
 	var res *http.Response
 	var err error
 	res, err = gincl.Get("/api/v1/user/repos")
 	if err != nil {
-		return repoList, err
+		return nil, err // return error from Get() directly
+	}
+	switch code := res.StatusCode; {
+	case code == http.StatusUnauthorized:
+		return nil, ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
+	case code == http.StatusInternalServerError:
+		return nil, ginerror{UError: res.Status, Origin: fn, Description: "server error"}
+	case code != http.StatusOK:
+		return nil, ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 	defer web.CloseRes(res.Body)
 	b, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return repoList, err
+		return nil, ginerror{UError: err.Error(), Origin: fn, Description: "failed to read response body"}
 	}
 	err = json.Unmarshal(b, &repoList)
-	return repoList, err
+	if err != nil {
+		return nil, ginerror{UError: err.Error(), Origin: fn, Description: "failed to parse response body"}
+	}
+	return repoList, nil
 }
 
 // CreateRepo creates a repository on the server.
 func (gincl *Client) CreateRepo(name, description string) error {
+	fn := fmt.Sprintf("CreateRepo(name)")
 	util.LogWrite("Creating repository")
 	newrepo := gogs.CreateRepoOption{Name: name, Description: description, Private: true}
 	util.LogWrite("Name: %s :: Description: %s", name, description)
 	res, err := gincl.Post("/api/v1/user/repos", newrepo)
 	if err != nil {
-		return err
-	} else if res.StatusCode != http.StatusCreated {
-		return fmt.Errorf("[Create repository] Failed. Server returned %d", res.StatusCode)
+		return err // return error from Post() directly
+	}
+	switch code := res.StatusCode; {
+	case code == http.StatusUnprocessableEntity:
+		return ginerror{UError: res.Status, Origin: fn, Description: "invalid repository name or repository with the same name already exists"}
+	case code == http.StatusUnauthorized:
+		return ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
+	case code == http.StatusInternalServerError:
+		return ginerror{UError: res.Status, Origin: fn, Description: "server error"}
+	case code != http.StatusCreated:
+		return ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 	web.CloseRes(res.Body)
 	util.LogWrite("Repository created")
@@ -106,12 +135,23 @@ func (gincl *Client) CreateRepo(name, description string) error {
 
 // DelRepo deletes a repository from the server.
 func (gincl *Client) DelRepo(name string) error {
+	fn := fmt.Sprintf("DelRepo(%s)", name)
 	util.LogWrite("Deleting repository")
 	res, err := gincl.Delete(fmt.Sprintf("/api/v1/repos/%s", name))
 	if err != nil {
-		return err
-	} else if res.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("[Delete repository] Failed. Server returned %s", res.Status)
+		return err // return error from Post() directly
+	}
+	switch code := res.StatusCode; {
+	case code == http.StatusForbidden:
+		return ginerror{UError: res.Status, Origin: fn, Description: "failed to delete repository (forbidden)"}
+	case code == http.StatusNotFound:
+		return ginerror{UError: res.Status, Origin: fn, Description: fmt.Sprintf("repository '%s' does not exist", name)}
+	case code == http.StatusUnauthorized:
+		return ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
+	case code == http.StatusInternalServerError:
+		return ginerror{UError: res.Status, Origin: fn, Description: "server error"}
+	case code != http.StatusNoContent:
+		return ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 	web.CloseRes(res.Body)
 	util.LogWrite("Repository deleted")
