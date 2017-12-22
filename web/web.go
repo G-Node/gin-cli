@@ -126,12 +126,12 @@ func (ut *UserToken) LoadToken() error {
 	}
 	path, err := util.ConfigPath(false)
 	if err != nil {
-		return fmt.Errorf("Could not read token: Error accessing config directory.")
+		return fmt.Errorf("unable to access config directory")
 	}
 	filepath := filepath.Join(path, "token")
 	file, err := os.Open(filepath)
 	if err != nil {
-		return fmt.Errorf("Error loading user token")
+		return fmt.Errorf("failed to load user token")
 	}
 	defer closeFile(file)
 
@@ -149,7 +149,7 @@ func (ut *UserToken) StoreToken() error {
 	util.LogWrite("Saving token. ")
 	path, err := util.ConfigPath(true)
 	if err != nil {
-		return fmt.Errorf("Could not save token: Error creating or accessing config directory.")
+		return fmt.Errorf("could not creating or accessing config directory.")
 	}
 	filepath := filepath.Join(path, "token")
 	file, err := os.Create(filepath)

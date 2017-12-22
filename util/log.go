@@ -13,25 +13,15 @@ var logger *log.Logger
 
 // LogInit initialises the log file and logger.
 func LogInit() error {
-	// move old log and clear old log path
-	oldpath, _ := OldDataPath()
-
+	// TODO: Log rotation
 	cachepath, err := CachePath(true)
 	if err != nil {
 		return err
 	}
-
-	if _, operr := os.Stat(oldpath); !os.IsNotExist(operr) {
-		isodate := time.Now().Format("2006-01-02")
-		movedest := path.Join(cachepath, fmt.Sprintf("old-logs-%s", isodate))
-		os.Rename(oldpath, movedest)
-	}
-
-	// TODO: Log rotation
-	fullPath := path.Join(cachepath, "gin.log")
-	logfile, err = os.OpenFile(fullPath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+	logpath := path.Join(cachepath, "gin.log")
+	logfile, err = os.OpenFile(logpath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
-		return fmt.Errorf("Error creating file %s", fullPath)
+		return fmt.Errorf("Error creating file %s", logpath)
 	}
 
 	flags := log.Ldate | log.Ltime | log.LUTC
@@ -40,6 +30,31 @@ func LogInit() error {
 	LogWrite("---")
 
 	return nil
+}
+
+// CachePath returns the path where gin cache files (logs) should be stored.
+func CachePath(create bool) (string, error) {
+	var err error
+	logpath := os.Getenv("GIN_LOG_DIR")
+	if logpath == "" {
+		// move old log and clear old log path
+		oldpath, _ := OldDataPath()
+
+		logpath = configDirs.QueryCacheFolder().Path
+		if _, operr := os.Stat(oldpath); !os.IsNotExist(operr) {
+			isodate := time.Now().Format("2006-01-02")
+			movedest := path.Join(logpath, fmt.Sprintf("old-logs-%s", isodate))
+			os.Rename(oldpath, movedest)
+		}
+
+	}
+	if create {
+		err = os.MkdirAll(logpath, 0755)
+		if err != nil {
+			return "", fmt.Errorf("could not create log directory %s", logpath)
+		}
+	}
+	return logpath, err
 }
 
 // LogWrite writes a string to the log file. Nothing happens if the log file is not initialised (see LogInit).
