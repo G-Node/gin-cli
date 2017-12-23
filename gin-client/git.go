@@ -1050,9 +1050,9 @@ func RunGitCommand(args ...string) (util.GinCmd, error) {
 	cmd := util.Command(gitbin)
 	cmd.Dir = Workingdir
 	cmd.Args = append(cmd.Args, args...)
-	env := os.Environ()
 	token := web.UserToken{}
 	_ = token.LoadToken()
+	env := os.Environ()
 	cmd.Env = append(env, util.GitSSHEnv(token.Username))
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Start()
@@ -1068,8 +1068,9 @@ func RunAnnexCommand(args ...string) (util.GinCmd, error) {
 	cmd.Dir = Workingdir
 	token := web.UserToken{}
 	_ = token.LoadToken()
-	annexsshopt := util.AnnexSSHOpt(token.Username)
-	cmd.Args = append(cmd.Args, "-c", annexsshopt)
+	env := os.Environ()
+	cmd.Env = append(env, util.GitSSHEnv(token.Username))
+	cmd.Env = append(cmd.Env, "GIT_ANNEX_USE_GIT_SSH=1")
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Start()
 	return cmd, err
