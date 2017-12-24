@@ -25,8 +25,11 @@ var commit string
 var verstr string
 var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 
+var jsonflag = "--json"
+
 var green = color.New(color.FgGreen).SprintFunc()
-var red = color.New(color.FgRed).SprintFunc()
+
+// var red = color.New(color.FgRed).SprintFunc()
 
 // requirelogin prompts for login if the user is not already logged in.
 // It only checks if a local token exists and does not confirm its validity with the server.
@@ -188,7 +191,7 @@ func isValidRepoPath(path string) bool {
 func getRepo(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -228,7 +231,7 @@ func lsRepo(args []string) {
 			short = true
 			break
 		}
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -286,7 +289,7 @@ func lsRepo(args []string) {
 func lock(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -304,7 +307,7 @@ func lock(args []string) {
 func unlock(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -373,7 +376,7 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 func upload(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -399,7 +402,7 @@ func upload(args []string) {
 func download(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -438,7 +441,7 @@ func download(args []string) {
 func getContent(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -460,7 +463,7 @@ func getContent(args []string) {
 func remove(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -710,7 +713,7 @@ func annexrun(args []string) {
 func printversion(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
