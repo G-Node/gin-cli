@@ -144,6 +144,8 @@ func LoadConfig() error {
 	LogWrite("Configuration values")
 	LogWrite("%+v", Config)
 
+	// TODO: Validate URLs on config read
+
 	return nil
 }
 

@@ -49,7 +49,10 @@ type Client struct {
 func urlJoin(parts ...string) string {
 	// First part must be a valid URL
 	u, err := url.Parse(parts[0])
-	util.CheckErrorMsg(err, "Bad URL in urlJoin")
+	if err != nil {
+		util.LogWrite("Bad URL in urlJoin: %v", parts)
+		return ""
+	}
 
 	for _, part := range parts[1:] {
 		u.Path = path.Join(u.Path, part)
