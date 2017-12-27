@@ -1,4 +1,5 @@
 // Simple utility functions for getting configuration paths based on the XDG specification.
+// DEPRECATED: These functions are kept for taking care of transfers from the old directories to the new, platform specific ones. They should not be used for anything else and will soon be removed.
 
 package util
 
