@@ -41,7 +41,7 @@ Commands:
 
 	get-content    [<filenames>]
 		 Download the content of files from a remote repository
-	
+
 	getc           [<filenames>]
 		 Synonym for get-content
 
@@ -174,6 +174,7 @@ DESCRIPTION
 	In the short form, the meaning of the status abbreviations is as follows:
 		OK: The file is part of the GIN repository and its contents are
 		synchronised with the server.
+		UL: The file has been unlocked for editing.
 		NC: The local file is a placeholder and its contents have not been
 		downloaded.
 		MD: The file has been modified locally and the changes have not been
