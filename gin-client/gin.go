@@ -78,28 +78,6 @@ func (gincl *Client) RequestAccount(name string) (gogs.User, error) {
 	return acc, err
 }
 
-// SearchAccount retrieves a list of accounts that match the query string.
-func (gincl *Client) SearchAccount(query string) ([]gin.Account, error) {
-	var accs []gin.Account
-
-	params := url.Values{}
-	params.Add("q", query)
-	address := fmt.Sprintf("/api/accounts?%s", params.Encode())
-	res, err := gincl.Get(address)
-	if err != nil {
-		return accs, err
-	} else if res.StatusCode != http.StatusOK {
-		return accs, fmt.Errorf("[Account search] Failed. Server returned: %s", res.Status)
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return accs, err
-	}
-
-	err = json.Unmarshal(body, &accs)
-	return accs, err
-}
 
 // AddKey adds the given key to the current user's authorised keys.
 // If force is enabled, any key which matches the new key's description will be overwritten.
