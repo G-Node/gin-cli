@@ -109,9 +109,7 @@ func (gincl *Client) AddKey(key, description string, force bool) error {
 		// Attempting to delete potential existing key that matches the title
 		_ = gincl.DeletePubKey(description)
 	}
-
-	address := fmt.Sprintf("/api/v1/user/keys")
-	res, err := gincl.Post(address, newkey)
+	res, err := gincl.Post("/api/v1/user/keys", newkey)
 	if err != nil {
 		return err // return error from Post() directly
 	}

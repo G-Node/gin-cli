@@ -55,17 +55,16 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 		return nil, ginerror{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl)}
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
-	util.LogWrite("Performing GET with token: %s", cl.Token)
+	util.LogWrite("Performing GET: %s", req.URL)
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
-		util.LogWrite("Added token to GET")
+		util.LogWrite("Token: %s", cl.Token)
 	}
-	util.LogWrite("Performing GET: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
 		return nil, ginerror{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl)}
 	}
-	return resp, err
+	return resp, nil
 }
 
 // Post sends a POST request to address with the provided data.
