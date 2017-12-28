@@ -16,22 +16,8 @@ import (
 	gogs "github.com/gogits/go-gogs-client"
 )
 
-// Error is used to return errors caused by web requests, API calls, or system calls in the web package
-type Error struct {
-	// The error that was returned by the underlying system or API call
-	UError string
-	// The function where the error originated
-	Origin string
-	// Human-readable description of error and conditions
-	Description string
-}
-
-func (e Error) Error() string {
-	if e.Description != "" {
-		return e.Description
-	}
-	return e.UError
-}
+// ginerror alias to util.Error
+type ginerror = util.Error
 
 // UserToken struct for username and token
 type UserToken struct {
@@ -66,7 +52,7 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	requrl := urlJoin(cl.Host, address)
 	req, err := http.NewRequest("GET", requrl, nil)
 	if err != nil {
-		return nil, Error{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl)}
+		return nil, ginerror{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl)}
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
 	util.LogWrite("Performing GET with token: %s", cl.Token)
@@ -77,7 +63,7 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	util.LogWrite("Performing GET: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		return nil, Error{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl)}
+		return nil, ginerror{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl)}
 	}
 	return resp, err
 }
@@ -88,12 +74,12 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	fn := fmt.Sprintf("Post(%s, <data>)", address)
 	datajson, err := json.Marshal(data)
 	if err != nil {
-		return nil, Error{UError: err.Error(), Origin: fn}
+		return nil, ginerror{UError: err.Error(), Origin: fn}
 	}
 	requrl := urlJoin(cl.Host, address)
 	req, err := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
 	if err != nil {
-		return nil, Error{UError: err.Error(), Origin: fn}
+		return nil, ginerror{UError: err.Error(), Origin: fn}
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
 	if cl.Token != "" {
@@ -103,7 +89,7 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	util.LogWrite("Performing POST: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		err = Error{UError: err.Error(), Origin: fn}
+		err = ginerror{UError: err.Error(), Origin: fn}
 	}
 	return resp, err
 }
@@ -114,19 +100,19 @@ func (cl *Client) PostBasicAuth(address, username, password string, data interfa
 	fn := fmt.Sprintf("PostBasicAuth(%s)", address)
 	datajson, err := json.Marshal(data)
 	if err != nil {
-		return nil, Error{UError: err.Error(), Origin: fn}
+		return nil, ginerror{UError: err.Error(), Origin: fn}
 	}
 	requrl := urlJoin(cl.Host, address)
 	req, err := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
 	if err != nil {
-		return nil, Error{UError: err.Error(), Origin: fn}
+		return nil, ginerror{UError: err.Error(), Origin: fn}
 	}
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", gogs.BasicAuthEncode(username, password)))
 	util.LogWrite("Performing POST: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		err = Error{UError: err.Error(), Origin: fn}
+		err = ginerror{UError: err.Error(), Origin: fn}
 	}
 	return resp, err
 }
@@ -137,7 +123,7 @@ func (cl *Client) Delete(address string) (*http.Response, error) {
 	requrl := urlJoin(cl.Host, address)
 	req, err := http.NewRequest("DELETE", requrl, nil)
 	if err != nil {
-		return nil, Error{UError: err.Error(), Origin: fn}
+		return nil, ginerror{UError: err.Error(), Origin: fn}
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
 	if cl.Token != "" {
@@ -147,7 +133,7 @@ func (cl *Client) Delete(address string) (*http.Response, error) {
 	util.LogWrite("Performing DELETE: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		err = Error{UError: err.Error(), Origin: fn}
+		err = ginerror{UError: err.Error(), Origin: fn}
 	}
 	return resp, err
 }
@@ -168,14 +154,14 @@ func (ut *UserToken) LoadToken() error {
 	filepath := filepath.Join(path, "token")
 	file, err := os.Open(filepath)
 	if err != nil {
-		return Error{UError: err.Error(), Origin: fn, Description: "failed to load user token"}
+		return ginerror{UError: err.Error(), Origin: fn, Description: "failed to load user token"}
 	}
 	defer closeFile(file)
 
 	decoder := gob.NewDecoder(file)
 	err = decoder.Decode(ut)
 	if err != nil {
-		return Error{UError: err.Error(), Origin: fn, Description: "failed to parse user token"}
+		return ginerror{UError: err.Error(), Origin: fn, Description: "failed to parse user token"}
 	}
 	util.LogWrite("Token read OK")
 	return nil
@@ -187,13 +173,13 @@ func (ut *UserToken) StoreToken() error {
 	util.LogWrite("Saving token")
 	path, err := util.ConfigPath(true)
 	if err != nil {
-		return Error{UError: err.Error(), Origin: fn}
+		return ginerror{UError: err.Error(), Origin: fn}
 	}
 	filepath := filepath.Join(path, "token")
 	file, err := os.Create(filepath)
 	if err != nil {
 		util.LogWrite("Failed to create token file %s", filepath)
-		return Error{UError: err.Error(), Origin: fn, Description: fmt.Sprintf("failed to create token file %s", filepath)}
+		return ginerror{UError: err.Error(), Origin: fn, Description: fmt.Sprintf("failed to create token file %s", filepath)}
 	}
 	defer closeFile(file)
 
@@ -201,7 +187,7 @@ func (ut *UserToken) StoreToken() error {
 	err = encoder.Encode(ut)
 	if err != nil {
 		util.LogWrite("Failed to write token to file %s", filepath)
-		return Error{UError: err.Error(), Origin: fn, Description: "failed to store token"}
+		return ginerror{UError: err.Error(), Origin: fn, Description: "failed to store token"}
 	}
 	util.LogWrite("Saved")
 	return nil
@@ -213,7 +199,7 @@ func DeleteToken() error {
 	tokenpath := filepath.Join(path, "token")
 	err := os.Remove(tokenpath)
 	if err != nil {
-		return Error{UError: err.Error(), Origin: "DeleteToken()", Description: "could not delete token"}
+		return ginerror{UError: err.Error(), Origin: "DeleteToken()", Description: "could not delete token"}
 	}
 	util.LogWrite("Token deleted")
 	return nil
