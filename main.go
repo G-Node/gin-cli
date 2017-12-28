@@ -484,6 +484,7 @@ func remove(args []string) {
 }
 
 func keys(args []string) {
+	// TODO: Add option to delete keys: Print then prompt for delete
 	if len(args) > 0 && args[0] == "--add" {
 		addKey(args)
 	} else {
