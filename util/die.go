@@ -10,8 +10,8 @@ import (
 
 var red = color.New(color.FgRed).SprintFunc()
 
-//Die prints a message to stderr and exits the program with status 1.
-func Die(msg string) {
+//Die prints an error message to stderr and exits the program with status 1.
+func Die(msg interface{}) {
 	// fmt.Fprintf(color.Error, "%s %s\n", red("ERROR"), msg)
 	// Swap the line above for the line below when (if) https://github.com/fatih/color/pull/87 gets merged
 	fmt.Fprintf(os.Stderr, "%s %s\n", "ERROR", msg)
@@ -27,7 +27,7 @@ func CheckError(err error) {
 		if strings.Contains(err.Error(), "Error loading user token") {
 			Die("This operation requires login.")
 		}
-		Die(err.Error())
+		Die(err)
 	}
 }
 
@@ -35,7 +35,7 @@ func CheckError(err error) {
 // Before exiting, the given msg string is printed to stderr.
 func CheckErrorMsg(err error, msg string) {
 	if err != nil {
-		LogWrite("The following error occured:\n%sExiting with message: %s", err.Error(), msg)
+		LogWrite("The following error occurred:\n%sExiting with message: %s", err, msg)
 		Die(msg)
 	}
 }
@@ -44,7 +44,7 @@ func CheckErrorMsg(err error, msg string) {
 // No logging is performed if err == nil.
 func LogError(err error) {
 	if err != nil {
-		LogWrite("The following error occured:\n%s", err.Error())
+		LogWrite("The following error occured:\n%s", err)
 	}
 }
 

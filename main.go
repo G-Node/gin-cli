@@ -72,7 +72,7 @@ func login(args []string) {
 		if err == gopass.ErrMaxLengthExceeded {
 			util.Die("Input too long")
 		}
-		util.Die(err.Error())
+		util.Die(err)
 	}
 
 	password = string(pwbytes)

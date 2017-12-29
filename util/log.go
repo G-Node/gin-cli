@@ -27,7 +27,7 @@ func LogInit() error {
 	flags := log.Ldate | log.Ltime | log.LUTC
 	logger = log.New(logfile, "", flags)
 
-	LogWrite("---")
+	LogWrite("LOGINIT")
 
 	return nil
 }

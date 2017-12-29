@@ -488,7 +488,7 @@ func GitLsFiles(args []string, lschan chan<- string) {
 	cmdargs := append([]string{"ls-files"}, args...)
 	cmd, err := RunGitCommand(cmdargs...)
 	if err != nil {
-		util.LogWrite("ls-files command set up failed: %s", err.Error())
+		util.LogWrite("ls-files command set up failed: %s", err)
 		return
 	}
 	for {
@@ -684,7 +684,7 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisRes) {
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
 		cmd.LogStdOutErr()
-		wichan <- AnnexWhereisRes{Err: fmt.Errorf("Failed to run git-annex whereis: %s", err.Error())}
+		wichan <- AnnexWhereisRes{Err: fmt.Errorf("Failed to run git-annex whereis: %s", err)}
 		return
 	}
 
@@ -726,7 +726,7 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 	if err != nil {
 		util.LogWrite("Error setting up git-annex status")
 		cmd.LogStdOutErr()
-		statuschan <- AnnexStatusRes{Err: fmt.Errorf("Failed to run git-annex status: %s", err.Error())}
+		statuschan <- AnnexStatusRes{Err: fmt.Errorf("Failed to run git-annex status: %s", err)}
 		return
 	}
 
