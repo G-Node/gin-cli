@@ -13,6 +13,7 @@ import (
 
 // Workingdir sets the directory for shell commands
 var Workingdir = "."
+var progcomplete = "100%"
 
 // **************** //
 
@@ -162,7 +163,7 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		}
 	}
 	// Progress doesn't show 100% if cloning an empty repository, so let's force it
-	status.Progress = "100%"
+	status.Progress = progcomplete
 	clonechan <- status
 	return
 }
@@ -286,7 +287,7 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
 	}
-	status.Progress = "100%"
+	status.Progress = progcomplete
 	syncchan <- status
 	return
 }
@@ -453,7 +454,7 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 			util.LogWrite("Error dropping %s", annexDropRes.File)
 			status.Err = fmt.Errorf("Failed")
 		}
-		status.Progress = "100%"
+		status.Progress = progcomplete
 		dropchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
@@ -562,7 +563,7 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		status.FileName = fname
 		util.LogWrite("%s added to git", fname)
 		// Error conditions?
-		status.Progress = "100%"
+		status.Progress = progcomplete
 		addchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
@@ -645,7 +646,7 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			util.LogWrite("Error adding %s", annexAddRes.File)
 			status.Err = fmt.Errorf("Failed")
 		}
-		status.Progress = "100%"
+		status.Progress = progcomplete
 		addchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
@@ -752,7 +753,7 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 // It is constructed using the result of 'git annex status'.
 // The description is composed of the file count for each status: added, modified, deleted
 func DescribeIndexShort() (string, error) {
-	// TODO: 'git annex status' doesn't list added (A) files wnen in direct mode.
+	// TODO: 'git annex status' doesn't list added (A) files when in direct mode.
 	statuschan := make(chan AnnexStatusRes)
 	go AnnexStatus([]string{""}, statuschan)
 	statusmap := make(map[string]int)
@@ -881,14 +882,14 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 			util.LogWrite("Error locking %s", annexAddRes.File)
 			status.Err = fmt.Errorf("Failed")
 		}
-		status.Progress = "100%"
+		status.Progress = progcomplete
 		lockchan <- status
 	}
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexLock")
 		cmd.LogStdOutErr()
 	}
-	status.Progress = "100%"
+	status.Progress = progcomplete
 	return
 }
 
@@ -939,7 +940,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 			util.LogWrite("Error unlocking %s", annexUnlockRes.File)
 			status.Err = fmt.Errorf("Failed")
 		}
-		status.Progress = "100%"
+		status.Progress = progcomplete
 		unlockchan <- status
 	}
 	if err != nil || cmd.Wait() != nil {
@@ -947,7 +948,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 		cmd.LogStdOutErr()
 		return
 	}
-	status.Progress = "100%"
+	status.Progress = progcomplete
 	return
 }
 
