@@ -174,17 +174,17 @@ type RepoFileStatus struct {
 
 // MarshalJSON overrides the default marshalling of RepoFileStatus to return the error string for the Err field.
 func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
-	type Alias RepoFileStatus
+	type RFSAlias RepoFileStatus
 	errmsg := ""
 	if s.Err != nil {
 		errmsg = s.Err.Error()
 	}
 	return json.Marshal(struct {
-		Alias
+		RFSAlias
 		Err string `json:"err"`
 	}{
-		Alias: Alias(s),
-		Err:   errmsg,
+		RFSAlias: RFSAlias(s),
+		Err:      errmsg,
 	})
 }
 
