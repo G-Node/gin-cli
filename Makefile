@@ -16,6 +16,8 @@ LDFLAGS = -ldflags "-X main.gincliversion=$(VERNUM) -X main.build=$(BUILDNUM) -X
 
 SOURCES = $(shell find . -type f -iname "*.go")
 
+.PHONY: gin allplatforms Install linux windows macos clean uninstall
+
 gin: $(BUILDLOC)/$(GIN)
 
 allplatforms: linux windows macos
@@ -38,12 +40,12 @@ uninstall:
 $(BUILDLOC)/$(GIN): $(SOURCES)
 	go build $(LDFLAGS) -o $(BUILDLOC)/$(GIN)
 
-$(BUILDLOC)/linux/$(GIN):
+$(BUILDLOC)/linux/$(GIN): $(SOURCES)
 	gox -output=$(BUILDLOC)/linux/$(GIN) -osarch=linux/amd64 $(LDFLAGS)
 
 
-$(BUILDLOC)/windows/$(GIN).exe:
+$(BUILDLOC)/windows/$(GIN).exe: $(SOURCES)
 	gox -output=$(BUILDLOC)/windows/$(GIN) -osarch=windows/386 $(LDFLAGS)
 
-$(BUILDLOC)/dawrin/$(GIN):
+$(BUILDLOC)/dawrin/$(GIN): $(SOURCES)
 	gox -output=$(BUILDLOC)/dawrin/$(GIN) -osarch=darwin/amd64 $(LDFLAGS)
