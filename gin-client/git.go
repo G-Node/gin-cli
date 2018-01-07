@@ -22,7 +22,7 @@ var progcomplete = "100%"
 // SetGitUser sets the user.name and user.email configuration values for the local git repository.
 func SetGitUser(name, email string) error {
 	if !IsRepo() {
-		return fmt.Errorf("Not a repository")
+		return fmt.Errorf("not a repository")
 	}
 	cmd, err := RunGitCommand("config", "--local", "user.name", name)
 	if err != nil {
@@ -41,17 +41,20 @@ func SetGitUser(name, email string) error {
 
 // AddRemote adds a remote named name for the repository at url.
 func AddRemote(name, url string) error {
+	fn := fmt.Sprintf("AddRemote(%s, %s)", name, url)
 	cmd, err := RunGitCommand("remote", "add", name, url)
 	if err != nil {
 		return err
 	}
 	err = cmd.Wait()
 	if err != nil {
+		gerr := ginerror{UError: err.Error(), Origin: fn}
 		util.LogWrite("Error during remote add command")
 		cmd.LogStdOutErr()
 		stderr := cmd.ErrPipe.ReadAll()
 		if strings.Contains(stderr, "already exists") {
-			return fmt.Errorf("Remote with name %s already exists", name)
+			gerr.Description = fmt.Sprintf("remote with name '%s' already exists", name)
+			return gerr
 		}
 	}
 	return err
@@ -62,7 +65,7 @@ func AddRemote(name, url string) error {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func CommitIfNew() (bool, error) {
 	if !IsRepo() {
-		return false, fmt.Errorf("Not a repository")
+		return false, fmt.Errorf("not a repository")
 	}
 	cmd, err := RunGitCommand("rev-parse", "HEAD")
 	if err == nil && cmd.Wait() == nil {
@@ -112,11 +115,12 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 // The status channel 'clonechan' is closed when this function returns.
 // (git clone ...)
 func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
+	fn := fmt.Sprintf("Clone(%s)", repoPath)
 	defer close(clonechan)
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 	cmd, err := RunGitCommand("clone", "--progress", remotePath)
 	if err != nil {
-		clonechan <- RepoFileStatus{Err: err}
+		clonechan <- RepoFileStatus{Err: ginerror{UError: err.Error(), Origin: fn}}
 		return
 	}
 	var status RepoFileStatus
@@ -150,16 +154,20 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		repoOwner, repoName := splitRepoParts(repoPath)
 
 		stderr := cmd.ErrPipe.ReadAll()
+		gerr := ginerror{UError: stderr, Origin: fn}
 		if strings.Contains(stderr, "Server returned non-OK status: 404") {
-			clonechan <- RepoFileStatus{Err: fmt.Errorf("Repository download failed.\n"+
-				"Please make sure you typed the repository path correctly.\n"+
+			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
+				"Make sure you typed the repository path correctly.\n"+
 				"Type 'gin repos %s' to see if the repository exists and if you have access to it.",
-				repoOwner)}
+				repoOwner)
+			clonechan <- RepoFileStatus{Err: gerr}
 		} else if strings.Contains(stderr, "already exists and is not an empty directory") {
-			clonechan <- RepoFileStatus{Err: fmt.Errorf("Repository download failed.\n"+
-				"'%s' already exists in the current directory and is not empty.", repoName)}
+			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
+				"'%s' already exists in the current directory and is not empty.", repoName)
+			clonechan <- RepoFileStatus{Err: gerr}
 		} else {
-			clonechan <- RepoFileStatus{Err: fmt.Errorf("Repository download failed.\nAn unknown error occured.")}
+			gerr.Description = "Repository download failed.\nAn unknown error occurred."
+			clonechan <- RepoFileStatus{Err: gerr}
 		}
 	}
 	// Progress doesn't show 100% if cloning an empty repository, so let's force it
@@ -938,7 +946,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			util.LogWrite("Error unlocking %s", annexUnlockRes.File)
-			status.Err = fmt.Errorf("Failed")
+			status.Err = fmt.Errorf("Failed. Content not available locally")
 		}
 		status.Progress = progcomplete
 		unlockchan <- status
