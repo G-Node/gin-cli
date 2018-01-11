@@ -350,6 +350,9 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 	go gincl.Clone(repoPath, clonestatus)
 	for stat := range clonestatus {
 		clonechan <- stat
+		if stat.Err != nil {
+			return
+		}
 	}
 	_, repoName := splitRepoParts(repoPath)
 	Workingdir = repoName
@@ -358,6 +361,9 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 	go gincl.InitDir(repoPath, initstatus)
 	for stat := range initstatus {
 		clonechan <- stat
+		if stat.Err != nil {
+			return
+		}
 	}
 	return
 }
