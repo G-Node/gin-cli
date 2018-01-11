@@ -365,8 +365,9 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 // InitDir initialises the local directory with the default remote and annex configuration.
 // The status channel 'initchan' is closed when this function returns.
 func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
+	fn := fmt.Sprintf("InitDir")
 	defer close(initchan)
-	initerr := fmt.Errorf("Error initialising local directory")
+	initerr := ginerror{Origin: fn, Description: "Error initialising local directory"}
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 
 	var stat RepoFileStatus
@@ -375,9 +376,14 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 	if !IsRepo() {
 		cmd, err := RunGitCommand("init")
 
-		if err != nil || cmd.Wait() != nil {
+		if err == nil {
+			err = cmd.Wait()
+		}
+
+		if err != nil {
 			util.LogWrite("Error during Init command: %s", err.Error())
 			cmd.LogStdOutErr()
+			initerr.UError = err.Error()
 			initchan <- RepoFileStatus{Err: initerr}
 			return
 		}
