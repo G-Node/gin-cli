@@ -12,8 +12,7 @@ gin-cli (0.12 beta); urgency=low
     options. All other options are ignored.
   * Local config file is never checked into annex, regardless of annex minsize
     rule.
-  * File operations and file transfers now pring progress output.
-  * Known issues: Some error conditions are not properly reported to the user.
+  * File operations and file transfers now print progress output.
 
 gin-cli (0.11); urgency=low
 
