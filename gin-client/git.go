@@ -1001,6 +1001,26 @@ func AnnexInfo() (AnnexInfoRes, error) {
 	return info, err
 }
 
+// GitLog ...
+func GitLog(logchan chan<- RepoFileStatus) {
+	defer close(logchan)
+	cmd, err := RunGitCommand("log")
+	if err != nil {
+		util.LogWrite("Error during AnnexInfo")
+		cmd.LogStdOutErr()
+		logchan <- RepoFileStatus{}
+		return
+	}
+
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		logchan <- RepoFileStatus{FileName: line}
+	}
+}
+
 var modecache = make(map[string]bool)
 
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.

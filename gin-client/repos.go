@@ -329,6 +329,18 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- RepoFileStatus
 	return
 }
 
+// RepoLog ...
+func (gincl *Client) RepoLog(logchan chan<- RepoFileStatus) {
+	defer close(logchan)
+	util.LogWrite("RepoLog")
+	gitlogchan := make(chan RepoFileStatus)
+	go GitLog(gitlogchan)
+	for stat := range gitlogchan {
+		logchan <- stat
+	}
+	return
+}
+
 // Download downloads changes and placeholder files in an already checked out repository.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) Download() error {
