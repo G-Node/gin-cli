@@ -1004,11 +1004,12 @@ func AnnexInfo() (AnnexInfoRes, error) {
 // GitLog ...
 func GitLog(logchan chan<- RepoFileStatus) {
 	defer close(logchan)
-	cmd, err := RunGitCommand("log")
+	logformat := `{"hash":"%H","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
+	cmd, err := RunGitCommand("log", fmt.Sprintf("--format=%s", logformat))
 	if err != nil {
-		util.LogWrite("Error during AnnexInfo")
+		util.LogWrite("Error during GitLog")
 		cmd.LogStdOutErr()
-		logchan <- RepoFileStatus{}
+		logchan <- RepoFileStatus{Err: err}
 		return
 	}
 
