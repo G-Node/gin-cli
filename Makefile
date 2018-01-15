@@ -8,13 +8,15 @@ BUILDLOC = build
 INSTLOC = $(GOPATH)/bin
 
 # Build flags
-VERNUM = $(shell grep -o -E '[0-9.]+(dev){0,1}' version)
+VERNUM = $(shell grep -o -E '[0-9.]+(dev|beta){0,1}' version)
 ncommits = $(shell git rev-list --count HEAD)
 BUILDNUM = $(shell printf '%06d' $(ncommits))
 COMMITHASH = $(shell git rev-parse HEAD)
 LDFLAGS = -ldflags "-X main.gincliversion=$(VERNUM) -X main.build=$(BUILDNUM) -X main.commit=$(COMMITHASH)"
 
 SOURCES = $(shell find . -type f -iname "*.go")
+
+.PHONY: gin allplatforms Install linux windows macos clean uninstall
 
 gin: $(BUILDLOC)/$(GIN)
 
@@ -38,12 +40,12 @@ uninstall:
 $(BUILDLOC)/$(GIN): $(SOURCES)
 	go build $(LDFLAGS) -o $(BUILDLOC)/$(GIN)
 
-$(BUILDLOC)/linux/$(GIN):
+$(BUILDLOC)/linux/$(GIN): $(SOURCES)
 	gox -output=$(BUILDLOC)/linux/$(GIN) -osarch=linux/amd64 $(LDFLAGS)
 
 
-$(BUILDLOC)/windows/$(GIN).exe:
+$(BUILDLOC)/windows/$(GIN).exe: $(SOURCES)
 	gox -output=$(BUILDLOC)/windows/$(GIN) -osarch=windows/386 $(LDFLAGS)
 
-$(BUILDLOC)/dawrin/$(GIN):
+$(BUILDLOC)/dawrin/$(GIN): $(SOURCES)
 	gox -output=$(BUILDLOC)/dawrin/$(GIN) -osarch=darwin/amd64 $(LDFLAGS)

@@ -13,6 +13,7 @@ import (
 
 // Workingdir sets the directory for shell commands
 var Workingdir = "."
+var progcomplete = "100%"
 
 // **************** //
 
@@ -21,7 +22,7 @@ var Workingdir = "."
 // SetGitUser sets the user.name and user.email configuration values for the local git repository.
 func SetGitUser(name, email string) error {
 	if !IsRepo() {
-		return fmt.Errorf("Not a repository")
+		return fmt.Errorf("not a repository")
 	}
 	cmd, err := RunGitCommand("config", "--local", "user.name", name)
 	if err != nil {
@@ -40,17 +41,20 @@ func SetGitUser(name, email string) error {
 
 // AddRemote adds a remote named name for the repository at url.
 func AddRemote(name, url string) error {
+	fn := fmt.Sprintf("AddRemote(%s, %s)", name, url)
 	cmd, err := RunGitCommand("remote", "add", name, url)
 	if err != nil {
 		return err
 	}
 	err = cmd.Wait()
 	if err != nil {
+		gerr := ginerror{UError: err.Error(), Origin: fn}
 		util.LogWrite("Error during remote add command")
 		cmd.LogStdOutErr()
 		stderr := cmd.ErrPipe.ReadAll()
 		if strings.Contains(stderr, "already exists") {
-			return fmt.Errorf("Remote with name %s already exists", name)
+			gerr.Description = fmt.Sprintf("remote with name '%s' already exists", name)
+			return gerr
 		}
 	}
 	return err
@@ -61,7 +65,7 @@ func AddRemote(name, url string) error {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func CommitIfNew() (bool, error) {
 	if !IsRepo() {
-		return false, fmt.Errorf("Not a repository")
+		return false, fmt.Errorf("not a repository")
 	}
 	cmd, err := RunGitCommand("rev-parse", "HEAD")
 	if err == nil && cmd.Wait() == nil {
@@ -111,11 +115,12 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 // The status channel 'clonechan' is closed when this function returns.
 // (git clone ...)
 func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
+	fn := fmt.Sprintf("Clone(%s)", repoPath)
 	defer close(clonechan)
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 	cmd, err := RunGitCommand("clone", "--progress", remotePath)
 	if err != nil {
-		clonechan <- RepoFileStatus{Err: err}
+		clonechan <- RepoFileStatus{Err: ginerror{UError: err.Error(), Origin: fn}}
 		return
 	}
 	var status RepoFileStatus
@@ -149,20 +154,24 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		repoOwner, repoName := splitRepoParts(repoPath)
 
 		stderr := cmd.ErrPipe.ReadAll()
+		gerr := ginerror{UError: stderr, Origin: fn}
 		if strings.Contains(stderr, "Server returned non-OK status: 404") {
-			clonechan <- RepoFileStatus{Err: fmt.Errorf("Repository download failed.\n"+
-				"Please make sure you typed the repository path correctly.\n"+
+			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
+				"Make sure you typed the repository path correctly.\n"+
 				"Type 'gin repos %s' to see if the repository exists and if you have access to it.",
-				repoOwner)}
+				repoOwner)
+			clonechan <- RepoFileStatus{Err: gerr}
 		} else if strings.Contains(stderr, "already exists and is not an empty directory") {
-			clonechan <- RepoFileStatus{Err: fmt.Errorf("Repository download failed.\n"+
-				"'%s' already exists in the current directory and is not empty.", repoName)}
+			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
+				"'%s' already exists in the current directory and is not empty.", repoName)
+			clonechan <- RepoFileStatus{Err: gerr}
 		} else {
-			clonechan <- RepoFileStatus{Err: fmt.Errorf("Repository download failed.\nAn unknown error occured.")}
+			gerr.Description = "Repository download failed.\nAn unknown error occurred."
+			clonechan <- RepoFileStatus{Err: gerr}
 		}
 	}
 	// Progress doesn't show 100% if cloning an empty repository, so let's force it
-	status.Progress = "100%"
+	status.Progress = progcomplete
 	clonechan <- status
 	return
 }
@@ -286,7 +295,7 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
 	}
-	status.Progress = "100%"
+	status.Progress = progcomplete
 	syncchan <- status
 	return
 }
@@ -453,7 +462,7 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 			util.LogWrite("Error dropping %s", annexDropRes.File)
 			status.Err = fmt.Errorf("Failed")
 		}
-		status.Progress = "100%"
+		status.Progress = progcomplete
 		dropchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
@@ -488,7 +497,7 @@ func GitLsFiles(args []string, lschan chan<- string) {
 	cmdargs := append([]string{"ls-files"}, args...)
 	cmd, err := RunGitCommand(cmdargs...)
 	if err != nil {
-		util.LogWrite("ls-files command set up failed: %s", err.Error())
+		util.LogWrite("ls-files command set up failed: %s", err)
 		return
 	}
 	for {
@@ -562,7 +571,7 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		status.FileName = fname
 		util.LogWrite("%s added to git", fname)
 		// Error conditions?
-		status.Progress = "100%"
+		status.Progress = progcomplete
 		addchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
@@ -645,7 +654,7 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			util.LogWrite("Error adding %s", annexAddRes.File)
 			status.Err = fmt.Errorf("Failed")
 		}
-		status.Progress = "100%"
+		status.Progress = progcomplete
 		addchan <- status
 	}
 	if err = cmd.Wait(); err != nil {
@@ -684,7 +693,7 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisRes) {
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
 		cmd.LogStdOutErr()
-		wichan <- AnnexWhereisRes{Err: fmt.Errorf("Failed to run git-annex whereis: %s", err.Error())}
+		wichan <- AnnexWhereisRes{Err: fmt.Errorf("Failed to run git-annex whereis: %s", err)}
 		return
 	}
 
@@ -726,7 +735,7 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 	if err != nil {
 		util.LogWrite("Error setting up git-annex status")
 		cmd.LogStdOutErr()
-		statuschan <- AnnexStatusRes{Err: fmt.Errorf("Failed to run git-annex status: %s", err.Error())}
+		statuschan <- AnnexStatusRes{Err: fmt.Errorf("Failed to run git-annex status: %s", err)}
 		return
 	}
 
@@ -752,7 +761,7 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 // It is constructed using the result of 'git annex status'.
 // The description is composed of the file count for each status: added, modified, deleted
 func DescribeIndexShort() (string, error) {
-	// TODO: 'git annex status' doesn't list added (A) files wnen in direct mode.
+	// TODO: 'git annex status' doesn't list added (A) files when in direct mode.
 	statuschan := make(chan AnnexStatusRes)
 	go AnnexStatus([]string{""}, statuschan)
 	statusmap := make(map[string]int)
@@ -881,14 +890,14 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 			util.LogWrite("Error locking %s", annexAddRes.File)
 			status.Err = fmt.Errorf("Failed")
 		}
-		status.Progress = "100%"
+		status.Progress = progcomplete
 		lockchan <- status
 	}
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexLock")
 		cmd.LogStdOutErr()
 	}
-	status.Progress = "100%"
+	status.Progress = progcomplete
 	return
 }
 
@@ -937,9 +946,9 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			util.LogWrite("Error unlocking %s", annexUnlockRes.File)
-			status.Err = fmt.Errorf("Failed")
+			status.Err = fmt.Errorf("Failed. Content not available locally")
 		}
-		status.Progress = "100%"
+		status.Progress = progcomplete
 		unlockchan <- status
 	}
 	if err != nil || cmd.Wait() != nil {
@@ -947,7 +956,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 		cmd.LogStdOutErr()
 		return
 	}
-	status.Progress = "100%"
+	status.Progress = progcomplete
 	return
 }
 
@@ -1050,9 +1059,9 @@ func RunGitCommand(args ...string) (util.GinCmd, error) {
 	cmd := util.Command(gitbin)
 	cmd.Dir = Workingdir
 	cmd.Args = append(cmd.Args, args...)
-	env := os.Environ()
 	token := web.UserToken{}
 	_ = token.LoadToken()
+	env := os.Environ()
 	cmd.Env = append(env, util.GitSSHEnv(token.Username))
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Start()
@@ -1068,8 +1077,9 @@ func RunAnnexCommand(args ...string) (util.GinCmd, error) {
 	cmd.Dir = Workingdir
 	token := web.UserToken{}
 	_ = token.LoadToken()
-	annexsshopt := util.AnnexSSHOpt(token.Username)
-	cmd.Args = append(cmd.Args, "-c", annexsshopt)
+	env := os.Environ()
+	cmd.Env = append(env, util.GitSSHEnv(token.Username))
+	cmd.Env = append(cmd.Env, "GIT_ANNEX_USE_GIT_SSH=1")
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	err := cmd.Start()
 	return cmd, err

@@ -35,7 +35,7 @@ func moveOldFiles(newpath string) {
 	// move old files and clear old config path
 	var movemessages []string
 	moveconflicts := false
-	oldpath, _ := OldConfigPath(false)
+	oldpath, _ := OldConfigPath()
 	if _, operr := os.Stat(oldpath); !os.IsNotExist(operr) {
 		files, _ := ioutil.ReadDir(oldpath)
 		for _, file := range files {
@@ -44,7 +44,11 @@ func moveOldFiles(newpath string) {
 			newfilepath := path.Join(newpath, oldfilename)
 			for counter := 0; ; counter++ {
 				if _, operr := os.Stat(newfilepath); os.IsNotExist(operr) {
-					ConfigPath(true)
+					_, err := ConfigPath(true)
+					if err != nil {
+						// Config directory could not be created. Can't move files.
+						return
+					}
 					os.Rename(oldfilepath, newfilepath)
 					msg := fmt.Sprintf("%s -> %s", oldfilepath, newfilepath)
 					movemessages = append(movemessages, msg)
@@ -86,9 +90,6 @@ func moveOldFiles(newpath string) {
 
 // LoadConfig reads in the configuration and makes it available through Config package global
 func LoadConfig() error {
-	userconfigpath, err := ConfigPath(false)
-	moveOldFiles(userconfigpath)
-
 	viper.SetTypeByDefaultValue(true)
 	// Binaries
 	viper.SetDefault("bin.git", "git")
@@ -106,28 +107,14 @@ func LoadConfig() error {
 	// annex filters
 	viper.SetDefault("annex.minsize", "10M")
 
-	// configpaths is a prioritised list of locations for finding configuration files (priority is lowest to highest)
-	var configpaths []string
-
-	// Global (user) config path
-	if err == nil {
-		configpaths = append(configpaths, userconfigpath)
-	}
-	// Second prio config files in the directory of the executable
-	// this is useful for portable packaging
-	execloc, err := os.Executable()
-	if err == nil {
-		execpath, _ := path.Split(execloc)
-		configpaths = append(configpaths, execpath)
-	}
-
+	// Merge in user config file
+	confpath, _ := ConfigPath(false)
 	configFileName := "config.yml"
-	for _, path := range configpaths {
-		confPath := filepath.Join(path, configFileName)
-		LogWrite("Reading config file %s", confPath)
-		viper.SetConfigFile(confPath)
-		_ = viper.MergeInConfig()
-	}
+	confpath = filepath.Join(confpath, configFileName)
+
+	LogWrite("Reading config file %s", confpath)
+	viper.SetConfigFile(confpath)
+	_ = viper.MergeInConfig()
 
 	Config.Bin.Git = viper.GetString("bin.git")
 	Config.Bin.GitAnnex = viper.GetString("bin.gitannex")
@@ -143,11 +130,11 @@ func LoadConfig() error {
 
 	Config.GitUser = viper.GetString("git.user")
 
-	// Highest priority config file is in the repository root for excludes
+	// Config file in the repository root (annex excludes and size threshold only)
 	reporoot, err := FindRepoRoot(".")
 	if err == nil {
-		confPath := filepath.Join(reporoot, configFileName)
-		viper.SetConfigFile(confPath)
+		confpath := filepath.Join(reporoot, configFileName)
+		viper.SetConfigFile(confpath)
 		_ = viper.MergeInConfig()
 	}
 
@@ -157,31 +144,26 @@ func LoadConfig() error {
 	LogWrite("Configuration values")
 	LogWrite("%+v", Config)
 
+	// TODO: Validate URLs on config read
+
 	return nil
 }
 
 // ConfigPath returns the configuration path where configuration files should be stored.
+// If the GIN_CONFIG_DIR environment variable is set, its value is returned, otherwise the platform default is used.
+// If create is true and the directory does not exist, the full path is created.
 func ConfigPath(create bool) (string, error) {
-	path := configDirs.QueryFolders(configdir.Global)[0].Path
+	confpath := os.Getenv("GIN_CONFIG_DIR")
+	if confpath == "" {
+		confpath = configDirs.QueryFolders(configdir.Global)[0].Path
+		moveOldFiles(confpath) // move old files only if default is used
+	}
 	var err error
 	if create {
-		err = os.MkdirAll(path, 0777)
+		err = os.MkdirAll(confpath, 0755)
 		if err != nil {
-			return "", fmt.Errorf("Error creating directory %s", path)
+			return "", fmt.Errorf("could not create config directory %s", confpath)
 		}
 	}
-	return path, err
-}
-
-// CachePath returns the path where gin cache files (logs) should be stored.
-func CachePath(create bool) (string, error) {
-	path := configDirs.QueryCacheFolder().Path
-	var err error
-	if create {
-		err = os.MkdirAll(path, 0777)
-		if err != nil {
-			return "", fmt.Errorf("Error creating directory %s", path)
-		}
-	}
-	return path, err
+	return confpath, err
 }

@@ -4,16 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 
 	"net/http"
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
-	"github.com/G-Node/gin-core/gin"
 	gogs "github.com/gogits/go-gogs-client"
 )
+
+// ginerror convenience alias to util.Error
+type ginerror = util.Error
 
 // GINUser represents a API user.
 type GINUser struct {
@@ -38,85 +39,89 @@ func NewClient(host string) *Client {
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
 func (gincl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
+	fn := "GetUserKeys()"
 	var keys []gogs.PublicKey
 	res, err := gincl.Get("/api/v1/user/keys")
 	if err != nil {
-		return keys, fmt.Errorf("Request for keys returned error")
-	} else if res.StatusCode != http.StatusOK {
-		return keys, fmt.Errorf("[Keys request error] Server returned: %s", res.Status)
+		return nil, err // return error from Get() directly
+	}
+	switch code := res.StatusCode; {
+	case code == http.StatusUnauthorized:
+		return nil, ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
+	case code == http.StatusInternalServerError:
+		return nil, ginerror{UError: res.Status, Origin: fn, Description: "server error"}
+	case code != http.StatusOK:
+		return nil, ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 
 	defer web.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return keys, err
+		return nil, ginerror{UError: err.Error(), Origin: fn, Description: "failed to read response body"}
 	}
 	err = json.Unmarshal(b, &keys)
-	return keys, err
+	if err != nil {
+		return nil, ginerror{UError: err.Error(), Origin: fn, Description: "failed to parse response body"}
+	}
+	return keys, nil
 }
 
 // RequestAccount requests a specific account by name.
 func (gincl *Client) RequestAccount(name string) (gogs.User, error) {
+	fn := fmt.Sprintf("RequestAccount(%s)", name)
 	var acc gogs.User
 	res, err := gincl.Get(fmt.Sprintf("/api/v1/users/%s", name))
 	if err != nil {
-		return acc, err
-	} else if res.StatusCode == http.StatusNotFound {
-		return acc, fmt.Errorf("User '%s' does not exist", name)
-	} else if res.StatusCode != http.StatusOK {
-		return acc, fmt.Errorf("Unknown error during user lookup for '%s'\nThe server returned '%s'", name, res.Status)
+		return acc, err // return error from Get() directly
+	}
+	switch code := res.StatusCode; {
+	case code == http.StatusNotFound:
+		return acc, ginerror{UError: res.Status, Origin: fn, Description: fmt.Sprintf("requested user '%s' does not exist", name)}
+	case code == http.StatusUnauthorized:
+		return acc, ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
+	case code == http.StatusInternalServerError:
+		return acc, ginerror{UError: res.Status, Origin: fn, Description: "server error"}
+	case code != http.StatusOK:
+		return acc, ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 
 	defer web.CloseRes(res.Body)
 
 	b, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return acc, err
+		return acc, ginerror{UError: err.Error(), Origin: fn, Description: "failed to read response body"}
 	}
 	err = json.Unmarshal(b, &acc)
+	if err != nil {
+		err = ginerror{UError: err.Error(), Origin: fn, Description: "failed to parse response body"}
+	}
 	return acc, err
-}
-
-// SearchAccount retrieves a list of accounts that match the query string.
-func (gincl *Client) SearchAccount(query string) ([]gin.Account, error) {
-	var accs []gin.Account
-
-	params := url.Values{}
-	params.Add("q", query)
-	address := fmt.Sprintf("/api/accounts?%s", params.Encode())
-	res, err := gincl.Get(address)
-	if err != nil {
-		return accs, err
-	} else if res.StatusCode != http.StatusOK {
-		return accs, fmt.Errorf("[Account search] Failed. Server returned: %s", res.Status)
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return accs, err
-	}
-
-	err = json.Unmarshal(body, &accs)
-	return accs, err
 }
 
 // AddKey adds the given key to the current user's authorised keys.
 // If force is enabled, any key which matches the new key's description will be overwritten.
 func (gincl *Client) AddKey(key, description string, force bool) error {
+	fn := "AddKey()"
 	newkey := gogs.PublicKey{Key: key, Title: description}
 
 	if force {
 		// Attempting to delete potential existing key that matches the title
 		_ = gincl.DeletePubKey(description)
 	}
-
-	address := fmt.Sprintf("/api/v1/user/keys")
-	res, err := gincl.Post(address, newkey)
+	res, err := gincl.Post("/api/v1/user/keys", newkey)
 	if err != nil {
-		return err
-	} else if res.StatusCode != http.StatusCreated {
-		return fmt.Errorf("[Add key] Failed. Server returned %s", res.Status)
+		return err // return error from Post() directly
+	}
+	switch code := res.StatusCode; {
+	case code == http.StatusUnprocessableEntity:
+		return ginerror{UError: res.Status, Origin: fn, Description: "invalid key or key with same name already exists"}
+	case code == http.StatusUnauthorized:
+		return ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
+	case code == http.StatusInternalServerError:
+		return ginerror{UError: res.Status, Origin: fn, Description: "server error"}
+	case code != http.StatusCreated:
+		return ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 	web.CloseRes(res.Body)
 	return nil
@@ -124,53 +129,66 @@ func (gincl *Client) AddKey(key, description string, force bool) error {
 
 // DeletePubKey removes the key that matches the given description (title) from the current user's authorised keys.
 func (gincl *Client) DeletePubKey(description string) error {
+	fn := "DeletePubKey()"
 	keys, err := gincl.GetUserKeys()
 	if err != nil {
 		util.LogWrite("Error when getting user keys: %v", err)
+		return err
 	}
-
+	var id int64
 	for _, key := range keys {
 		if key.Title == description {
-			address := fmt.Sprintf("/api/v1/user/keys/%d", key.ID)
-			res, err := gincl.Delete(address)
-			if err != nil {
-				return err
-			} else if res.StatusCode != http.StatusNoContent {
-				return fmt.Errorf("[Del key] Failed. Server returned %s", res.Status)
-			}
-			web.CloseRes(res.Body)
-			// IDs are unique, so we can break after the first match
+			id = key.ID
 			break
 		}
 	}
 
+	address := fmt.Sprintf("/api/v1/user/keys/%d", id)
+	res, err := gincl.Delete(address)
+	defer web.CloseRes(res.Body)
+	if err != nil {
+		return err // Return error from Delete() directly
+	}
+	switch code := res.StatusCode; {
+	case code == http.StatusInternalServerError:
+		return ginerror{UError: res.Status, Origin: fn, Description: "server error"}
+	case code == http.StatusUnauthorized:
+		return ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
+	case code == http.StatusForbidden:
+		return ginerror{UError: res.Status, Origin: fn, Description: "failed to delete key (forbidden)"}
+	case code != http.StatusNoContent:
+		return ginerror{UError: res.Status, Origin: fn} // Unexpected error
+	}
 	return nil
 }
 
 // Login requests a token from the auth server and stores the username and token to file.
 // It also generates a key pair for the user for use in git commands.
 func (gincl *Client) Login(username, password, clientID string) error {
+	fn := "Login()"
 	tokenCreate := &gogs.CreateAccessTokenOption{Name: "gin-cli"}
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
-	resp, err := gincl.PostBasicAuth(address, username, password, tokenCreate)
+	res, err := gincl.PostBasicAuth(address, username, password, tokenCreate)
 	if err != nil {
-		if resp != nil {
-			return fmt.Errorf("[Login] Request failed: %s", resp.Status)
-		}
-		return fmt.Errorf("[Login] Request failed. No response from server")
+		return err // return error from PostBasicAuth directly
 	}
-	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("[Login] Failed. Check username and password: %s", resp.Status)
+	switch code := res.StatusCode; {
+	case code == http.StatusInternalServerError:
+		return ginerror{UError: res.Status, Origin: fn, Description: "server error"}
+	case code == http.StatusUnauthorized:
+		return ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
+	case code != http.StatusCreated:
+		return ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return err
 	}
-	util.LogWrite("Got response: %s", resp.Status)
+	util.LogWrite("Got resonse: %s", res.Status)
 	token := AccessToken{}
 	err = json.Unmarshal(data, &token)
 	if err != nil {
-		return err
+		return ginerror{UError: err.Error(), Origin: fn, Description: "failed to parse response body"}
 	}
 	gincl.Username = username
 	gincl.Token = token.Sha1

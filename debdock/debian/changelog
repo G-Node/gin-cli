@@ -1,8 +1,18 @@
-gin-cli (0.12); urgency=low
+gin-cli (0.12 beta); urgency=low
 
-  * Release 0.12
+  * Release 0.12 beta
   * Support creating new repository and setting up current directory as local
     clone: `gin create --here`.
+  * Support `--json` output for most commands.
+  * New location for configuration and log files. Old files are transferred
+    automatically on first run.
+  * Unless `--json` is specified, any command that requires login will
+    prompt for login if the user is not logged in
+  * Local config file can only be used for annex.minsize and annex.excludes
+    options. All other options are ignored.
+  * Local config file is never checked into annex, regardless of annex minsize
+    rule.
+  * File operations and file transfers now print progress output.
 
 gin-cli (0.11); urgency=low
 

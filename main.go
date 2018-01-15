@@ -25,8 +25,11 @@ var commit string
 var verstr string
 var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 
+var jsonflag = "--json"
+
 var green = color.New(color.FgGreen).SprintFunc()
-var red = color.New(color.FgRed).SprintFunc()
+
+// var red = color.New(color.FgRed).SprintFunc()
 
 // requirelogin prompts for login if the user is not already logged in.
 // It only checks if a local token exists and does not confirm its validity with the server.
@@ -69,7 +72,7 @@ func login(args []string) {
 		if err == gopass.ErrMaxLengthExceeded {
 			util.Die("Input too long")
 		}
-		util.Die(err.Error())
+		util.Die(err)
 	}
 
 	password = string(pwbytes)
@@ -123,13 +126,11 @@ func createRepo(args []string) {
 			repoDesc = args[1]
 		}
 	}
-	// TODO: Check name validity before sending to server?
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
 	fmt.Printf("Creating repository '%s' ", repoPath)
 	err := gincl.CreateRepo(repoName, repoDesc)
-	// Parse error message and make error nicer
 	util.CheckError(err)
 	fmt.Fprintln(color.Output, green("OK"))
 
@@ -189,7 +190,7 @@ func isValidRepoPath(path string) bool {
 func getRepo(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -229,7 +230,7 @@ func lsRepo(args []string) {
 			short = true
 			break
 		}
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -287,7 +288,7 @@ func lsRepo(args []string) {
 func lock(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -305,7 +306,7 @@ func lock(args []string) {
 func unlock(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -325,6 +326,7 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 	prevlinelength := 0 // used to clear lines before overwriting
 	nerrors := 0
 	for stat := range statuschan {
+		var msgparts []string
 		if jsonout {
 			j, _ := json.Marshal(stat)
 			fmt.Println(string(j))
@@ -340,27 +342,22 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			}
 			fname = stat.FileName
 		}
-		progress := stat.Progress
-		rate := stat.Rate
-		if len(rate) > 0 {
-			rate = fmt.Sprintf("(%s)", rate)
-		}
+		msgparts = append(msgparts, stat.State, stat.FileName)
 		if stat.Err == nil {
-			if progress == "100%" {
-				progress = green("OK")
+			if stat.Progress == "100%" {
+				msgparts = append(msgparts, green("OK"))
+			} else {
+				msgparts = append(msgparts, stat.Progress, stat.Rate)
 			}
-		} else if stat.Err.Error() == "Failed" {
-			progress = red("Failed")
-			nerrors++
+			// } else if stat.Err.Error() == "Failed" {
+			// 	msgparts = append(msgparts, red("Failed"))
+			// 	nerrors++
 		} else {
-			msg := fmt.Sprintf("%s %s %s: %s", stat.State, stat.FileName, red("Error"), stat.Err.Error())
-			fmt.Fprintln(color.Output, util.CleanSpaces(msg))
+			msgparts = append(msgparts, stat.Err.Error())
 			nerrors++
-			continue
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
-		msg := fmt.Sprintf("%s %s %s %s", stat.State, stat.FileName, progress, rate)
-		prevlinelength, _ = fmt.Fprintf(color.Output, "\r%s", util.CleanSpaces(msg))
+		prevlinelength, _ = fmt.Fprintf(color.Output, "\r%s", util.CleanSpaces(strings.Join(msgparts, " ")))
 	}
 	if prevlinelength > 0 {
 		fmt.Println()
@@ -378,7 +375,7 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 func upload(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -404,7 +401,7 @@ func upload(args []string) {
 func download(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -443,7 +440,7 @@ func download(args []string) {
 func getContent(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -465,7 +462,7 @@ func getContent(args []string) {
 func remove(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
@@ -487,6 +484,7 @@ func remove(args []string) {
 }
 
 func keys(args []string) {
+	// TODO: Add option to delete keys: Print then prompt for delete
 	if len(args) > 0 && args[0] == "--add" {
 		addKey(args)
 	} else {
@@ -541,9 +539,7 @@ func addKey(args []string) {
 		util.Die(usage)
 	}
 	err := gincl.LoadToken()
-	if err != nil {
-		util.Die("This command requires login.")
-	}
+	util.CheckError(err)
 
 	filename := args[1]
 
@@ -717,7 +713,7 @@ func annexrun(args []string) {
 func printversion(args []string) {
 	var jsonout bool
 	for idx, arg := range args {
-		if arg == "--json" {
+		if arg == jsonflag {
 			args = append(args[:idx], args[idx+1:]...)
 			jsonout = true
 			break
