@@ -310,8 +310,8 @@ DESCRIPTION
 
 	Remove the content of local files. This command will not remove the content
 	of files that have not been already uploaded to a remote repository, even
-	if the user specifies such files exclusively.  Removed content can be
-	retrieved from the server by using the 'gin download' command.  With no
+	if the user specifies such files exclusively. Removed content can be
+	retrieved from the server by using the 'gin download' command. With no
 	arguments, removes the content of all files under the current working
 	directory, as long as they have been safely uploaded to a remote
 	repository.
@@ -329,26 +329,17 @@ ARGUMENTS
 const reposHelp = `USAGE
 
 	gin repos [<username>]
-	gin repos -s, --shared-with-me
-	gin repos -p, --public
 
 
 DESCRIPTION
 
 	List repositories on the server that provide read access. If no argument is
-	provided, it will list the repositories owned by the logged in user. If no
-	user is logged in, it will list all public repositories.
+	provided, it will list the repositories owned by the logged in user.
 
 ARGUMENTS
 
-	-s, --shared-with-me
-		List all repositories shared with the logged in user.
-
-	-p, --public
-		List all public repositories.
-
 	<username>
-		The name of the user whose repositories should be listed.  This
+		The name of the user whose repositories should be listed. This
 		consists of public repositories and repositories shared with the logged
 		in user.
 `

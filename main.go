@@ -597,33 +597,19 @@ func repos(args []string) {
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(gincl, true)
-	var arg string
-	if len(args) == 0 {
-		arg = gincl.Username
-	} else {
+	arg := gincl.Username
+	if len(args) == 1 {
 		arg = args[0]
-		if arg == "-p" {
-			arg = "--public"
-		} else if arg == "-s" {
-			arg = "--shared-with-me"
-		}
 	}
 	repolist, err := gincl.ListRepos(arg)
 	util.CheckError(err)
 
-	if arg == "" || arg == "--public" {
-		fmt.Print("Listing all public repositories:\n\n")
-	} else if arg == "--shared-with-me" {
-		fmt.Print("Listing all accessible shared repositories:\n\n")
+	if arg == gincl.Username {
+		fmt.Print("Listing your repositories:\n\n")
 	} else {
-		if gincl.Username == "" {
-			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s':\n\n", arg)
-		} else if arg == gincl.Username {
-			fmt.Print("Listing your repositories:\n\n")
-		} else {
-			fmt.Printf("Listing accessible repositories owned by '%s':\n\n", arg)
-		}
+		fmt.Printf("Listing accessible repositories owned by '%s':\n\n", arg)
 	}
+
 	for idx, repoInfo := range repolist {
 		fmt.Printf("%d: %s\n", idx+1, repoInfo.FullName)
 		fmt.Printf("Description: %s\n", strings.Trim(repoInfo.Description, "\n"))

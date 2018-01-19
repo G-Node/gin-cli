@@ -43,12 +43,13 @@ Shouldn't happen. Failsafe for bad routing? Will ignore in client.
 - 404 Not Found: User or Repository (path) does not exist.
 
 
-## GET `/api/v1/user/repos`
+## GET `/api/v1/users/<user>/repos`
 
 **Description**: Retrieve a list of user repositories.
 
 ### Status codes
 - 200 OK: Success.
+- 404 Not Found: User does not exist.
 
 
 ## DELETE `/api/v1/repos/<user>/<repository>`

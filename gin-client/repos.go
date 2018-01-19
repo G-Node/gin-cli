@@ -84,11 +84,13 @@ func (gincl *Client) ListRepos(user string) ([]gogs.Repository, error) {
 	var repoList []gogs.Repository
 	var res *http.Response
 	var err error
-	res, err = gincl.Get("/api/v1/user/repos")
+	res, err = gincl.Get(fmt.Sprintf("/api/v1/users/%s/repos", user))
 	if err != nil {
 		return nil, err // return error from Get() directly
 	}
 	switch code := res.StatusCode; {
+	case code == http.StatusNotFound:
+		return nil, ginerror{UError: res.Status, Origin: fn, Description: fmt.Sprintf("user '%s' does not exist", user)}
 	case code == http.StatusUnauthorized:
 		return nil, ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
 	case code == http.StatusInternalServerError:
