@@ -306,7 +306,7 @@ func unlock(args []string) {
 }
 
 func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
-	var fname string
+	var fname, state string
 	prevlinelength := 0 // used to clear lines before overwriting
 	nerrors := 0
 	for stat := range statuschan {
@@ -316,13 +316,14 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			fmt.Println(string(j))
 			continue
 		}
-		if stat.FileName != fname {
-			// New line if new file status
+		if stat.FileName != fname || stat.State != state {
+			// New line if new file or new state
 			if fname != "" {
 				fmt.Println()
 				prevlinelength = 0
 			}
 			fname = stat.FileName
+			state = stat.State
 		}
 		msgparts = append(msgparts, stat.State, stat.FileName)
 		if stat.Err == nil {
