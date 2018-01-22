@@ -29,8 +29,7 @@ var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 var jsonflag = "--json"
 
 var green = color.New(color.FgGreen).SprintFunc()
-
-// var red = color.New(color.FgRed).SprintFunc()
+var red = color.New(color.FgRed).SprintFunc()
 
 // requirelogin prompts for login if the user is not already logged in.
 // It only checks if a local token exists and does not confirm its validity with the server.
@@ -317,8 +316,6 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			fmt.Println(string(j))
 			continue
 		}
-		// TODO: Parse error
-		// util.CheckError(stat.Err)
 		if stat.FileName != fname {
 			// New line if new file status
 			if fname != "" {
@@ -334,11 +331,8 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			} else {
 				msgparts = append(msgparts, stat.Progress, stat.Rate)
 			}
-			// } else if stat.Err.Error() == "Failed" {
-			// 	msgparts = append(msgparts, red("Failed"))
-			// 	nerrors++
 		} else {
-			msgparts = append(msgparts, stat.Err.Error())
+			msgparts = append(msgparts, red(stat.Err.Error()))
 			nerrors++
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
