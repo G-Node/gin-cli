@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/G-Node/gin-cli/util"
 	gogs "github.com/gogits/go-gogs-client"
@@ -46,6 +47,17 @@ func urlJoin(parts ...string) string {
 	return u.String()
 }
 
+func parseServerError(err error) string {
+	// should only receive non-nil error messages, but lets check anyway
+	if err != nil {
+		if strings.Contains(err.Error(), "connection refused") {
+			return ("server refused connection - check configuration or try logging in again")
+		}
+		return err.Error()
+	}
+	return ""
+}
+
 // Get sends a GET request to address.
 // The address is appended to the client host, so it should be specified without a host prefix.
 func (cl *Client) Get(address string) (*http.Response, error) {
@@ -61,7 +73,7 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	}
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		return nil, ginerror{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl)}
+		return nil, ginerror{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl), Description: parseServerError(err)}
 	}
 	return resp, nil
 }
@@ -87,7 +99,7 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	util.LogWrite("Performing POST: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		err = ginerror{UError: err.Error(), Origin: fn}
+		err = ginerror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
 	}
 	return resp, err
 }
@@ -110,7 +122,7 @@ func (cl *Client) PostBasicAuth(address, username, password string, data interfa
 	util.LogWrite("Performing POST: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		err = ginerror{UError: err.Error(), Origin: fn}
+		err = ginerror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
 	}
 	return resp, err
 }
@@ -131,7 +143,7 @@ func (cl *Client) Delete(address string) (*http.Response, error) {
 	util.LogWrite("Performing DELETE: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		err = ginerror{UError: err.Error(), Origin: fn}
+		err = ginerror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
 	}
 	return resp, err
 }
