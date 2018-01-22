@@ -393,14 +393,18 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 		if strings.HasPrefix(line, "get") {
 			words := strings.Split(line, " ")
 			status.FileName = strings.TrimSpace(words[1])
-			// new file - reset Progress and Rate
+			// new file - reset Progress, Rate, and Err
 			status.Progress = ""
 			status.Rate = ""
+			status.Err = nil
 			if !strings.HasSuffix(line, "ok") {
 				// if the copy line ends with ok, the file is already done (no upload needed)
 				// so we shouldn't send the status to the caller
 				getchan <- status
 			}
+		} else if strings.HasSuffix(line, "failed") {
+			status.Err = fmt.Errorf("failed (content or server unavailable)")
+			getchan <- status
 		} else if strings.Contains(line, "%") {
 			words := strings.Split(line, " ")
 			status.Progress = words[1]
