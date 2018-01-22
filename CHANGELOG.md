@@ -13,6 +13,11 @@
 - Local (in-repo) config file can only be used to specify annex selection. In other words, only the `annex.minsize` and `annex.excludes` is used. All other options are read from the global and default configurations.
 - The local (in-repo) configuration file is never checked into annex, regardless of annex minsize rules.
 - The local config file can only be used for `annex.minsize` and `annex.excludes` options. All other options are ignored.
+- Repository listing function fix:
+    - `gin repos` now lists only the logged in user's repositories.
+    - `gin repos --all` lists the logged in user's repositories and all other repositories in which they are a member.
+    - `gin repos --shared` lists only the repositories in which the user is a member.
+- Repository listings now provide more information if available.
 
 ### File operation and file transfer progress output
 - File operations such as `lock`, `unlock`, and `remove-content` now provide per-file output on whether the operation was successful or not. The output prints per line as the operation finishes for each file.
