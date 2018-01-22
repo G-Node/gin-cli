@@ -18,7 +18,7 @@ Commands:
 	logout
 		Logout from the GIN services
 
-	create         [<name>] [<description>]
+	create         [--here] [<name>] [<description>]
 		Create a repository on the remote server and clone it
 
 	get            <repopath>
@@ -99,13 +99,20 @@ DESCRIPTION
 
 const createHelp = `USAGE
 
-	gin create [<name>] [<description>]
+	gin create [--here] [<name>] [<description>]
 
 DESCRIPTION
 
 	Create a new repository on the GIN server and clone it locally.
 
 ARGUMENTS
+
+	--here
+		Create the local repository clone in the current working directory.
+		By default, repositories are cloned to a directory that matches the
+		repository name inside the working directory. Specifying this option
+		will set up the current working directory as a local clone for the new
+		repository.
 
 	<name>
 		The name of the repository. If no <name> is provided, you will be
@@ -131,6 +138,10 @@ EXAMPLES
 	Create a repository named 'example' with no description
 
 		$ gin create example
+	
+	Create a repository named 'mydata' and initialise the current working
+	directory as the local clone
+		$ gin create --here mydata
 `
 
 const getHelp = `USAGE
