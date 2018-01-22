@@ -58,7 +58,6 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 	util.LogWrite("Performing GET: %s", req.URL)
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
-		util.LogWrite("Token: %s", cl.Token)
 	}
 	resp, err := cl.web.Do(req)
 	if err != nil {

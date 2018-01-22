@@ -18,13 +18,13 @@ Commands:
 	logout
 		Logout from the GIN services
 
-	create         [<name>] [<description>]
+	create         [--here] [<name>] [<description>]
 		Create a repository on the remote server and clone it
 
 	get            <repopath>
 		Retrieve (clone) a repository from the remote server
 
-	ls             [-s, --short, --json] [<filenames>]
+	ls             [-s | --short | --json] [<filenames>]
 		List the sync status of files in a local repository
 
 	unlock         [<filenames>]
@@ -51,13 +51,16 @@ Commands:
 	rmc            [<filenames>]
 		Synonym for remove-content
 
+	repos          [--shared | --all]
+		List remote repositories
+
 	repos          [<username>]
-		List available remote repositories
+		List available remote repositories for specific user
 
 	info           [<username>]
 		Print user information
 
-	keys           [-v, --verbose]
+	keys           [-v | --verbose]
 		List the keys associated with the logged in user
 
 	keys           --add <filename>
@@ -99,13 +102,20 @@ DESCRIPTION
 
 const createHelp = `USAGE
 
-	gin create [<name>] [<description>]
+	gin create [--here] [<name>] [<description>]
 
 DESCRIPTION
 
 	Create a new repository on the GIN server and clone it locally.
 
 ARGUMENTS
+
+	--here
+		Create the local repository clone in the current working directory.
+		By default, repositories are cloned to a directory that matches the
+		repository name inside the working directory. Specifying this option
+		will set up the current working directory as a local clone for the new
+		repository.
 
 	<name>
 		The name of the repository. If no <name> is provided, you will be
@@ -131,6 +141,10 @@ EXAMPLES
 	Create a repository named 'example' with no description
 
 		$ gin create example
+	
+	Create a repository named 'mydata' and initialise the current working
+	directory as the local clone
+		$ gin create --here mydata
 `
 
 const getHelp = `USAGE
@@ -310,8 +324,8 @@ DESCRIPTION
 
 	Remove the content of local files. This command will not remove the content
 	of files that have not been already uploaded to a remote repository, even
-	if the user specifies such files exclusively.  Removed content can be
-	retrieved from the server by using the 'gin download' command.  With no
+	if the user specifies such files exclusively. Removed content can be
+	retrieved from the server by using the 'gin download' command. With no
 	arguments, removes the content of all files under the current working
 	directory, as long as they have been safely uploaded to a remote
 	repository.
@@ -328,27 +342,25 @@ ARGUMENTS
 
 const reposHelp = `USAGE
 
+	gin repos [--shared | --all]
 	gin repos [<username>]
-	gin repos -s, --shared-with-me
-	gin repos -p, --public
-
 
 DESCRIPTION
 
 	List repositories on the server that provide read access. If no argument is
-	provided, it will list the repositories owned by the logged in user. If no
-	user is logged in, it will list all public repositories.
+	provided, it will list the repositories owned by the logged in user.
 
 ARGUMENTS
 
-	-s, --shared-with-me
-		List all repositories shared with the logged in user.
+	--shared
+		List all repositories that the user is a member of (excluding own
+		repositories).
 
-	-p, --public
-		List all public repositories.
+	--all
+		List all repositories accessible by the logged in user.
 
 	<username>
-		The name of the user whose repositories should be listed.  This
+		The name of the user whose repositories should be listed. This
 		consists of public repositories and repositories shared with the logged
 		in user.
 `

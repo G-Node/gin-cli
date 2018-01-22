@@ -15,6 +15,7 @@ import (
 	"github.com/G-Node/gin-cli/util"
 	"github.com/docopt/docopt-go"
 	"github.com/fatih/color"
+	gogs "github.com/gogits/go-gogs-client"
 	version "github.com/hashicorp/go-version"
 	"github.com/howeyc/gopass"
 )
@@ -43,6 +44,19 @@ func requirelogin(gincl *ginclient.Client, prompt bool) {
 		err = gincl.LoadToken()
 	}
 	util.CheckError(err)
+}
+
+// checkJSON checks if the JSON flag is in the first position of the arg list and either true followed
+// by the rest of the arguments or false with the original argument list.
+func checkJSON(args []string) (json bool, rargs []string) {
+	rargs = args
+	if len(args) > 0 {
+		if args[0] == jsonflag {
+			json = true
+			rargs = args[1:]
+		}
+	}
+	return
 }
 
 // login requests credentials, performs login with auth server, and stores the token.
@@ -188,23 +202,16 @@ func isValidRepoPath(path string) bool {
 }
 
 func getRepo(args []string) {
-	var jsonout bool
-	for idx, arg := range args {
-		if arg == jsonflag {
-			args = append(args[:idx], args[idx+1:]...)
-			jsonout = true
-			break
-		}
-	}
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl, !jsonout)
-
+	jsonout, args := checkJSON(args)
 	var repostr string
 	if len(args) != 1 {
 		util.Die(usage)
 	} else {
 		repostr = args[0]
 	}
+
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, !jsonout)
 
 	if !isValidRepoPath(repostr) {
 		util.Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
@@ -223,18 +230,10 @@ func lsRepo(args []string) {
 	}
 
 	var short bool
-	var jsonout bool
-	for idx, arg := range args {
-		if arg == "-s" || arg == "--short" {
-			args = append(args[:idx], args[idx+1:]...)
-			short = true
-			break
-		}
-		if arg == jsonflag {
-			args = append(args[:idx], args[idx+1:]...)
-			jsonout = true
-			break
-		}
+	jsonout, args := checkJSON(args)
+	if len(args) > 0 && (args[0] == "-s" || args[0] == "--short") {
+		short = true
+		args = args[1:]
 	}
 
 	gincl := ginclient.NewClient(util.Config.GinHost)
@@ -286,14 +285,7 @@ func lsRepo(args []string) {
 }
 
 func lock(args []string) {
-	var jsonout bool
-	for idx, arg := range args {
-		if arg == jsonflag {
-			args = append(args[:idx], args[idx+1:]...)
-			jsonout = true
-			break
-		}
-	}
+	jsonout, args := checkJSON(args)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -304,14 +296,7 @@ func lock(args []string) {
 }
 
 func unlock(args []string) {
-	var jsonout bool
-	for idx, arg := range args {
-		if arg == jsonflag {
-			args = append(args[:idx], args[idx+1:]...)
-			jsonout = true
-			break
-		}
-	}
+	jsonout, args := checkJSON(args)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -373,14 +358,7 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 }
 
 func upload(args []string) {
-	var jsonout bool
-	for idx, arg := range args {
-		if arg == jsonflag {
-			args = append(args[:idx], args[idx+1:]...)
-			jsonout = true
-			break
-		}
-	}
+	jsonout, args := checkJSON(args)
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
@@ -399,14 +377,7 @@ func upload(args []string) {
 }
 
 func download(args []string) {
-	var jsonout bool
-	for idx, arg := range args {
-		if arg == jsonflag {
-			args = append(args[:idx], args[idx+1:]...)
-			jsonout = true
-			break
-		}
-	}
+	jsonout, args := checkJSON(args)
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
@@ -438,14 +409,7 @@ func download(args []string) {
 }
 
 func getContent(args []string) {
-	var jsonout bool
-	for idx, arg := range args {
-		if arg == jsonflag {
-			args = append(args[:idx], args[idx+1:]...)
-			jsonout = true
-			break
-		}
-	}
+	jsonout, args := checkJSON(args)
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
@@ -460,14 +424,7 @@ func getContent(args []string) {
 }
 
 func remove(args []string) {
-	var jsonout bool
-	for idx, arg := range args {
-		if arg == jsonflag {
-			args = append(args[:idx], args[idx+1:]...)
-			jsonout = true
-			break
-		}
-	}
+	jsonout, args := checkJSON(args)
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(gincl, !jsonout)
 	if !ginclient.IsRepo() {
@@ -591,46 +548,81 @@ func printAccountInfo(args []string) {
 	fmt.Println(outBuffer.String())
 }
 
+func printRepoList(repolist []gogs.Repository, jsonout bool) {
+	for _, repo := range repolist {
+		if jsonout {
+			j, _ := json.Marshal(repo)
+			fmt.Println(string(j))
+			continue
+		}
+		fmt.Printf("* %s\n", repo.FullName)
+		fmt.Printf("\tLocation: %s\n", repo.HTMLURL)
+		desc := strings.Trim(repo.Description, "\n")
+		if desc != "" {
+			fmt.Printf("\tDescription: %s\n", desc)
+		}
+		if repo.Website != "" {
+			fmt.Printf("\tWebsite: %s\n", repo.Website)
+		}
+		if !repo.Private {
+			fmt.Println("\tThis repository is public")
+		}
+		fmt.Println()
+	}
+}
+
 func repos(args []string) {
+	jsonout, args := checkJSON(args)
+	var allrepos, sharedrepos bool
+	if len(args) > 0 {
+		if args[0] == "--all" {
+			allrepos = true
+			args = args[1:]
+		} else if args[0] == "--shared" {
+			sharedrepos = true
+			args = args[1:]
+		}
+	}
+	if (allrepos || sharedrepos) && len(args) > 0 {
+		util.Die(usage)
+	}
 	if len(args) > 1 {
 		util.Die(usage)
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(gincl, true)
-	var arg string
-	if len(args) == 0 {
-		arg = gincl.Username
-	} else {
-		arg = args[0]
-		if arg == "-p" {
-			arg = "--public"
-		} else if arg == "-s" {
-			arg = "--shared-with-me"
-		}
+	username := gincl.Username
+	if len(args) == 1 && args[0] != username {
+		username = args[0]
+		// for other users, print everything
+		allrepos = true
 	}
-	repolist, err := gincl.ListRepos(arg)
+	repolist, err := gincl.ListRepos(username)
 	util.CheckError(err)
 
-	if arg == "" || arg == "--public" {
-		fmt.Print("Listing all public repositories:\n\n")
-	} else if arg == "--shared-with-me" {
-		fmt.Print("Listing all accessible shared repositories:\n\n")
-	} else {
-		if gincl.Username == "" {
-			fmt.Printf("You are not logged in.\nListing only public repositories owned by '%s':\n\n", arg)
-		} else if arg == gincl.Username {
-			fmt.Print("Listing your repositories:\n\n")
+	var userrepos []gogs.Repository
+	var otherrepos []gogs.Repository
+
+	for _, repo := range repolist {
+		if repo.Owner.UserName == gincl.Username {
+			userrepos = append(userrepos, repo)
 		} else {
-			fmt.Printf("Listing accessible repositories owned by '%s':\n\n", arg)
+			otherrepos = append(otherrepos, repo)
 		}
 	}
-	for idx, repoInfo := range repolist {
-		fmt.Printf("%d: %s\n", idx+1, repoInfo.FullName)
-		fmt.Printf("Description: %s\n", strings.Trim(repoInfo.Description, "\n"))
-		if !repoInfo.Private {
-			fmt.Println("[This repository is public]")
-		}
-		fmt.Println()
+
+	printedlines := 0
+	if len(userrepos) > 0 && !sharedrepos {
+		printedlines += len(userrepos)
+		printRepoList(userrepos, jsonout)
+	}
+	if len(otherrepos) > 0 && (sharedrepos || allrepos) {
+		printedlines += len(otherrepos)
+		printRepoList(otherrepos, jsonout)
+	}
+
+	if printedlines == 0 && !jsonout {
+		fmt.Println("No repositories found")
 	}
 }
 
@@ -711,14 +703,7 @@ func annexrun(args []string) {
 }
 
 func printversion(args []string) {
-	var jsonout bool
-	for idx, arg := range args {
-		if arg == jsonflag {
-			args = append(args[:idx], args[idx+1:]...)
-			jsonout = true
-			break
-		}
-	}
+	jsonout, args := checkJSON(args)
 	if len(args) > 0 {
 		util.Die(usage)
 	}
