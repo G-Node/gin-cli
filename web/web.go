@@ -47,15 +47,19 @@ func urlJoin(parts ...string) string {
 	return u.String()
 }
 
-func parseServerError(err error) string {
+func parseServerError(err error) (errmsg string) {
 	// should only receive non-nil error messages, but lets check anyway
 	if err != nil {
-		if strings.Contains(err.Error(), "connection refused") {
-			return ("server refused connection - check configuration or try logging in again")
+		errmsg = err.Error()
+		if strings.HasSuffix(errmsg, "connection refused") {
+			errmsg = "server refused connection"
+		} else if strings.HasSuffix(errmsg, "no such host") {
+			errmsg = "server unreachable"
+		} else if strings.HasSuffix(errmsg, "timeout") {
+			errmsg = "request timed out"
 		}
-		return err.Error()
 	}
-	return ""
+	return
 }
 
 // Get sends a GET request to address.
