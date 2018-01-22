@@ -15,6 +15,7 @@ import (
 	"github.com/G-Node/gin-cli/util"
 	"github.com/docopt/docopt-go"
 	"github.com/fatih/color"
+	gogs "github.com/gogits/go-gogs-client"
 	version "github.com/hashicorp/go-version"
 	"github.com/howeyc/gopass"
 )
@@ -547,38 +548,81 @@ func printAccountInfo(args []string) {
 	fmt.Println(outBuffer.String())
 }
 
+func printRepoList(repolist []gogs.Repository, jsonout bool) {
+	for _, repo := range repolist {
+		if jsonout {
+			j, _ := json.Marshal(repo)
+			fmt.Println(string(j))
+			continue
+		}
+		fmt.Printf("* %s\n", repo.FullName)
+		fmt.Printf("\tLocation: %s\n", repo.HTMLURL)
+		desc := strings.Trim(repo.Description, "\n")
+		if desc != "" {
+			fmt.Printf("\tDescription: %s\n", desc)
+		}
+		if repo.Website != "" {
+			fmt.Printf("\tWebsite: %s\n", repo.Website)
+		}
+		if !repo.Private {
+			fmt.Println("\tThis repository is public")
+		}
+		fmt.Println()
+	}
+}
+
 func repos(args []string) {
 	jsonout, args := checkJSON(args)
+	var allrepos, sharedrepos bool
+	if len(args) > 0 {
+		if args[0] == "--all" {
+			allrepos = true
+			args = args[1:]
+		} else if args[0] == "--shared" {
+			sharedrepos = true
+			args = args[1:]
+		}
+	}
+	if (allrepos || sharedrepos) && len(args) > 0 {
+		util.Die(usage)
+	}
 	if len(args) > 1 {
 		util.Die(usage)
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(gincl, true)
-	arg := gincl.Username
-	if len(args) == 1 {
-		arg = args[0]
+	username := gincl.Username
+	if len(args) == 1 && args[0] != username {
+		username = args[0]
+		// for other users, print everything
+		allrepos = true
 	}
-	repolist, err := gincl.ListRepos(arg)
+	repolist, err := gincl.ListRepos(username)
 	util.CheckError(err)
 
-	if arg == gincl.Username {
-		fmt.Print("Listing your repositories:\n\n")
-	} else {
-		fmt.Printf("Listing accessible repositories owned by '%s':\n\n", arg)
+	var userrepos []gogs.Repository
+	var otherrepos []gogs.Repository
+
+	for _, repo := range repolist {
+		if repo.Owner.UserName == gincl.Username {
+			userrepos = append(userrepos, repo)
+		} else {
+			otherrepos = append(otherrepos, repo)
+		}
 	}
 
-	if jsonout {
+	printedlines := 0
+	if len(userrepos) > 0 && !sharedrepos {
+		printedlines += len(userrepos)
+		printRepoList(userrepos, jsonout)
+	}
+	if len(otherrepos) > 0 && (sharedrepos || allrepos) {
+		printedlines += len(otherrepos)
+		printRepoList(otherrepos, jsonout)
+	}
 
-	} else {
-		// TODO: Sort by owner
-		for idx, repoInfo := range repolist {
-			fmt.Printf("%d: %s\n", idx+1, repoInfo.FullName)
-			fmt.Printf("Description: %s\n", strings.Trim(repoInfo.Description, "\n"))
-			if !repoInfo.Private {
-				fmt.Println("[This repository is public]")
-			}
-			fmt.Println()
-		}
+	if printedlines == 0 && !jsonout {
+		fmt.Println("No repositories found")
 	}
 }
 
