@@ -24,7 +24,7 @@ Commands:
 	get            <repopath>
 		Retrieve (clone) a repository from the remote server
 
-	ls             [-s, --short, --json] [<filenames>]
+	ls             [-s | --short | --json] [<filenames>]
 		List the sync status of files in a local repository
 
 	unlock         [<filenames>]
@@ -51,13 +51,16 @@ Commands:
 	rmc            [<filenames>]
 		Synonym for remove-content
 
+	repos          [--shared | --all]
+		List remote repositories
+
 	repos          [<username>]
-		List available remote repositories
+		List available remote repositories for specific user
 
 	info           [<username>]
 		Print user information
 
-	keys           [-v, --verbose]
+	keys           [-v | --verbose]
 		List the keys associated with the logged in user
 
 	keys           --add <filename>
@@ -339,8 +342,8 @@ ARGUMENTS
 
 const reposHelp = `USAGE
 
+	gin repos [--shared | --all]
 	gin repos [<username>]
-
 
 DESCRIPTION
 
@@ -348,6 +351,13 @@ DESCRIPTION
 	provided, it will list the repositories owned by the logged in user.
 
 ARGUMENTS
+
+	--shared
+		List all repositories that the user is a member of (excluding own
+		repositories).
+
+	--all
+		List all repositories accessible by the logged in user.
 
 	<username>
 		The name of the user whose repositories should be listed. This
