@@ -543,12 +543,7 @@ func printAccountInfo(args []string) {
 	fmt.Println(outBuffer.String())
 }
 
-func printRepoList(repolist []gogs.Repository, jsonout bool) {
-	if jsonout {
-		j, _ := json.Marshal(repolist)
-		fmt.Println(string(j))
-		return
-	}
+func printRepoList(repolist []gogs.Repository) {
 	for _, repo := range repolist {
 		fmt.Printf("* %s\n", repo.FullName)
 		fmt.Printf("\tLocation: %s\n", repo.HTMLURL)
@@ -606,17 +601,26 @@ func repos(args []string) {
 		}
 	}
 
+	if jsonout {
+		allrepos := append(userrepos, otherrepos...)
+		if len(allrepos) > 0 {
+			j, _ := json.Marshal(allrepos)
+			fmt.Println(string(j))
+		}
+		return
+	}
+
 	printedlines := 0
 	if len(userrepos) > 0 && !sharedrepos {
 		printedlines += len(userrepos)
-		printRepoList(userrepos, jsonout)
+		printRepoList(userrepos)
 	}
 	if len(otherrepos) > 0 && (sharedrepos || allrepos) {
 		printedlines += len(otherrepos)
-		printRepoList(otherrepos, jsonout)
+		printRepoList(otherrepos)
 	}
 
-	if printedlines == 0 && !jsonout {
+	if printedlines == 0 {
 		fmt.Println("No repositories found")
 	}
 }
