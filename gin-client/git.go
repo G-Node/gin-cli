@@ -393,14 +393,18 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 		if strings.HasPrefix(line, "get") {
 			words := strings.Split(line, " ")
 			status.FileName = strings.TrimSpace(words[1])
-			// new file - reset Progress and Rate
+			// new file - reset Progress, Rate, and Err
 			status.Progress = ""
 			status.Rate = ""
+			status.Err = nil
 			if !strings.HasSuffix(line, "ok") {
 				// if the copy line ends with ok, the file is already done (no upload needed)
 				// so we shouldn't send the status to the caller
 				getchan <- status
 			}
+		} else if strings.HasSuffix(line, "failed") {
+			status.Err = fmt.Errorf("failed (content or server unavailable)")
+			getchan <- status
 		} else if strings.Contains(line, "%") {
 			words := strings.Split(line, " ")
 			status.Progress = words[1]
@@ -460,7 +464,7 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			util.LogWrite("Error dropping %s", annexDropRes.File)
-			status.Err = fmt.Errorf("Failed")
+			status.Err = fmt.Errorf("failed")
 		}
 		status.Progress = progcomplete
 		dropchan <- status
@@ -652,7 +656,7 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			util.LogWrite("Error adding %s", annexAddRes.File)
-			status.Err = fmt.Errorf("Failed")
+			status.Err = fmt.Errorf("failed")
 		}
 		status.Progress = progcomplete
 		addchan <- status
@@ -888,7 +892,7 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			util.LogWrite("Error locking %s", annexAddRes.File)
-			status.Err = fmt.Errorf("Failed")
+			status.Err = fmt.Errorf("failed")
 		}
 		status.Progress = progcomplete
 		lockchan <- status
@@ -946,7 +950,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			util.LogWrite("Error unlocking %s", annexUnlockRes.File)
-			status.Err = fmt.Errorf("Failed. Content not available locally")
+			status.Err = fmt.Errorf("failed (content not available locally)")
 		}
 		status.Progress = progcomplete
 		unlockchan <- status

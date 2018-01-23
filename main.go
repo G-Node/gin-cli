@@ -29,8 +29,7 @@ var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 var jsonflag = "--json"
 
 var green = color.New(color.FgGreen).SprintFunc()
-
-// var red = color.New(color.FgRed).SprintFunc()
+var red = color.New(color.FgRed).SprintFunc()
 
 // requirelogin prompts for login if the user is not already logged in.
 // It only checks if a local token exists and does not confirm its validity with the server.
@@ -307,7 +306,7 @@ func unlock(args []string) {
 }
 
 func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
-	var fname string
+	var fname, state string
 	prevlinelength := 0 // used to clear lines before overwriting
 	nerrors := 0
 	for stat := range statuschan {
@@ -317,15 +316,14 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			fmt.Println(string(j))
 			continue
 		}
-		// TODO: Parse error
-		// util.CheckError(stat.Err)
-		if stat.FileName != fname {
-			// New line if new file status
+		if stat.FileName != fname || stat.State != state {
+			// New line if new file or new state
 			if fname != "" {
 				fmt.Println()
 				prevlinelength = 0
 			}
 			fname = stat.FileName
+			state = stat.State
 		}
 		msgparts = append(msgparts, stat.State, stat.FileName)
 		if stat.Err == nil {
@@ -334,11 +332,8 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			} else {
 				msgparts = append(msgparts, stat.Progress, stat.Rate)
 			}
-			// } else if stat.Err.Error() == "Failed" {
-			// 	msgparts = append(msgparts, red("Failed"))
-			// 	nerrors++
 		} else {
-			msgparts = append(msgparts, stat.Err.Error())
+			msgparts = append(msgparts, red(stat.Err.Error()))
 			nerrors++
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
@@ -549,12 +544,12 @@ func printAccountInfo(args []string) {
 }
 
 func printRepoList(repolist []gogs.Repository, jsonout bool) {
+	if jsonout {
+		j, _ := json.Marshal(repolist)
+		fmt.Println(string(j))
+		return
+	}
 	for _, repo := range repolist {
-		if jsonout {
-			j, _ := json.Marshal(repo)
-			fmt.Println(string(j))
-			continue
-		}
 		fmt.Printf("* %s\n", repo.FullName)
 		fmt.Printf("\tLocation: %s\n", repo.HTMLURL)
 		desc := strings.Trim(repo.Description, "\n")
