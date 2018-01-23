@@ -1,8 +1,8 @@
 # Changelog
 
---Beta-- releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top --Unreleased-- section.
+**Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
-## Unreleased
+## Version 0.12
 
 ### New features and feature changes
 - Create repository out of current directory
@@ -37,6 +37,10 @@
 - #135: Platform-specific config and log directories
 - #137: Bug fixes and login prompt
 - #141: Local config changes: Only annex filtering
+- #148: Error handling and messages
+- #149: New repository listing command
+- #150: Fixes to repos command and error messages
+- #153: Minor tweak of `gin repos --json output`
 
 ### Known issues
 - Some error conditions are not reported properly. In these cases, a command may fail with "unknown error" or in worse cases, appear to succeed without providing information about failure.

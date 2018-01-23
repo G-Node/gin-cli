@@ -1,6 +1,6 @@
-gin-cli (0.12 beta); urgency=low
+gin-cli (0.12); urgency=low
 
-  * Release 0.12 beta
+  * Release 0.12
   * Support creating new repository and setting up current directory as local
     clone: `gin create --here`.
   * Support `--json` output for most commands.
@@ -13,6 +13,8 @@ gin-cli (0.12 beta); urgency=low
   * Local config file is never checked into annex, regardless of annex minsize
     rule.
   * File operations and file transfers now print progress output.
+  * Repository listing fixed. Supports listing own repositories, shared, or
+    other user's available repositories.
 
 gin-cli (0.11); urgency=low
 
