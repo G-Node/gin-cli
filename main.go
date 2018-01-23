@@ -544,12 +544,12 @@ func printAccountInfo(args []string) {
 }
 
 func printRepoList(repolist []gogs.Repository, jsonout bool) {
+	if jsonout {
+		j, _ := json.Marshal(repolist)
+		fmt.Println(string(j))
+		return
+	}
 	for _, repo := range repolist {
-		if jsonout {
-			j, _ := json.Marshal(repo)
-			fmt.Println(string(j))
-			continue
-		}
 		fmt.Printf("* %s\n", repo.FullName)
 		fmt.Printf("\tLocation: %s\n", repo.HTMLURL)
 		desc := strings.Trim(repo.Description, "\n")
