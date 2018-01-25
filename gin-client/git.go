@@ -162,12 +162,11 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 
 		stderr := cmd.ErrPipe.ReadAll()
 		gerr := ginerror{UError: stderr, Origin: fn}
-		if strings.Contains(stderr, "Server returned non-OK status: 404") {
-			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
-				"Make sure you typed the repository path correctly.\n"+
-				"Type 'gin repos %s' to see if the repository exists and if you have access to it.",
+		if strings.Contains(stderr, "does not exist") {
+			gerr.Description = fmt.Sprintf("Repository download failed\n"+
+				"Make sure you typed the repository path correctly\n"+
+				"Type 'gin repos %s' to see if the repository exists and if you have access to it",
 				repoOwner)
-			clonechan <- RepoFileStatus{Err: gerr}
 		} else if strings.Contains(stderr, "already exists and is not an empty directory") {
 			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
 				"'%s' already exists in the current directory and is not empty.", repoName)
@@ -180,6 +179,8 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", stderr)
 			clonechan <- RepoFileStatus{Err: gerr}
 		}
+		status.Err = gerr
+		clonechan <- status
 	}
 	// Progress doesn't show 100% if cloning an empty repository, so let's force it
 	status.Progress = progcomplete
