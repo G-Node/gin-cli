@@ -602,9 +602,16 @@ func repos(args []string) {
 	}
 
 	if jsonout {
-		allrepos := append(userrepos, otherrepos...)
-		if len(allrepos) > 0 {
-			j, _ := json.Marshal(allrepos)
+		var outlist []gogs.Repository
+		if allrepos {
+			outlist = append(userrepos, otherrepos...)
+		} else if sharedrepos {
+			outlist = otherrepos
+		} else {
+			outlist = userrepos
+		}
+		if len(outlist) > 0 {
+			j, _ := json.Marshal(outlist)
 			fmt.Println(string(j))
 		}
 		return
