@@ -396,7 +396,14 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 				getchan <- status
 			}
 		} else if strings.HasSuffix(line, "failed") {
-			status.Err = fmt.Errorf("failed (content or server unavailable)")
+			// determine error type
+			errline := cmd.ErrPipe.ReadAll()
+			if strings.Contains(errline, "Permission denied") {
+				status.Err = fmt.Errorf("Authentication failed: try logging in again")
+			} else {
+				// TODO: Other reasons?
+				status.Err = fmt.Errorf("Content or server unavailable")
+			}
 			getchan <- status
 		} else if strings.Contains(line, "%") {
 			words := strings.Split(line, " ")
