@@ -938,7 +938,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			util.LogWrite("Error unlocking %s", annexUnlockRes.File)
-			status.Err = fmt.Errorf("failed (content not available locally)")
+			status.Err = fmt.Errorf("Content not available locally\nUse 'gin get-content' to download")
 		}
 		status.Progress = progcomplete
 		unlockchan <- status
