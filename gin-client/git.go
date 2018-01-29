@@ -1001,25 +1001,42 @@ func AnnexInfo() (AnnexInfoRes, error) {
 	return info, err
 }
 
+type GinCommit struct {
+	Hash        string `json:"hash"`
+	AuthorName  string `json:"authorname"`
+	AuthorEmail string `json:"authoremail"`
+	Date        string `json:"date"`
+	Subject     string `json:"subject"`
+	Body        string `json:"body"`
+}
+
 // GitLog ...
-func GitLog(logchan chan<- RepoFileStatus) {
-	defer close(logchan)
+func GitLog(count int) ([]GinCommit, error) {
+	// TODO: Use git log -z and split stdout on NULL (\x00)
 	logformat := `{"hash":"%H","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
-	cmd, err := RunGitCommand("log", fmt.Sprintf("--format=%s", logformat))
+	cmd, err := RunGitCommand("log", fmt.Sprintf("--format=%s", logformat), fmt.Sprintf("--max-count=%d", count))
 	if err != nil {
 		util.LogWrite("Error during GitLog")
 		cmd.LogStdOutErr()
-		logchan <- RepoFileStatus{Err: err}
-		return
+		return nil, err
 	}
 
-	for {
+	commits := make([]GinCommit, count)
+	for idx := 0; ; idx++ {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
 		}
-		logchan <- RepoFileStatus{FileName: line}
+		var commit GinCommit
+		err := json.Unmarshal([]byte(line), &commit)
+		if err != nil {
+			util.LogWrite("Error parsing git log")
+			util.LogWrite(err.Error())
+		}
+		commits[idx] = commit
 	}
+
+	return commits, nil
 }
 
 var modecache = make(map[string]bool)
