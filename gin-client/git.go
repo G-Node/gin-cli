@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
@@ -1002,18 +1003,19 @@ func AnnexInfo() (AnnexInfoRes, error) {
 }
 
 type GinCommit struct {
-	Hash        string `json:"hash"`
-	AuthorName  string `json:"authorname"`
-	AuthorEmail string `json:"authoremail"`
-	Date        string `json:"date"`
-	Subject     string `json:"subject"`
-	Body        string `json:"body"`
+	Hash            string    `json:"hash"`
+	AbbreviatedHash string    `json:"abbrevhash"`
+	AuthorName      string    `json:"authorname"`
+	AuthorEmail     string    `json:"authoremail"`
+	Date            time.Time `json:"date"`
+	Subject         string    `json:"subject"`
+	Body            string    `json:"body"`
 }
 
 // GitLog ...
 func GitLog(count int) ([]GinCommit, error) {
 	// TODO: Use git log -z and split stdout on NULL (\x00)
-	logformat := `{"hash":"%H","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
+	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
 	cmd, err := RunGitCommand("log", fmt.Sprintf("--format=%s", logformat), fmt.Sprintf("--max-count=%d", count))
 	if err != nil {
 		util.LogWrite("Error during GitLog")
