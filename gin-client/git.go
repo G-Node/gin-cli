@@ -1041,6 +1041,26 @@ func GitLog(count int) ([]GinCommit, error) {
 	return commits, nil
 }
 
+// GitCheckout performs a git checkout of a specific commit.
+// Individual files or directories may be specified, otherwise the entire tree is checked out.
+func GitCheckout(hash string, paths []string) error {
+	var pathsstr string
+	if paths == nil || len(paths) == 0 {
+		pathsstr, _ = util.FindRepoRoot(".")
+	} else {
+		pathsstr = strings.Join(paths, " ")
+	}
+	cmd, err := RunGitCommand("checkout", hash, "--", pathsstr)
+	if err != nil {
+		util.LogWrite("Error during GitCheckout")
+		cmd.LogStdOutErr()
+		return err
+	}
+
+	fmt.Print(cmd.OutPipe.ReadAll())
+	return nil
+}
+
 var modecache = make(map[string]bool)
 
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
