@@ -1023,8 +1023,8 @@ func GitLog(count int) ([]GinCommit, error) {
 		return nil, err
 	}
 
-	commits := make([]GinCommit, count)
-	for idx := 0; ; idx++ {
+	var commits []GinCommit
+	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
@@ -1035,7 +1035,7 @@ func GitLog(count int) ([]GinCommit, error) {
 			util.LogWrite("Error parsing git log")
 			util.LogWrite(err.Error())
 		}
-		commits[idx] = commit
+		commits = append(commits, commit)
 	}
 
 	return commits, nil
