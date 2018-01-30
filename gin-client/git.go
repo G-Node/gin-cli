@@ -1002,6 +1002,7 @@ func AnnexInfo() (AnnexInfoRes, error) {
 	return info, err
 }
 
+// GinCommit describes a commit, retrieved from the git log.
 type GinCommit struct {
 	Hash            string    `json:"hash"`
 	AbbreviatedHash string    `json:"abbrevhash"`
@@ -1012,11 +1013,17 @@ type GinCommit struct {
 	Body            string    `json:"body"`
 }
 
-// GitLog ...
+// GitLog returns the commit logs for the repository.
+// The number of commits can be limited by the 'count' argument.
+// If count <= 0, the entire commit history is returned.
 func GitLog(count int) ([]GinCommit, error) {
 	// TODO: Use git log -z and split stdout on NULL (\x00)
 	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
-	cmd, err := RunGitCommand("log", fmt.Sprintf("--format=%s", logformat), fmt.Sprintf("--max-count=%d", count))
+	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat)}
+	if count > 0 {
+		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
+	}
+	cmd, err := RunGitCommand(cmdargs...)
 	if err != nil {
 		util.LogWrite("Error during GitLog")
 		cmd.LogStdOutErr()
