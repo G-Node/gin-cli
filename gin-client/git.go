@@ -1011,6 +1011,7 @@ type GinCommit struct {
 	Date            time.Time `json:"date"`
 	Subject         string    `json:"subject"`
 	Body            string    `json:"body"`
+	FileStats       DiffStat
 }
 
 // GitLog returns the commit logs for the repository.
@@ -1041,11 +1042,80 @@ func GitLog(count int) ([]GinCommit, error) {
 		if err != nil {
 			util.LogWrite("Error parsing git log")
 			util.LogWrite(err.Error())
+			continue
 		}
 		commits = append(commits, commit)
 	}
 
+	logstats, err := GitLogDiffstat(count)
+	if err != nil {
+		util.LogWrite("Failed to get diff stats")
+		return commits, nil
+	}
+
+	for idx, commit := range commits {
+		commits[idx].FileStats = logstats[commit.Hash]
+	}
+
 	return commits, nil
+}
+
+type DiffStat struct {
+	NewFiles      []string
+	DeletedFiles  []string
+	ModifiedFiles []string
+}
+
+func GitLogDiffstat(count int) (map[string]DiffStat, error) {
+	logformat := `::%H`
+	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
+	if count > 0 {
+		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
+	}
+	cmd, err := RunGitCommand(cmdargs...)
+	if err != nil {
+		util.LogWrite("Error during GitLogDiffstat")
+		cmd.LogStdOutErr()
+		return nil, err
+	}
+
+	stats := make(map[string]DiffStat)
+	var curhash string
+	var curstat DiffStat
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		line = util.CleanSpaces(line)
+		if strings.HasPrefix(line, "::") {
+			curhash = strings.TrimPrefix(line, "::")
+			curstat = DiffStat{}
+		} else if len(line) == 0 {
+			continue // Skip empty lines
+		} else {
+			// parse name-status
+			fstat := strings.SplitN(line, " ", 2) // stat (A, M, or D) and filename
+			stat, fname := fstat[0], fstat[1]
+			switch stat {
+			case "A":
+				nf := curstat.NewFiles
+				curstat.NewFiles = append(nf, fname)
+			case "M":
+				mf := curstat.ModifiedFiles
+				curstat.ModifiedFiles = append(mf, fname)
+			case "D":
+				df := curstat.DeletedFiles
+				curstat.DeletedFiles = append(df, fname)
+			default:
+				util.LogWrite("Could not parse diffstat line")
+				util.LogWrite(line)
+			}
+			stats[curhash] = curstat
+		}
+	}
+
+	return stats, nil
 }
 
 // GitCheckout performs a git checkout of a specific commit.
