@@ -193,7 +193,7 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 
 // Upload adds files to a repository and uploads them.
 // The status channel 'uploadchan' is closed when this function returns.
-func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
+func (gincl *Client) Upload(paths []string, commitmsg string, uploadchan chan<- RepoFileStatus) {
 	defer close(uploadchan)
 	util.LogWrite("Upload")
 
@@ -220,28 +220,8 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 		}
 	}
 
-	changes, err := DescribeIndexShort()
-	if err != nil {
-		uploadchan <- RepoFileStatus{Err: err}
-		return
-	}
-	// add header commit line
-	hostname, err := os.Hostname()
-	if err != nil {
-		util.LogWrite("Could not retrieve hostname")
-		hostname = defaultHostname
-	}
-	if changes == "" {
-		changes = "No changes recorded"
-	}
-	changes = fmt.Sprintf("gin upload from %s\n\n%s", hostname, changes)
-	if err != nil {
-		uploadchan <- RepoFileStatus{Err: err}
-		return
-	}
-
 	annexpushchan := make(chan RepoFileStatus)
-	go AnnexPush(paths, changes, annexpushchan)
+	go AnnexPush(paths, commitmsg, annexpushchan)
 	for stat := range annexpushchan {
 		uploadchan <- stat
 	}

@@ -291,9 +291,9 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull --content)
-func AnnexPush(paths []string, commitMsg string, pushchan chan<- RepoFileStatus) {
+func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
-	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
+	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitmsg)}
 	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		pushchan <- RepoFileStatus{Err: err}
