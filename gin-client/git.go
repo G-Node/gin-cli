@@ -774,7 +774,7 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 func DescribeIndexShort() (string, error) {
 	// TODO: 'git annex status' doesn't list added (A) files when in direct mode.
 	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus([]string{""}, statuschan)
+	go AnnexStatus([]string{}, statuschan)
 	statusmap := make(map[string]int)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -802,7 +802,7 @@ func DescribeIndexShort() (string, error) {
 // that are about to be uploaded and as a long commit message.
 func DescribeIndex() (string, error) {
 	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus([]string{""}, statuschan)
+	go AnnexStatus([]string{}, statuschan)
 	statusmap := make(map[string][]string)
 	for item := range statuschan {
 		if item.Err != nil {
