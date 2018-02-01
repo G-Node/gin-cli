@@ -436,9 +436,15 @@ func remove(args []string) {
 }
 
 func keys(args []string) {
-	// TODO: Add option to delete keys: Print then prompt for delete
-	if len(args) > 0 && args[0] == "--add" {
-		addKey(args)
+	if len(args) > 0 {
+		subcommand := args[0]
+		if subcommand == "--add" {
+			addKey(args)
+		} else if subcommand == "--delete" {
+			delKey(args)
+		} else {
+			util.Die(usage)
+		}
 	} else {
 		printKeys(args)
 	}
@@ -485,11 +491,11 @@ func printKeys(args []string) {
 }
 
 func addKey(args []string) {
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(gincl, true)
 	if len(args) != 2 {
 		util.Die(usage)
 	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, true)
 	err := gincl.LoadToken()
 	util.CheckError(err)
 
@@ -497,7 +503,6 @@ func addKey(args []string) {
 
 	keyBytes, err := ioutil.ReadFile(filename)
 	util.CheckError(err)
-	// TODO: Accept custom description for key and simply default to filename
 	key := string(keyBytes)
 	strSlice := strings.Split(key, " ")
 	var description string
@@ -510,6 +515,25 @@ func addKey(args []string) {
 	err = gincl.AddKey(string(keyBytes), description, false)
 	util.CheckError(err)
 	fmt.Printf("New key added '%s'\n", description)
+}
+
+func delKey(args []string) {
+	if len(args) != 2 {
+		util.Die(usage)
+	}
+
+	idx, err := strconv.Atoi(args[1])
+	if err != nil {
+		util.Die(usage)
+	}
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(gincl, true)
+	err = gincl.LoadToken()
+	util.CheckError(err)
+
+	name, err := gincl.DeletePubKeyByIdx(idx)
+	util.CheckError(err)
+	fmt.Printf("Deleted key with name '%s'\n", name)
 }
 
 func printAccountInfo(args []string) {
@@ -602,9 +626,16 @@ func repos(args []string) {
 	}
 
 	if jsonout {
-		allrepos := append(userrepos, otherrepos...)
-		if len(allrepos) > 0 {
-			j, _ := json.Marshal(allrepos)
+		var outlist []gogs.Repository
+		if allrepos {
+			outlist = append(userrepos, otherrepos...)
+		} else if sharedrepos {
+			outlist = otherrepos
+		} else {
+			outlist = userrepos
+		}
+		if len(outlist) > 0 {
+			j, _ := json.Marshal(outlist)
 			fmt.Println(string(j))
 		}
 		return

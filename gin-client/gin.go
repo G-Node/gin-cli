@@ -107,7 +107,7 @@ func (gincl *Client) AddKey(key, description string, force bool) error {
 
 	if force {
 		// Attempting to delete potential existing key that matches the title
-		_ = gincl.DeletePubKey(description)
+		_ = gincl.DeletePubKeyByTitle(description)
 	}
 	res, err := gincl.Post("/api/v1/user/keys", newkey)
 	if err != nil {
@@ -127,21 +127,9 @@ func (gincl *Client) AddKey(key, description string, force bool) error {
 	return nil
 }
 
-// DeletePubKey removes the key that matches the given description (title) from the current user's authorised keys.
-func (gincl *Client) DeletePubKey(description string) error {
+// DeletePubKey the key with the given ID from the current user's authorised keys.
+func (gincl *Client) DeletePubKey(id int64) error {
 	fn := "DeletePubKey()"
-	keys, err := gincl.GetUserKeys()
-	if err != nil {
-		util.LogWrite("Error when getting user keys: %v", err)
-		return err
-	}
-	var id int64
-	for _, key := range keys {
-		if key.Title == description {
-			id = key.ID
-			break
-		}
-	}
 
 	address := fmt.Sprintf("/api/v1/user/keys/%d", id)
 	res, err := gincl.Delete(address)
@@ -160,6 +148,47 @@ func (gincl *Client) DeletePubKey(description string) error {
 		return ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 	return nil
+}
+
+// DeletePubKeyByTitle removes the key that matches the given title from the current user's authorised keys.
+func (gincl *Client) DeletePubKeyByTitle(title string) error {
+	util.LogWrite("Searching for key with title '%s'", title)
+	keys, err := gincl.GetUserKeys()
+	if err != nil {
+		util.LogWrite("Error when getting user keys: %v", err)
+		return err
+	}
+	var id int64
+	for _, key := range keys {
+		if key.Title == title {
+			id = key.ID
+			break
+		}
+	}
+	return gincl.DeletePubKey(id)
+}
+
+// DeletePubKeyByIdx removes the key with the given index from the current user's authorised keys.
+// Upon deletion, it returns the title of the key that was deleted.
+// Note that the first key has index 1.
+func (gincl *Client) DeletePubKeyByIdx(idx int) (string, error) {
+	util.LogWrite("Searching for key with index '%d'", idx)
+	if idx < 1 {
+		util.LogWrite("Invalid index [idx %d]", idx)
+		return "", fmt.Errorf("Invalid key index '%d'", idx)
+	}
+	util.LogWrite("Searching for key with index '%d'", idx)
+	keys, err := gincl.GetUserKeys()
+	if err != nil {
+		util.LogWrite("Error when getting user keys: %v", err)
+		return "", err
+	}
+	if idx > len(keys) {
+		util.LogWrite("Invalid index [idx %d > N %d]", idx, len(keys))
+		return "", fmt.Errorf("Invalid key index '%d'", idx)
+	}
+	key := keys[idx-1]
+	return key.Title, gincl.DeletePubKey(key.ID)
 }
 
 // Login requests a token from the auth server and stores the username and token to file.
@@ -215,7 +244,7 @@ func (gincl *Client) Logout() {
 	}
 
 	currentkeyname := fmt.Sprintf("%s@%s", gincl.Username, hostname)
-	_ = gincl.DeletePubKey(currentkeyname)
+	_ = gincl.DeletePubKeyByTitle(currentkeyname)
 
 	// 2. Delete private key
 	privKeyFile := util.PrivKeyPath(gincl.UserToken.Username)

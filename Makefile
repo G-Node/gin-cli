@@ -29,7 +29,7 @@ linux: $(BUILDLOC)/linux/$(GIN)
 
 windows: $(BUILDLOC)/windows/$(GIN).exe
 
-macos: $(BUILDLOC)/dawrin/$(GIN)
+macos: $(BUILDLOC)/darwin/$(GIN)
 
 clean:
 	rm -r $(BUILDLOC)
@@ -47,5 +47,5 @@ $(BUILDLOC)/linux/$(GIN): $(SOURCES)
 $(BUILDLOC)/windows/$(GIN).exe: $(SOURCES)
 	gox -output=$(BUILDLOC)/windows/$(GIN) -osarch=windows/386 $(LDFLAGS)
 
-$(BUILDLOC)/dawrin/$(GIN): $(SOURCES)
-	gox -output=$(BUILDLOC)/dawrin/$(GIN) -osarch=darwin/amd64 $(LDFLAGS)
+$(BUILDLOC)/darwin/$(GIN): $(SOURCES)
+	gox -output=$(BUILDLOC)/darwin/$(GIN) -osarch=darwin/amd64 $(LDFLAGS)
