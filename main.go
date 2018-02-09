@@ -121,11 +121,16 @@ func createRepo(args []string) {
 	requirelogin(gincl, true)
 
 	var repoName, repoDesc string
-	var here bool
+	var here, noclone bool
 
-	if len(args) > 0 && args[0] == "--here" {
-		here = true
-		args = args[1:]
+	if len(args) > 0 {
+		if args[0] == "--here" {
+			here = true
+			args = args[1:]
+		} else if args[0] == "--no-clone" {
+			noclone = true
+			args = args[1:]
+		}
 	}
 
 	if len(args) == 0 {
@@ -153,7 +158,7 @@ func createRepo(args []string) {
 		initchan := make(chan ginclient.RepoFileStatus)
 		go gincl.InitDir(repoPath, initchan)
 		printProgress(initchan, false)
-	} else {
+	} else if !noclone {
 		// Clone repository after creation
 		getRepo([]string{repoPath})
 	}
