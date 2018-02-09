@@ -123,14 +123,19 @@ func createRepo(args []string) {
 	var repoName, repoDesc string
 	var here, noclone bool
 
-	if len(args) > 0 {
+	// consume options
+	for len(args) > 0 && (args[0] == "--here" || args[0] == "--no-clone") {
 		if args[0] == "--here" {
 			here = true
-			args = args[1:]
-		} else if args[0] == "--no-clone" {
-			noclone = true
-			args = args[1:]
 		}
+		if args[0] == "--no-clone" {
+			noclone = true
+		}
+		args = args[1:]
+	}
+
+	if noclone && here {
+		util.Die(usage)
 	}
 
 	if len(args) == 0 {
