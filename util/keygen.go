@@ -86,7 +86,7 @@ func GitSSHEnv(user string) string {
 	keyfile := PrivKeyPath(user)
 	keyfile = strings.Replace(keyfile, ossep, "/", -1)
 	keyfile = strings.Replace(keyfile, " ", "\\ ", -1)
-	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=no", sshbin, keyfile)
+	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=%s", sshbin, keyfile, HostKeyPath())
 	LogWrite("env %s", gitSSHCmd)
 	return gitSSHCmd
 }
