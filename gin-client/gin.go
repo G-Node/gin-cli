@@ -228,7 +228,16 @@ func (gincl *Client) Login(username, password, clientID string) error {
 		return fmt.Errorf("Error while storing token: %s", err.Error())
 	}
 
+	MakeHostsFile()
+
 	return gincl.MakeSessionKey()
+}
+
+// MakeHostsFile creates a known_hosts file in the config directory based on the server configuration for host key checking.
+func MakeHostsFile() {
+	hostkeyfile := util.HostKeyPath()
+	_ = ioutil.WriteFile(hostkeyfile, []byte(util.Config.GitHostKey), 0600)
+	return
 }
 
 // Logout logs out the currently logged in user in 3 steps:
