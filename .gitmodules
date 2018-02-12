@@ -1,3 +1,3 @@
 [submodule "aur"]
 	path = aur
-	url = ./aur
+	url = ssh://aur@aur.archlinux.org/gin-cli.git
