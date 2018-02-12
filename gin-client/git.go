@@ -539,7 +539,7 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		// Set bare false and revert at the end of the function
 		err := setBare(false)
 		if err != nil {
-			addchan <- RepoFileStatus{Err: fmt.Errorf("Error adding files to repository. Unable to toggle repository bare mode.")}
+			addchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
 			return
 		}
 		defer setBare(true)
@@ -563,14 +563,19 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	}
 	// TODO: Parse output
 	var status RepoFileStatus
-	status.State = "Adding"
 	for {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
 		}
 		fname := strings.TrimSpace(line)
-		fname = strings.TrimPrefix(fname, "add '")
+		if strings.HasPrefix(fname, "add") {
+			status.State = "Adding"
+			fname = strings.TrimPrefix(fname, "add '")
+		} else if strings.HasPrefix(fname, "remove") {
+			status.State = "Removing"
+			fname = strings.TrimPrefix(fname, "remove '")
+		}
 		fname = strings.TrimSuffix(fname, "'")
 		status.FileName = fname
 		util.LogWrite("%s added to git", fname)
