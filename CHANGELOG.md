@@ -2,6 +2,17 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 0.13
+
+### New features
+- Create repository on the server without cloning: `gin create --no-clone`
+    - Cannot be used in combination with `--here`.
+- Delete public SSH key from the server: `gin keys --delete <index>`
+
+### Relevant PRs:
+- #157: Delete key command
+- #160: `gin create --no-clone`
+
 ## Version 0.12
 
 ### New features and feature changes
