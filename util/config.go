@@ -14,10 +14,11 @@ import (
 var configDirs = configdir.New("g-node", "gin")
 
 type conf struct {
-	GinHost string
-	GitHost string
-	GitUser string
-	Bin     struct {
+	GinHost    string
+	GitHost    string
+	GitUser    string
+	GitHostKey string
+	Bin        struct {
 		Git      string
 		GitAnnex string
 		SSH      string
@@ -103,6 +104,7 @@ func LoadConfig() error {
 	viper.SetDefault("git.address", "gin.g-node.org")
 	viper.SetDefault("git.port", "22")
 	viper.SetDefault("git.user", "git")
+	viper.SetDefault("git.hostkey", "gin.g-node.org,141.84.41.216 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBE5IBgKP3nUryEFaACwY4N3jlqDx8Qw1xAxU2Xpt5V0p9RNefNnedVmnIBV6lA3n+9kT1OSbyqA/+SgsQ57nHo0=")
 
 	// annex filters
 	viper.SetDefault("annex.minsize", "10M")
@@ -127,8 +129,8 @@ func LoadConfig() error {
 	gitAddress := viper.GetString("git.address")
 	gitPort := viper.GetInt("git.port")
 	Config.GitHost = fmt.Sprintf("%s:%d", gitAddress, gitPort)
-
 	Config.GitUser = viper.GetString("git.user")
+	Config.GitHostKey = viper.GetString("git.hostkey")
 
 	// Config file in the repository root (annex excludes and size threshold only)
 	reporoot, err := FindRepoRoot(".")
