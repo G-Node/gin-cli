@@ -702,8 +702,7 @@ func checkAnnexVersion() {
 
 func gitrun(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
-	err := gincl.LoadToken()
-	util.CheckError(err)
+	_ = gincl.LoadToken() // OK to run without token
 
 	cmd, err := ginclient.RunGitCommand(args...)
 	util.CheckError(err)
@@ -723,8 +722,7 @@ func gitrun(args []string) {
 
 func annexrun(args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
-	err := gincl.LoadToken()
-	util.CheckError(err)
+	_ = gincl.LoadToken() // OK to run without token
 	cmd, err := ginclient.RunAnnexCommand(args...)
 	util.CheckError(err)
 	var line string
