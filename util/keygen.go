@@ -64,6 +64,17 @@ func PrivKeyPath(user string) string {
 	return filepath.Join(configpath, fmt.Sprintf("%s.key", user))
 }
 
+// HostKeyPath returns the full path for the location of the gin host key file.
+func HostKeyPath() string {
+	configpath, err := ConfigPath(false)
+	if err != nil {
+		LogWrite("Error getting user's config path. Can't create host key file.")
+		LogWrite(err.Error())
+		return ""
+	}
+	return filepath.Join(configpath, "ginhostkey")
+}
+
 // GitSSHEnv returns the value that should be set for the GIT_SSH_COMMAND environment variable
 // in order to use the user's private key.
 func GitSSHEnv(user string) string {
@@ -75,7 +86,7 @@ func GitSSHEnv(user string) string {
 	keyfile := PrivKeyPath(user)
 	keyfile = strings.Replace(keyfile, ossep, "/", -1)
 	keyfile = strings.Replace(keyfile, " ", "\\ ", -1)
-	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=no", sshbin, keyfile)
+	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=%s", sshbin, keyfile, HostKeyPath())
 	LogWrite("env %s", gitSSHCmd)
 	return gitSSHCmd
 }
