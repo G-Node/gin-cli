@@ -19,10 +19,7 @@ matrix:
 
 before_install:
   - sudo apt-get update
-  - sudo apt-get install git-annex
-  - sudo apt-get install python3
   - git clone https://github.com/G-Node/gin-cli-test
-  - python3 --version
 
 install:
   # tools
@@ -47,5 +44,8 @@ install:
   - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -vs $(pwd) ${GOPATH}/src/github.com/G-Node/gin-cli; fi
 
 script:
-  - make install
-
+  - make
+  - cp ./build/gin ./gin-cli-test/bin/gin
+  - ./gin-cli-test/start-server.sh
+  - while ! curl localhost:3000 -so /dev/null; do sleep 1; done
+  - ./gin-cli-test/run-cont-tests.sh
