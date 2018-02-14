@@ -6,9 +6,6 @@ sudo: required
 services:
     - docker
 
-git:
-    submodules: false
-
 go:
   - 1.9
   - tip
@@ -19,7 +16,6 @@ matrix:
 
 before_install:
   - sudo apt-get update
-  - git clone https://github.com/G-Node/gin-cli-test
 
 install:
   # tools
