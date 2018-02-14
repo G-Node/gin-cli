@@ -41,14 +41,5 @@ install:
   - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -vs $(pwd) ${GOPATH}/src/github.com/G-Node/gin-cli; fi
 
 script:
-  - go vet ./...
-  - go test -v ./...
+  - make install
 
-after_success:
-  - if [ $TRAVIS_GO_VERSION == "tip" ]; then exit 0; fi
-  # run tests again individually and generate coverage profiles
-  - find -iname "*test.go" -execdir [ ! -e covprof.part ] \; -execdir go test -v -covermode=count -coverprofile=covprof.part \;
-  - "echo \"mode: count\" > profile.cov"
-  - "grep -h -v -F \"mode: count\" --include=covprof.part -r . >> profile.cov"
-  # upload coverage profile
-  - goveralls -coverprofile=profile.cov -service=travis-ci
