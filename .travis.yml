@@ -3,6 +3,9 @@ language: go
 dist: trusty
 sudo: required
 
+services:
+    - docker
+
 git:
     submodules: false
 
@@ -17,6 +20,9 @@ matrix:
 before_install:
   - sudo apt-get update
   - sudo apt-get install git-annex
+  - sudo apt-get install python3
+  - git clone https://github.com/G-Node/gin-cli-test
+  - python3 --version
 
 install:
   # tools
