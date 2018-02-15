@@ -78,15 +78,17 @@ func HostKeyPath() string {
 // GitSSHEnv returns the value that should be set for the GIT_SSH_COMMAND environment variable
 // in order to use the user's private key.
 func GitSSHEnv(user string) string {
-	sshbin := Config.Bin.SSH
 	// Windows git seems to require Unix paths for the SSH command -- this is dirty but works
 	ossep := string(os.PathSeparator)
-	sshbin = strings.Replace(sshbin, ossep, "/", -1)
-	sshbin = strings.Replace(sshbin, " ", "\\ ", -1)
-	keyfile := PrivKeyPath(user)
-	keyfile = strings.Replace(keyfile, ossep, "/", -1)
-	keyfile = strings.Replace(keyfile, " ", "\\ ", -1)
-	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=%s", sshbin, keyfile, HostKeyPath())
+	fixpathsep := func(p string) string {
+		p = strings.Replace(p, ossep, "/", -1)
+		p = strings.Replace(p, " ", "\\ ", -1)
+		return p
+	}
+	sshbin := fixpathsep(Config.Bin.SSH)
+	keyfile := fixpathsep(PrivKeyPath(user))
+	hostkeyfile := fixpathsep(HostKeyPath())
+	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=%s", sshbin, keyfile, hostkeyfile)
 	LogWrite("env %s", gitSSHCmd)
 	return gitSSHCmd
 }
