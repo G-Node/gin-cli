@@ -45,3 +45,8 @@ script:
   - ./gin-cli-test/start-server.sh
   - while ! curl localhost:3000 -so /dev/null; do sleep 1; done
   - ./gin-cli-test/run-cont-tests.sh
+
+after_failure:
+  # print log for debugging
+  # TODO: Upload it somewhere for easier access
+  - cat ./gin-cli-test/scripts/log/gin.log
