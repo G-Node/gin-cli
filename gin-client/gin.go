@@ -236,7 +236,8 @@ func (gincl *Client) Login(username, password, clientID string) error {
 // MakeHostsFile creates a known_hosts file in the config directory based on the server configuration for host key checking.
 func MakeHostsFile() {
 	hostkeyfile := util.HostKeyPath()
-	_ = ioutil.WriteFile(hostkeyfile, []byte(util.Config.GitHostKey), 0600)
+	ginhostkey := fmt.Sprintln(util.Config.GitHostKey)
+	_ = ioutil.WriteFile(hostkeyfile, []byte(ginhostkey), 0600)
 	return
 }
 
