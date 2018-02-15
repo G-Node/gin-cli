@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path"
-	"time"
 )
 
 var logfile *os.File
@@ -37,16 +36,7 @@ func CachePath(create bool) (string, error) {
 	var err error
 	logpath := os.Getenv("GIN_LOG_DIR")
 	if logpath == "" {
-		// move old log and clear old log path
-		oldpath, _ := OldDataPath()
-
 		logpath = configDirs.QueryCacheFolder().Path
-		if _, operr := os.Stat(oldpath); !os.IsNotExist(operr) {
-			isodate := time.Now().Format("2006-01-02")
-			movedest := path.Join(logpath, fmt.Sprintf("old-logs-%s", isodate))
-			os.Rename(oldpath, movedest)
-		}
-
 	}
 	if create {
 		err = os.MkdirAll(logpath, 0755)
