@@ -1,3 +1,9 @@
+gin-cli (0.14); urgency=low
+
+  * Release 0.14
+  * Host SSH key needs to be added to any non-default host configuration and is strictly checked.
+  * Various improvements and bug fixes.
+
 gin-cli (0.13); urgency=low
 
   * Release 0.13

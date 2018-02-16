@@ -2,6 +2,19 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 0.14
+
+### Changes
+- Host SSH key needs to be added to any non-default host configuration and is strictly checked.
+- Various improvements and bug fixes.
+
+### Relevant PRs
+- #161: Fixed bug where output message for file removals was 'Adding remove'.
+- #162: Strict host key checking for git and ssh commands.
+- #163: Allow running git and annex proxy commands without token.
+- #168: Ignore old (deprecated) config paths.
+- #169: Disable symlinks explicitly on Windows.
+
 ## Version 0.13
 
 ### New features
@@ -9,7 +22,7 @@
     - Cannot be used in combination with `--here`.
 - Delete public SSH key from the server: `gin keys --delete <index>`
 
-### Relevant PRs:
+### Relevant PRs
 - #157: Delete key command
 - #160: `gin create --no-clone`
 
