@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
@@ -118,7 +119,13 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 	fn := fmt.Sprintf("Clone(%s)", repoPath)
 	defer close(clonechan)
 	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
-	cmd, err := RunGitCommand("clone", "--progress", remotePath)
+	args := []string{"clone", "--progress", remotePath}
+	if runtime.GOOS == "windows" {
+		// force disable symlinks even if user can create them
+		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
+		args = append([]string{"-c", "core.symlinks=false"}, args...)
+	}
+	cmd, err := RunGitCommand(args...)
 	if err != nil {
 		clonechan <- RepoFileStatus{Err: ginerror{UError: err.Error(), Origin: fn}}
 		return

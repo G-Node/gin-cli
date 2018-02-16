@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -397,6 +398,7 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		}
 		Workingdir = "."
 	}
+
 	stat.Progress = "10%"
 	initchan <- stat
 
@@ -423,6 +425,13 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		}
 	}
 	stat.Progress = "20%"
+
+	if runtime.GOOS == "windows" {
+		// force disable symlinks even if user can create them
+		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
+		cmd, _ := RunGitCommand("config", "--local", "core.symlinks", "false")
+		cmd.Wait()
+	}
 
 	// If there are no commits, create the initial commit.
 	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
