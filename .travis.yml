@@ -3,8 +3,8 @@ language: go
 dist: trusty
 sudo: required
 
-git:
-    submodules: false
+services:
+    - docker
 
 go:
   - 1.9
@@ -16,7 +16,6 @@ matrix:
 
 before_install:
   - sudo apt-get update
-  - sudo apt-get install git-annex
 
 install:
   # tools
@@ -41,14 +40,15 @@ install:
   - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -vs $(pwd) ${GOPATH}/src/github.com/G-Node/gin-cli; fi
 
 script:
-  - go vet ./...
-  - go test -v ./...
+  - make
+  - cp ./build/gin ./gin-cli-test/bin/gin
+  - ./gin-cli-test/start-server.sh
+  - while ! curl localhost:3000 -so /dev/null; do sleep 1; done
+  - ./gin-cli-test/run-cont-tests.sh
 
-after_success:
-  - if [ $TRAVIS_GO_VERSION == "tip" ]; then exit 0; fi
-  # run tests again individually and generate coverage profiles
-  - find -iname "*test.go" -execdir [ ! -e covprof.part ] \; -execdir go test -v -covermode=count -coverprofile=covprof.part \;
-  - "echo \"mode: count\" > profile.cov"
-  - "grep -h -v -F \"mode: count\" --include=covprof.part -r . >> profile.cov"
-  # upload coverage profile
-  - goveralls -coverprofile=profile.cov -service=travis-ci
+after_script:
+  # push logs to gist
+  - echo $GISTTOKEN > ./gin-cli-test/testuserhome/.gist
+  - ./gin-cli-test/run-cont.sh gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c ./scripts/log/gin.log
+  - ./gin-cli-test/run-cont.sh gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c ./scripts/log/tests.log
+  - rm ./gin-cli-test/testuserhome/.gist
