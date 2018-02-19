@@ -214,7 +214,7 @@ func AnnexInit(description string) error {
 // (git annex sync --no-push [--content])
 func AnnexPull(content bool, pullchan chan<- RepoFileStatus) {
 	defer close(pullchan)
-	args := []string{"sync", "--no-push"}
+	args := []string{"sync", "--no-push", "--no-commit"}
 	if content {
 		args = append(args, "--content")
 	}
