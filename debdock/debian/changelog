@@ -1,3 +1,8 @@
+gin-cli (0.15); urgency=low
+
+  * Release 0.15
+  * Minor change in `gin download` behaviour.
+
 gin-cli (0.14); urgency=low
 
   * Release 0.14
