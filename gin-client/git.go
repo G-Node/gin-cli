@@ -247,6 +247,9 @@ func AnnexPull(content bool, pullchan chan<- RepoFileStatus) {
 			status.Progress = words[1]
 			status.Rate = words[2]
 			pullchan <- status
+		} else if strings.HasSuffix(line, "failed") {
+			status.Err = fmt.Errorf("failed")
+			pullchan <- status
 		}
 	}
 
