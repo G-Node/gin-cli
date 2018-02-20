@@ -2,6 +2,14 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 0.15
+
+### Changes
+- No longer commits changes when performing an `AnnexPull` (`git annex sync --no-push`).
+
+### Relevant PRs
+- #171: No commit on gin download
+
 ## Version 0.14
 
 ### Changes
