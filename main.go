@@ -831,4 +831,6 @@ func main() {
 	default:
 		util.Die(usage)
 	}
+
+	util.LogWrite("EXIT OK")
 }

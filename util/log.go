@@ -26,7 +26,7 @@ func LogInit() error {
 	flags := log.Ldate | log.Ltime | log.LUTC
 	logger = log.New(logfile, "", flags)
 
-	LogWrite("LOGINIT")
+	LogWrite("=== LOGINIT ===")
 
 	return nil
 }
@@ -62,5 +62,6 @@ func LogWrite(fmtstr string, args ...interface{}) {
 
 // LogClose closes the log file.
 func LogClose() {
+	LogWrite("=== LOGEND ===")
 	_ = logfile.Close()
 }
