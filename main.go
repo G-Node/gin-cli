@@ -450,14 +450,13 @@ func keys(args []string) {
 		subcommand := args[0]
 		if subcommand == "--add" {
 			addKey(args)
+			return
 		} else if subcommand == "--delete" {
 			delKey(args)
-		} else {
-			usageDie("keys")
+			return
 		}
-	} else {
-		printKeys(args)
 	}
+	printKeys(args)
 }
 
 func printKeys(args []string) {
