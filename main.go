@@ -789,6 +789,8 @@ func main() {
 	defer util.LogClose()
 
 	util.LogWrite("COMMAND: %s %s", command, strings.Join(cmdArgs, " "))
+	cwd, _ := os.Getwd()
+	util.LogWrite("CWD: %s", cwd)
 
 	err = util.LoadConfig()
 	util.CheckError(err)
