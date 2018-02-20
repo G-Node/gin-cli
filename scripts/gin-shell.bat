@@ -7,10 +7,10 @@
 ::
 :: The following actions are taken:
 ::
-:: - The location of gin.exe is appended to the PATH variable so it can be
+:: - The location of gin.exe is prepended to the PATH variable so it can be
 :: used from the shell.
 :: - The locations of the git, annex, and utility binaries (SSH, rsync, etc)
-:: are appended to the PATH variable.
+:: are prepended to the PATH variable.
 :: - A shell is started in the user's home directory.
 
 echo off
