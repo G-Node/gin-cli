@@ -68,7 +68,7 @@ func login(args []string) {
 		fmt.Print("Login: ")
 		fmt.Scanln(&username)
 	} else if len(args) > 1 {
-		util.Die(usage)
+		usageDie("login")
 	} else {
 		username = args[0]
 	}
@@ -104,7 +104,7 @@ func login(args []string) {
 
 func logout(args []string) {
 	if len(args) > 0 {
-		util.Die(usage)
+		usageDie("logout")
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	err := gincl.LoadToken()
@@ -135,14 +135,14 @@ func createRepo(args []string) {
 	}
 
 	if noclone && here {
-		util.Die(usage)
+		usageDie("create")
 	}
 
 	if len(args) == 0 {
 		fmt.Print("Repository name: ")
 		fmt.Scanln(&repoName)
 	} else if len(args) > 2 {
-		util.Die(usage)
+		usageDie("create")
 	} else {
 		repoName = args[0]
 		if len(args) == 2 {
@@ -175,7 +175,7 @@ func deleteRepo(args []string) {
 	var repostr, confirmation string
 
 	if len(args) == 0 {
-		util.Die(usage)
+		usageDie("delete")
 	} else {
 		repostr = args[0]
 	}
@@ -214,7 +214,7 @@ func getRepo(args []string) {
 	jsonout, args := checkJSON(args)
 	var repostr string
 	if len(args) != 1 {
-		util.Die(usage)
+		usageDie("get")
 	} else {
 		repostr = args[0]
 	}
@@ -392,7 +392,7 @@ func download(args []string) {
 	var content bool
 	if len(args) > 0 {
 		if args[0] != "--content" {
-			util.Die(usage)
+			usageDie("upload")
 		}
 		content = true
 	}
@@ -453,7 +453,7 @@ func keys(args []string) {
 		} else if subcommand == "--delete" {
 			delKey(args)
 		} else {
-			util.Die(usage)
+			usageDie("keys")
 		}
 	} else {
 		printKeys(args)
@@ -465,12 +465,12 @@ func printKeys(args []string) {
 	requirelogin(gincl, true)
 	printFull := false
 	if len(args) > 1 {
-		util.Die(usage)
+		usageDie("keys")
 	} else if len(args) == 1 {
 		if args[0] == "-v" || args[0] == "--verbose" {
 			printFull = true
 		} else {
-			util.Die(usage)
+			usageDie("keys")
 		}
 	}
 
@@ -502,7 +502,7 @@ func printKeys(args []string) {
 
 func addKey(args []string) {
 	if len(args) != 2 {
-		util.Die(usage)
+		usageDie("keys")
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(gincl, true)
@@ -529,12 +529,12 @@ func addKey(args []string) {
 
 func delKey(args []string) {
 	if len(args) != 2 {
-		util.Die(usage)
+		usageDie("keys")
 	}
 
 	idx, err := strconv.Atoi(args[1])
 	if err != nil {
-		util.Die(usage)
+		usageDie("keys")
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(gincl, true)
@@ -608,10 +608,10 @@ func repos(args []string) {
 		}
 	}
 	if (allrepos || sharedrepos) && len(args) > 0 {
-		util.Die(usage)
+		usageDie("repos")
 	}
 	if len(args) > 1 {
-		util.Die(usage)
+		usageDie("repos")
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(gincl, true)
@@ -666,16 +666,25 @@ func repos(args []string) {
 	}
 }
 
+// help prints the help text for either a specific command, if args has one string that is a known command, or the general usage text otherwise.
 func help(args []string) {
+	var helptext string
+	var ok bool
 	if len(args) != 1 {
-		util.Die(usage)
+		helptext = usage
+	} else {
+		helptext, ok = cmdHelp[args[0]]
+		if !ok {
+			helptext = usage
+		}
 	}
-	helptext, ok := cmdHelp[args[0]]
-	if !ok {
-		util.Die(usage)
-	}
-
 	fmt.Println(helptext)
+}
+
+func usageDie(command string) {
+	help([]string{command})
+	// exit without message
+	util.Die("")
 }
 
 func checkAnnexVersion() {
@@ -743,7 +752,7 @@ func annexrun(args []string) {
 func printversion(args []string) {
 	jsonout, args := checkJSON(args)
 	if len(args) > 0 {
-		util.Die(usage)
+		usageDie("version")
 	}
 	if jsonout {
 		verjson := struct {
@@ -780,6 +789,8 @@ func main() {
 	defer util.LogClose()
 
 	util.LogWrite("COMMAND: %s %s", command, strings.Join(cmdArgs, " "))
+	cwd, _ := os.Getwd()
+	util.LogWrite("CWD: %s", cwd)
 
 	err = util.LoadConfig()
 	util.CheckError(err)
@@ -829,6 +840,8 @@ func main() {
 	case "version":
 		printversion(cmdArgs)
 	default:
-		util.Die(usage)
+		usageDie(command)
 	}
+
+	util.LogWrite("EXIT OK")
 }
