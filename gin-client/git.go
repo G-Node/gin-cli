@@ -172,6 +172,10 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
 				"'%s' already exists in the current directory and is not empty.", repoName)
 			clonechan <- RepoFileStatus{Err: gerr}
+
+		} else if strings.Contains(stderr, "Host key verification failed") {
+			gerr.Description = "Server key does not match known/configured host key."
+			clonechan <- RepoFileStatus{Err: gerr}
 		} else {
 			gerr.Description = "Repository download failed.\nAn unknown error occurred."
 			clonechan <- RepoFileStatus{Err: gerr}
