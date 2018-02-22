@@ -402,14 +402,18 @@ func download(args []string) {
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent([]string{}, lockchan)
 	printProgress(lockchan, jsonout)
-	dlchan := make(chan ginclient.RepoFileStatus)
-	if !content && !jsonout {
-		fmt.Print("Downloading...")
+	if !jsonout {
+		fmt.Print("Downloading changes ")
 	}
-	go gincl.Download(content, dlchan)
-	printProgress(dlchan, jsonout)
-	if !content && !jsonout {
+	err := gincl.Download()
+	util.CheckError(err)
+	if !jsonout {
 		fmt.Fprintln(color.Output, green("OK"))
+	}
+	if content {
+		reporoot, _ := util.FindRepoRoot(".")
+		ginclient.Workingdir = reporoot
+		getContent(nil)
 	}
 }
 

@@ -331,17 +331,9 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- RepoFileStatus
 
 // Download downloads changes and placeholder files in an already checked out repository.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-// The status channel 'downloadchan' is closed when this function returns.
-func (gincl *Client) Download(content bool, downloadchan chan<- RepoFileStatus) {
-	defer close(downloadchan)
+func (gincl *Client) Download() error {
 	util.LogWrite("Download")
-
-	downloadstatus := make(chan RepoFileStatus)
-	go AnnexPull(content, downloadstatus)
-	for stat := range downloadstatus {
-		downloadchan <- stat
-	}
-	return
+	return AnnexPull()
 }
 
 // CloneRepo clones a remote repository and initialises annex.
