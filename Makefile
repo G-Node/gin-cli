@@ -7,6 +7,9 @@ BUILDLOC = build
 # Install location
 INSTLOC = $(GOPATH)/bin
 
+# tests submodule bin
+TESTBINLOC = tests/bin
+
 # Build flags
 VERNUM = $(shell grep -o -E '[0-9.]+(dev|beta){0,1}' version)
 ncommits = $(shell git rev-list --count HEAD)
@@ -24,6 +27,9 @@ allplatforms: linux windows macos
 
 install: gin
 	install $(BUILDLOC)/$(GIN) $(INSTLOC)/$(GIN)
+
+installtest: gin
+	install $(BUILDLOC)/$(GIN) $(TESTBINLOC)/$(GIN)
 
 linux: $(BUILDLOC)/linux/$(GIN)
 
