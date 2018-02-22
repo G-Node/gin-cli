@@ -2,5 +2,5 @@
 	path = aur
 	url = https://aur.archlinux.org/gin-cli.git
 [submodule "gin-cli-test"]
-	path = gin-cli-test
+	path = tests
 	url = https://github.com/G-Node/gin-cli-test
