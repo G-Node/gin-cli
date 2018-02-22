@@ -318,7 +318,7 @@ func unlock(args []string) {
 func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 	var fname, state string
 	prevlinelength := 0 // used to clear lines before overwriting
-	nerrors := 0
+	filesuccess := make(map[string]bool)
 	for stat := range statuschan {
 		var msgparts []string
 		if jsonout {
@@ -339,18 +339,27 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 		if stat.Err == nil {
 			if stat.Progress == "100%" {
 				msgparts = append(msgparts, green("OK"))
+				filesuccess[stat.FileName] = true
 			} else {
 				msgparts = append(msgparts, stat.Progress, stat.Rate)
 			}
 		} else {
 			msgparts = append(msgparts, red(stat.Err.Error()))
-			nerrors++
+			filesuccess[stat.FileName] = false
 		}
 		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
 		prevlinelength, _ = fmt.Fprintf(color.Output, "\r%s", util.CleanSpaces(strings.Join(msgparts, " ")))
 	}
 	if prevlinelength > 0 {
 		fmt.Println()
+	}
+
+	// count unique file errors
+	nerrors := 0
+	for _, stat := range filesuccess {
+		if !stat {
+			nerrors++
+		}
 	}
 	if nerrors > 0 {
 		// Exit with error message and failed exit status
