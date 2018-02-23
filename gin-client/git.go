@@ -226,6 +226,12 @@ func AnnexPull() error {
 		util.LogWrite("Error during AnnexPull.")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
+		stderr := cmd.ErrPipe.ReadAll()
+		if strings.Contains(stderr, "Permission denied") {
+			return fmt.Errorf("download failed: permission denied")
+		} else if strings.Contains(stderr, "Host key verification failed") {
+			return fmt.Errorf("download failed: bad host key - check server configuration")
+		}
 	}
 	return err
 }
