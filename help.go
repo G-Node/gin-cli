@@ -13,10 +13,10 @@ Options:
 
 Commands:
 	login          [<username>]
-		Login to the GIN services
+		Login to the GIN server
 
 	logout
-		Logout from the GIN services
+		Logout from the GIN server
 
 	create         [--here | --no-clone] [<name>] [<description>]
 		Create a repository on the remote server and clone it
@@ -40,16 +40,12 @@ Commands:
 		Download all new information from a remote repository
 
 	get-content    [<filenames>]
+	getc           [<filenames>]
 		Download the content of files from a remote repository
 
-	getc           [<filenames>]
-		Synonym for get-content
-
 	remove-content [<filenames>]
-		Remove the content of local files that have already been uploaded
-
 	rmc            [<filenames>]
-		Synonym for remove-content
+		Remove the content of local files that have already been uploaded
 
 	repos          [--shared | --all]
 		List remote repositories
@@ -64,7 +60,10 @@ Commands:
 		List the keys associated with the logged in user
 
 	keys           --add <filename>
-		Add/upload a new public key to the GIN services
+		Add/upload a new public key to the GIN server
+
+	keys           --delete <number>
+		Delete a public key from the GIN server
 
 	help           <command>
 		Get help for individual commands
@@ -116,17 +115,17 @@ ARGUMENTS
 		repository name inside the working directory. Specifying this option
 		will set up the current working directory as a local clone for the new
 		repository.
-		Cannot be specified with --no-clone.
+		Cannot be used with --no-clone.
 
 	--no-clone
 		Create the repository on the server but do not clone it locally.
-		Cannot be specified with --here.
+		Cannot be used with --here.
 
 	<name>
-		The name of the repository. If no <name> is provided, you will be
-		prompted for one. If you want to provide a description, you need to
-		provide a repository name on the command line. Names should contain
-		only alphanumeric characters, '.', '-', and '_'.
+		The name of the repository. If not provided, you will be prompted for
+		one. If you want to provide a description, you need to provide a
+		repository name on the command line. Names should contain only
+		alphanumeric characters, '.', '-', and '_'.
 
 	<description>
 		A repository description (optional). The description should be
@@ -149,12 +148,13 @@ EXAMPLES
 	
 	Create a repository named 'mydata' and initialise the current working
 	directory as the local clone
+
 		$ gin create --here mydata
 `
 
 const getHelp = `USAGE
 
-	gin get <repopath>
+	gin get [--json] <repopath>
 
 DESCRIPTION
 
@@ -168,6 +168,10 @@ ARGUMENTS
 		The repository path <repopath> must be specified on the command line.
 		A repository path is the owner's username, followed by a "/" and the
 		repository name.
+
+	--json
+		Print output in json format.
+
 
 EXAMPLES
 
@@ -200,6 +204,7 @@ DESCRIPTION
 		recorded yet.
 		LC: The file has been modified locally, the changes have been recorded
 		but they haven't been uploaded.
+		RM: The file has been removed from the repository.
 		??: The file is not under repository control.
 
 ARGUMENTS
@@ -216,7 +221,7 @@ ARGUMENTS
 
 const unlockHelp = `USAGE
 
-	gin unlock [<filenames>]...
+	gin unlock [--json] [<filenames>]...
 
 DESCRIPTION
 
@@ -235,11 +240,14 @@ ARGUMENTS
 
 	<filenames>
 		One or more directories or files to unlock.
+
+	--json
+		Print output in json format.
 `
 
 const lockHelp = `USAGE
 
-	gin lock [<filenames>]...
+	gin lock [--json] [<filenames>]...
 
 DESCRIPTION
 
@@ -259,11 +267,14 @@ ARGUMENTS
 
 	<filenames>
 		One or more directories or files to lock.
+
+	--json
+		Print output in json format.
 `
 
 const uploadHelp = `USAGE
 
-	gin upload [<filenames>]...
+	gin upload [--json] [<filenames>]...
 
 DESCRIPTION
 
@@ -280,11 +291,14 @@ ARGUMENTS
 
 	<filenames>
 		One or more directories of files to upload and update.
+
+	--json
+		Print output in json format.
 `
 
 const downloadHelp = `USAGE
 
-	gin download [--content]
+	gin download [--json] [--content]
 
 DESCRIPTION
 
@@ -300,11 +314,15 @@ ARGUMENTS
 
 	--content
 		Optionally download the content for all files in the repository.
+
+	--json
+		Print output in json format.
 `
 
 const getContentHelp = `USAGE
 
-	gin get-content [<filenames>]...
+	gin get-content [--json] [<filenames>]...
+	gin getc        [--json] [<filenames>]...
 
 DESCRIPTION
 
@@ -318,12 +336,15 @@ ARGUMENTS
 
 	<filenames>
 		One or more names of files or directories to retrieve.
+
+	--json
+		Print output in json format.
 `
 
 const rmcHelp = `USAGE
 
-	gin remove-content [<filenames>]...
-	gin rmc [<filenames>]...
+	gin remove-content [--json] [<filenames>]...
+	gin rmc            [--json] [<filenames>]...
 
 DESCRIPTION
 
@@ -343,6 +364,9 @@ ARGUMENTS
 
 	<filenames>
 		One or more names of files or directories to remove.
+
+	--json
+		Print output in json format.
 `
 
 const reposHelp = `USAGE
