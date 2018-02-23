@@ -230,7 +230,7 @@ func AnnexPull() error {
 		if strings.Contains(stderr, "Permission denied") {
 			return fmt.Errorf("download failed: permission denied")
 		} else if strings.Contains(stderr, "Host key verification failed") {
-			return fmt.Errorf("download failed: bad host key - check server configuration")
+			return fmt.Errorf("download failed: server key does not match known host key")
 		}
 	}
 	return err
@@ -309,6 +309,14 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- RepoFileStatus)
 		util.LogWrite("Error during AnnexPush (sync --no-pull)")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
+		stderr := cmd.ErrPipe.ReadAll()
+		errmsg := "failed"
+		if strings.Contains(stderr, "Permission denied") {
+			errmsg = "upload failed: permission denied"
+		} else if strings.Contains(stderr, "Host key verification failed") {
+			errmsg = "upload failed: server key does not match known host key"
+		}
+		pushchan <- RepoFileStatus{Err: fmt.Errorf(errmsg)}
 		return
 	}
 
