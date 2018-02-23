@@ -844,32 +844,15 @@ func makeFileList(header string, fnames []string) string {
 // Attempting to lock an untracked file, or a file in any state other than T will have no effect.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'lockchan' is closed when this function returns.
-// (git annex add)
+// (git annex add --update)
 func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 	defer close(lockchan)
-	// Annex lock doesn't work like it used to. It's better to instead annex add, but only the files that are already known to annex.
-	// To find these files, we can do a 'git-annex status paths...'and look for Type changes (T)
+	// Annex lock doesn't work like it used to. It's better to instead annex add, but only the files that are already known to annex (handled by --update).
 	var status RepoFileStatus
 	status.State = "Locking"
 
-	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus(filepaths, statuschan)
-	unlockedfiles := make([]string, 0, len(filepaths))
-	for item := range statuschan {
-		if item.Err != nil {
-			lockchan <- RepoFileStatus{Err: item.Err}
-		}
-		if item.Status == "T" {
-			unlockedfiles = append(unlockedfiles, item.File)
-		}
-	}
-
-	if len(unlockedfiles) == 0 {
-		util.LogWrite("No files to lock")
-		return
-	}
-	cmdargs := []string{"add", "--json"}
-	cmdargs = append(cmdargs, unlockedfiles...)
+	cmdargs := []string{"add", "--json", "--update"}
+	cmdargs = append(cmdargs, filepaths...)
 	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		lockchan <- RepoFileStatus{Err: err}
