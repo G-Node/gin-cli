@@ -251,7 +251,7 @@ func (gincl *Client) Logout() {
 		hostname = defaultHostname
 	}
 
-	currentkeyname := fmt.Sprintf("%s@%s", gincl.Username, hostname)
+	currentkeyname := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)
 	err = gincl.DeletePubKeyByTitle(currentkeyname)
 	if err != nil {
 		util.LogWrite(err.Error())
