@@ -49,6 +49,7 @@ script:
 after_script:
   # push logs to gist
   - echo $GISTTOKEN > ./tests/testuserhome/.gist
-  - ./tests/run-cont.sh gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c ./scripts/log/gin.log
-  - ./tests/run-cont.sh gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c ./scripts/log/tests.log
+  - mv ./scripts/log/gin.log ./scripts/log/gin-${TRAVIS_BRANCH}.log
+  - mv ./scripts/log/tests.log ./scripts/log/tests-${TRAVIS_BRANCH}.log
+  - ./tests/run-cont.sh gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c ./scripts/log/*.log
   - rm ./tests/testuserhome/.gist
