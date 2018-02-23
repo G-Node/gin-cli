@@ -784,7 +784,7 @@ func main() {
 	command := args["<command>"].(string)
 	cmdArgs := args["<args>"].([]string)
 
-	err := util.LogInit()
+	err := util.LogInit(verstr)
 	util.CheckError(err)
 	defer util.LogClose()
 
