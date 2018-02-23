@@ -1,3 +1,6 @@
+# full pkg name
+PKG = github.com/G-Node/gin-cli
+
 # Binary
 GIN = gin
 
@@ -15,7 +18,7 @@ VERNUM = $(shell grep -o -E '[0-9.]+(dev|beta){0,1}' version)
 ncommits = $(shell git rev-list --count HEAD)
 BUILDNUM = $(shell printf '%06d' $(ncommits))
 COMMITHASH = $(shell git rev-parse HEAD)
-LDFLAGS = -ldflags "-X main.gincliversion=$(VERNUM) -X main.build=$(BUILDNUM) -X main.commit=$(COMMITHASH)"
+LDFLAGS = -ldflags=$(PKG)="-X main.gincliversion=$(VERNUM) -X main.build=$(BUILDNUM) -X main.commit=$(COMMITHASH)"
 
 SOURCES = $(shell find . -type f -iname "*.go")
 
