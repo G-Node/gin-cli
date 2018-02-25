@@ -158,14 +158,12 @@ func (gincl *Client) DeletePubKeyByTitle(title string) error {
 		util.LogWrite("Error when getting user keys: %v", err)
 		return err
 	}
-	var id int64
 	for _, key := range keys {
 		if key.Title == title {
-			id = key.ID
-			break
+			return gincl.DeletePubKey(key.ID)
 		}
 	}
-	return gincl.DeletePubKey(id)
+	return fmt.Errorf("No key with title '%s'", title)
 }
 
 // DeletePubKeyByIdx removes the key with the given index from the current user's authorised keys.
@@ -253,8 +251,11 @@ func (gincl *Client) Logout() {
 		hostname = defaultHostname
 	}
 
-	currentkeyname := fmt.Sprintf("%s@%s", gincl.Username, hostname)
-	_ = gincl.DeletePubKeyByTitle(currentkeyname)
+	currentkeyname := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)
+	err = gincl.DeletePubKeyByTitle(currentkeyname)
+	if err != nil {
+		util.LogWrite(err.Error())
+	}
 
 	// 2. Delete private key
 	privKeyFile := util.PrivKeyPath(gincl.UserToken.Username)
