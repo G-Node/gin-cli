@@ -11,7 +11,7 @@ var logfile *os.File
 var logger *log.Logger
 
 // LogInit initialises the log file and logger.
-func LogInit() error {
+func LogInit(ver string) error {
 	// TODO: Log rotation
 	cachepath, err := CachePath(true)
 	if err != nil {
@@ -27,6 +27,7 @@ func LogInit() error {
 	logger = log.New(logfile, "", flags)
 
 	LogWrite("=== LOGINIT ===")
+	LogWrite("GIN CLI VERSION %s", ver)
 
 	return nil
 }
