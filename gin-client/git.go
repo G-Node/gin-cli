@@ -172,6 +172,10 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
 				"'%s' already exists in the current directory and is not empty.", repoName)
 			clonechan <- RepoFileStatus{Err: gerr}
+
+		} else if strings.Contains(stderr, "Host key verification failed") {
+			gerr.Description = "Server key does not match known/configured host key."
+			clonechan <- RepoFileStatus{Err: gerr}
 		} else {
 			gerr.Description = "Repository download failed.\nAn unknown error occurred."
 			clonechan <- RepoFileStatus{Err: gerr}
@@ -210,52 +214,26 @@ func AnnexInit(description string) error {
 
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-// The status channel 'pullchan' is closed when this function returns.
 // (git annex sync --no-push [--content])
-func AnnexPull(content bool, pullchan chan<- RepoFileStatus) {
-	defer close(pullchan)
+func AnnexPull() error {
 	args := []string{"sync", "--no-push", "--no-commit"}
-	if content {
-		args = append(args, "--content")
-	}
 	cmd, err := RunAnnexCommand(args...)
 	if err != nil {
-		pullchan <- RepoFileStatus{Err: err}
-		return
+		return err
 	}
-	var status RepoFileStatus
-	status.State = "Downloading"
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
-		line = util.CleanSpaces(line)
-		if strings.HasPrefix(line, "get") {
-			words := strings.Split(line, " ")
-			status.FileName = strings.TrimSpace(words[1])
-			// new file - reset Progress and Rate
-			status.Progress = ""
-			status.Rate = ""
-			if !strings.HasSuffix(line, "ok") {
-				// if the copy line ends with ok, the file is already done (no upload needed)
-				// so we shouldn't send the status to the caller
-				pullchan <- status
-			}
-		} else if strings.Contains(line, "%") {
-			words := strings.Split(line, " ")
-			status.Progress = words[1]
-			status.Rate = words[2]
-			pullchan <- status
-		}
-	}
-
-	if err != nil || cmd.Wait() != nil {
+	err = cmd.Wait()
+	if err != nil {
 		util.LogWrite("Error during AnnexPull.")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
+		stderr := cmd.ErrPipe.ReadAll()
+		if strings.Contains(stderr, "Permission denied") {
+			return fmt.Errorf("download failed: permission denied")
+		} else if strings.Contains(stderr, "Host key verification failed") {
+			return fmt.Errorf("download failed: server key does not match known host key")
+		}
 	}
-	return
+	return err
 }
 
 // AnnexSync synchronises the local repository with the remote.
@@ -331,6 +309,14 @@ func AnnexPush(paths []string, commitMsg string, pushchan chan<- RepoFileStatus)
 		util.LogWrite("Error during AnnexPush (sync --no-pull)")
 		util.LogWrite("[Error]: %v", err)
 		cmd.LogStdOutErr()
+		stderr := cmd.ErrPipe.ReadAll()
+		errmsg := "failed"
+		if strings.Contains(stderr, "Permission denied") {
+			errmsg = "upload failed: permission denied"
+		} else if strings.Contains(stderr, "Host key verification failed") {
+			errmsg = "upload failed: server key does not match known host key"
+		}
+		pushchan <- RepoFileStatus{Err: fmt.Errorf(errmsg)}
 		return
 	}
 
