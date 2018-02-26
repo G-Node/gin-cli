@@ -317,7 +317,7 @@ func unlock(args []string) {
 
 func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 	var fname, state string
-	prevlinelength := 0 // used to clear lines before overwriting
+	var lastprint string
 	filesuccess := make(map[string]bool)
 	for stat := range statuschan {
 		var msgparts []string
@@ -328,10 +328,10 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 		}
 		if stat.FileName != fname || stat.State != state {
 			// New line if new file or new state
-			if fname != "" {
+			if len(lastprint) > 0 {
 				fmt.Println()
-				prevlinelength = 0
 			}
+			lastprint = ""
 			fname = stat.FileName
 			state = stat.State
 		}
@@ -347,10 +347,14 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			msgparts = append(msgparts, red(stat.Err.Error()))
 			filesuccess[stat.FileName] = false
 		}
-		fmt.Printf("\r%s", strings.Repeat(" ", prevlinelength)) // clear the previous line
-		prevlinelength, _ = fmt.Fprintf(color.Output, "\r%s", util.CleanSpaces(strings.Join(msgparts, " ")))
+		newprint := fmt.Sprintf("\r%s", util.CleanSpaces(strings.Join(msgparts, " ")))
+		if newprint != lastprint {
+			fmt.Printf("\r%s", strings.Repeat(" ", len(lastprint))) // clear the line
+			fmt.Fprint(color.Output, newprint)
+			lastprint = newprint
+		}
 	}
-	if prevlinelength > 0 {
+	if len(lastprint) > 0 {
 		fmt.Println()
 	}
 
