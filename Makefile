@@ -1,3 +1,6 @@
+# full pkg name
+PKG = github.com/G-Node/gin-cli
+
 # Binary
 GIN = gin
 
@@ -7,12 +10,15 @@ BUILDLOC = build
 # Install location
 INSTLOC = $(GOPATH)/bin
 
+# tests submodule bin
+TESTBINLOC = tests/bin
+
 # Build flags
 VERNUM = $(shell grep -o -E '[0-9.]+(dev|beta){0,1}' version)
 ncommits = $(shell git rev-list --count HEAD)
 BUILDNUM = $(shell printf '%06d' $(ncommits))
 COMMITHASH = $(shell git rev-parse HEAD)
-LDFLAGS = -ldflags "-X main.gincliversion=$(VERNUM) -X main.build=$(BUILDNUM) -X main.commit=$(COMMITHASH)"
+LDFLAGS = -ldflags=$(PKG)="-X main.gincliversion=$(VERNUM) -X main.build=$(BUILDNUM) -X main.commit=$(COMMITHASH)"
 
 SOURCES = $(shell find . -type f -iname "*.go")
 
@@ -24,6 +30,9 @@ allplatforms: linux windows macos
 
 install: gin
 	install $(BUILDLOC)/$(GIN) $(INSTLOC)/$(GIN)
+
+installtest: gin
+	install $(BUILDLOC)/$(GIN) $(TESTBINLOC)/$(GIN)
 
 linux: $(BUILDLOC)/linux/$(GIN)
 
