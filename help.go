@@ -420,6 +420,7 @@ const keysHelp = `USAGE
 
 	gin keys [-v | --verbose]
 	gin keys --add <filename>
+	gin keys --delete <number>
 
 DESCRIPTION
 
@@ -438,6 +439,10 @@ ARGUMENTS
 	--add <filename>
 		Specify a filename which contains a public key to be added to the GIN
 		server.
+
+	--delete <number>
+		Specify a number to delete the corresponding key from the server. Use
+		gin keys (with or without verbose) to get the numbered listing of keys.
 
 EXAMPLES
 
