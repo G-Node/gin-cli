@@ -328,7 +328,9 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 		}
 		if stat.FileName != fname || stat.State != state {
 			// New line if new file or new state
-			fmt.Println()
+			if len(lastprint) > 0 {
+				fmt.Println()
+			}
 			lastprint = ""
 			fname = stat.FileName
 			state = stat.State
