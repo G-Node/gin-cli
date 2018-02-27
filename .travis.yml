@@ -25,8 +25,8 @@ install:
   - go get github.com/mattn/goveralls
   - go get golang.org/x/tools/cmd/cover
   # dependencies
-  - go get github.com/docopt/docopt-go
   - go get github.com/spf13/viper
+  - go get github.com/spf13/cobra
   - go get github.com/howeyc/gopass
   - go get golang.org/x/crypto/ssh
   - go get github.com/G-Node/gin-core/gin
@@ -36,6 +36,7 @@ install:
   - go get github.com/fatih/color
   - go get github.com/hashicorp/go-version
   - go get github.com/shibukawa/configdir
+  - go get github.com/bbrks/wrap
   # import path symlink for forks
   - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -vs $(pwd) ${GOPATH}/src/github.com/G-Node/gin-cli; fi
 
