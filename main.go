@@ -27,8 +27,6 @@ var commit string
 var verstr string
 var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 
-var jsonflag = "--json"
-
 var green = color.New(color.FgGreen).SprintFunc()
 var red = color.New(color.FgRed).SprintFunc()
 
@@ -46,19 +44,6 @@ func requirelogin(cmd *cobra.Command, gincl *ginclient.Client, prompt bool) {
 	util.CheckError(err)
 }
 
-// checkJSON checks if the JSON flag is in the first position of the arg list and either true followed
-// by the rest of the arguments or false with the original argument list.
-func checkJSON(args []string) (json bool, rargs []string) {
-	rargs = args
-	if len(args) > 0 {
-		if args[0] == jsonflag {
-			json = true
-			rargs = args[1:]
-		}
-	}
-	return
-}
-
 // login requests credentials, performs login with auth server, and stores the token.
 func login(cmd *cobra.Command, args []string) {
 	var username string
@@ -69,7 +54,7 @@ func login(cmd *cobra.Command, args []string) {
 		fmt.Print("Login: ")
 		fmt.Scanln(&username)
 	} else if len(args) > 1 {
-		usageDie("login")
+		usageDie(cmd)
 	} else {
 		username = args[0]
 	}
@@ -105,7 +90,7 @@ func login(cmd *cobra.Command, args []string) {
 
 func logout(cmd *cobra.Command, args []string) {
 	if len(args) > 0 {
-		usageDie("logout")
+		usageDie(cmd)
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	err := gincl.LoadToken()
@@ -122,28 +107,18 @@ func createRepo(cmd *cobra.Command, args []string) {
 	requirelogin(cmd, gincl, true)
 
 	var repoName, repoDesc string
-	var here, noclone bool
 
-	// consume options
-	for len(args) > 0 && (args[0] == "--here" || args[0] == "--no-clone") {
-		if args[0] == "--here" {
-			here = true
-		}
-		if args[0] == "--no-clone" {
-			noclone = true
-		}
-		args = args[1:]
-	}
+	flags := cmd.Flags()
+	here, _ := flags.GetBool("here")
+	noclone, _ := flags.GetBool("no-clone")
 
 	if noclone && here {
-		usageDie("create")
+		usageDie(cmd)
 	}
 
 	if len(args) == 0 {
 		fmt.Print("Repository name: ")
 		fmt.Scanln(&repoName)
-	} else if len(args) > 2 {
-		usageDie("create")
 	} else {
 		repoName = args[0]
 		if len(args) == 2 {
@@ -176,7 +151,7 @@ func deleteRepo(cmd *cobra.Command, args []string) {
 	var repostr, confirmation string
 
 	if len(args) == 0 {
-		usageDie("delete")
+		usageDie(cmd)
 	} else {
 		repostr = args[0]
 	}
@@ -212,14 +187,8 @@ func isValidRepoPath(path string) bool {
 }
 
 func getRepo(cmd *cobra.Command, args []string) {
-	jsonout, args := checkJSON(args)
-	var repostr string
-	if len(args) != 1 {
-		usageDie("get")
-	} else {
-		repostr = args[0]
-	}
-
+	jsonout, _ := cmd.Flags().GetBool("json")
+	repostr := args[0]
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 
@@ -239,12 +208,12 @@ func lsRepo(cmd *cobra.Command, args []string) {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 
-	var short bool
-	jsonout, args := checkJSON(args)
-	if len(args) > 0 && (args[0] == "-s" || args[0] == "--short") {
-		short = true
-		args = args[1:]
+	flags := cmd.Flags()
+	if flags.NFlag() > 1 {
+		usageDie(cmd)
 	}
+	jsonout, _ := flags.GetBool("json")
+	short, _ := flags.GetBool("short")
 
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
@@ -295,7 +264,7 @@ func lsRepo(cmd *cobra.Command, args []string) {
 }
 
 func lock(cmd *cobra.Command, args []string) {
-	jsonout, args := checkJSON(args)
+	jsonout, _ := cmd.Flags().GetBool("json")
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -306,7 +275,7 @@ func lock(cmd *cobra.Command, args []string) {
 }
 
 func unlock(cmd *cobra.Command, args []string) {
-	jsonout, args := checkJSON(args)
+	jsonout, _ := cmd.Flags().GetBool("json")
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
@@ -377,7 +346,7 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 }
 
 func upload(cmd *cobra.Command, args []string) {
-	jsonout, args := checkJSON(args)
+	jsonout, _ := cmd.Flags().GetBool("json")
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 	if !ginclient.IsRepo() {
@@ -396,21 +365,14 @@ func upload(cmd *cobra.Command, args []string) {
 }
 
 func download(cmd *cobra.Command, args []string) {
-	jsonout, args := checkJSON(args)
+	jsonout, _ := cmd.Flags().GetBool("json")
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 
-	var content bool
-	if len(args) > 0 {
-		if args[0] != "--content" {
-			usageDie("upload")
-		}
-		content = true
-	}
-
+	content, _ := cmd.Flags().GetBool("content")
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 	lockchan := make(chan ginclient.RepoFileStatus)
@@ -432,7 +394,7 @@ func download(cmd *cobra.Command, args []string) {
 }
 
 func getContent(cmd *cobra.Command, args []string) {
-	jsonout, args := checkJSON(args)
+	jsonout, _ := cmd.Flags().GetBool("json")
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 	if !ginclient.IsRepo() {
@@ -447,7 +409,7 @@ func getContent(cmd *cobra.Command, args []string) {
 }
 
 func remove(cmd *cobra.Command, args []string) {
-	jsonout, args := checkJSON(args)
+	jsonout, _ := cmd.Flags().GetBool("json")
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 	if !ginclient.IsRepo() {
@@ -464,33 +426,30 @@ func remove(cmd *cobra.Command, args []string) {
 }
 
 func keys(cmd *cobra.Command, args []string) {
-	if len(args) > 0 {
-		subcommand := args[0]
-		if subcommand == "--add" {
-			addKey(cmd, args)
-			return
-		} else if subcommand == "--delete" {
-			delKey(cmd, args)
-			return
-		}
+	flags := cmd.Flags()
+	if flags.NFlag() > 1 {
+		usageDie(cmd)
 	}
-	printKeys(cmd, args)
-}
 
-func printKeys(cmd *cobra.Command, args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, true)
-	printFull := false
-	if len(args) > 1 {
-		usageDie("keys")
-	} else if len(args) == 1 {
-		if args[0] == "-v" || args[0] == "--verbose" {
-			printFull = true
-		} else {
-			usageDie("keys")
-		}
-	}
 
+	keyfilename, _ := flags.GetString("add")
+	keyidx, _ := flags.GetInt("delete")
+	verbose, _ := flags.GetBool("verbose")
+
+	if keyfilename != "" {
+		addKey(gincl, keyfilename)
+		return
+	}
+	if keyidx > 0 {
+		delKey(gincl, keyidx)
+		return
+	}
+	printKeys(gincl, verbose)
+}
+
+func printKeys(gincl *ginclient.Client, verbose bool) {
 	keys, err := gincl.GetUserKeys()
 	util.CheckError(err)
 
@@ -511,23 +470,13 @@ func printKeys(cmd *cobra.Command, args []string) {
 	fmt.Printf("You have %s key%s associated with your account.\n\n", nkeysStr, plural)
 	for idx, key := range keys {
 		fmt.Printf("[%v] \"%s\"\n", idx+1, key.Title)
-		if printFull {
+		if verbose {
 			fmt.Printf("--- Key ---\n%s\n", key.Key)
 		}
 	}
 }
 
-func addKey(cmd *cobra.Command, args []string) {
-	if len(args) != 2 {
-		usageDie("keys")
-	}
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(cmd, gincl, true)
-	err := gincl.LoadToken()
-	util.CheckError(err)
-
-	filename := args[1]
-
+func addKey(gincl *ginclient.Client, filename string) {
 	keyBytes, err := ioutil.ReadFile(filename)
 	util.CheckError(err)
 	key := string(keyBytes)
@@ -544,20 +493,7 @@ func addKey(cmd *cobra.Command, args []string) {
 	fmt.Printf("New key added '%s'\n", description)
 }
 
-func delKey(cmd *cobra.Command, args []string) {
-	if len(args) != 2 {
-		usageDie("keys")
-	}
-
-	idx, err := strconv.Atoi(args[1])
-	if err != nil {
-		usageDie("keys")
-	}
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(cmd, gincl, true)
-	err = gincl.LoadToken()
-	util.CheckError(err)
-
+func delKey(gincl *ginclient.Client, idx int) {
 	name, err := gincl.DeletePubKeyByIdx(idx)
 	util.CheckError(err)
 	fmt.Printf("Deleted key with name '%s'\n", name)
@@ -613,22 +549,12 @@ func printRepoList(repolist []gogs.Repository) {
 }
 
 func repos(cmd *cobra.Command, args []string) {
-	jsonout, args := checkJSON(args)
-	var allrepos, sharedrepos bool
-	if len(args) > 0 {
-		if args[0] == "--all" {
-			allrepos = true
-			args = args[1:]
-		} else if args[0] == "--shared" {
-			sharedrepos = true
-			args = args[1:]
-		}
-	}
-	if (allrepos || sharedrepos) && len(args) > 0 {
-		usageDie("repos")
-	}
-	if len(args) > 1 {
-		usageDie("repos")
+	flags := cmd.Flags()
+	jsonout, _ := flags.GetBool("json")
+	allrepos, _ := flags.GetBool("all")
+	sharedrepos, _ := flags.GetBool("shared")
+	if (allrepos && sharedrepos) || ((allrepos || sharedrepos) && len(args) > 0) {
+		usageDie(cmd)
 	}
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, true)
@@ -698,8 +624,8 @@ func help(args []string) {
 	fmt.Println(helptext)
 }
 
-func usageDie(command string) {
-	help([]string{command})
+func usageDie(cmd *cobra.Command) {
+	cmd.Help()
 	// exit without message
 	util.Die("")
 }
@@ -767,10 +693,7 @@ func annexrun(cmd *cobra.Command, args []string) {
 }
 
 func printversion(args []string) {
-	jsonout, args := checkJSON(args)
-	if len(args) > 0 {
-		usageDie("version")
-	}
+	jsonout := true // TODO: make this a new command
 	if jsonout {
 		verjson := struct {
 			Version string `json:"version"`
@@ -808,7 +731,7 @@ func main() {
 	var rootCmd = &cobra.Command{
 		Use:                   "gin",
 		Long:                  "GIN Command Line Interface and client for the GIN services", // TODO: Add license and web info
-		Version:               verstr,
+		Version:               fmt.Sprintln(verstr),
 		DisableFlagsInUseLine: true,
 	}
 	rootCmd.SetVersionTemplate("{{ .Version }}")
@@ -839,7 +762,7 @@ func main() {
 		Short: "Logout of the GIN services",
 		Long:  "Logout of the GIN services. This command takes no arguments.",
 		Args:  cobra.NoArgs,
-		Run:   login,
+		Run:   logout,
 		DisableFlagsInUseLine: true,
 	}
 	rootCmd.AddCommand(logoutCmd)
@@ -849,11 +772,12 @@ func main() {
 		Use:   "create [--here | --no-clone] [<repository>] [<description>]",
 		Short: "Create a new repository on the GIN server",
 		Long:  "Create a new repository on the GIN server and optionally clone it locally or initialise working directory.",
-		Args:  cobra.RangeArgs(0, 3),
+		Args:  cobra.MaximumNArgs(2),
 		Run:   createRepo,
 		DisableFlagsInUseLine: true,
 	}
-	// TODO: Handle flags properly
+	createCmd.Flags().Bool("here", false, "Create the local repository clone in the current working directory. Cannot be used with --no-clone.")
+	createCmd.Flags().Bool("no-clone", false, "Create repository on the server but do not clone it locally. Cannot be used with --here.")
 	rootCmd.AddCommand(createCmd)
 
 	// Delete repo (unlisted)
@@ -866,7 +790,6 @@ func main() {
 		DisableFlagsInUseLine: true,
 		Hidden:                true,
 	}
-	// TODO: Handle flags properly
 	rootCmd.AddCommand(deleteCmd)
 
 	// Get repo
@@ -878,7 +801,7 @@ func main() {
 		Run:   getRepo,
 		DisableFlagsInUseLine: true,
 	}
-	// TODO: Handle flags properly
+	createCmd.Flags().Bool("json", false, "Print output in JSON format.")
 	rootCmd.AddCommand(getRepoCmd)
 
 	// List files
@@ -890,7 +813,8 @@ func main() {
 		Run:   lsRepo,
 		DisableFlagsInUseLine: true,
 	}
-	// TODO: Handle flags properly
+	lsRepoCmd.Flags().Bool("json", false, "Print listing in JSON format (uses short form abbreviations).")
+	lsRepoCmd.Flags().BoolP("short", "s", false, "Print listing in short form.")
 	rootCmd.AddCommand(lsRepoCmd)
 
 	w := wrap.NewWrapper()
@@ -904,7 +828,7 @@ func main() {
 		Run:   unlock,
 		DisableFlagsInUseLine: true,
 	}
-	// TODO: Handle flags properly
+	unlockCmd.Flags().Bool("json", false, "Print output in JSON format.")
 	rootCmd.AddCommand(unlockCmd)
 
 	// Lock content
@@ -916,7 +840,7 @@ func main() {
 		Run:   lock,
 		DisableFlagsInUseLine: true,
 	}
-	// TODO: Handle flags properly
+	lockCmd.Flags().Bool("json", false, "Print output in JSON format.")
 	rootCmd.AddCommand(lockCmd)
 
 	// Upload
@@ -928,7 +852,7 @@ func main() {
 		Run:   upload,
 		DisableFlagsInUseLine: true,
 	}
-	// TODO: Handle flags properly
+	uploadCmd.Flags().Bool("json", false, "Print output in JSON format.")
 	rootCmd.AddCommand(uploadCmd)
 
 	// Download
@@ -940,7 +864,8 @@ func main() {
 		Run:   download,
 		DisableFlagsInUseLine: true,
 	}
-	// TODO: Handle flags properly
+	downloadCmd.Flags().Bool("json", false, "Print output in JSON format.")
+	downloadCmd.Flags().Bool("content", false, "Download the content for all files in the repository.")
 	rootCmd.AddCommand(downloadCmd)
 
 	// Get content
@@ -953,7 +878,7 @@ func main() {
 		Aliases:               []string{"getc"},
 		DisableFlagsInUseLine: true,
 	}
-	// TODO: Handle flags properly
+	getContentCmd.Flags().Bool("json", false, "Print output in JSON format.")
 	rootCmd.AddCommand(getContentCmd)
 
 	// Remove content
@@ -962,11 +887,11 @@ func main() {
 		Short:                 "Remove the content of local files that have already been uploaded",
 		Long:                  w.Wrap("Remove the content of local files. This command will not remove the content of files that have not been already uploaded to a remote repository, even if the user specifies such files explicitly. Removed content can be retrieved from the server by using the 'get-content' command. With no arguments, removes the content of all files under the current working directory, as long as they have been safely uploaded to a remote repository.\n\nNote that after removal, placeholder files will remain in the local repository. These files appear as 'No Content' when running the 'gin ls' command.", 80),
 		Args:                  cobra.ArbitraryArgs,
-		Run:                   getContent,
+		Run:                   remove,
 		Aliases:               []string{"rmc"},
 		DisableFlagsInUseLine: true,
 	}
-	// TODO: Handle flags properly
+	rmContentCmd.Flags().Bool("json", false, "Print output in JSON format.")
 	rootCmd.AddCommand(rmContentCmd)
 
 	// Account info
@@ -989,6 +914,9 @@ func main() {
 		Run:   repos,
 		DisableFlagsInUseLine: true,
 	}
+	reposCmd.Flags().Bool("all", false, "List all repositories accessible to the logged in user.")
+	reposCmd.Flags().Bool("shared", false, "List all repositories that the user is a member of (excluding own repositories).")
+	reposCmd.Flags().Bool("json", false, "Print listing in JSON format.")
 	rootCmd.AddCommand(reposCmd)
 
 	// Keys
@@ -1000,6 +928,9 @@ func main() {
 		Run:   keys,
 		DisableFlagsInUseLine: true,
 	}
+	keysCmd.Flags().String("add", "", "Specify a filename which contains a public key to be added to the GIN server.")
+	keysCmd.Flags().Int("delete", 0, "Specify a number to delete the corresponding key from the server. Use 'gin keys' to get the numbered listing of keys.")
+	keysCmd.Flags().BoolP("verbose", "v", false, "Verbose printing. Prints the entire public key.")
 	rootCmd.AddCommand(keysCmd)
 
 	// git and annex passthrough (unlisted)
@@ -1011,6 +942,7 @@ func main() {
 		Run:   gitrun,
 		DisableFlagsInUseLine: true,
 		Hidden:                true,
+		DisableFlagParsing:    true,
 	}
 	rootCmd.AddCommand(gitCmd)
 
@@ -1022,6 +954,7 @@ func main() {
 		Run:   annexrun,
 		DisableFlagsInUseLine: true,
 		Hidden:                true,
+		DisableFlagParsing:    true,
 	}
 	rootCmd.AddCommand(annexCmd)
 
