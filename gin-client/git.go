@@ -1017,12 +1017,15 @@ type GinCommit struct {
 // GitLog returns the commit logs for the repository.
 // The number of commits can be limited by the 'count' argument.
 // If count <= 0, the entire commit history is returned.
-func GitLog(count uint) ([]GinCommit, error) {
+func GitLog(count uint, paths []string) ([]GinCommit, error) {
 	// TODO: Use git log -z and split stdout on NULL (\x00)
 	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat)}
 	if count > 0 {
 		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
+	}
+	if paths != nil && len(paths) > 0 {
+		cmdargs = append(cmdargs, paths...)
 	}
 	cmd, err := RunGitCommand(cmdargs...)
 	if err != nil {
@@ -1038,16 +1041,16 @@ func GitLog(count uint) ([]GinCommit, error) {
 			break
 		}
 		var commit GinCommit
-		err := json.Unmarshal([]byte(line), &commit)
-		if err != nil {
+		ierr := json.Unmarshal([]byte(line), &commit)
+		if ierr != nil {
 			util.LogWrite("Error parsing git log")
-			util.LogWrite(err.Error())
+			util.LogWrite(ierr.Error())
 			continue
 		}
 		commits = append(commits, commit)
 	}
 
-	logstats, err := GitLogDiffstat(count)
+	logstats, err := GitLogDiffstat(count, paths)
 	if err != nil {
 		util.LogWrite("Failed to get diff stats")
 		return commits, nil
@@ -1066,11 +1069,14 @@ type DiffStat struct {
 	ModifiedFiles []string
 }
 
-func GitLogDiffstat(count uint) (map[string]DiffStat, error) {
+func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 	logformat := `::%H`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
 	if count > 0 {
 		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
+	}
+	if paths != nil && len(paths) > 0 {
+		cmdargs = append(cmdargs, paths...)
 	}
 	cmd, err := RunGitCommand(cmdargs...)
 	if err != nil {
