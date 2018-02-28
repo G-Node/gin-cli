@@ -41,6 +41,7 @@ build_script:
   - go get github.com/hashicorp/go-version
   - go get github.com/shibukawa/configdir
   - go get github.com/bbrks/wrap
+  - go get github.com/docker/docker/pkg/term
   - go vet ./...
   - gofmt -s -l .
   - golint github.com/G-Node/gin-cli...
