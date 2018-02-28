@@ -1,0 +1,102 @@
+package gincmd
+
+import (
+	"fmt"
+	"io/ioutil"
+	"strconv"
+	"strings"
+	"time"
+
+	ginclient "github.com/G-Node/gin-cli/gin-client"
+	"github.com/G-Node/gin-cli/util"
+	"github.com/spf13/cobra"
+)
+
+func keys(cmd *cobra.Command, args []string) {
+	flags := cmd.Flags()
+	if flags.NFlag() > 1 {
+		usageDie(cmd)
+	}
+
+	gincl := ginclient.NewClient(util.Config.GinHost)
+	requirelogin(cmd, gincl, true)
+
+	keyfilename, _ := flags.GetString("add")
+	keyidx, _ := flags.GetInt("delete")
+	verbose, _ := flags.GetBool("verbose")
+
+	if keyfilename != "" {
+		addKey(gincl, keyfilename)
+		return
+	}
+	if keyidx > 0 {
+		delKey(gincl, keyidx)
+		return
+	}
+	printKeys(gincl, verbose)
+}
+
+func printKeys(gincl *ginclient.Client, verbose bool) {
+	keys, err := gincl.GetUserKeys()
+	util.CheckError(err)
+
+	nkeys := len(keys)
+	var plural string
+	if nkeys == 1 {
+		plural = ""
+	} else {
+		plural = "s"
+	}
+
+	var nkeysStr string
+	if nkeys == 0 {
+		nkeysStr = "no"
+	} else {
+		nkeysStr = fmt.Sprintf("%d", nkeys)
+	}
+	fmt.Printf("You have %s key%s associated with your account.\n\n", nkeysStr, plural)
+	for idx, key := range keys {
+		fmt.Printf("[%v] \"%s\"\n", idx+1, key.Title)
+		if verbose {
+			fmt.Printf("--- Key ---\n%s\n", key.Key)
+		}
+	}
+}
+
+func addKey(gincl *ginclient.Client, filename string) {
+	keyBytes, err := ioutil.ReadFile(filename)
+	util.CheckError(err)
+	key := string(keyBytes)
+	strSlice := strings.Split(key, " ")
+	var description string
+	if len(strSlice) > 2 {
+		description = strings.TrimSpace(strSlice[2])
+	} else {
+		description = fmt.Sprintf("%s@%s", gincl.Username, strconv.FormatInt(time.Now().Unix(), 10))
+	}
+
+	err = gincl.AddKey(string(keyBytes), description, false)
+	util.CheckError(err)
+	fmt.Printf("New key added '%s'\n", description)
+}
+
+func delKey(gincl *ginclient.Client, idx int) {
+	name, err := gincl.DeletePubKeyByIdx(idx)
+	util.CheckError(err)
+	fmt.Printf("Deleted key with name '%s'\n", name)
+}
+
+func KeysCmd() *cobra.Command {
+	var keysCmd = &cobra.Command{
+		Use:   "keys [--add <filename> | --delete <keynum> | --verbose | -v]",
+		Short: "List, add, or delete public keys on the GIN services",
+		Long:  w.Wrap("List, add, or delete SSH keys. If No argument is provided, a numbered list of key names is printed. The key number can be used with the '--delete' flag to remove a key from the server.\n\nThe command can also be used to add a public key to your account from an existing filename (see '--add' flag).", 80),
+		Args:  cobra.MaximumNArgs(1),
+		Run:   keys,
+		DisableFlagsInUseLine: true,
+	}
+	keysCmd.Flags().String("add", "", "Specify a filename which contains a public key to be added to the GIN server.")
+	keysCmd.Flags().Int("delete", 0, "Specify a number to delete the corresponding key from the server. Use 'gin keys' to get the numbered listing of keys.")
+	keysCmd.Flags().BoolP("verbose", "v", false, "Verbose printing. Prints the entire public key.")
+	return keysCmd
+}
