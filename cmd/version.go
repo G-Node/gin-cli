@@ -40,6 +40,7 @@ func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
 		fmt.Printf("%s  %s * %s\n\n", idxstr, green(commit.AbbreviatedHash), commit.Date.Format("Mon Jan 2 15:04:05 2006 (-0700)"))
 		fmt.Printf("\t%s\n\n", commit.Subject)
 		fstats := commit.FileStats
+		// TODO: wrap file listings
 		if len(fstats.NewFiles) > 0 {
 			fmt.Printf("\tAdded:    %s\n", strings.Join(fstats.NewFiles, ", "))
 		}
@@ -89,4 +90,23 @@ func checkout(commit ginclient.GinCommit, gincl *ginclient.Client) {
 
 	go gincl.Upload([]string{}, commitmsg, uploadchan)
 	printProgress(uploadchan, false)
+}
+
+// VersionCmd sets up the 'version' subcommand
+func VersionCmd() *cobra.Command {
+	description := "Roll back directories or files to older versions."
+	args := map[string]string{"<filenames>": "One or more directories or files to roll back."}
+	examples := map[string]string{"Example 1": "$ gin version -n 50"}
+	var versionCmd = &cobra.Command{
+		Use:     "version [--json] [--max-count] [<filenames>]...",
+		Short:   "Roll back files or directories to older versions",
+		Long:    formatdesc(description, args),
+		Example: formatexamples(examples),
+		Args:    cobra.ArbitraryArgs,
+		Run:     repoversion,
+		DisableFlagsInUseLine: true,
+	}
+	versionCmd.Flags().Bool("json", false, "Print output in JSON format.")
+	versionCmd.Flags().UintP("max-count", "n", 10, "Maximum number of versions to display before prompting. 0 means 'all'.")
+	return versionCmd
 }

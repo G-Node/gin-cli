@@ -136,6 +136,9 @@ func main() {
 	// Keys
 	rootCmd.AddCommand(gincmd.KeysCmd())
 
+	// Version
+	rootCmd.AddCommand(gincmd.VersionCmd())
+
 	// git and annex passthrough (unlisted)
 	rootCmd.AddCommand(gincmd.GitCmd())
 	rootCmd.AddCommand(gincmd.AnnexCmd())
