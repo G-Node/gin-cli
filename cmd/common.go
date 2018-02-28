@@ -8,14 +8,13 @@ import (
 	ginclient "github.com/G-Node/gin-cli/gin-client"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/bbrks/wrap"
+	"github.com/docker/docker/pkg/term"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
 var green = color.New(color.FgGreen).SprintFunc()
 var red = color.New(color.FgRed).SprintFunc()
-
-var w = wrap.NewWrapper()
 
 // requirelogin prompts for login if the user is not already logged in.
 // It only checks if a local token exists and does not confirm its validity with the server.
@@ -95,4 +94,44 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 		}
 		util.Die(fmt.Sprintf("%d operation%s failed", nerrors, plural))
 	}
+}
+
+var wouter = wrap.NewWrapper()
+var winner = wrap.NewWrapper()
+
+func termwidth() int {
+	width := 80
+	if ws, err := term.GetWinsize(0); err == nil {
+		width = int(ws.Width)
+	}
+	return width - 1
+}
+
+func formatdesc(desc string, args map[string]string) (fdescription string) {
+	width := termwidth()
+	wouter.OutputLinePrefix = "  "
+	winner.OutputLinePrefix = "    "
+
+	if len(desc) > 0 {
+		fdescription = fmt.Sprintf("Description:\n\n%s", wouter.Wrap(desc, width))
+	}
+
+	if args != nil {
+		argsdesc := fmt.Sprintf("Arguments:\n\n")
+		for a, d := range args {
+			argsdesc = fmt.Sprintf("%s%s%s\n", argsdesc, wouter.Wrap(a, width), winner.Wrap(d, width))
+		}
+		fdescription = fmt.Sprintf("%s\n%s", fdescription, argsdesc)
+	}
+	return
+}
+
+func formatexamples(examples map[string]string) (exdesc string) {
+	width := termwidth()
+	if examples != nil {
+		for d, ex := range examples {
+			exdesc = fmt.Sprintf("%s\n%s%s", exdesc, wouter.Wrap(d, width), winner.Wrap(ex, width))
+		}
+	}
+	return
 }

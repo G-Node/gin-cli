@@ -92,10 +92,15 @@ func repos(cmd *cobra.Command, args []string) {
 
 // ReposCmd sets up the 'repos' listing subcommand
 func ReposCmd() *cobra.Command {
+	description := "List repositories on the server that provide read access. If no argument is provided, it will list the repositories owned by the logged in user.\n\nNote that only one of the options can be specified."
+
+	args := map[string]string{
+		"<username>": "The name of the user whose repositories should be listed. The list consists of public repositories and repositories shared with the logged in user.",
+	}
 	var reposCmd = &cobra.Command{
 		Use:   "repos [--shared | --all | <username>]",
 		Short: "List available remote repositories",
-		Long:  w.Wrap("List repositories on the server that provide read access. If no argument is provided, it will list the repositories owned by the logged in user.\n\nNote that only one of the options can be specified.", 80),
+		Long:  formatdesc(description, args),
 		Args:  cobra.MaximumNArgs(1),
 		Run:   repos,
 		DisableFlagsInUseLine: true,

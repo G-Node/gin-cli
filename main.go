@@ -84,14 +84,9 @@ func main() {
 	}
 	rootCmd.SetVersionTemplate("{{ .Version }}")
 
-	// TODO: Nicely wrap long command descriptions
-	// TODO: Add argument descriptions (might have to put them in the long description)
-	// cobra.AddTemplateFunc("indent", indent)
-	// cobra.AddTemplateFunc("wrapflags", wrapFlags)
-	// cobra.AddTemplateFunc("wrapdesc", wrapDescription)
-	// cobra.AddTemplateFunc("wrapexample", wrapExample)
-
-	// rootCmd.SetHelpTemplate(usageTemplate)
+	cobra.AddTemplateFunc("wrappedFlagUsages", wrappedFlagUsages)
+	rootCmd.SetHelpTemplate(helpTemplate)
+	rootCmd.SetUsageTemplate(usageTemplate)
 
 	// Login
 	rootCmd.AddCommand(gincmd.LoginCmd())

@@ -32,12 +32,21 @@ func getRepo(cmd *cobra.Command, args []string) {
 
 // GetCmd sets up the 'get' repository subcommand
 func GetCmd() *cobra.Command {
+	description := "Download a remote repository to a new directory and initialise the directory with the default options. The local directory is referred to as the 'clone' of the repository."
+	args := map[string]string{
+		"<repopath>": "The repository path must be specified on the command line. A repository path is the owner's username, followed by a \"/\" and the repository name.",
+	}
+	examples := map[string]string{
+		"Get and initialise the repository named 'example' owned by user 'alice'": "$ gin get alice/example",
+		"Get and initialise the repository named 'eegdata' owned by user 'peter'": "$ gin get peter/eegdata",
+	}
 	var getRepoCmd = &cobra.Command{
-		Use:   "get [--json] <repository>",
-		Short: "Retrieve (clone) a repository from the remote server",
-		Long:  "Download a remote repository to a new directory and initialise the directory with the default options. The local directory is referred to as the 'clone' of the repository.",
-		Args:  cobra.ExactArgs(1),
-		Run:   getRepo,
+		Use:     "get [--json] <repository>",
+		Short:   "Retrieve (clone) a repository from the remote server",
+		Long:    formatdesc(description, args),
+		Example: formatexamples(examples),
+		Args:    cobra.ExactArgs(1),
+		Run:     getRepo,
 		DisableFlagsInUseLine: true,
 	}
 	getRepoCmd.Flags().Bool("json", false, "Print output in JSON format.")

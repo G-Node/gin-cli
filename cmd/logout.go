@@ -27,7 +27,7 @@ func LogoutCmd() *cobra.Command {
 	var logoutCmd = &cobra.Command{
 		Use:   "logout",
 		Short: "Logout of the GIN services",
-		Long:  "Logout of the GIN services. This command takes no arguments.",
+		Long:  "Logout of the GIN services.\n\nThis command takes no arguments.",
 		Args:  cobra.NoArgs,
 		Run:   logout,
 		DisableFlagsInUseLine: true,

@@ -19,10 +19,14 @@ func lock(cmd *cobra.Command, args []string) {
 
 // LockCmd sets up the file 'lock' subcommand
 func LockCmd() *cobra.Command {
+	description := "Lock one or more files after editing. After unlocking files for editing (using the 'unlock' command), it is recommended that they be locked again. This records any changes made and prepares a file for upload.\n\nLocked files are replaced by symbolic links in the working directory (where supported by the filesystem).\n\nAfter performing an 'upload', 'download', or 'get', affected files are reverted to a locked state.\n\nLocking a file takes longer depending on the size of the file."
+	args := map[string]string{
+		"<filenames>": "One or more directories or files to lock.",
+	}
 	var lockCmd = &cobra.Command{
 		Use:   "lock [--json] [<filenames>]...",
 		Short: "Lock files",
-		Long:  w.Wrap("Lock one or more files after editing. After unlocking files for editing (using the 'unlock' command), it is recommended that they be locked again. This records any changes made and prepares a file for upload.\n\nLocked files are replaced by symbolic links in the working directory (where supported by the filesystem).\n\nAfter performing an 'upload', 'download', or 'get', affected files are reverted to a locked state.\n\nLocking a file takes longer depending on the size of the file.", 80),
+		Long:  formatdesc(description, args),
 		Args:  cobra.ArbitraryArgs,
 		Run:   lock,
 		DisableFlagsInUseLine: true,

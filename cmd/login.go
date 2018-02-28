@@ -55,10 +55,11 @@ func login(cmd *cobra.Command, args []string) {
 
 // LoginCmd sets up the 'login' subcommand
 func LoginCmd() *cobra.Command {
+	description := "Login to the GIN services.\n\nIf no username is specified on the command line, you will be prompted for it. The login command always prompts for a password."
 	var loginCmd = &cobra.Command{
 		Use:   "login [<username>]",
 		Short: "Login to the GIN services",
-		Long:  "Login to the GIN services.",
+		Long:  formatdesc(description, nil),
 		Args:  cobra.MaximumNArgs(1),
 		Run:   login,
 		DisableFlagsInUseLine: true,

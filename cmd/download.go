@@ -40,10 +40,11 @@ func download(cmd *cobra.Command, args []string) {
 
 // DownloadCmd sets up the 'download' subcommand
 func DownloadCmd() *cobra.Command {
+	description := "Downloads changes from the remote repository to the local clone. This will create new files that were added remotely, delete files that were removed, and update files that were changed.\n\nOptionally downloads the content of all files in the repository. If 'content' is not specified, new files will be empty placeholders. Content of individual files can later be retrieved using the 'get-content' command."
 	var downloadCmd = &cobra.Command{
 		Use:   "download [--json] [--content]",
 		Short: "Download all new information from a remote repository",
-		Long:  w.Wrap("Downloads changes from the remote repository to the local clone. This will create new files that were added remotely, delete files that were removed, and update files that were changed.\n\nOptionally downloads the content of all files in the repository. If 'content' is not specified, new files will be empty placeholders. Content of individual files can later be retrieved using the 'get-content' command.", 80),
+		Long:  formatdesc(description, nil),
 		Args:  cobra.NoArgs,
 		Run:   download,
 		DisableFlagsInUseLine: true,

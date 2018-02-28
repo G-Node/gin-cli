@@ -73,10 +73,26 @@ func lsRepo(cmd *cobra.Command, args []string) {
 
 // LsRepoCmd sets up the file 'ls' subcommand
 func LsRepoCmd() *cobra.Command {
+
+	description := `List one or more files or the contents of directories and the status of the files within it. With no arguments, lists the status of the files under the current directory. Directory listings are performed recursively.
+
+In the short form, the meaning of the status abbreviations is as follows:
+OK: The file is part of the GIN repository and its contents are synchronised with the server.
+UL: The file has been unlocked for editing.
+NC: The local file is a placeholder and its contents have not been downloaded.
+MD: The file has been modified locally and the changes have not been recorded yet.
+LC: The file has been modified locally, the changes have been recorded but they haven't been uploaded.
+RM: The file has been removed from the repository.
+??: The file is not under repository control.`
+
+	args := map[string]string{
+		"<filenames>": "One or more directories or files to list.",
+	}
+
 	var lsRepoCmd = &cobra.Command{
 		Use:   "ls [--json | --short | -s] [<filenames>]...",
 		Short: "List the sync status of files in the local repository",
-		Long:  "List one or more files or the contents of directories and their status. With no arguments, lists the status of the files under the current directory. Directory listings are performed recursively.",
+		Long:  formatdesc(description, args),
 		Args:  cobra.ArbitraryArgs,
 		Run:   lsRepo,
 		DisableFlagsInUseLine: true,
