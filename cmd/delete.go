@@ -45,6 +45,7 @@ func deleteRepo(cmd *cobra.Command, args []string) {
 	fmt.Printf("Repository %s has been deleted!\n", repostr)
 }
 
+// DeleteCmd sets up the 'delete' repository subcommand
 func DeleteCmd() *cobra.Command {
 	var deleteCmd = &cobra.Command{
 		Use:   "delete <repository>",

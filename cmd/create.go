@@ -52,6 +52,7 @@ func createRepo(cmd *cobra.Command, args []string) {
 	}
 }
 
+// CreateCmd sets up the 'create' subcommand
 func CreateCmd() *cobra.Command {
 	var createCmd = &cobra.Command{
 		Use:   "create [--here | --no-clone] [<repository>] [<description>]",

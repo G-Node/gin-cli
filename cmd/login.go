@@ -53,6 +53,7 @@ func login(cmd *cobra.Command, args []string) {
 	fmt.Printf("Hello %s. You are now logged in.\n", info.UserName)
 }
 
+// LoginCmd sets up the 'login' subcommand
 func LoginCmd() *cobra.Command {
 	var loginCmd = &cobra.Command{
 		Use:   "login [<username>]",

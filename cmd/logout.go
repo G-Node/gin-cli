@@ -22,6 +22,7 @@ func logout(cmd *cobra.Command, args []string) {
 	fmt.Println("You have been logged out.")
 }
 
+// LogoutCmd sets up the 'logout' subcommand
 func LogoutCmd() *cobra.Command {
 	var logoutCmd = &cobra.Command{
 		Use:   "logout",

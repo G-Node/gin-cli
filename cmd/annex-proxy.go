@@ -29,6 +29,7 @@ func annexrun(cmd *cobra.Command, args []string) {
 	}
 }
 
+// AnnexCmd sets up the 'annex' passthrough subcommand
 func AnnexCmd() *cobra.Command {
 	var annexCmd = &cobra.Command{
 		Use:   "annex <cmd> [<args>]...",

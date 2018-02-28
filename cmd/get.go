@@ -30,6 +30,7 @@ func getRepo(cmd *cobra.Command, args []string) {
 	printProgress(clonechan, jsonout)
 }
 
+// GetCmd sets up the 'get' repository subcommand
 func GetCmd() *cobra.Command {
 	var getRepoCmd = &cobra.Command{
 		Use:   "get [--json] <repository>",

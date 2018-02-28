@@ -38,6 +38,7 @@ func download(cmd *cobra.Command, args []string) {
 	}
 }
 
+// DownloadCmd sets up the 'download' subcommand
 func DownloadCmd() *cobra.Command {
 	var downloadCmd = &cobra.Command{
 		Use:   "download [--json] [--content]",

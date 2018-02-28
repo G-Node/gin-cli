@@ -86,6 +86,7 @@ func delKey(gincl *ginclient.Client, idx int) {
 	fmt.Printf("Deleted key with name '%s'\n", name)
 }
 
+// KeysCmd sets up the 'keys' list, add, delete subcommand(s)
 func KeysCmd() *cobra.Command {
 	var keysCmd = &cobra.Command{
 		Use:   "keys [--add <filename> | --delete <keynum> | --verbose | -v]",

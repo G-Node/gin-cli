@@ -17,6 +17,7 @@ func lock(cmd *cobra.Command, args []string) {
 	printProgress(lockchan, jsonout)
 }
 
+// LockCmd sets up the file 'lock' subcommand
 func LockCmd() *cobra.Command {
 	var lockCmd = &cobra.Command{
 		Use:   "lock [--json] [<filenames>]...",

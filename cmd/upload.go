@@ -25,6 +25,7 @@ func upload(cmd *cobra.Command, args []string) {
 	printProgress(uploadchan, jsonout)
 }
 
+// UploadCmd sets up the 'upload' subcommand
 func UploadCmd() *cobra.Command {
 	var uploadCmd = &cobra.Command{
 		Use:   "upload [--json] [<filenames>]...",

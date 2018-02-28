@@ -40,6 +40,7 @@ func printAccountInfo(cmd *cobra.Command, args []string) {
 	fmt.Println(outBuffer.String())
 }
 
+// InfoCmd sets up the  user 'info' subcommand
 func InfoCmd() *cobra.Command {
 	var infoCmd = &cobra.Command{
 		Use:   "info [username]",

@@ -23,6 +23,7 @@ func remove(cmd *cobra.Command, args []string) {
 	printProgress(rmchan, jsonout)
 }
 
+// RemoveContentCmd sets up the 'remove-content' subcommand
 func RemoveContentCmd() *cobra.Command {
 	var rmContentCmd = &cobra.Command{
 		Use:                   "remove-content [--json] [<filenames>]...",

@@ -21,6 +21,7 @@ func getContent(cmd *cobra.Command, args []string) {
 	printProgress(getcchan, jsonout)
 }
 
+// GetContentCmd sets up the 'get-content' subcommand
 func GetContentCmd() *cobra.Command {
 	var getContentCmd = &cobra.Command{
 		Use:                   "get-content [--json] [<filenames>]...",

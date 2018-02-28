@@ -71,6 +71,7 @@ func lsRepo(cmd *cobra.Command, args []string) {
 	}
 }
 
+// LsRepoCmd sets up the file 'ls' subcommand
 func LsRepoCmd() *cobra.Command {
 	var lsRepoCmd = &cobra.Command{
 		Use:   "ls [--json | --short | -s] [<filenames>]...",

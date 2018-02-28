@@ -17,6 +17,7 @@ func unlock(cmd *cobra.Command, args []string) {
 	printProgress(unlockchan, jsonout)
 }
 
+// UnlockCmd sets up the file 'unlock' subcommand
 func UnlockCmd() *cobra.Command {
 	var unlockCmd = &cobra.Command{
 		Use:   "unlock [--json] [<filenames>]...",

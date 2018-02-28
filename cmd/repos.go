@@ -90,6 +90,7 @@ func repos(cmd *cobra.Command, args []string) {
 	}
 }
 
+// ReposCmd sets up the 'repos' listing subcommand
 func ReposCmd() *cobra.Command {
 	var reposCmd = &cobra.Command{
 		Use:   "repos [--shared | --all | <username>]",
