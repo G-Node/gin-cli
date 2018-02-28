@@ -43,8 +43,8 @@ install:
 
 script:
   - make
+  - make installtest
   - if [ ${TRAVIS_GO_VERSION} != "tip" ]; then
-        cp ./build/gin ./tests/bin/gin;
         ./tests/start-server.sh;
         while ! curl localhost:3000 -so /dev/null; do sleep 1; done;
         ./tests/run-cont-tests.sh;
