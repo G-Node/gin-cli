@@ -1017,7 +1017,7 @@ type GinCommit struct {
 // GitLog returns the commit logs for the repository.
 // The number of commits can be limited by the 'count' argument.
 // If count <= 0, the entire commit history is returned.
-func GitLog(count int) ([]GinCommit, error) {
+func GitLog(count uint) ([]GinCommit, error) {
 	// TODO: Use git log -z and split stdout on NULL (\x00)
 	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat)}
@@ -1066,7 +1066,7 @@ type DiffStat struct {
 	ModifiedFiles []string
 }
 
-func GitLogDiffstat(count int) (map[string]DiffStat, error) {
+func GitLogDiffstat(count uint) (map[string]DiffStat, error) {
 	logformat := `::%H`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
 	if count > 0 {
