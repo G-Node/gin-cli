@@ -592,6 +592,25 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	return
 }
 
+// build exclusion argument list
+// files < annex.minsize or matching exclusion extensions will not be annexed and
+// will instead be handled by git
+func annexExclArgs() (exclargs []string) {
+	if util.Config.Annex.MinSize != "" {
+		sizefilterarg := fmt.Sprintf("--largerthan=%s", util.Config.Annex.MinSize)
+		exclargs = append(exclargs, sizefilterarg)
+	}
+
+	for _, pattern := range util.Config.Annex.Exclude {
+		arg := fmt.Sprintf("--exclude=%s", pattern)
+		exclargs = append(exclargs, arg)
+	}
+
+	// explicitly exclude config file
+	exclargs = append(exclargs, "--exclude=config.yml")
+	return
+}
+
 // AnnexAdd adds paths to the annex.
 // Files specified for exclusion in the configuration are ignored automatically.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
@@ -606,23 +625,7 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	cmdargs := []string{"--json", "add"}
 	cmdargs = append(cmdargs, filepaths...)
 
-	// build exclusion argument list
-	// files < annex.minsize or matching exclusion extensions will not be annexed and
-	// will instead be handled by git
-	var exclargs []string
-	if util.Config.Annex.MinSize != "" {
-		sizefilterarg := fmt.Sprintf("--largerthan=%s", util.Config.Annex.MinSize)
-		exclargs = append(exclargs, sizefilterarg)
-	}
-
-	for _, pattern := range util.Config.Annex.Exclude {
-		arg := fmt.Sprintf("--exclude=%s", pattern)
-		exclargs = append(exclargs, arg)
-	}
-
-	// explicitly exclude config file
-	exclargs = append(exclargs, "--exclude=config.yml")
-
+	exclargs := annexExclArgs()
 	if len(exclargs) > 0 {
 		cmdargs = append(cmdargs, exclargs...)
 	}
@@ -847,6 +850,11 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 	status.State = "Locking"
 
 	cmdargs := []string{"add", "--json", "--update"}
+	exclargs := annexExclArgs()
+	if len(exclargs) > 0 {
+		cmdargs = append(cmdargs, exclargs...)
+	}
+
 	cmdargs = append(cmdargs, filepaths...)
 	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
