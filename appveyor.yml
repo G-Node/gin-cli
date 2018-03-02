@@ -29,8 +29,8 @@ build_script:
   # cd to project necessary?
   - cd %clone_folder%
   # download deps
-  - go get github.com/docopt/docopt-go
   - go get github.com/spf13/viper
+  - go get github.com/spf13/cobra
   - go get github.com/howeyc/gopass
   - go get golang.org/x/crypto/ssh
   - go get github.com/G-Node/gin-core/gin
@@ -40,6 +40,8 @@ build_script:
   - go get github.com/fatih/color
   - go get github.com/hashicorp/go-version
   - go get github.com/shibukawa/configdir
+  - go get github.com/bbrks/wrap
+  - go get github.com/docker/docker/pkg/term
   - go vet ./...
   - gofmt -s -l .
   - golint github.com/G-Node/gin-cli...
@@ -49,17 +51,17 @@ test_script:
   - go test -v ./...
 
 after_test:
-  - go build -ldflags "-X main.version=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o gin.exe .
-  - gin.exe --version
-  - md %BINDIR%
-  - copy *.exe %BINDIR%
+  - go build -ldflags "-X main.gincliversion=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o gin.exe .
+  # - gin.exe --version
+  # - md %BINDIR%
+  # - copy *.exe %BINDIR%
 
 # to disable deployment
 deploy: off
 
-artifacts:
-  - path: $(BINDIR)\*
-    name: bin
+# artifacts:
+#   - path: $(BINDIR)\*
+#     name: bin
 
 # Uncomment on_finish block to enable RDP
 # on_finish:
