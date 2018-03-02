@@ -171,17 +171,16 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		} else if strings.Contains(stderr, "already exists and is not an empty directory") {
 			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
 				"'%s' already exists in the current directory and is not empty.", repoName)
-			clonechan <- RepoFileStatus{Err: gerr}
-
 		} else if strings.Contains(stderr, "Host key verification failed") {
 			gerr.Description = "Server key does not match known/configured host key."
-			clonechan <- RepoFileStatus{Err: gerr}
 		} else {
 			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", stderr)
 			clonechan <- RepoFileStatus{Err: gerr}
 		}
 		status.Err = gerr
 		clonechan <- status
+		// doesn't really need to break here, but let's not send the progcomplete
+		return
 	}
 	// Progress doesn't show 100% if cloning an empty repository, so let's force it
 	status.Progress = progcomplete
@@ -201,14 +200,14 @@ func AnnexInit(description string) error {
 	cmd, err := RunAnnexCommand(args...)
 	cmd.LogStdOutErr()
 	if err != nil || cmd.Wait() != nil {
-		initError := fmt.Errorf("Repository annex initialisation failed.")
+		initError := fmt.Errorf("Repository annex initialisation failed.\n%s", cmd.ErrPipe.ReadAll())
 		util.LogWrite(initError.Error())
 		return initError
 	}
 	cmd, err = RunGitCommand("config", "annex.backends", "MD5")
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Failed to set default annex backend MD5")
-		util.LogWrite("[Error]: %v", err)
+		util.LogWrite("[Error]: %v", cmd.ErrPipe.ReadAll())
 		cmd.LogStdOutErr()
 	}
 	return nil
