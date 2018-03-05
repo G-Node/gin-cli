@@ -130,6 +130,9 @@ func main() {
 	// List repos
 	rootCmd.AddCommand(gincmd.ReposCmd())
 
+	// Repo info
+	rootCmd.AddCommand(gincmd.RepoInfoCmd())
+
 	// Keys
 	rootCmd.AddCommand(gincmd.KeysCmd())
 
