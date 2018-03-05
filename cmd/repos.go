@@ -3,7 +3,6 @@ package gincmd
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/gin-client"
 	"github.com/G-Node/gin-cli/util"
@@ -13,19 +12,7 @@ import (
 
 func printRepoList(repolist []gogs.Repository) {
 	for _, repo := range repolist {
-		fmt.Printf("* %s\n", repo.FullName)
-		fmt.Printf("\tLocation: %s\n", repo.HTMLURL)
-		desc := strings.Trim(repo.Description, "\n")
-		if desc != "" {
-			fmt.Printf("\tDescription: %s\n", desc)
-		}
-		if repo.Website != "" {
-			fmt.Printf("\tWebsite: %s\n", repo.Website)
-		}
-		if !repo.Private {
-			fmt.Println("\tThis repository is public")
-		}
-		fmt.Println()
+		printRepoInfo(repo)
 	}
 }
 
