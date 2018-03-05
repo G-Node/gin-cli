@@ -2,6 +2,28 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 0.16
+
+### Changes
+- Logging changes: More useful logging info and command delimitation.
+- Relevant help: When a command is given bad arguments, instead of printing the general help/usage info, it now prints the help/usage for that specific command.
+- Fix for stuttering/flashing of text during progress printing on Windows.
+- Completely redone command line argument handling and better help formatting.
+- New command: `gin repoinfo`
+  - Prints the information for a single repository on the server
+
+### Relevant PRs
+- #172: Logging changes
+- #174: Use git annex add --update for locking
+- #176: Print gin-cli version to log on initialisation (of the log)
+- #177: Update help text
+- #181: Error message and output improvements
+- #182: Print output status only when text has changed
+- #184: Better command line argument parsing
+- #187: Fix for configuration paths with spaces
+- #188: New command: repoinfo
+
+
 ## Version 0.15
 
 ### Changes

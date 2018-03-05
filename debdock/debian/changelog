@@ -1,3 +1,12 @@
+gin-cli (0.16); urgency=low
+
+  * Release 0.16
+  * Logging changes: More useful logging info and command delimitation.
+  * Relevant help: When a command is given bad arguments, instead of printing the general help/usage info, it now prints the help/usage for that specific command.
+  * Fix for stuttering/flashing of text during progress printing on Windows.
+  * Completely redone command line argument handling and better help formatting.
+  * New command `gin repoinfo`: Prints the information for a single repository on the server 
+
 gin-cli (0.15); urgency=low
 
   * Release 0.15
