@@ -14,7 +14,7 @@ func login(cmd *cobra.Command, args []string) {
 	var username string
 	var password string
 
-	if args != nil && len(args) == 0 {
+	if args == nil || len(args) == 0 {
 		// prompt for login
 		fmt.Print("Login: ")
 		fmt.Scanln(&username)
