@@ -177,7 +177,7 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 			gerr.Description = "Server key does not match known/configured host key."
 			clonechan <- RepoFileStatus{Err: gerr}
 		} else {
-			gerr.Description = "Repository download failed.\nAn unknown error occurred."
+			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", stderr)
 			clonechan <- RepoFileStatus{Err: gerr}
 		}
 	}
