@@ -41,7 +41,7 @@ func GetCmd() *cobra.Command {
 		"Get and initialise the repository named 'eegdata' owned by user 'peter'": "$ gin get peter/eegdata",
 	}
 	var getRepoCmd = &cobra.Command{
-		Use:     "get [--json] <repository>",
+		Use:     "get [--json] <repopath>",
 		Short:   "Retrieve (clone) a repository from the remote server",
 		Long:    formatdesc(description, args),
 		Example: formatexamples(examples),
