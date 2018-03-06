@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	gincmd "github.com/G-Node/gin-cli/cmd"
@@ -68,9 +69,17 @@ func init() {
 }
 
 func main() {
+	args := os.Args
 	err := util.LogInit(verstr)
 	util.CheckError(err)
 	defer util.LogClose()
+
+	for idx, a := range args {
+		if strings.Contains(a, " ") {
+			args[idx] = fmt.Sprintf("'%s'", a)
+		}
+	}
+	util.LogWrite("COMMAND: %s", strings.Join(args, " "))
 
 	err = util.LoadConfig()
 	util.CheckError(err)

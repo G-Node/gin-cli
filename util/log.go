@@ -27,7 +27,7 @@ func LogInit(ver string) error {
 	logger = log.New(logfile, "", flags)
 
 	LogWrite("=== LOGINIT ===")
-	LogWrite("GIN CLI VERSION %s", ver)
+	LogWrite("VERSION: %s", ver)
 
 	return nil
 }
