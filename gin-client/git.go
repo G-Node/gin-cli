@@ -1134,17 +1134,19 @@ func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 // GitCheckout performs a git checkout of a specific commit.
 // Individual files or directories may be specified, otherwise the entire tree is checked out.
 func GitCheckout(hash string, paths []string) error {
-	var pathsstr string
+	cmdargs := []string{"checkout", hash, "--"}
 	if paths == nil || len(paths) == 0 {
-		pathsstr, _ = util.FindRepoRoot(".")
+		reporoot, _ := util.FindRepoRoot(".")
+		cmdargs = append(cmdargs, reporoot)
 	} else {
-		pathsstr = strings.Join(paths, " ")
+		cmdargs = append(cmdargs, paths...)
 	}
-	cmd, err := RunGitCommand("checkout", hash, "--", pathsstr)
-	if err != nil {
+
+	cmd, err := RunGitCommand(cmdargs...)
+	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during GitCheckout")
 		cmd.LogStdOutErr()
-		return err
+		return fmt.Errorf(cmd.ErrPipe.ReadAll())
 	}
 
 	fmt.Print(cmd.OutPipe.ReadAll())

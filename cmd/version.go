@@ -18,7 +18,8 @@ func repoversion(cmd *cobra.Command, args []string) {
 	}
 	count, _ := cmd.Flags().GetUint("max-count")
 	jsonout, _ := cmd.Flags().GetBool("json")
-	commits, err := ginclient.GitLog(count, args)
+	paths := args
+	commits, err := ginclient.GitLog(count, paths)
 	util.CheckError(err)
 	if jsonout {
 		j, _ := json.Marshal(commits)
