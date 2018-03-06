@@ -30,7 +30,22 @@ func repoversion(cmd *cobra.Command, args []string) {
 
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, true) // TODO: change when we support offline-only
-	checkout(commit, gincl)
+	err = checkout(commit, paths)
+	util.CheckError(err)
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		util.LogWrite("Could not retrieve hostname")
+		hostname = "(unknown)"
+	}
+
+	commitsubject := fmt.Sprintf("Repository version changed by %s@%s", gincl.Username, hostname)
+	commitbody := fmt.Sprintf("Returning to version as of %s\nVersion ID: %s\n%s", commit.Date.Format("Mon Jan 2 15:04:05 2006 (-0700)"), commit.AbbreviatedHash, getchanges())
+	commitmsg := fmt.Sprintf("%s\n\n%s", commitsubject, commitbody)
+
+	annexpushchan := make(chan ginclient.RepoFileStatus)
+	go ginclient.AnnexPush(paths, commitmsg, annexpushchan)
+	printProgress(annexpushchan, false)
 }
 
 func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
@@ -73,33 +88,23 @@ func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
 	return ginclient.GinCommit{}
 }
 
-func checkout(commit ginclient.GinCommit, gincl *ginclient.Client) {
+func checkout(commit ginclient.GinCommit, paths []string) error {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	ginclient.GitCheckout(commit.Hash, nil)
-	uploadchan := make(chan ginclient.RepoFileStatus) // TODO: change to commit when we support offline-only
-	hostname, err := os.Hostname()
-	if err != nil {
-		util.LogWrite("Could not retrieve hostname")
-		hostname = "(unknown)"
-	}
-
-	commitsubject := fmt.Sprintf("Repository version changed by %s@%s", gincl.Username, hostname)
-	commitbody := fmt.Sprintf("Returning to version as of %s\nVersion ID: %s\n%s", commit.Date.Format("Mon Jan 2 15:04:05 2006 (-0700)"), commit.AbbreviatedHash, getchanges())
-	commitmsg := fmt.Sprintf("%s\n\n%s", commitsubject, commitbody)
-
-	go gincl.Upload([]string{}, commitmsg, uploadchan)
-	printProgress(uploadchan, false)
+	return ginclient.GitCheckout(commit.Hash, paths)
 }
 
 // VersionCmd sets up the 'version' subcommand
 func VersionCmd() *cobra.Command {
 	description := "Roll back directories or files to older versions."
 	args := map[string]string{"<filenames>": "One or more directories or files to roll back."}
-	examples := map[string]string{"Example 1": "$ gin version -n 50"}
+	examples := map[string]string{
+		"Show the 50 most recent versions of recordings.nix and prompt for version": "$ gin version -n 50 recordings.nix",
+		"Return the files in the code/ directory to the version with ID 429d51e":    "$ gin version --id 429d51e code/",
+	}
 	var versionCmd = &cobra.Command{
-		Use:     "version [--json] [--max-count] [<filenames>]...",
+		Use:     "version [--json] [--max-count n | --id hash] [<filenames>]...",
 		Short:   "Roll back files or directories to older versions",
 		Long:    formatdesc(description, args),
 		Example: formatexamples(examples),
@@ -109,5 +114,6 @@ func VersionCmd() *cobra.Command {
 	}
 	versionCmd.Flags().Bool("json", false, "Print output in JSON format.")
 	versionCmd.Flags().UintP("max-count", "n", 10, "Maximum number of versions to display before prompting. 0 means 'all'.")
+	versionCmd.Flags().String("id", "", "Commit ID (hash) to return to.")
 	return versionCmd
 }

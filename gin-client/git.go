@@ -1153,6 +1153,18 @@ func GitCheckout(hash string, paths []string) error {
 	return nil
 }
 
+// GitCatFile performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func GitCatFile(revision, filepath, output string) ([]byte, error) {
+	cmd, err := RunGitCommand("cat-file", "blob", fmt.Sprintf("%s:%s", revision, filepath))
+	if err != nil {
+		util.LogWrite("Error during GitCatFile")
+		cmd.LogStdOutErr()
+		return nil, err
+	}
+	return cmd.Output()
+}
+
 var modecache = make(map[string]bool)
 
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
