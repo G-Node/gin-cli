@@ -45,6 +45,10 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 		if jsonout {
 			j, _ := json.Marshal(stat)
 			fmt.Println(string(j))
+			filesuccess[stat.FileName] = true
+			if stat.Err != nil {
+				filesuccess[stat.FileName] = false
+			}
 			continue
 		}
 		if stat.FileName != fname || stat.State != state {
