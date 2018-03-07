@@ -211,7 +211,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	if err != nil {
 		return err
 	}
-	util.LogWrite("Got resonse: %s", res.Status)
+	util.LogWrite("Got response: %s", res.Status)
 	token := AccessToken{}
 	err = json.Unmarshal(data, &token)
 	if err != nil {
