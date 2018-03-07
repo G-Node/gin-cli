@@ -80,6 +80,8 @@ func main() {
 		}
 	}
 	util.LogWrite("COMMAND: %s", strings.Join(args, " "))
+	cwd, _ := os.Getwd()
+	util.LogWrite("CWD: %s", cwd)
 
 	err = util.LoadConfig()
 	util.CheckError(err)
