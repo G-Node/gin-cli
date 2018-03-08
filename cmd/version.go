@@ -18,19 +18,33 @@ func repoversion(cmd *cobra.Command, args []string) {
 	}
 	count, _ := cmd.Flags().GetUint("max-count")
 	jsonout, _ := cmd.Flags().GetBool("json")
+	commithash, _ := cmd.Flags().GetString("id")
 	paths := args
-	commits, err := ginclient.GitLog(count, paths)
-	util.CheckError(err)
-	if jsonout {
-		j, _ := json.Marshal(commits)
-		fmt.Println(string(j))
-		return
+
+	var commit ginclient.GinCommit
+	if commithash == "" {
+		commits, err := ginclient.GitLog(count, "", paths)
+		util.CheckError(err)
+		if jsonout {
+			j, _ := json.Marshal(commits)
+			fmt.Println(string(j))
+			return
+		}
+		commit = verprompt(commits)
+	} else {
+		commits, err := ginclient.GitLog(1, commithash, paths)
+		util.CheckError(err)
+		commit = commits[0]
+		if jsonout {
+			j, _ := json.Marshal(commit)
+			fmt.Println(string(j))
+			return
+		}
 	}
-	commit := verprompt(commits)
 
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, true) // TODO: change when we support offline-only
-	err = checkout(commit, paths)
+	err := checkout(commit.AbbreviatedHash, paths)
 	util.CheckError(err)
 
 	hostname, err := os.Hostname()
@@ -88,11 +102,11 @@ func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
 	return ginclient.GinCommit{}
 }
 
-func checkout(commit ginclient.GinCommit, paths []string) error {
+func checkout(commithash string, paths []string) error {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	return ginclient.GitCheckout(commit.Hash, paths)
+	return ginclient.GitCheckout(commithash, paths)
 }
 
 // VersionCmd sets up the 'version' subcommand

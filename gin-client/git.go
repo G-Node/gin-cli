@@ -1024,21 +1024,26 @@ type GinCommit struct {
 // GitLog returns the commit logs for the repository.
 // The number of commits can be limited by the 'count' argument.
 // If count <= 0, the entire commit history is returned.
-func GitLog(count uint, paths []string) ([]GinCommit, error) {
+func GitLog(count uint, revrange string, paths []string) ([]GinCommit, error) {
 	// TODO: Use git log -z and split stdout on NULL (\x00)
 	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat)}
 	if count > 0 {
 		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
 	}
+	if revrange != "" {
+		cmdargs = append(cmdargs, revrange)
+	}
+
+	cmdargs = append(cmdargs, "--") // separate revisions from paths, even if there are no paths
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
 	cmd, err := RunGitCommand(cmdargs...)
 	if err != nil {
-		util.LogWrite("Error during GitLog")
+		util.LogWrite("Error setting up git log command")
 		cmd.LogStdOutErr()
-		return nil, err
+		return nil, fmt.Errorf("error retrieving version logs - malformed git log command")
 	}
 
 	var commits []GinCommit
@@ -1057,6 +1062,18 @@ func GitLog(count uint, paths []string) ([]GinCommit, error) {
 		commits = append(commits, commit)
 	}
 
+	err = cmd.Wait() // should be done by now
+	if err != nil {
+		util.LogWrite("Error getting git log")
+		cmd.LogStdOutErr()
+		stderr := cmd.ErrPipe.ReadAll()
+		if strings.Contains(stderr, "bad revision") {
+			stderr = fmt.Sprintf("'%s' does not match a known version ID or name", revrange)
+		}
+		return nil, fmt.Errorf(stderr)
+	}
+
+	// TODO: Combine diffstats into first git log invocation
 	logstats, err := GitLogDiffstat(count, paths)
 	if err != nil {
 		util.LogWrite("Failed to get diff stats")
@@ -1082,6 +1099,7 @@ func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 	if count > 0 {
 		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
 	}
+	cmdargs = append(cmdargs, "--") // separate revisions from paths, even if there are no paths
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
