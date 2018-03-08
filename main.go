@@ -69,12 +69,13 @@ func init() {
 }
 
 func main() {
-	args := os.Args
 	err := util.LogInit(verstr)
 	util.CheckError(err)
 	defer util.LogClose()
 
-	for idx, a := range args {
+	var args = make([]string, len(os.Args))
+	for idx, a := range os.Args {
+		args[idx] = a
 		if strings.Contains(a, " ") {
 			args[idx] = fmt.Sprintf("'%s'", a)
 		}
