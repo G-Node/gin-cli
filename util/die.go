@@ -14,8 +14,13 @@ var red = color.New(color.FgRed).SprintFunc()
 func Die(msg interface{}) {
 	// fmt.Fprintf(color.Error, "%s %s\n", red("ERROR"), msg)
 	// Swap the line above for the line below when (if) https://github.com/fatih/color/pull/87 gets merged
-	fmt.Fprintln(os.Stderr, msg)
-	LogWrite("Exiting with ERROR message: %s", msg)
+	msgstring := fmt.Sprintf("%s", msg)
+	if len(msgstring) > 0 {
+		LogWrite("Exiting with ERROR message: %s", msg)
+		fmt.Fprintln(os.Stderr, msg)
+	} else {
+		LogWrite("Exiting with ERROR (no message)")
+	}
 	LogClose()
 	os.Exit(1)
 }
