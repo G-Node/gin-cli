@@ -177,7 +177,6 @@ func (ut *UserToken) LoadToken() error {
 	if err != nil {
 		return ginerror{UError: err.Error(), Origin: fn, Description: "failed to parse user token"}
 	}
-	util.LogWrite("Token read OK")
 	return nil
 }
 

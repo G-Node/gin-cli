@@ -343,6 +343,25 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 	return
 }
 
+// CheckoutVersion checks out all files specified by paths from the revision with the specified commithash.
+func CheckoutVersion(commithash string, paths []string) error {
+	return GitCheckout(commithash, paths)
+}
+
+// CheckoutFileCopy checks out a copy of a single file specified by path from the revision with the specified commithash.
+// The checked out file is stored in the working tree using the given outfile string as name.
+func CheckoutFileCopy(commithash string, path string, outfile string) error {
+	content, err := GitCatFile(commithash, path)
+	if err != nil {
+		if strings.Contains(err.Error(), "Not a valid object name") || strings.Contains(err.Error(), "bad file") {
+			return fmt.Errorf("invalid file name '%s': only one file can be used with --copy-to", path)
+		}
+		return err
+	}
+	err = ioutil.WriteFile(outfile, content, 0666)
+	return err
+}
+
 // InitDir initialises the local directory with the default remote and annex configuration.
 // The status channel 'initchan' is closed when this function returns.
 func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
@@ -589,7 +608,6 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	go AnnexStatus(asargs, statuschan)
 	for item := range statuschan {
 		if item.Err != nil {
-			// listchan <- RepoFileStatus{Err: item.Err}
 			return nil, item.Err
 		}
 		if item.Status == "?" {

@@ -19,7 +19,12 @@ func repoversion(cmd *cobra.Command, args []string) {
 	count, _ := cmd.Flags().GetUint("max-count")
 	jsonout, _ := cmd.Flags().GetBool("json")
 	commithash, _ := cmd.Flags().GetString("id")
+	copyto, _ := cmd.Flags().GetString("copy-to")
 	paths := args
+
+	if len(copyto) > 0 && len(paths) != 1 {
+		usageDie(cmd)
+	}
 
 	var commit ginclient.GinCommit
 	if commithash == "" {
@@ -35,31 +40,37 @@ func repoversion(cmd *cobra.Command, args []string) {
 		commits, err := ginclient.GitLog(1, commithash, paths, false)
 		util.CheckError(err)
 		commit = commits[0]
-		if jsonout {
-			j, _ := json.Marshal(commit)
-			fmt.Println(string(j))
-			return
-		}
 	}
 
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, true) // TODO: change when we support offline-only
-	err := checkout(commit.AbbreviatedHash, paths)
-	util.CheckError(err)
+	var err error
+	if copyto == "" {
+		err = ginclient.CheckoutVersion(commit.AbbreviatedHash, paths)
+		hostname, herr := os.Hostname()
+		if herr != nil {
+			util.LogWrite("Could not retrieve hostname")
+			hostname = "(unknown)"
+		}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		util.LogWrite("Could not retrieve hostname")
-		hostname = "(unknown)"
+		commitsubject := fmt.Sprintf("Repository version changed by %s@%s", gincl.Username, hostname)
+		commitbody := fmt.Sprintf("Returning to version as of %s\nVersion ID: %s\n%s", commit.Date.Format("Mon Jan 2 15:04:05 2006 (-0700)"), commit.AbbreviatedHash, getchanges())
+		commitmsg := fmt.Sprintf("%s\n\n%s", commitsubject, commitbody)
+
+		uploadchan := make(chan ginclient.RepoFileStatus)
+		go gincl.Upload(paths, commitmsg, uploadchan)
+		printProgress(uploadchan, jsonout)
+	} else {
+		filepath := paths[0]
+		// Use ls to check if it's a single file and if it's annexed
+		filestat, _ := gincl.ListFiles(filepath) // Ignore error. If filepath does not exist, it could still be in the history
+		if len(filestat) > 1 {
+			util.Die(fmt.Sprintf("invalid file name '%s': only one file can be used with --copy-to", filepath))
+		}
+		// if filestat[0].Abbrev() ==
+		err = ginclient.CheckoutFileCopy(commit.AbbreviatedHash, filepath, copyto)
 	}
-
-	commitsubject := fmt.Sprintf("Repository version changed by %s@%s", gincl.Username, hostname)
-	commitbody := fmt.Sprintf("Returning to version as of %s\nVersion ID: %s\n%s", commit.Date.Format("Mon Jan 2 15:04:05 2006 (-0700)"), commit.AbbreviatedHash, getchanges())
-	commitmsg := fmt.Sprintf("%s\n\n%s", commitsubject, commitbody)
-
-	annexpushchan := make(chan ginclient.RepoFileStatus)
-	go ginclient.AnnexPush(paths, commitmsg, annexpushchan)
-	printProgress(annexpushchan, false)
+	util.CheckError(err)
 }
 
 func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
@@ -102,20 +113,15 @@ func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
 	return ginclient.GinCommit{}
 }
 
-func checkout(commithash string, paths []string) error {
-	if !ginclient.IsRepo() {
-		util.Die("This command must be run from inside a gin repository.")
-	}
-	return ginclient.GitCheckout(commithash, paths)
-}
-
 // VersionCmd sets up the 'version' subcommand
 func VersionCmd() *cobra.Command {
 	description := "Roll back directories or files to older versions."
 	args := map[string]string{"<filenames>": "One or more directories or files to roll back."}
 	examples := map[string]string{
-		"Show the 50 most recent versions of recordings.nix and prompt for version": "$ gin version -n 50 recordings.nix",
-		"Return the files in the code/ directory to the version with ID 429d51e":    "$ gin version --id 429d51e code/",
+		"Show the 50 most recent versions of recordings.nix and prompt for version":                                       "$ gin version -n 50 recordings.nix",
+		"Return the files in the code/ directory to the version with ID 429d51e":                                          "$ gin version --id 429d51e code/",
+		"Retrieve analysis.py in code directory from version with ID 918a06f and copy it to analysis-old.py":              "$ gin version --id 918a06f --copy-to analysis-old.py code/analysis.py",
+		"Show the 15 most recent versions of data.zip, prompt for version, and copy the selected version to old-data.zip": "$ gin version -n 15 --copy-to old-data.zip data.zip",
 	}
 	var versionCmd = &cobra.Command{
 		Use:     "version [--json] [--max-count n | --id hash] [<filenames>]...",
@@ -129,5 +135,6 @@ func VersionCmd() *cobra.Command {
 	versionCmd.Flags().Bool("json", false, "Print output in JSON format.")
 	versionCmd.Flags().UintP("max-count", "n", 10, "Maximum number of versions to display before prompting. 0 means 'all'.")
 	versionCmd.Flags().String("id", "", "Commit ID (hash) to return to.")
+	versionCmd.Flags().String("copy-to", "", "Retrieve a single file from history and copy it to a new file instead of overwriting the existing one. Can only be used with a single file.")
 	return versionCmd
 }

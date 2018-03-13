@@ -1159,10 +1159,10 @@ func GitCheckout(hash string, paths []string) error {
 	cmdargs := []string{"checkout", hash, "--"}
 	if paths == nil || len(paths) == 0 {
 		reporoot, _ := util.FindRepoRoot(".")
-		cmdargs = append(cmdargs, reporoot)
-	} else {
-		cmdargs = append(cmdargs, paths...)
+		Workingdir = reporoot
+		paths = []string{"."}
 	}
+	cmdargs = append(cmdargs, paths...)
 
 	cmd, err := RunGitCommand(cmdargs...)
 	if err != nil || cmd.Wait() != nil {
@@ -1177,14 +1177,16 @@ func GitCheckout(hash string, paths []string) error {
 
 // GitCatFile performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func GitCatFile(revision, filepath, output string) ([]byte, error) {
-	cmd, err := RunGitCommand("cat-file", "blob", fmt.Sprintf("%s:%s", revision, filepath))
-	if err != nil {
+func GitCatFile(revision, filepath string) ([]byte, error) {
+	cmd, err := RunGitCommand("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
+	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during GitCatFile")
 		cmd.LogStdOutErr()
+		err = fmt.Errorf(cmd.ErrPipe.ReadAll())
 		return nil, err
 	}
-	return cmd.Output()
+	output := cmd.OutPipe.ReadAll()
+	return []byte(output), nil
 }
 
 var modecache = make(map[string]bool)
