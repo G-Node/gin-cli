@@ -55,9 +55,11 @@ func LoadConfig() error {
 	configFileName := "config.yml"
 	confpath = filepath.Join(confpath, configFileName)
 
-	LogWrite("Reading config file %s", confpath)
 	viper.SetConfigFile(confpath)
-	_ = viper.MergeInConfig()
+	cerr := viper.MergeInConfig()
+	if cerr == nil {
+		LogWrite("Found config file %s", confpath)
+	}
 
 	Config.Bin.Git = viper.GetString("bin.git")
 	Config.Bin.GitAnnex = viper.GetString("bin.gitannex")
@@ -78,9 +80,11 @@ func LoadConfig() error {
 	if err == nil {
 		confpath := filepath.Join(reporoot, configFileName)
 		viper.SetConfigFile(confpath)
-		_ = viper.MergeInConfig()
+		cerr = viper.MergeInConfig()
+		if cerr == nil {
+			LogWrite("Found config file %s", confpath)
+		}
 	}
-
 	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
 	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
