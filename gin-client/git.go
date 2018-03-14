@@ -1169,9 +1169,50 @@ func GitCheckout(hash string, paths []string) error {
 	return nil
 }
 
-// GitCatFile performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
+// GitObject contains the information for a tree or blob object in git
+type GitObject struct {
+	Name string
+	Hash string
+	Type string
+	Mode string
+}
+
+// GitLsTree performs a recursive git ls-tree with a given revision (hash) and a list of paths.
+// For each item, it returns a struct which contains the type (blob, tree), the mode, the hash, and the absolute (repo rooted) path to the object (name).
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func GitCatFile(revision, filepath string) ([]byte, error) {
+func GitLsTree(revision string, paths []string) ([]GitObject, error) {
+	cmdargs := []string{"ls-tree", "--full-tree", "-t", "-r"}
+	cmdargs = append(cmdargs, paths...)
+	cmd, err := RunGitCommand(cmdargs...)
+	if err != nil || cmd.Wait() != nil {
+		util.LogWrite("Error during GitLsTree")
+		cmd.LogStdOutErr()
+		err = fmt.Errorf(cmd.ErrPipe.ReadAll())
+		return nil, err
+	}
+
+	var objects []GitObject
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		words := strings.Fields(line)
+		fnamesplit := strings.SplitN(line, "   ", 2)
+		obj := GitObject{
+			Mode: words[0],
+			Type: words[1],
+			Hash: words[2],
+			Name: fnamesplit[len(fnamesplit)-1],
+		}
+		objects = append(objects, obj)
+	}
+	return objects, nil
+}
+
+// GitCatFileContents performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func GitCatFileContents(revision, filepath string) ([]byte, error) {
 	cmd, err := RunGitCommand("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during GitCatFile")
@@ -1181,6 +1222,19 @@ func GitCatFile(revision, filepath string) ([]byte, error) {
 	}
 	output := cmd.OutPipe.ReadAll()
 	return []byte(output), nil
+}
+
+// GitCatFileType returns the type of a given object at a given revision (blob, tree, or commit)
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func GitCatFileType(object string) (string, error) {
+	cmd, err := RunGitCommand("cat-file", "-t", object)
+	if err != nil || cmd.Wait() != nil {
+		util.LogWrite("Error during GitCatFile")
+		cmd.LogStdOutErr()
+		err = fmt.Errorf(cmd.ErrPipe.ReadAll())
+		return "", err
+	}
+	return cmd.OutPipe.ReadAll(), nil
 }
 
 var modecache = make(map[string]bool)
