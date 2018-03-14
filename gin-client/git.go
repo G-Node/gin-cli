@@ -139,10 +139,9 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		if rerr != nil {
 			break
 		}
-		line = util.CleanSpaces(line)
+		words := strings.Fields(line)
 		status.FileName = repoPath
-		if strings.HasPrefix(line, "Receiving objects") {
-			words := strings.Split(line, " ")
+		if words[0] == "Receiving" && words[1] == "objects" {
 			if len(words) > 2 {
 				status.Progress = words[2]
 			}
@@ -257,20 +256,18 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 		if rerr != nil {
 			break
 		}
-		line = util.CleanSpaces(line)
-		if strings.HasPrefix(line, "copy") || strings.HasPrefix(line, "get") {
-			words := strings.Split(line, " ")
+		words := strings.Fields(line)
+		if words[0] == "copy" || words[0] == "get" {
 			status.FileName = strings.TrimSpace(words[1])
 			// new file - reset Progress and Rate
 			status.Progress = ""
 			status.Rate = ""
-			if !strings.HasSuffix(line, "ok") {
+			if words[len(words)-1] != "ok" {
 				// if the copy line ends with ok, the file is already done (no upload needed)
 				// so we shouldn't send the status to the caller
 				syncchan <- status
 			}
 		} else if strings.Contains(line, "%") {
-			words := strings.Split(line, " ")
 			status.Progress = words[1]
 			status.Rate = words[2]
 			syncchan <- status
@@ -337,20 +334,18 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 		if rerr != nil {
 			break
 		}
-		line = util.CleanSpaces(line)
-		if strings.HasPrefix(line, "copy") {
-			words := strings.Split(line, " ")
-			status.FileName = strings.TrimSpace(words[1])
+		words := strings.Fields(line)
+		if words[0] == "copy" {
+			status.FileName = words[1] // NOTE: doesn't work for files with spaces in the name; fix with --json-progress
 			// new file - reset Progress and Rate
 			status.Progress = ""
 			status.Rate = ""
-			if !strings.HasSuffix(line, "ok") {
+			if words[len(words)-1] != "ok" {
 				// if the copy line ends with ok, the file is already done (no upload needed)
 				// so we shouldn't send the status to the caller
 				pushchan <- status
 			}
 		} else if strings.Contains(line, "%") {
-			words := strings.Split(line, " ")
 			status.Progress = words[1]
 			status.Rate = words[2]
 			pushchan <- status
@@ -383,20 +378,20 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 		if rerr != nil {
 			break
 		}
-		line = util.CleanSpaces(line)
-		if strings.HasPrefix(line, "get") {
-			words := strings.Split(line, " ")
-			status.FileName = strings.TrimSpace(words[1])
+		words := strings.Fields(line)
+		lastword := words[len(words)-1]
+		if words[0] == "get" {
+			status.FileName = words[1] // NOTE: Fix with --json-progress
 			// new file - reset Progress, Rate, and Err
 			status.Progress = ""
 			status.Rate = ""
 			status.Err = nil
-			if !strings.HasSuffix(line, "ok") {
+			if lastword != "ok" {
 				// if the copy line ends with ok, the file is already done (no upload needed)
 				// so we shouldn't send the status to the caller
 				getchan <- status
 			}
-		} else if strings.HasSuffix(line, "failed") {
+		} else if lastword == "failed" {
 			// determine error type
 			errline := cmd.ErrPipe.ReadAll()
 			if strings.Contains(errline, "Permission denied") {
@@ -407,7 +402,6 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 			}
 			getchan <- status
 		} else if strings.Contains(line, "%") {
-			words := strings.Split(line, " ")
 			status.Progress = words[1]
 			status.Rate = words[2]
 			getchan <- status
