@@ -15,10 +15,12 @@ type Reader struct {
 }
 
 // GinCmd extends the exec.Cmd struct with convenience functions for reading piped output.
+// It also overrides the Wait() method such that the error is stored in the Err field.
 type GinCmd struct {
 	*exec.Cmd
 	OutPipe *Reader
 	ErrPipe *Reader
+	Err     error
 }
 
 // Command returns the GinCmd struct to execute the named program with the given arguments.
@@ -31,7 +33,7 @@ func Command(name string, args ...string) GinCmd {
 	outreader.Split(scanLinesCR)
 	errreader.Split(scanLinesCR)
 	var cout, cerr string
-	return GinCmd{cmd, &Reader{outreader, cout}, &Reader{errreader, cerr}}
+	return GinCmd{cmd, &Reader{outreader, cout}, &Reader{errreader, cerr}, nil}
 }
 
 // scanLinesCR is a modification of the default split function for the Scanner.
@@ -96,12 +98,15 @@ func (cmd *GinCmd) LogStdOutErr() {
 	LogWrite("[stderr]\r\n%s", stderr)
 }
 
-// Wait collects stdout and stderr from the command and then waits for the command to finish before returning.
-// Stdout and stderr are then available for reading through each pipe's respective cache.
+// Wait collects stdout and stderr from the command and then calls the cmd.Wait() for the underlying exec.Cmd, to wait for the command to finish before returning.
+// See exec.Cmd.Wait() for further details.
+// Stdout and Stderr are then available for reading through each pipe's respective cache.
+// The error returned from underlying exec.Cmd.Wait() method is stored in the Err field.
 func (cmd *GinCmd) Wait() error {
 	_ = cmd.OutPipe.ReadAll()
 	_ = cmd.ErrPipe.ReadAll()
-	return cmd.Cmd.Wait()
+	cmd.Err = cmd.Cmd.Wait()
+	return cmd.Err
 }
 
 // CleanSpaces replaces multiple occurences of the space character with one and trims leading and trailing spaces from a string.

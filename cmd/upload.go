@@ -1,6 +1,9 @@
 package gincmd
 
 import (
+	"fmt"
+	"os"
+
 	ginclient "github.com/G-Node/gin-cli/gin-client"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
@@ -20,9 +23,28 @@ func upload(cmd *cobra.Command, args []string) {
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
 	printProgress(lockchan, jsonout)
+
+	// add header commit line
+	hostname, err := os.Hostname()
+	if err != nil {
+		util.LogWrite("Could not retrieve hostname")
+		hostname = "(unknown)"
+	}
+	commitmsg := fmt.Sprintf("gin upload from %s\n\n%s", hostname, getchanges())
 	uploadchan := make(chan ginclient.RepoFileStatus)
-	go gincl.Upload(args, uploadchan)
+	go gincl.Upload(args, commitmsg, uploadchan)
 	printProgress(uploadchan, jsonout)
+}
+
+func getchanges() string {
+	changes, err := ginclient.DescribeIndexShort()
+	if err != nil {
+		util.LogWrite("Failed to determine file changes for commit message")
+	}
+	if changes == "" {
+		changes = "No changes recorded"
+	}
+	return changes
 }
 
 // UploadCmd sets up the 'upload' subcommand

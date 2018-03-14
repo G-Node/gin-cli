@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	gincmd "github.com/G-Node/gin-cli/cmd"
@@ -72,6 +73,17 @@ func main() {
 	util.CheckError(err)
 	defer util.LogClose()
 
+	var args = make([]string, len(os.Args))
+	for idx, a := range os.Args {
+		args[idx] = a
+		if strings.Contains(a, " ") {
+			args[idx] = fmt.Sprintf("'%s'", a)
+		}
+	}
+	util.LogWrite("COMMAND: %s", strings.Join(args, " "))
+	cwd, _ := os.Getwd()
+	util.LogWrite("CWD: %s", cwd)
+
 	err = util.LoadConfig()
 	util.CheckError(err)
 	checkAnnexVersion()
@@ -135,6 +147,9 @@ func main() {
 
 	// Keys
 	rootCmd.AddCommand(gincmd.KeysCmd())
+
+	// Version
+	rootCmd.AddCommand(gincmd.VersionCmd())
 
 	// git and annex passthrough (unlisted)
 	rootCmd.AddCommand(gincmd.GitCmd())

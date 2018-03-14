@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
@@ -162,24 +163,24 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 
 		stderr := cmd.ErrPipe.ReadAll()
 		gerr := ginerror{UError: stderr, Origin: fn}
-		if strings.Contains(stderr, "Server returned non-OK status: 404") {
-			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
-				"Make sure you typed the repository path correctly.\n"+
-				"Type 'gin repos %s' to see if the repository exists and if you have access to it.",
+		if strings.Contains(stderr, "does not exist") {
+			gerr.Description = fmt.Sprintf("Repository download failed\n"+
+				"Make sure you typed the repository path correctly\n"+
+				"Type 'gin repos %s' to see if the repository exists and if you have access to it",
 				repoOwner)
-			clonechan <- RepoFileStatus{Err: gerr}
 		} else if strings.Contains(stderr, "already exists and is not an empty directory") {
 			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
 				"'%s' already exists in the current directory and is not empty.", repoName)
-			clonechan <- RepoFileStatus{Err: gerr}
-
 		} else if strings.Contains(stderr, "Host key verification failed") {
 			gerr.Description = "Server key does not match known/configured host key."
-			clonechan <- RepoFileStatus{Err: gerr}
 		} else {
 			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", stderr)
 			clonechan <- RepoFileStatus{Err: gerr}
 		}
+		status.Err = gerr
+		clonechan <- status
+		// doesn't really need to break here, but let's not send the progcomplete
+		return
 	}
 	// Progress doesn't show 100% if cloning an empty repository, so let's force it
 	status.Progress = progcomplete
@@ -199,14 +200,14 @@ func AnnexInit(description string) error {
 	cmd, err := RunAnnexCommand(args...)
 	cmd.LogStdOutErr()
 	if err != nil || cmd.Wait() != nil {
-		initError := fmt.Errorf("Repository annex initialisation failed.")
+		initError := fmt.Errorf("Repository annex initialisation failed.\n%s", cmd.ErrPipe.ReadAll())
 		util.LogWrite(initError.Error())
 		return initError
 	}
 	cmd, err = RunGitCommand("config", "annex.backends", "MD5")
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Failed to set default annex backend MD5")
-		util.LogWrite("[Error]: %v", err)
+		util.LogWrite("[Error]: %v", cmd.ErrPipe.ReadAll())
 		cmd.LogStdOutErr()
 	}
 	return nil
@@ -289,9 +290,9 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull --content)
-func AnnexPush(paths []string, commitMsg string, pushchan chan<- RepoFileStatus) {
+func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
-	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitMsg)}
+	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitmsg)}
 	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
 		pushchan <- RepoFileStatus{Err: err}
@@ -396,7 +397,14 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 				getchan <- status
 			}
 		} else if strings.HasSuffix(line, "failed") {
-			status.Err = fmt.Errorf("failed (content or server unavailable)")
+			// determine error type
+			errline := cmd.ErrPipe.ReadAll()
+			if strings.Contains(errline, "Permission denied") {
+				status.Err = fmt.Errorf("Authentication failed: try logging in again")
+			} else {
+				// TODO: Other reasons?
+				status.Err = fmt.Errorf("Content or server unavailable")
+			}
 			getchan <- status
 		} else if strings.Contains(line, "%") {
 			words := strings.Split(line, " ")
@@ -583,6 +591,25 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	return
 }
 
+// build exclusion argument list
+// files < annex.minsize or matching exclusion extensions will not be annexed and
+// will instead be handled by git
+func annexExclArgs() (exclargs []string) {
+	if util.Config.Annex.MinSize != "" {
+		sizefilterarg := fmt.Sprintf("--largerthan=%s", util.Config.Annex.MinSize)
+		exclargs = append(exclargs, sizefilterarg)
+	}
+
+	for _, pattern := range util.Config.Annex.Exclude {
+		arg := fmt.Sprintf("--exclude=%s", pattern)
+		exclargs = append(exclargs, arg)
+	}
+
+	// explicitly exclude config file
+	exclargs = append(exclargs, "--exclude=config.yml")
+	return
+}
+
 // AnnexAdd adds paths to the annex.
 // Files specified for exclusion in the configuration are ignored automatically.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
@@ -597,23 +624,7 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	cmdargs := []string{"--json", "add"}
 	cmdargs = append(cmdargs, filepaths...)
 
-	// build exclusion argument list
-	// files < annex.minsize or matching exclusion extensions will not be annexed and
-	// will instead be handled by git
-	var exclargs []string
-	if util.Config.Annex.MinSize != "" {
-		sizefilterarg := fmt.Sprintf("--largerthan=%s", util.Config.Annex.MinSize)
-		exclargs = append(exclargs, sizefilterarg)
-	}
-
-	for _, pattern := range util.Config.Annex.Exclude {
-		arg := fmt.Sprintf("--exclude=%s", pattern)
-		exclargs = append(exclargs, arg)
-	}
-
-	// explicitly exclude config file
-	exclargs = append(exclargs, "--exclude=config.yml")
-
+	exclargs := annexExclArgs()
 	if len(exclargs) > 0 {
 		cmdargs = append(cmdargs, exclargs...)
 	}
@@ -765,7 +776,7 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 func DescribeIndexShort() (string, error) {
 	// TODO: 'git annex status' doesn't list added (A) files when in direct mode.
 	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus([]string{""}, statuschan)
+	go AnnexStatus([]string{}, statuschan)
 	statusmap := make(map[string]int)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -793,7 +804,7 @@ func DescribeIndexShort() (string, error) {
 // that are about to be uploaded and as a long commit message.
 func DescribeIndex() (string, error) {
 	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus([]string{""}, statuschan)
+	go AnnexStatus([]string{}, statuschan)
 	statusmap := make(map[string][]string)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -838,6 +849,11 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 	status.State = "Locking"
 
 	cmdargs := []string{"add", "--json", "--update"}
+	exclargs := annexExclArgs()
+	if len(exclargs) > 0 {
+		cmdargs = append(cmdargs, exclargs...)
+	}
+
 	cmdargs = append(cmdargs, filepaths...)
 	cmd, err := RunAnnexCommand(cmdargs...)
 	if err != nil {
@@ -931,7 +947,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			util.LogWrite("Error unlocking %s", annexUnlockRes.File)
-			status.Err = fmt.Errorf("failed (content not available locally)")
+			status.Err = fmt.Errorf("Content not available locally\nUse 'gin get-content' to download")
 		}
 		status.Progress = progcomplete
 		unlockchan <- status
@@ -991,6 +1007,180 @@ func AnnexInfo() (AnnexInfoRes, error) {
 	}
 	err = json.Unmarshal([]byte(stdout), &info)
 	return info, err
+}
+
+// GinCommit describes a commit, retrieved from the git log.
+type GinCommit struct {
+	Hash            string    `json:"hash"`
+	AbbreviatedHash string    `json:"abbrevhash"`
+	AuthorName      string    `json:"authorname"`
+	AuthorEmail     string    `json:"authoremail"`
+	Date            time.Time `json:"date"`
+	Subject         string    `json:"subject"`
+	Body            string    `json:"body"`
+	FileStats       DiffStat
+}
+
+// GitLog returns the commit logs for the repository.
+// The number of commits can be limited by the 'count' argument.
+// If count <= 0, the entire commit history is returned.
+func GitLog(count uint, revrange string, paths []string) ([]GinCommit, error) {
+	// TODO: Use git log -z and split stdout on NULL (\x00)
+	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
+	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat)}
+	if count > 0 {
+		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
+	}
+	if revrange != "" {
+		cmdargs = append(cmdargs, revrange)
+	}
+
+	cmdargs = append(cmdargs, "--") // separate revisions from paths, even if there are no paths
+	if paths != nil && len(paths) > 0 {
+		cmdargs = append(cmdargs, paths...)
+	}
+	cmd, err := RunGitCommand(cmdargs...)
+	if err != nil {
+		util.LogWrite("Error setting up git log command")
+		cmd.LogStdOutErr()
+		return nil, fmt.Errorf("error retrieving version logs - malformed git log command")
+	}
+
+	var commits []GinCommit
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		var commit GinCommit
+		ierr := json.Unmarshal([]byte(line), &commit)
+		if ierr != nil {
+			util.LogWrite("Error parsing git log")
+			util.LogWrite(ierr.Error())
+			continue
+		}
+		commits = append(commits, commit)
+	}
+
+	err = cmd.Wait() // should be done by now
+	if err != nil {
+		util.LogWrite("Error getting git log")
+		cmd.LogStdOutErr()
+		stderr := cmd.ErrPipe.ReadAll()
+		if strings.Contains(stderr, "bad revision") {
+			stderr = fmt.Sprintf("'%s' does not match a known version ID or name", revrange)
+		}
+		return nil, fmt.Errorf(stderr)
+	}
+
+	// TODO: Combine diffstats into first git log invocation
+	logstats, err := GitLogDiffstat(count, paths)
+	if err != nil {
+		util.LogWrite("Failed to get diff stats")
+		return commits, nil
+	}
+
+	for idx, commit := range commits {
+		commits[idx].FileStats = logstats[commit.Hash]
+	}
+
+	return commits, nil
+}
+
+type DiffStat struct {
+	NewFiles      []string
+	DeletedFiles  []string
+	ModifiedFiles []string
+}
+
+func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
+	logformat := `::%H`
+	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
+	if count > 0 {
+		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
+	}
+	cmdargs = append(cmdargs, "--") // separate revisions from paths, even if there are no paths
+	if paths != nil && len(paths) > 0 {
+		cmdargs = append(cmdargs, paths...)
+	}
+	cmd, err := RunGitCommand(cmdargs...)
+	if err != nil {
+		util.LogWrite("Error during GitLogDiffstat")
+		cmd.LogStdOutErr()
+		return nil, err
+	}
+
+	stats := make(map[string]DiffStat)
+	var curhash string
+	var curstat DiffStat
+	for {
+		line, rerr := cmd.OutPipe.ReadLine()
+		if rerr != nil {
+			break
+		}
+		line = util.CleanSpaces(line)
+		if strings.HasPrefix(line, "::") {
+			curhash = strings.TrimPrefix(line, "::")
+			curstat = DiffStat{}
+		} else if len(line) == 0 {
+			continue // Skip empty lines
+		} else {
+			// parse name-status
+			fstat := strings.SplitN(line, " ", 2) // stat (A, M, or D) and filename
+			stat, fname := fstat[0], fstat[1]
+			switch stat {
+			case "A":
+				nf := curstat.NewFiles
+				curstat.NewFiles = append(nf, fname)
+			case "M":
+				mf := curstat.ModifiedFiles
+				curstat.ModifiedFiles = append(mf, fname)
+			case "D":
+				df := curstat.DeletedFiles
+				curstat.DeletedFiles = append(df, fname)
+			default:
+				util.LogWrite("Could not parse diffstat line")
+				util.LogWrite(line)
+			}
+			stats[curhash] = curstat
+		}
+	}
+
+	return stats, nil
+}
+
+// GitCheckout performs a git checkout of a specific commit.
+// Individual files or directories may be specified, otherwise the entire tree is checked out.
+func GitCheckout(hash string, paths []string) error {
+	cmdargs := []string{"checkout", hash, "--"}
+	if paths == nil || len(paths) == 0 {
+		reporoot, _ := util.FindRepoRoot(".")
+		cmdargs = append(cmdargs, reporoot)
+	} else {
+		cmdargs = append(cmdargs, paths...)
+	}
+
+	cmd, err := RunGitCommand(cmdargs...)
+	if err != nil || cmd.Wait() != nil {
+		util.LogWrite("Error during GitCheckout")
+		cmd.LogStdOutErr()
+		return fmt.Errorf(cmd.ErrPipe.ReadAll())
+	}
+
+	fmt.Print(cmd.OutPipe.ReadAll())
+	return nil
+}
+
+// GitCatFile performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func GitCatFile(revision, filepath, output string) ([]byte, error) {
+	cmd, err := RunGitCommand("cat-file", "blob", fmt.Sprintf("%s:%s", revision, filepath))
+	if err != nil {
+		util.LogWrite("Error during GitCatFile")
+		cmd.LogStdOutErr()
+		return nil, err
+	}
+	return cmd.Output()
 }
 
 var modecache = make(map[string]bool)
