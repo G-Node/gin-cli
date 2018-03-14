@@ -23,7 +23,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 
 	var commit ginclient.GinCommit
 	if commithash == "" {
-		commits, err := ginclient.GitLog(count, "", paths)
+		commits, err := ginclient.GitLog(count, "", paths, false)
 		util.CheckError(err)
 		if jsonout {
 			j, _ := json.Marshal(commits)
@@ -32,7 +32,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 		}
 		commit = verprompt(commits)
 	} else {
-		commits, err := ginclient.GitLog(1, commithash, paths)
+		commits, err := ginclient.GitLog(1, commithash, paths, false)
 		util.CheckError(err)
 		commit = commits[0]
 		if jsonout {

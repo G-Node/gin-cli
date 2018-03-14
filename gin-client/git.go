@@ -1022,14 +1022,18 @@ type GinCommit struct {
 }
 
 // GitLog returns the commit logs for the repository.
-// The number of commits can be limited by the 'count' argument.
+// The number of commits can be limited by the count argument.
 // If count <= 0, the entire commit history is returned.
-func GitLog(count uint, revrange string, paths []string) ([]GinCommit, error) {
+// Revisions which match only the deletion of the matching paths can be filtered using the showdeletes argument.
+func GitLog(count uint, revrange string, paths []string, showdeletes bool) ([]GinCommit, error) {
 	// TODO: Use git log -z and split stdout on NULL (\x00)
 	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat)}
 	if count > 0 {
 		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
+	}
+	if !showdeletes {
+		cmdargs = append(cmdargs, "--diff-filter=d")
 	}
 	if revrange != "" {
 		cmdargs = append(cmdargs, revrange)
