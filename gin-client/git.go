@@ -1129,7 +1129,8 @@ func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 		if rerr != nil {
 			break
 		}
-		line = strings.TrimSpace(line)
+		// Avoid trimming spaces at end of filenames
+		line = strings.TrimSuffix(line, "\n")
 		if len(line) == 0 {
 			continue
 		}
@@ -1138,8 +1139,9 @@ func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 			curstat = DiffStat{}
 		} else {
 			// parse name-status
-			fstat := strings.SplitN(line, " ", 2) // stat (A, M, or D) and filename
-			stat, fname := fstat[0], fstat[1]
+			fstat := strings.SplitN(line, "\t", 2) // stat (A, M, or D) and filename
+			stat := fstat[0]
+			fname := fstat[1]
 			switch stat {
 			case "A":
 				nf := curstat.NewFiles
