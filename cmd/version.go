@@ -83,7 +83,7 @@ func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
 		fmt.Println()
 	}
 	var selstr string
-	fmt.Print("Version to change to: ")
+	fmt.Print("Version to retrieve files from: ")
 	fmt.Scanln(&selstr)
 
 	num, err := strconv.Atoi(selstr)
