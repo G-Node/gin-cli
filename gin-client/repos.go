@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -348,41 +349,35 @@ func CheckoutVersion(commithash string, paths []string) error {
 	return GitCheckout(commithash, paths)
 }
 
-// CheckoutFileCopies checks out a copy of a single file specified by path from the revision with the specified commithash.
-// The checked out file is stored in the working tree using the given outfile string as name.
-func CheckoutFileCopies(commithash string, paths []string, outfile string) error {
+// CheckoutFileCopies checks out copies of files specified by path from the revision with the specified commithash.
+// The checked out files are stored in the location specified by outpath.
+// The timestamp of the revision is appended to the original filenames.
+func CheckoutFileCopies(commithash string, paths []string, outpath string) error {
 	// TODO: Needs progress/status output (per file)
-	for _, path := range paths {
-		object := fmt.Sprintf("%s:./%s", commithash, path)
-		// Determine type of object (tree or blob)
-		objtype, err := GitCatFileType(object)
-		if objtype == "blob" {
-			// if blob, determine if link
-			// if link, git annex fromkey --force contents path-timestamp.extension
+	objects, err := GitLsTree(commithash, paths)
+	if err != nil {
+		return err
+	}
 
-			// if git file, save contents to path-timestamp.extension
-			content, err := GitCatFileContents(commithash, path)
-			newfilename := path + "-old" // TODO: add timestamp instead
-			if err != nil {
-				if strings.Contains(err.Error(), "Not a valid object name") || strings.Contains(err.Error(), "bad file") {
-					return fmt.Errorf("invalid file name '%s': only one file can be used with --copy-to", paths)
+	for _, obj := range objects {
+		if obj.Type == "blob" {
+			outfilename := obj.Name + "-old" // TODO: append timestamp (before extension)
+			outfile := filepath.Join(outpath, outfilename)
+			// determine if it's an annexed link
+			content, cerr := GitCatFileContents(commithash, obj.Name)
+			if cerr != nil {
+				util.LogError(cerr)
+				// Collect and return
+			}
+			if obj.Mode == "120000" {
+				if isAnnexPath(string(content)) {
+					fmt.Printf("Checking out annex file %s from revision %s and copying to %s\n", obj.Name, commithash, outfile)
+				} else {
+					fmt.Printf("%s is a link to %s and is not an annexed file. Cannot recover\n", obj.Name, content)
 				}
-				return err
+			} else if obj.Mode == "100755" || obj.Mode == "100644" {
+				fmt.Printf("Checking out git file %s from revision %s and copying to %s\n", obj.Name, commithash, outfile)
 			}
-			// TODO: Create parent directories
-			err = ioutil.WriteFile(newfilename, content, 0666)
-			if err != nil {
-				return fmt.Errorf("failed to create file '%s' (from '%s')", newfilename, path)
-			}
-
-		} else if objtype == "tree" {
-
-		}
-
-		// if tree, ls-tree -r
-
-		if err != nil {
-			return err
 		}
 	}
 	return nil

@@ -1285,6 +1285,12 @@ func IsDirect() bool {
 	return false
 }
 
+//isAnnexPath returns true if a given string represents the path to an annex object.
+func isAnnexPath(path string) bool {
+	// TODO: Check paths on Windows
+	return strings.Contains(path, ".git/annex/objects")
+}
+
 // IsVersion6 returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
