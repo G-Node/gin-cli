@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"time"
@@ -139,6 +140,7 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		if rerr != nil {
 			break
 		}
+		line = strings.TrimSpace(line)
 		if len(line) == 0 {
 			continue
 		}
@@ -259,6 +261,7 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 		if rerr != nil {
 			break
 		}
+		line = strings.TrimSpace(line)
 		if len(line) == 0 {
 			continue
 		}
@@ -340,6 +343,7 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 		if rerr != nil {
 			break
 		}
+		line = strings.TrimSpace(line)
 		if len(line) == 0 {
 			continue
 		}
@@ -1131,7 +1135,7 @@ func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 		}
 		// Avoid trimming spaces at end of filenames
 		line = strings.TrimSuffix(line, "\n")
-		if len(line) == 0 {
+		if len(line) == 0 { // but still check if the line is only spaces
 			continue
 		}
 		if strings.HasPrefix(line, "::") {
@@ -1140,6 +1144,9 @@ func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 		} else {
 			// parse name-status
 			fstat := strings.SplitN(line, "\t", 2) // stat (A, M, or D) and filename
+			if len(fstat) < 2 {
+				continue
+			}
 			stat := fstat[0]
 			fname := fstat[1]
 			switch stat {
@@ -1218,11 +1225,14 @@ func GitLsTree(revision string, paths []string) ([]GitObject, error) {
 		line = strings.TrimSuffix(line, "\n")
 		words := strings.Fields(line)
 		fnamesplit := strings.SplitN(line, "\t", 2)
+		if len(words) < 4 || len(fnamesplit) < 2 {
+			continue
+		}
 		obj := GitObject{
 			Mode: words[0],
 			Type: words[1],
 			Hash: words[2],
-			Name: fnamesplit[len(fnamesplit)-1],
+			Name: fnamesplit[1],
 		}
 		objects = append(objects, obj)
 	}
@@ -1236,15 +1246,34 @@ func GitLsTree(revision string, paths []string) ([]GitObject, error) {
 // GitCatFileContents performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func GitCatFileContents(revision, filepath string) ([]byte, error) {
-	cmd, err := RunGitCommand("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
-	if err != nil || cmd.Wait() != nil {
+	fmt.Println("Reading contents of ", filepath)
+
+	gitbin := util.Config.Bin.Git
+	cmd := exec.Command(gitbin, "cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
+	cmd.Dir = Workingdir
+	token := web.UserToken{}
+	_ = token.LoadToken()
+	env := os.Environ()
+	cmd.Env = append(env, util.GitSSHEnv(token.Username))
+	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
+	var err error
+	// err := cmd.Start()
+
+	fmt.Println("waiting now")
+	if err != nil {
 		util.LogWrite("Error during GitCatFile")
-		cmd.LogStdOutErr()
-		err = fmt.Errorf(cmd.ErrPipe.ReadAll())
+		// cmd.LogStdOutErr()
+		// err = fmt.Errorf(cmd.ErrPipe.ReadAll())
 		return nil, err
 	}
-	output := cmd.OutPipe.ReadAll()
-	return []byte(output), nil
+	fmt.Println("Done")
+	fmt.Println("Shoving in")
+	output, _ := cmd.Output()
+	fmt.Println("Output is ", len(output))
+
+	fmt.Println("Done")
+	return output, nil
+	// return []byte(output), nil
 }
 
 // GitCatFileType returns the type of a given object at a given revision (blob, tree, or commit)
