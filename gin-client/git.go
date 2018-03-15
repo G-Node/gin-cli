@@ -1181,13 +1181,10 @@ type GitObject struct {
 // For each item, it returns a struct which contains the type (blob, tree), the mode, the hash, and the absolute (repo rooted) path to the object (name).
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func GitLsTree(revision string, paths []string) ([]GitObject, error) {
-	cmdargs := []string{"ls-tree", "--full-tree", "-t", "-r"}
+	cmdargs := []string{"ls-tree", "--full-tree", "-t", "-r", revision}
 	cmdargs = append(cmdargs, paths...)
 	cmd, err := RunGitCommand(cmdargs...)
-	if err != nil || cmd.Wait() != nil {
-		util.LogWrite("Error during GitLsTree")
-		cmd.LogStdOutErr()
-		err = fmt.Errorf(cmd.ErrPipe.ReadAll())
+	if err != nil {
 		return nil, err
 	}
 
@@ -1197,8 +1194,11 @@ func GitLsTree(revision string, paths []string) ([]GitObject, error) {
 		if rerr != nil {
 			break
 		}
+		// Don't trim spaces, since filenames at the end of the line might end with a space
+		// TODO: use null byte termination in ReadLine()
+		line = strings.TrimSuffix(line, "\n")
 		words := strings.Fields(line)
-		fnamesplit := strings.SplitN(line, "   ", 2)
+		fnamesplit := strings.SplitN(line, "\t", 2)
 		obj := GitObject{
 			Mode: words[0],
 			Type: words[1],
@@ -1206,6 +1206,10 @@ func GitLsTree(revision string, paths []string) ([]GitObject, error) {
 			Name: fnamesplit[len(fnamesplit)-1],
 		}
 		objects = append(objects, obj)
+	}
+	stderr := cmd.ErrPipe.ReadAll()
+	if len(stderr) > 0 {
+		return nil, fmt.Errorf(stderr)
 	}
 	return objects, nil
 }

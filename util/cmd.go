@@ -10,6 +10,7 @@ import (
 
 // Reader extends bufio.Reader with convenience functions for reading and caching piped output.
 type Reader struct {
+	// TODO: Use bufio.Reader and ReadString(delim) so delim can be \r, \n, or \0 depending on situation
 	*bufio.Scanner
 	cache string
 }
