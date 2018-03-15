@@ -139,6 +139,9 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		if rerr != nil {
 			break
 		}
+		if len(line) == 0 {
+			continue
+		}
 		words := strings.Fields(line)
 		status.FileName = repoPath
 		if words[0] == "Receiving" && words[1] == "objects" {
@@ -256,6 +259,9 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 		if rerr != nil {
 			break
 		}
+		if len(line) == 0 {
+			continue
+		}
 		words := strings.Fields(line)
 		if words[0] == "copy" || words[0] == "get" {
 			status.FileName = strings.TrimSpace(words[1])
@@ -334,6 +340,9 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 		if rerr != nil {
 			break
 		}
+		if len(line) == 0 {
+			continue
+		}
 		words := strings.Fields(line)
 		if words[0] == "copy" {
 			status.FileName = words[1] // NOTE: doesn't work for files with spaces in the name; fix with --json-progress
@@ -377,6 +386,10 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
+		}
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
 		}
 		words := strings.Fields(line)
 		lastword := words[len(words)-1]
@@ -1116,12 +1129,13 @@ func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 		if rerr != nil {
 			break
 		}
-		line = util.CleanSpaces(line)
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
 		if strings.HasPrefix(line, "::") {
 			curhash = strings.TrimPrefix(line, "::")
 			curstat = DiffStat{}
-		} else if len(line) == 0 {
-			continue // Skip empty lines
 		} else {
 			// parse name-status
 			fstat := strings.SplitN(line, " ", 2) // stat (A, M, or D) and filename
@@ -1193,6 +1207,9 @@ func GitLsTree(revision string, paths []string) ([]GitObject, error) {
 		line, rerr := cmd.OutPipe.ReadLine()
 		if rerr != nil {
 			break
+		}
+		if len(line) == 0 {
+			continue
 		}
 		// Don't trim spaces, since filenames at the end of the line might end with a space
 		// TODO: use null byte termination in ReadLine()
