@@ -12,19 +12,18 @@ import (
 func annexrun(cmd *cobra.Command, args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	_ = gincl.LoadToken() // OK to run without token
-	annexcmd, err := ginclient.RunAnnexCommand(args...)
+	annexcmd := ginclient.RunAnnexCommand(args...)
+	err := annexcmd.Start()
 	util.CheckError(err)
 	var line string
-	for {
-		line, err = annexcmd.OutPipe.ReadLine()
-		if err != nil {
-			break
-		}
+	var rerr error
+	for rerr = nil; rerr == nil; line, rerr = annexcmd.OutReader.ReadString('\n') {
 		fmt.Print(line)
 	}
-	fmt.Print(annexcmd.ErrPipe.ReadAll())
-	err = annexcmd.Wait()
-	if err != nil {
+	for rerr = nil; rerr == nil; line, rerr = annexcmd.ErrReader.ReadString('\n') {
+		fmt.Fprint(os.Stderr, line)
+	}
+	if annexcmd.Wait() != nil {
 		os.Exit(1)
 	}
 }

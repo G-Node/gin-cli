@@ -395,15 +395,11 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 	stat.State = "Initialising local storage"
 	initchan <- stat
 	if !IsRepo() {
-		cmd, err := RunGitCommand("init")
-
-		if err == nil {
-			err = cmd.Wait()
-		}
-
+		cmd := RunGitCommand("init")
+		stdout, stderr, err := cmd.OutputError()
 		if err != nil {
-			util.LogWrite("Error during Init command: %s", err.Error())
-			cmd.LogStdOutErr()
+			util.LogWrite("Error during Init command: %s", string(stderr))
+			logstd(stdout, stderr)
 			initerr.UError = err.Error()
 			initchan <- RepoFileStatus{Err: initerr}
 			return
@@ -421,10 +417,10 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 
 	// If there is no global git user.name or user.email set local ones
-	cmd, _ := RunGitCommand("config", "--global", "user.name")
-	globalGitName := cmd.OutPipe.ReadAll()
-	cmd, _ = RunGitCommand("config", "--global", "user.email")
-	globalGitEmail := cmd.OutPipe.ReadAll()
+	cmd := RunGitCommand("config", "--global", "user.name")
+	globalGitName, _ := cmd.Output()
+	cmd = RunGitCommand("config", "--global", "user.email")
+	globalGitEmail, _ := cmd.Output()
 	if len(globalGitName) == 0 && len(globalGitEmail) == 0 {
 		info, ierr := gincl.RequestAccount(gincl.Username)
 		name := info.FullName
@@ -437,12 +433,12 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 		}
 	}
 	stat.Progress = "20%"
+	initchan <- stat
 
 	if runtime.GOOS == "windows" {
 		// force disable symlinks even if user can create them
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
-		cmd, _ := RunGitCommand("config", "--local", "core.symlinks", "false")
-		cmd.Wait()
+		RunGitCommand("config", "--local", "core.symlinks", "false").Run()
 	}
 
 	// If there are no commits, create the initial commit.
@@ -474,10 +470,10 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 
 	if new {
 		// Push initial commit and set default remote
-		cmd, err := RunGitCommand("push", "--set-upstream", "origin", "master")
-		if err != nil || cmd.Wait() != nil {
-			util.LogWrite("Error during set upstream command")
-			cmd.LogStdOutErr()
+		cmd := RunGitCommand("push", "--set-upstream", "origin", "master")
+		stdout, stderr, err := cmd.OutputError()
+		if err != nil {
+			logstd(stdout, stderr)
 			initchan <- RepoFileStatus{Err: initerr}
 			return
 		}
@@ -732,16 +728,17 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	}
 
 	// If cached files are diff from upstream, mark as LocalChanges
-	diffargs := []string{"diff", "--name-only", "--relative", "@{upstream}"}
+	diffargs := []string{"diff", "-z", "--name-only", "--relative", "@{upstream}"}
 	diffargs = append(diffargs, cachedfiles...)
-	cmd, err := RunGitCommand(diffargs...)
-	if err != nil || cmd.Wait() != nil {
+	cmd := RunGitCommand(diffargs...)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
 		util.LogWrite("Error during diff command for status")
-		cmd.LogStdOutErr()
+		logstd(stdout, stderr)
 		// ignoring error and continuing
 	}
 
-	diffresults := strings.Split(cmd.OutPipe.ReadAll(), "\n")
+	diffresults := strings.Split(string(stdout), "\000")
 	for _, fname := range diffresults {
 		// Two notes:
 		//		1. There will definitely be overlap here with the same status in annex (not a problem)
