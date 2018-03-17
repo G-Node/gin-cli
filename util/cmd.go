@@ -2,6 +2,7 @@ package util
 
 import (
 	"bufio"
+	"bytes"
 	"os/exec"
 )
 
@@ -22,4 +23,13 @@ func Command(name string, args ...string) GinCmd {
 	outreader := bufio.NewReader(outpipe)
 	errreader := bufio.NewReader(errpipe)
 	return GinCmd{cmd, outreader, errreader, nil}
+}
+
+// OutputError runs the command and returns the standard output and standard error as two byte slices.
+func (cmd *GinCmd) OutputError() ([]byte, []byte, error) {
+	var bout, berr bytes.Buffer
+	cmd.Stdout = &bout
+	cmd.Stderr = &berr
+	err := cmd.Run()
+	return bout.Bytes(), berr.Bytes(), err
 }
