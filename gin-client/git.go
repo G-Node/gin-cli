@@ -320,53 +320,68 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 		return
 	}
 
-	cmdargs = []string{"copy"}
+	cmdargs = []string{"copy", "--json-progress"}
 	cmdargs = append(cmdargs, paths...)
 	// NOTE: Using origin which is the conventional default remote. This should change to work with alternate remotes.
-	cmdargs = append(cmdargs, "--to=origin") // TODO: --json-progress
+	cmdargs = append(cmdargs, "--to=origin")
 	cmd = RunAnnexCommand(cmdargs...)
 	err = cmd.Start()
 	if err != nil {
 		pushchan <- RepoFileStatus{Err: err}
 		return
 	}
+
 	var status RepoFileStatus
-	var line string
-	var rerr error
 	status.State = "Uploading"
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\r') {
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
+
+	var outline []byte
+	var rerr error
+	var progress AnnexProgress
+	var getresult AnnexAction
+	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+		if len(outline) == 0 {
+			// skip empty lines
 			continue
 		}
-		words := strings.Fields(line)
-		if words[0] == "copy" {
-			status.FileName = words[1] // NOTE: doesn't work for files with spaces in the name; fix with --json-progress
-			// new file - reset Progress and Rate
-			status.Progress = ""
-			status.Rate = ""
-			if words[len(words)-1] != "ok" {
-				// if the copy line ends with ok, the file is already done (no upload needed)
-				// so we shouldn't send the status to the caller
-				pushchan <- status
+		err := json.Unmarshal(outline, &progress)
+		if err != nil || progress == (AnnexProgress{}) {
+			// File done? Check if succeeded and continue to next line
+			err = json.Unmarshal(outline, &getresult)
+			if err != nil || getresult == (AnnexAction{}) {
+				// Couldn't parse output
+				util.LogWrite("Could not parse 'git annex copy' output")
+				util.LogWrite(string(outline))
+				util.LogWrite(err.Error())
+				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+				continue
 			}
-		} else if strings.Contains(line, "%") {
-			status.Progress = words[1]
-			status.Rate = words[2]
-			pushchan <- status
+			status.FileName = getresult.File
+			if getresult.Success {
+				status.Progress = "100%"
+				status.Err = nil
+			} else {
+				errmsg := getresult.Note
+				if strings.Contains(errmsg, "Unable to access") {
+					errmsg = "authorisation failed or remote storage unavailable"
+				}
+				status.Err = fmt.Errorf("failed: %s", errmsg)
+			}
+		} else {
+			status.FileName = progress.Action.File
+			status.Progress = progress.PercentProgress
+			status.Rate = fmt.Sprintf("%d/%d", progress.ByteProgress, progress.TotalSize) // calculate rate using d_byteprogress/d_t
+			status.Err = nil
 		}
-	}
 
-	var errline []byte
-	stderr = make([]byte, 0)
-	for rerr = nil; rerr == nil; errline, rerr = cmd.ErrReader.ReadBytes('\000') {
-		stderr = append(stderr, errline...)
+		pushchan <- status
 	}
-	if err := cmd.Wait(); err != nil {
-		util.LogWrite("Error during AnnexSync")
-		util.LogWrite("[stdout]\n%s", stdout)
-		util.LogWrite("[stderr]\n%s", stderr)
-		util.LogWrite("[Error]: %v", err)
+	if cmd.Wait() != nil {
+		var stderr, errline []byte
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
+		util.LogWrite("Error during AnnexGet")
+		util.LogWrite(string(stderr))
 	}
 	return
 }
