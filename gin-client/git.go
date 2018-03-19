@@ -660,18 +660,18 @@ func annexExclArgs() (exclargs []string) {
 	return
 }
 
-// AnnexAdd adds paths to the annex.
-// Files specified for exclusion in the configuration are ignored automatically.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-// The status channel 'addchan' is closed when this function returns.
-// (git annex add)
-func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
+// annexAddCommon is the common function that serves both AnnexAdd() and AnnexLock().
+// AnnexLock() is performed by passing true to 'update'.
+func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStatus) {
 	defer close(addchan)
 	if len(filepaths) == 0 {
 		util.LogWrite("No paths to add to annex. Nothing to do.")
 		return
 	}
-	cmdargs := []string{"--json", "add"}
+	cmdargs := []string{"add", "--json"}
+	if update {
+		cmdargs = append(cmdargs, "--update")
+	}
 	cmdargs = append(cmdargs, filepaths...)
 
 	exclargs := annexExclArgs()
@@ -691,6 +691,9 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	var status RepoFileStatus
 	var addresult AnnexAction
 	status.State = "Adding"
+	if update {
+		status.State = "Locking"
+	}
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// Empty line output. Ignore
@@ -725,6 +728,15 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		logstd(nil, stderr)
 	}
 	return
+}
+
+// AnnexAdd adds paths to the annex.
+// Files specified for exclusion in the configuration are ignored automatically.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'addchan' is closed when this function returns.
+// (git annex add)
+func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
+	annexAddCommon(filepaths, false, addchan)
 }
 
 // AnnexWhereisRes holds the output of a "git annex whereis" command
@@ -889,66 +901,7 @@ func makeFileList(header string, fnames []string) string {
 // The status channel 'lockchan' is closed when this function returns.
 // (git annex add --update)
 func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
-	defer close(lockchan)
-	// Annex lock doesn't work like it used to. It's better to instead annex add, but only the files that are already known to annex (handled by --update).
-	var status RepoFileStatus
-	status.State = "Locking"
-
-	cmdargs := []string{"add", "--json", "--update"}
-	exclargs := annexExclArgs()
-	if len(exclargs) > 0 {
-		cmdargs = append(cmdargs, exclargs...)
-	}
-
-	cmdargs = append(cmdargs, filepaths...)
-	cmd := RunAnnexCommand(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
-		lockchan <- RepoFileStatus{Err: err}
-		return
-	}
-
-	var annexAddRes struct {
-		Command string `json:"command"`
-		File    string `json:"file"`
-		Key     string `json:"key"`
-		Success bool   `json:"success"`
-	}
-	var line string
-	var rerr error
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\r') {
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
-			// Empty line output. Ignore
-			continue
-		}
-		// Send file name
-		err = json.Unmarshal([]byte(line), &annexAddRes)
-		if err != nil {
-			lockchan <- RepoFileStatus{Err: err}
-			return
-		}
-		status.FileName = annexAddRes.File
-		if annexAddRes.Success {
-			util.LogWrite("%s locked", annexAddRes.File)
-			status.Err = nil
-		} else {
-			util.LogWrite("Error locking %s", annexAddRes.File)
-			status.Err = fmt.Errorf("failed")
-		}
-		status.Progress = progcomplete
-		lockchan <- status
-	}
-	var stderr, errline []byte
-	if cmd.Wait() != nil {
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
-		}
-		util.LogWrite("Error during AnnexLock")
-		logstd(nil, stderr)
-	}
-	status.Progress = progcomplete
-	return
+	annexAddCommon(filepaths, true, lockchan)
 }
 
 // AnnexUnlock unlocks the specified files and directory contents if they are annexed
