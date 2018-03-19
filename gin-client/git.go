@@ -362,61 +362,78 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 // (git annex get)
 func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 	defer close(getchan)
-	cmdargs := append([]string{"get"}, filepaths...)
+	cmdargs := append([]string{"get", "--json-progress"}, filepaths...)
 	cmd := RunAnnexCommand(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
+	if err := cmd.Start(); err != nil {
 		getchan <- RepoFileStatus{Err: err}
 		return
 	}
+
+	type annexGetAction struct {
+		Command string `json:"command"`
+		Note    string `json:"note"`
+		Success bool   `json:"success"`
+		Key     string `json:"key"`
+		File    string `json:"file"`
+	}
+	type annexGetProgress struct {
+		Action          annexGetAction `json:"action"`
+		ByteProgress    int            `json:"byte-progress"`
+		TotalSize       int            `json:"total-size"`
+		PercentProgress string         `json:"percent-progress"`
+	}
+
 	var status RepoFileStatus
 	status.State = "Downloading"
-	var outline, stdout, errline, stderr []byte
+
+	var outline []byte
 	var rerr, ererr error
-	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\r') {
-		stdout = append(stdout, outline...)
-		line := strings.TrimSpace(string(outline))
-		if len(line) == 0 {
+	var progress annexGetProgress
+	var getresult annexGetAction
+	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+		if len(outline) == 0 {
+			// skip empty lines
 			continue
 		}
-		words := strings.Fields(line)
-		lastword := words[len(words)-1]
-		if words[0] == "get" {
-			status.FileName = words[1] // NOTE: Fix with --json-progress
-			// new file - reset Progress, Rate, and Err
-			status.Progress = ""
-			status.Rate = ""
-			status.Err = nil
-			if lastword != "ok" {
-				// if the copy line ends with ok, the file is already done (no upload needed)
-				// so we shouldn't send the status to the caller
-				getchan <- status
+		err := json.Unmarshal(outline, &progress)
+		if err != nil || progress == (annexGetProgress{}) {
+			// File done? Check if succeeded and continue to next line
+			err = json.Unmarshal(outline, &getresult)
+			if err != nil || getresult == (annexGetAction{}) {
+				// Couldn't parse output
+				util.LogWrite("Could not parse 'git annex get' output")
+				util.LogWrite(string(outline))
+				util.LogWrite(err.Error())
+				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+				continue
 			}
-		} else if lastword == "failed" {
-			// determine error type
-			for ererr = nil; ererr == nil; errline, ererr = cmd.OutReader.ReadBytes('\000') {
-				stderr = append(stderr, errline...)
-			}
-			if strings.Contains(string(stderr), "Permission denied") {
-				status.Err = fmt.Errorf("Authentication failed: try logging in again")
+			status.FileName = getresult.File
+			if getresult.Success {
+				status.Progress = "100%"
+				status.Err = nil
 			} else {
-				// TODO: Other reasons?
-				status.Err = fmt.Errorf("Content or server unavailable")
+				errmsg := getresult.Note
+				if strings.Contains(errmsg, "Unable to access") {
+					errmsg = "authorisation failed or remote storage unavailable"
+				}
+				status.Err = fmt.Errorf("failed: %s", errmsg)
 			}
-			getchan <- status
-		} else if strings.Contains(line, "%") {
-			status.Progress = words[1]
-			status.Rate = words[2]
-			getchan <- status
+		} else {
+			status.FileName = progress.Action.File
+			status.Progress = progress.PercentProgress
+			status.Rate = fmt.Sprintf("%d/%d", progress.ByteProgress, progress.TotalSize) // calculate rate using d_byteprogress/d_t
+			status.Err = nil
 		}
+
+		getchan <- status
 	}
 	if cmd.Wait() != nil {
+		var stderr, errline []byte
 		for ererr = nil; ererr == nil; errline, ererr = cmd.OutReader.ReadBytes('\000') {
-			// Read the rest of stderr (if there is any)
 			stderr = append(stderr, errline...)
 		}
 		util.LogWrite("Error during AnnexGet")
-		logstd(stdout, stderr)
+		util.LogWrite(string(stderr))
 	}
 	return
 }
