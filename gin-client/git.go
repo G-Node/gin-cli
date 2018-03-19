@@ -667,34 +667,38 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		return
 	}
 
-	var annexAddRes struct {
+	type annexAddRes struct {
 		Command string `json:"command"`
 		File    string `json:"file"`
 		Key     string `json:"key"`
 		Success bool   `json:"success"`
 	}
-	var line string
+
+	var outline []byte
 	var rerr error
 	var status RepoFileStatus
+	var addresult annexAddRes
 	status.State = "Adding"
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
+	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+		if len(outline) == 0 {
 			// Empty line output. Ignore
 			continue
 		}
-		// Send file name
-		err = json.Unmarshal([]byte(line), &annexAddRes)
-		if err != nil {
-			addchan <- RepoFileStatus{Err: err}
-			return
+		err := json.Unmarshal(outline, &addresult)
+		if err != nil || addresult == (annexAddRes{}) {
+			// Couldn't parse output
+			util.LogWrite("Could not parse 'git annex add' output")
+			util.LogWrite(string(outline))
+			util.LogWrite(err.Error())
+			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+			continue
 		}
-		status.FileName = annexAddRes.File
-		if annexAddRes.Success {
-			util.LogWrite("%s added to annex", annexAddRes.File)
+		status.FileName = addresult.File
+		if addresult.Success {
+			util.LogWrite("%s added to annex", addresult.File)
 			status.Err = nil
 		} else {
-			util.LogWrite("Error adding %s", annexAddRes.File)
+			util.LogWrite("Error adding %s", addresult.File)
 			status.Err = fmt.Errorf("failed")
 		}
 		status.Progress = progcomplete
