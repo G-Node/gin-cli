@@ -921,33 +921,30 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 	var status RepoFileStatus
 	status.State = "Unlocking"
 
-	var annexUnlockRes struct {
-		Command string `json:"command"`
-		File    string `json:"file"`
-		Key     string `json:"key"`
-		Success bool   `json:"success"`
-		Note    string `json:"note"`
-	}
-	var line string
+	var outline []byte
 	var rerr error
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\r') {
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
+	var unlockres annexAction
+	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+		if len(outline) == 0 {
 			// Empty line output. Ignore
 			continue
 		}
 		// Send file name
-		err = json.Unmarshal([]byte(line), &annexUnlockRes)
-		if err != nil {
-			unlockchan <- RepoFileStatus{Err: err}
-			return
+		err = json.Unmarshal(outline, &unlockres)
+		if err != nil || unlockres == (annexAction{}) {
+			// Couldn't parse output
+			util.LogWrite("Could not parse 'git annex unlock' output")
+			util.LogWrite(string(outline))
+			util.LogWrite(err.Error())
+			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+			continue
 		}
-		status.FileName = annexUnlockRes.File
-		if annexUnlockRes.Success {
-			util.LogWrite("%s unlocked", annexUnlockRes.File)
+		status.FileName = unlockres.File
+		if unlockres.Success {
+			util.LogWrite("%s unlocked", unlockres.File)
 			status.Err = nil
 		} else {
-			util.LogWrite("Error unlocking %s", annexUnlockRes.File)
+			util.LogWrite("Error unlocking %s", unlockres.File)
 			status.Err = fmt.Errorf("Content not available locally\nUse 'gin get-content' to download")
 		}
 		status.Progress = progcomplete
