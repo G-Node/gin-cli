@@ -464,7 +464,11 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			util.LogWrite("Error dropping %s", annexDropRes.File)
-			status.Err = fmt.Errorf(annexDropRes.Note)
+			errmsg := annexDropRes.Note
+			if strings.Contains(errmsg, "unsafe") {
+				errmsg = "failed (unsafe): could not verify remote copy"
+			}
+			status.Err = fmt.Errorf(errmsg)
 		}
 		status.Progress = progcomplete
 		dropchan <- status
