@@ -596,6 +596,10 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	var rerr error
 	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
 		fname := strings.TrimSpace(line)
+		if len(fname) == 0 {
+			// skip empty lines
+			continue
+		}
 		if strings.HasPrefix(fname, "add") {
 			status.State = "Adding"
 			fname = strings.TrimPrefix(fname, "add '")
@@ -613,7 +617,6 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	var stderr, errline []byte
 	if cmd.Wait() != nil {
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			// Read the rest of stderr (if there is any)
 			stderr = append(stderr, errline...)
 		}
 		util.LogWrite("Error during GitAdd")
