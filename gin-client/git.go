@@ -180,7 +180,7 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 
 // Git annex commands
 
-type AnnexAction struct {
+type annexAction struct {
 	Command string `json:"command"`
 	Note    string `json:"note"`
 	Success bool   `json:"success"`
@@ -188,8 +188,8 @@ type AnnexAction struct {
 	File    string `json:"file"`
 }
 
-type AnnexProgress struct {
-	Action          AnnexAction `json:"action"`
+type annexProgress struct {
+	Action          annexAction `json:"action"`
 	ByteProgress    int         `json:"byte-progress"`
 	TotalSize       int         `json:"total-size"`
 	PercentProgress string      `json:"percent-progress"`
@@ -336,18 +336,18 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 
 	var outline []byte
 	var rerr error
-	var progress AnnexProgress
-	var getresult AnnexAction
+	var progress annexProgress
+	var getresult annexAction
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// skip empty lines
 			continue
 		}
 		err := json.Unmarshal(outline, &progress)
-		if err != nil || progress == (AnnexProgress{}) {
+		if err != nil || progress == (annexProgress{}) {
 			// File done? Check if succeeded and continue to next line
 			err = json.Unmarshal(outline, &getresult)
-			if err != nil || getresult == (AnnexAction{}) {
+			if err != nil || getresult == (annexAction{}) {
 				// Couldn't parse output
 				util.LogWrite("Could not parse 'git annex copy' output")
 				util.LogWrite(string(outline))
@@ -404,18 +404,18 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 
 	var outline []byte
 	var rerr error
-	var progress AnnexProgress
-	var getresult AnnexAction
+	var progress annexProgress
+	var getresult annexAction
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// skip empty lines
 			continue
 		}
 		err := json.Unmarshal(outline, &progress)
-		if err != nil || progress == (AnnexProgress{}) {
+		if err != nil || progress == (annexProgress{}) {
 			// File done? Check if succeeded and continue to next line
 			err = json.Unmarshal(outline, &getresult)
-			if err != nil || getresult == (AnnexAction{}) {
+			if err != nil || getresult == (annexAction{}) {
 				// Couldn't parse output
 				util.LogWrite("Could not parse 'git annex get' output")
 				util.LogWrite(string(outline))
@@ -689,7 +689,7 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 	var outline []byte
 	var rerr error
 	var status RepoFileStatus
-	var addresult AnnexAction
+	var addresult annexAction
 	status.State = "Adding"
 	if update {
 		status.State = "Locking"
@@ -700,7 +700,7 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 			continue
 		}
 		err := json.Unmarshal(outline, &addresult)
-		if err != nil || addresult == (AnnexAction{}) {
+		if err != nil || addresult == (annexAction{}) {
 			// Couldn't parse output
 			util.LogWrite("Could not parse 'git annex add' output")
 			util.LogWrite(string(outline))
