@@ -60,14 +60,18 @@ func repoversion(cmd *cobra.Command, args []string) {
 		go gincl.Upload(paths, commitmsg, uploadchan)
 		printProgress(uploadchan, jsonout)
 	} else {
-		checkoutcopies(commit.AbbreviatedHash, paths, copyto)
+		checkoutcopies(commit, paths, copyto)
 	}
 }
 
-func checkoutcopies(hash string, paths []string, destination string) {
+func checkoutcopies(commit ginclient.GinCommit, paths []string, destination string) {
+	hash := commit.AbbreviatedHash
+	isodate := commit.Date.Format("2006-01-02-1504")
+	prettydate := commit.Date.Format("Jan 2 15:04:05 2006 (-0700)")
 	checkoutchan := make(chan ginclient.FileCheckoutStatus)
-	go ginclient.CheckoutFileCopies(hash, paths, destination, checkoutchan)
+	go ginclient.CheckoutFileCopies(hash, paths, destination, isodate, checkoutchan)
 
+	var newfiles []string
 	for costatus := range checkoutchan {
 		if costatus.Err != nil {
 			fmt.Println(costatus.Err.Error())

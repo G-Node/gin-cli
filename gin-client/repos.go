@@ -361,7 +361,7 @@ type FileCheckoutStatus struct {
 // CheckoutFileCopies checks out copies of files specified by path from the revision with the specified commithash.
 // The checked out files are stored in the location specified by outpath.
 // The timestamp of the revision is appended to the original filenames.
-func CheckoutFileCopies(commithash string, paths []string, outpath string, cochan chan<- FileCheckoutStatus) {
+func CheckoutFileCopies(commithash string, paths []string, outpath string, suffix string, cochan chan<- FileCheckoutStatus) {
 	defer close(cochan)
 	objects, err := GitLsTree(commithash, paths)
 	if err != nil {
@@ -374,7 +374,8 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, cocha
 			var status FileCheckoutStatus
 			status.Filename = obj.Name
 
-			outfilename := obj.Name + "-old" // TODO: append timestamp (before extension)
+			filext := filepath.Ext(obj.Name)
+			outfilename := fmt.Sprintf("%s-%s%s", strings.TrimSuffix(obj.Name, filext), suffix, filext)
 			outfile := filepath.Join(outpath, outfilename)
 			status.Destination = outfile
 
@@ -680,6 +681,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 }
 
 func lfIndirect(paths ...string) (map[string]FileStatus, error) {
+	// TODO: Determine if added files (LocalChanges) are new or not (new status needed?)
 	statuses := make(map[string]FileStatus)
 
 	cachedchan := make(chan string)
