@@ -1272,14 +1272,29 @@ func GitCatFileType(object string) (string, error) {
 	return string(stdout), nil
 }
 
-var modecache = make(map[string]bool)
+// AnnexFromKey creates an Annex placeholder file at a given location with a specific key.
+// The creation is forced, so there is no guarantee that the key refers to valid repository content, nor that the content is still available in any of the remotes.
+// The location where the file is to be created must be available (no directories are created).
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// (git annex fromkey --force)
+func AnnexFromKey(key, filepath string) error {
+	cmd := AnnexCommand("fromkey", "--force", key, filepath)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+		return fmt.Errorf(string(stderr))
+	}
+	return nil
+}
+
+var annexmodecache = make(map[string]bool)
 
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // If the path is a repository and no error was raised, the result it cached so that subsequent checks are faster.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsDirect() bool {
-	if mode, ok := modecache[Workingdir]; ok {
+	if mode, ok := annexmodecache[Workingdir]; ok {
 		return mode
 	}
 	cmd := GitCommand("config", "--local", "annex.direct")
@@ -1290,10 +1305,10 @@ func IsDirect() bool {
 	}
 
 	if strings.TrimSpace(string(stdout)) == "true" {
-		modecache[Workingdir] = true
+		annexmodecache[Workingdir] = true
 		return true
 	}
-	modecache[Workingdir] = false
+	annexmodecache[Workingdir] = false
 	return false
 }
 

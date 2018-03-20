@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -368,14 +369,27 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string) error
 			if cerr != nil {
 				return cerr
 			}
+			if mderr := os.MkdirAll(outpath, 0777); mderr != nil {
+				return mderr
+			}
 			if obj.Mode == "120000" {
-				if isAnnexPath(string(content)) {
+				linkdst := string(content)
+				if isAnnexPath(linkdst) {
 					fmt.Printf("Checking out annex file %s from revision %s and copying to %s\n", obj.Name, commithash, outfile)
+					_, key := path.Split(linkdst)
+					fkerr := AnnexFromKey(key, outfile)
+					if fkerr != nil {
+						fmt.Printf("Error creating placeholder file %s\n", outfile)
+					}
 				} else {
-					fmt.Printf("%s is a link to %s and is not an annexed file. Cannot recover\n", obj.Name, content)
+					fmt.Printf("%s is a link to %s and is not an annexed file. Cannot recover\n", obj.Name, linkdst)
 				}
 			} else if obj.Mode == "100755" || obj.Mode == "100644" {
 				fmt.Printf("Checking out git file %s from revision %s and copying to %s\n", obj.Name, commithash, outfile)
+				werr := ioutil.WriteFile(outfile, content, 0666)
+				if werr != nil {
+					fmt.Printf("Error writing %s\n", outfile)
+				}
 			}
 		}
 	}
