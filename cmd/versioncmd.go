@@ -43,9 +43,9 @@ func repoversion(cmd *cobra.Command, args []string) {
 
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, true) // TODO: change when we support offline-only
-	var err error
 	if copyto == "" {
-		err = ginclient.CheckoutVersion(commit.AbbreviatedHash, paths)
+		err := ginclient.CheckoutVersion(commit.AbbreviatedHash, paths)
+		util.CheckError(err)
 		hostname, herr := os.Hostname()
 		if herr != nil {
 			util.LogWrite("Could not retrieve hostname")
@@ -60,9 +60,29 @@ func repoversion(cmd *cobra.Command, args []string) {
 		go gincl.Upload(paths, commitmsg, uploadchan)
 		printProgress(uploadchan, jsonout)
 	} else {
-		err = ginclient.CheckoutFileCopies(commit.AbbreviatedHash, paths, copyto)
+		checkoutcopies(commit.AbbreviatedHash, paths, copyto)
 	}
-	util.CheckError(err)
+}
+
+func checkoutcopies(hash string, paths []string, destination string) {
+	checkoutchan := make(chan ginclient.FileCheckoutStatus)
+	go ginclient.CheckoutFileCopies(hash, paths, destination, checkoutchan)
+
+	for costatus := range checkoutchan {
+		if costatus.Err != nil {
+			fmt.Println(costatus.Err.Error())
+			continue
+		}
+		switch costatus.Type {
+		case "Git":
+			fmt.Printf("Copied git file '%s' from revision %s to '%s'\n", costatus.Filename, hash, costatus.Destination)
+		case "Annex":
+			fmt.Printf("Copied placeholder file '%s' from revision %s to '%s'\n", costatus.Filename, hash, costatus.Destination)
+			// TODO: Check if contents are available locally and if not advise with 'gin get-content' command
+		case "Link":
+			fmt.Printf("'%s' is a link to '%s' and it not a placeholder file; cannot recover\n", costatus.Filename, costatus.Destination)
+		}
+	}
 }
 
 func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {

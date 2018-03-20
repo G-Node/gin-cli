@@ -350,50 +350,67 @@ func CheckoutVersion(commithash string, paths []string) error {
 	return GitCheckout(commithash, paths)
 }
 
+// FileCheckoutStatus is used to report the status of a CheckoutFileCopies() operation.
+type FileCheckoutStatus struct {
+	Filename    string
+	Type        string
+	Destination string
+	Err         error
+}
+
 // CheckoutFileCopies checks out copies of files specified by path from the revision with the specified commithash.
 // The checked out files are stored in the location specified by outpath.
 // The timestamp of the revision is appended to the original filenames.
-func CheckoutFileCopies(commithash string, paths []string, outpath string) error {
-	// TODO: Needs progress/status output (per file)
+func CheckoutFileCopies(commithash string, paths []string, outpath string, cochan chan<- FileCheckoutStatus) {
+	defer close(cochan)
 	objects, err := GitLsTree(commithash, paths)
 	if err != nil {
-		return err
+		cochan <- FileCheckoutStatus{Err: err}
+		return
 	}
 
 	for _, obj := range objects {
 		if obj.Type == "blob" {
+			var status FileCheckoutStatus
+			status.Filename = obj.Name
+
 			outfilename := obj.Name + "-old" // TODO: append timestamp (before extension)
 			outfile := filepath.Join(outpath, outfilename)
+			status.Destination = outfile
+
 			// determine if it's an annexed link
 			content, cerr := GitCatFileContents(commithash, obj.Name)
 			if cerr != nil {
-				return cerr
+				cochan <- FileCheckoutStatus{Err: cerr}
+				return
 			}
 			if mderr := os.MkdirAll(outpath, 0777); mderr != nil {
-				return mderr
+				cochan <- FileCheckoutStatus{Err: mderr}
+				return
 			}
 			if obj.Mode == "120000" {
 				linkdst := string(content)
 				if isAnnexPath(linkdst) {
-					fmt.Printf("Checking out annex file %s from revision %s and copying to %s\n", obj.Name, commithash, outfile)
+					status.Type = "Annex"
 					_, key := path.Split(linkdst)
 					fkerr := AnnexFromKey(key, outfile)
 					if fkerr != nil {
-						fmt.Printf("Error creating placeholder file %s\n", outfile)
+						status.Err = fmt.Errorf("Error creating placeholder file %s: %s", outfile, fkerr.Error())
 					}
 				} else {
-					fmt.Printf("%s is a link to %s and is not an annexed file. Cannot recover\n", obj.Name, linkdst)
+					status.Type = "Link"
+					status.Destination = string(content)
 				}
 			} else if obj.Mode == "100755" || obj.Mode == "100644" {
-				fmt.Printf("Checking out git file %s from revision %s and copying to %s\n", obj.Name, commithash, outfile)
+				status.Type = "Git"
 				werr := ioutil.WriteFile(outfile, content, 0666)
 				if werr != nil {
-					fmt.Printf("Error writing %s\n", outfile)
+					status.Err = fmt.Errorf("Error writing %s: %s", outfile, werr.Error())
 				}
 			}
+			cochan <- status
 		}
 	}
-	return nil
 }
 
 // InitDir initialises the local directory with the default remote and annex configuration.
