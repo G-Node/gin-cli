@@ -395,7 +395,7 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 	stat.State = "Initialising local storage"
 	initchan <- stat
 	if !IsRepo() {
-		cmd := RunGitCommand("init")
+		cmd := GitCommand("init")
 		stdout, stderr, err := cmd.OutputError()
 		if err != nil {
 			util.LogWrite("Error during Init command: %s", string(stderr))
@@ -417,9 +417,9 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 
 	// If there is no global git user.name or user.email set local ones
-	cmd := RunGitCommand("config", "--global", "user.name")
+	cmd := GitCommand("config", "--global", "user.name")
 	globalGitName, _ := cmd.Output()
-	cmd = RunGitCommand("config", "--global", "user.email")
+	cmd = GitCommand("config", "--global", "user.email")
 	globalGitEmail, _ := cmd.Output()
 	if len(globalGitName) == 0 && len(globalGitEmail) == 0 {
 		info, ierr := gincl.RequestAccount(gincl.Username)
@@ -438,7 +438,7 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 	if runtime.GOOS == "windows" {
 		// force disable symlinks even if user can create them
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
-		RunGitCommand("config", "--local", "core.symlinks", "false").Run()
+		GitCommand("config", "--local", "core.symlinks", "false").Run()
 	}
 
 	// If there are no commits, create the initial commit.
@@ -470,7 +470,7 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 
 	if new {
 		// Push initial commit and set default remote
-		cmd := RunGitCommand("push", "--set-upstream", "origin", "master")
+		cmd := GitCommand("push", "--set-upstream", "origin", "master")
 		stdout, stderr, err := cmd.OutputError()
 		if err != nil {
 			logstd(stdout, stderr)
@@ -730,7 +730,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	// If cached files are diff from upstream, mark as LocalChanges
 	diffargs := []string{"diff", "-z", "--name-only", "--relative", "@{upstream}"}
 	diffargs = append(diffargs, cachedfiles...)
-	cmd := RunGitCommand(diffargs...)
+	cmd := GitCommand(diffargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during diff command for status")

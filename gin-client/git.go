@@ -26,19 +26,19 @@ func SetGitUser(name, email string) error {
 	if !IsRepo() {
 		return fmt.Errorf("not a repository")
 	}
-	cmd := RunGitCommand("config", "--local", "user.name", name)
+	cmd := GitCommand("config", "--local", "user.name", name)
 	err := cmd.Run()
 	if err != nil {
 		return err
 	}
-	cmd = RunGitCommand("config", "--local", "user.email", email)
+	cmd = GitCommand("config", "--local", "user.email", email)
 	return cmd.Run()
 }
 
 // AddRemote adds a remote named name for the repository at url.
 func AddRemote(name, url string) error {
 	fn := fmt.Sprintf("AddRemote(%s, %s)", name, url)
-	cmd := RunGitCommand("remote", "add", name, url)
+	cmd := GitCommand("remote", "add", name, url)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := ginerror{UError: err.Error(), Origin: fn}
@@ -59,7 +59,7 @@ func CommitIfNew() (bool, error) {
 	if !IsRepo() {
 		return false, fmt.Errorf("not a repository")
 	}
-	cmd := RunGitCommand("rev-parse", "HEAD")
+	cmd := GitCommand("rev-parse", "HEAD")
 	err := cmd.Wait()
 	if err == nil {
 		// All good. No need to do anything
@@ -72,7 +72,7 @@ func CommitIfNew() (bool, error) {
 		hostname = defaultHostname
 	}
 	commitargs := []string{"commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname)}
-	cmd = RunGitCommand(commitargs...)
+	cmd = GitCommand(commitargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error while creating initial commit")
@@ -114,7 +114,7 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
 		args = append([]string{"-c", "core.symlinks=false"}, args...)
 	}
-	cmd := RunGitCommand(args...)
+	cmd := GitCommand(args...)
 	err := cmd.Start()
 	if err != nil {
 		clonechan <- RepoFileStatus{Err: ginerror{UError: err.Error(), Origin: fn}}
@@ -200,14 +200,14 @@ type annexProgress struct {
 // (git annex init)
 func AnnexInit(description string) error {
 	args := []string{"init", description}
-	cmd := RunAnnexCommand(args...)
+	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		initError := fmt.Errorf("Repository annex initialisation failed.\n%s", string(stderr))
 		logstd(stdout, stderr)
 		return initError
 	}
-	cmd = RunGitCommand("config", "annex.backends", "MD5")
+	cmd = GitCommand("config", "annex.backends", "MD5")
 	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Failed to set default annex backend MD5")
@@ -222,7 +222,7 @@ func AnnexInit(description string) error {
 // (git annex sync --no-push [--content])
 func AnnexPull() error {
 	args := []string{"sync", "--no-push", "--no-commit"}
-	cmd := RunAnnexCommand(args...)
+	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during AnnexPull.")
@@ -249,7 +249,7 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 	if content {
 		args = append(args, "--content")
 	}
-	cmd := RunAnnexCommand(args...)
+	cmd := AnnexCommand(args...)
 	cmd.Start()
 	var status RepoFileStatus
 	status.State = "Synchronising repository"
@@ -302,7 +302,7 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
 	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitmsg)}
-	cmd := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	// TODO: Parse git push output for progress
 	if err != nil {
@@ -324,7 +324,7 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 	cmdargs = append(cmdargs, paths...)
 	// NOTE: Using origin which is the conventional default remote. This should change to work with alternate remotes.
 	cmdargs = append(cmdargs, "--to=origin")
-	cmd = RunAnnexCommand(cmdargs...)
+	cmd = AnnexCommand(cmdargs...)
 	err = cmd.Start()
 	if err != nil {
 		pushchan <- RepoFileStatus{Err: err}
@@ -393,7 +393,7 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 	defer close(getchan)
 	cmdargs := append([]string{"get", "--json-progress"}, filepaths...)
-	cmd := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
 	if err := cmd.Start(); err != nil {
 		getchan <- RepoFileStatus{Err: err}
 		return
@@ -461,7 +461,7 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 	defer close(dropchan)
 	cmdargs := append([]string{"drop", "--json"}, filepaths...)
-	cmd := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		dropchan <- RepoFileStatus{Err: err}
@@ -524,7 +524,7 @@ func setBare(state bool) error {
 	} else {
 		statestr = "false"
 	}
-	cmd := RunGitCommand("config", "--local", "--bool", "core.bare", statestr)
+	cmd := GitCommand("config", "--local", "--bool", "core.bare", statestr)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error switching bare status to %s", statestr)
@@ -541,7 +541,7 @@ func setBare(state bool) error {
 func GitLsFiles(args []string, lschan chan<- string) {
 	defer close(lschan)
 	cmdargs := append([]string{"ls-files"}, args...)
-	cmd := RunGitCommand(cmdargs...)
+	cmd := GitCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("ls-files command set up failed: %s", err)
@@ -601,7 +601,7 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	}
 
 	cmdargs := append([]string{"add", "--verbose", "--"}, filepaths...)
-	cmd := RunGitCommand(cmdargs...)
+	cmd := GitCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		addchan <- RepoFileStatus{Err: err}
@@ -679,7 +679,7 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		cmdargs = append(cmdargs, exclargs...)
 	}
 
-	cmd := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		addchan <- RepoFileStatus{Err: err}
@@ -764,7 +764,7 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisRes) {
 	defer close(wichan)
 	cmdargs := []string{"whereis", "--json"}
 	cmdargs = append(cmdargs, paths...)
-	cmd := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
@@ -803,7 +803,7 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 	defer close(statuschan)
 	cmdargs := []string{"status", "--json"}
 	cmdargs = append(cmdargs, paths...)
-	cmd := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
 	// TODO: Parse output
 	err := cmd.Start()
 	if err != nil {
@@ -912,7 +912,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 	defer close(unlockchan)
 	cmdargs := []string{"unlock", "--json"}
 	cmdargs = append(cmdargs, filepaths...)
-	cmd := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		unlockchan <- RepoFileStatus{Err: err}
@@ -992,7 +992,7 @@ type AnnexInfoRes struct {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex info)
 func AnnexInfo() (AnnexInfoRes, error) {
-	cmd := RunAnnexCommand("info", "--json")
+	cmd := AnnexCommand("info", "--json")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexInfo")
@@ -1039,7 +1039,7 @@ func GitLog(count uint, revrange string, paths []string, showdeletes bool) ([]Gi
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd := RunGitCommand(cmdargs...)
+	cmd := GitCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("Error setting up git log command")
@@ -1104,7 +1104,7 @@ func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd := RunGitCommand(cmdargs...)
+	cmd := GitCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("Error during GitLogDiffstat")
@@ -1166,7 +1166,7 @@ func GitCheckout(hash string, paths []string) error {
 	}
 	cmdargs = append(cmdargs, paths...)
 
-	cmd := RunGitCommand(cmdargs...)
+	cmd := GitCommand(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during GitCheckout")
@@ -1191,7 +1191,7 @@ func GitLsTree(revision string, paths []string) ([]GitObject, error) {
 	// TODO: use -z and split on null
 	cmdargs := []string{"ls-tree", "--full-tree", "-t", "-r", revision}
 	cmdargs = append(cmdargs, paths...)
-	cmd := RunGitCommand(cmdargs...)
+	cmd := GitCommand(cmdargs...)
 	// This command doesn't need to be read line-by-line
 	err := cmd.Start()
 	if err != nil {
@@ -1238,7 +1238,7 @@ func GitLsTree(revision string, paths []string) ([]GitObject, error) {
 // GitCatFileContents performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func GitCatFileContents(revision, filepath string) ([]byte, error) {
-	cmd := RunGitCommand("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
+	cmd := GitCommand("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during GitCatFile (Contents)")
@@ -1251,7 +1251,7 @@ func GitCatFileContents(revision, filepath string) ([]byte, error) {
 // GitCatFileType returns the type of a given object at a given revision (blob, tree, or commit)
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func GitCatFileType(object string) (string, error) {
-	cmd := RunGitCommand("cat-file", "-t", object)
+	cmd := GitCommand("cat-file", "-t", object)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during GitCatFile (Type)")
@@ -1272,7 +1272,7 @@ func IsDirect() bool {
 	if mode, ok := modecache[Workingdir]; ok {
 		return mode
 	}
-	cmd := RunGitCommand("config", "--local", "annex.direct")
+	cmd := GitCommand("config", "--local", "annex.direct")
 	stdout, _, err := cmd.OutputError()
 	if err != nil {
 		// Don't cache this result
@@ -1297,7 +1297,7 @@ func isAnnexPath(path string) bool {
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsVersion6() bool {
-	cmd := RunGitCommand("config", "--local", "--get", "annex.version")
+	cmd := GitCommand("config", "--local", "--get", "annex.version")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error while checking repository annex version")
@@ -1311,9 +1311,9 @@ func IsVersion6() bool {
 
 // Utility functions for shelling out
 
-// RunGitCommand sets up an external git command with the provided arguments and returns a GinCmd struct.
+// GitCommand sets up an external git command with the provided arguments and returns a GinCmd struct.
 // Setting the Workingdir package global affects the working directory in which the command will be executed.
-func RunGitCommand(args ...string) util.GinCmd {
+func GitCommand(args ...string) util.GinCmd {
 	gitbin := util.Config.Bin.Git
 	cmd := util.Command(gitbin)
 	cmd.Dir = Workingdir
@@ -1326,9 +1326,9 @@ func RunGitCommand(args ...string) util.GinCmd {
 	return cmd
 }
 
-// RunAnnexCommand sets up a git annex command with the provided arguments and returns a GinCmd struct.
+// AnnexCommand sets up a git annex command with the provided arguments and returns a GinCmd struct.
 // Setting the Workingdir package global affects the working directory in which the command will be executed.
-func RunAnnexCommand(args ...string) util.GinCmd {
+func AnnexCommand(args ...string) util.GinCmd {
 	gitannexbin := util.Config.Bin.GitAnnex
 	cmd := util.Command(gitannexbin, args...)
 	cmd.Dir = Workingdir
@@ -1343,7 +1343,7 @@ func RunAnnexCommand(args ...string) util.GinCmd {
 
 // GetAnnexVersion returns the version string of the system's git-annex.
 func GetAnnexVersion() (string, error) {
-	cmd := RunAnnexCommand("version", "--raw")
+	cmd := AnnexCommand("version", "--raw")
 	stdout, _, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error while preparing git-annex version command")
