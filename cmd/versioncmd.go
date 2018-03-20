@@ -68,22 +68,24 @@ func repoversion(cmd *cobra.Command, args []string) {
 func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
 	ndigits := len(strconv.Itoa(len(commits) + 1))
 	numfmt := fmt.Sprintf("[%%%dd]", ndigits)
+	width := termwidth()
 	for idx, commit := range commits {
 		idxstr := fmt.Sprintf(numfmt, idx+1)
 		fmt.Printf("%s  %s * %s\n\n", idxstr, green(commit.AbbreviatedHash), commit.Date.Format("Mon Jan 2 15:04:05 2006 (-0700)"))
-		fmt.Printf("\t%s\n\n", commit.Subject)
+		fmt.Printf("%s\n", winner.Wrap(commit.Subject, width))
+		if len(commit.Body) > 0 {
+			fmt.Printf("%s\n", winner.Wrap(commit.Body, width))
+		}
 		fstats := commit.FileStats
-		// TODO: wrap file listings
 		if len(fstats.NewFiles) > 0 {
-			fmt.Printf("\tAdded:    %s\n", strings.Join(fstats.NewFiles, ", "))
+			fmt.Printf("  Added\n%s\n", winner.Wrap(strings.Join(fstats.NewFiles, ", "), width))
 		}
 		if len(fstats.ModifiedFiles) > 0 {
-			fmt.Printf("\tModified: %s\n", strings.Join(fstats.ModifiedFiles, ", "))
+			fmt.Printf("  Modified\n%s\n", winner.Wrap(strings.Join(fstats.ModifiedFiles, ", "), width))
 		}
 		if len(fstats.DeletedFiles) > 0 {
-			fmt.Printf("\tDeleted:  %s\n", strings.Join(fstats.DeletedFiles, ", "))
+			fmt.Printf("  Deleted\n%s\n", winner.Wrap(strings.Join(fstats.DeletedFiles, ", "), width))
 		}
-		fmt.Println()
 	}
 	var selstr string
 	fmt.Print("Version to retrieve files from: ")
