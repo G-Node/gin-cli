@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -79,9 +78,8 @@ func HostKeyPath() string {
 // in order to use the user's private key.
 func GitSSHEnv(user string) string {
 	// Windows git seems to require Unix paths for the SSH command -- this is dirty but works
-	ossep := string(os.PathSeparator)
 	fixpathsep := func(p string) string {
-		p = strings.Replace(p, ossep, "/", -1)
+		p = filepath.ToSlash(p)
 		p = strings.Replace(p, " ", "\\ ", -1)
 		return p
 	}
