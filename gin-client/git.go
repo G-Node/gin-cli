@@ -1201,8 +1201,7 @@ type GitObject struct {
 // For each item, it returns a struct which contains the type (blob, tree), the mode, the hash, and the absolute (repo rooted) path to the object (name).
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func GitLsTree(revision string, paths []string) ([]GitObject, error) {
-	// TODO: use -z and split on null
-	cmdargs := []string{"ls-tree", "--full-tree", "-t", "-r", revision}
+	cmdargs := []string{"ls-tree", "--full-tree", "-z", "-t", "-r", revision}
 	cmdargs = append(cmdargs, paths...)
 	cmd := GitCommand(cmdargs...)
 	// This command doesn't need to be read line-by-line
@@ -1214,13 +1213,11 @@ func GitLsTree(revision string, paths []string) ([]GitObject, error) {
 	var objects []GitObject
 	var line string
 	var rerr error
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		if len(strings.TrimSpace(line)) == 0 {
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\000') {
+		line = strings.TrimSuffix(line, "\000")
+		if len(line) == 0 {
 			continue
 		}
-		// Don't trim spaces, since filenames at the end of the line might end with a space
-		// TODO: use null byte termination in ReadLine()
-		line = strings.TrimSuffix(line, "\n")
 		words := strings.Fields(line)
 		fnamesplit := strings.SplitN(line, "\t", 2)
 		if len(words) < 4 || len(fnamesplit) < 2 {
