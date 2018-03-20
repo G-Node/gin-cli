@@ -31,6 +31,9 @@ func repoversion(cmd *cobra.Command, args []string) {
 			fmt.Println(string(j))
 			return
 		}
+		if len(commits) == 0 {
+			util.Die("No revisions matched request")
+		}
 		commit = verprompt(commits)
 	} else {
 		commits, err := ginclient.GitLog(1, commithash, paths, false)
