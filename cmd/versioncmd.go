@@ -44,6 +44,8 @@ func repoversion(cmd *cobra.Command, args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	requirelogin(cmd, gincl, true) // TODO: change when we support offline-only
 	if copyto == "" {
+		// TODO: Print some sort of output (similar to copy-to variant)
+		// e.g., File 'fname' restored to version <revision> (date)
 		err := ginclient.CheckoutVersion(commit.AbbreviatedHash, paths)
 		util.CheckError(err)
 		hostname, herr := os.Hostname()
@@ -71,6 +73,7 @@ func checkoutcopies(commit ginclient.GinCommit, paths []string, destination stri
 	checkoutchan := make(chan ginclient.FileCheckoutStatus)
 	go ginclient.CheckoutFileCopies(hash, paths, destination, isodate, checkoutchan)
 
+	// TODO: JSON output
 	var newfiles []string
 	for costatus := range checkoutchan {
 		if costatus.Err != nil {
@@ -79,14 +82,20 @@ func checkoutcopies(commit ginclient.GinCommit, paths []string, destination stri
 		}
 		switch costatus.Type {
 		case "Git":
-			fmt.Printf("Copied git file '%s' from revision %s to '%s'\n", costatus.Filename, hash, costatus.Destination)
+			fmt.Printf("Copied git file '%s' from revision %s (%s) to '%s'\n", costatus.Filename, hash, prettydate, costatus.Destination)
+			newfiles = append(newfiles, costatus.Destination)
 		case "Annex":
-			fmt.Printf("Copied placeholder file '%s' from revision %s to '%s'\n", costatus.Filename, hash, costatus.Destination)
+			fmt.Printf("Copied placeholder file '%s' from revision %s (%s) to '%s'\n", costatus.Filename, hash, prettydate, costatus.Destination)
 			// TODO: Check if contents are available locally and if not advise with 'gin get-content' command
 		case "Link":
 			fmt.Printf("'%s' is a link to '%s' and it not a placeholder file; cannot recover\n", costatus.Filename, costatus.Destination)
 		}
 	}
+	// Add new files to index but do not upload
+	addchan := make(chan ginclient.RepoFileStatus)
+	go ginclient.GitAdd(newfiles, addchan)
+	<-addchan
+	// TODO: Instead of adding git files, would it be better if we did get-content on annex files and then removed them from the index?
 }
 
 func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
