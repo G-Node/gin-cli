@@ -1022,9 +1022,8 @@ type GinCommit struct {
 // If count <= 0, the entire commit history is returned.
 // Revisions which match only the deletion of the matching paths can be filtered using the showdeletes argument.
 func GitLog(count uint, revrange string, paths []string, showdeletes bool) ([]GinCommit, error) {
-	// TODO: Use git log -z and split stdout on NULL (\x00)
-	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
-	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat)}
+	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":"%b"}`
+	cmdargs := []string{"log", "-z", fmt.Sprintf("--format=%s", logformat)}
 	if count > 0 {
 		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
 	}
@@ -1046,17 +1045,27 @@ func GitLog(count uint, revrange string, paths []string, showdeletes bool) ([]Gi
 		return nil, fmt.Errorf("error retrieving version logs - malformed git log command")
 	}
 
-	var line string
+	var line []byte
 	var rerr error
 	var commits []GinCommit
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadBytes('\000') {
+		line = bytes.TrimSuffix(line, []byte("\000"))
+		if len(line) == 0 {
+			continue
+		}
+		// Escape newlines and tabs (from body)
+		line = bytes.Replace(line, []byte("\n"), []byte("\\n"), -1)
+		line = bytes.Replace(line, []byte("\t"), []byte("\\t"), -1)
 		var commit GinCommit
-		ierr := json.Unmarshal([]byte(line), &commit)
+		ierr := json.Unmarshal(line, &commit)
 		if ierr != nil {
 			util.LogWrite("Error parsing git log")
+			util.LogWrite(string(line))
 			util.LogWrite(ierr.Error())
 			continue
 		}
+		// Trim potential newline or spaces at end of body
+		commit.Body = strings.TrimSpace(commit.Body)
 		commits = append(commits, commit)
 	}
 
