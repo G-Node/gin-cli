@@ -1083,7 +1083,7 @@ func GitLog(count uint, revrange string, paths []string, showdeletes bool) ([]Gi
 	}
 
 	// TODO: Combine diffstats into first git log invocation
-	logstats, err := GitLogDiffstat(count, paths)
+	logstats, err := GitLogDiffstat(count, paths, showdeletes)
 	if err != nil {
 		util.LogWrite("Failed to get diff stats")
 		return commits, nil
@@ -1102,12 +1102,14 @@ type DiffStat struct {
 	ModifiedFiles []string
 }
 
-func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
+func GitLogDiffstat(count uint, paths []string, showdeletes bool) (map[string]DiffStat, error) {
 	logformat := `::%H`
-	// TODO: Use -z and split on null byte
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
 	if count > 0 {
 		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
+	}
+	if !showdeletes {
+		cmdargs = append(cmdargs, "--diff-filter=d")
 	}
 	cmdargs = append(cmdargs, "--") // separate revisions from paths, even if there are no paths
 	if paths != nil && len(paths) > 0 {
@@ -1153,6 +1155,8 @@ func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 			case "D":
 				df := curstat.DeletedFiles
 				curstat.DeletedFiles = append(df, fname)
+			case "R100":
+				// Ignore renames
 			default:
 				util.LogWrite("Could not parse diffstat line")
 				util.LogWrite(line)
