@@ -366,8 +366,7 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string) error
 			// determine if it's an annexed link
 			content, cerr := GitCatFileContents(commithash, obj.Name)
 			if cerr != nil {
-				util.LogError(cerr)
-				// Collect and return
+				return cerr
 			}
 			if obj.Mode == "120000" {
 				if isAnnexPath(string(content)) {
