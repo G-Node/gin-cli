@@ -254,10 +254,9 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 	var status RepoFileStatus
 	status.State = "Synchronising repository"
 	syncchan <- status
-	var line, stdout string
+	var line string
 	var rerr error
 	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		stdout += line
 		line = strings.TrimSpace(line)
 		if len(line) == 0 {
 			continue
@@ -286,7 +285,6 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 	}
 	if err := cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexSync")
-		util.LogWrite("[stdout]\n%s", stdout)
 		util.LogWrite("[stderr]\n%s", stderr)
 		util.LogWrite("[Error]: %v", err)
 	}
