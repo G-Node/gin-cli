@@ -355,7 +355,7 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 			}
 			status.FileName = getresult.File
 			if getresult.Success {
-				status.Progress = "100%"
+				status.Progress = progcomplete
 				status.Err = nil
 			} else {
 				errmsg := getresult.Note
@@ -423,7 +423,7 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 			}
 			status.FileName = getresult.File
 			if getresult.Success {
-				status.Progress = "100%"
+				status.Progress = progcomplete
 				status.Err = nil
 			} else {
 				errmsg := getresult.Note
