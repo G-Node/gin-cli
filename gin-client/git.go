@@ -15,7 +15,8 @@ import (
 
 // Workingdir sets the directory for shell commands
 var Workingdir = "."
-var progcomplete = "100%"
+
+const progcomplete = "100%"
 
 // **************** //
 
