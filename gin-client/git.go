@@ -121,17 +121,28 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		clonechan <- RepoFileStatus{Err: ginerror{UError: err.Error(), Origin: fn}}
 		return
 	}
+
+	var line, stderr string
+	cutline := func(b []byte) (string, bool) {
+		return string(b), true
+	}
 	var status RepoFileStatus
 	status.State = "Downloading repository"
-	var line, stderr string
 	var rerr error
+	readbuffer := make([]byte, 1024)
+	var nread int
+	var ok bool
 	// git clone progress prints to stderr
-	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\n') {
-		stderr += line
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
+	for rerr = nil; rerr == nil; nread, rerr = cmd.ErrReader.Read(readbuffer) {
+		// TODO: Read fixed number of bytes and parse lines (split on \r or \n)
+		if nread == 0 {
 			continue
 		}
+		line, ok = cutline(readbuffer)
+		if !ok {
+			continue
+		}
+		stderr += string(readbuffer[:nread])
 		words := strings.Fields(line)
 		status.FileName = repoPath
 		if words[0] == "Receiving" && words[1] == "objects" {
@@ -147,6 +158,10 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 			}
 		}
 		clonechan <- status
+	}
+	// collect the rest of stderr
+	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\000') {
+		stderr += line
 	}
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during clone command")
@@ -164,7 +179,6 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 			gerr.Description = "Server key does not match known/configured host key."
 		} else {
 			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", stderr)
-			clonechan <- RepoFileStatus{Err: gerr}
 		}
 		status.Err = gerr
 		clonechan <- status
