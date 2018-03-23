@@ -11,6 +11,7 @@ import (
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
+	humanize "github.com/dustin/go-humanize"
 )
 
 // Workingdir sets the directory for shell commands
@@ -340,6 +341,9 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 	var rerr error
 	var progress annexProgress
 	var getresult annexAction
+
+	var prevByteProgress int
+	var prevT time.Time
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// skip empty lines
@@ -371,7 +375,13 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 		} else {
 			status.FileName = progress.Action.File
 			status.Progress = progress.PercentProgress
-			status.Rate = fmt.Sprintf("%d/%d", progress.ByteProgress, progress.TotalSize) // calculate rate using d_byteprogress/d_t
+
+			dbytes := progress.ByteProgress - prevByteProgress
+			now := time.Now()
+			dt := now.Sub(prevT)
+			status.Rate = calcRate(dbytes, dt)
+			prevByteProgress = progress.ByteProgress
+			prevT = now
 			status.Err = nil
 		}
 
@@ -408,6 +418,8 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 	var rerr error
 	var progress annexProgress
 	var getresult annexAction
+	var prevByteProgress int
+	var prevT time.Time
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// skip empty lines
@@ -439,7 +451,12 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 		} else {
 			status.FileName = progress.Action.File
 			status.Progress = progress.PercentProgress
-			status.Rate = fmt.Sprintf("%d/%d", progress.ByteProgress, progress.TotalSize) // calculate rate using d_byteprogress/d_t
+			dbytes := progress.ByteProgress - prevByteProgress
+			now := time.Now()
+			dt := now.Sub(prevT)
+			status.Rate = calcRate(dbytes, dt)
+			prevByteProgress = progress.ByteProgress
+			prevT = now
 			status.Err = nil
 		}
 
@@ -1412,4 +1429,13 @@ func makeFileList(header string, fnames []string) string {
 func isAnnexPath(path string) bool {
 	// TODO: Check paths on Windows
 	return strings.Contains(path, ".git/annex/objects")
+}
+
+func calcRate(dbytes int, dt time.Duration) string {
+	dtns := dt.Nanoseconds()
+	if dtns <= 0 || dbytes <= 0 {
+		return ""
+	}
+	rate := int64(dbytes) * 1000000000 / dtns
+	return fmt.Sprintf("%s/s", humanize.IBytes(uint64(rate)))
 }
