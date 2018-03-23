@@ -44,7 +44,6 @@ build_script:
   - go get github.com/docker/docker/pkg/term
   - go get github.com/alecthomas/template
   - go get github.com/dustin/go-humanize
-  - go get github.com/alecthomas/template
   - go vet ./...
   - gofmt -s -l .
   - golint github.com/G-Node/gin-cli...
