@@ -20,10 +20,6 @@ before_install:
 install:
   # tools
   - go get github.com/golang/lint/golint
-  - go get github.com/GeertJohan/fgt
-  # coveralls
-  - go get github.com/mattn/goveralls
-  - go get golang.org/x/tools/cmd/cover
   # dependencies
   - go get github.com/spf13/viper
   - go get github.com/spf13/cobra
@@ -38,8 +34,12 @@ install:
   - go get github.com/shibukawa/configdir
   - go get github.com/bbrks/wrap
   - go get github.com/docker/docker/pkg/term
+  - go get github.com/dustin/go-humanize
   # import path symlink for forks
   - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -vs $(pwd) ${GOPATH}/src/github.com/G-Node/gin-cli; fi
+  - go vet ./...
+  - gofmt -s -l .
+  - golint github.com/G-Node/gin-cli...
 
 script:
   - make
