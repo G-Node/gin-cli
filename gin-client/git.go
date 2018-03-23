@@ -130,9 +130,10 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 			eof = true
 		}
 		stderr = append(stderr, readbuffer[:nread]...)
-		for eob = false; !eob; line, eob = cutline(stderr[errhead:]) {
+		for eob = false; !eob || errhead < len(stderr); line, eob = cutline(stderr[errhead:]) {
 			if len(line) == 0 {
-				continue
+				errhead++
+				break
 			}
 			errhead += len(line) + 1
 			words := strings.Fields(line)
@@ -1381,15 +1382,15 @@ func cutline(b []byte) (string, bool) {
 	idx := -1
 	cridx := bytes.IndexByte(b, '\r')
 	nlidx := bytes.IndexByte(b, '\n')
-	if cridx >= 0 {
+	if cridx > 0 {
 		idx = cridx
 	} else {
 		cridx = len(b) + 1
 	}
-	if nlidx >= 0 && nlidx < cridx {
+	if nlidx > 0 && nlidx < cridx {
 		idx = nlidx
 	}
-	if idx == -1 {
+	if idx <= 0 {
 		return string(b), true
 	}
 	return string(b[:idx]), false
