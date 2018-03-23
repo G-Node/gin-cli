@@ -94,30 +94,6 @@ func IsRepo() bool {
 	return yes
 }
 
-func splitRepoParts(repoPath string) (repoOwner, repoName string) {
-	repoPathParts := strings.SplitN(repoPath, "/", 2)
-	repoOwner = repoPathParts[0]
-	repoName = repoPathParts[1]
-	return
-}
-func cutline(b []byte) (string, bool) {
-	idx := -1
-	cridx := bytes.IndexByte(b, '\r')
-	nlidx := bytes.IndexByte(b, '\n')
-	if cridx >= 0 {
-		idx = cridx
-	} else {
-		cridx = len(b) + 1
-	}
-	if nlidx >= 0 && nlidx < cridx {
-		idx = nlidx
-	}
-	if idx == -1 {
-		return string(b), true
-	}
-	return string(b[:idx]), false
-}
-
 // Clone downloads a repository and sets the remote fetch and push urls.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'clonechan' is closed when this function returns.
@@ -543,23 +519,6 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 	return
 }
 
-func setBare(state bool) error {
-	var statestr string
-	if state {
-		statestr = "true"
-	} else {
-		statestr = "false"
-	}
-	cmd := GitCommand("config", "--local", "--bool", "core.bare", statestr)
-	stdout, stderr, err := cmd.OutputError()
-	if err != nil {
-		util.LogWrite("Error switching bare status to %s", statestr)
-		logstd(stdout, stderr)
-		err = fmt.Errorf(string(stderr))
-	}
-	return err
-}
-
 // GitLsFiles lists all files known to git.
 // In direct mode, the bare flag is temporarily switched off before running the command.
 // The output channel 'lschan' is closed when this function returns.
@@ -905,19 +864,6 @@ func DescribeIndex() (string, error) {
 	_, _ = changesBuffer.WriteString(makeFileList("Untracked files ", statusmap["?"]))
 
 	return changesBuffer.String(), nil
-}
-
-func makeFileList(header string, fnames []string) string {
-	if len(fnames) == 0 {
-		return ""
-	}
-	var filelist bytes.Buffer
-	_, _ = filelist.WriteString(fmt.Sprintf("%s (%d)\n", header, len(fnames)))
-	for idx, name := range fnames {
-		_, _ = filelist.WriteString(fmt.Sprintf("  %d: %s\n", idx+1, name))
-	}
-	_, _ = filelist.WriteString("\n")
-	return filelist.String()
 }
 
 // AnnexLock locks the specified files and directory contents if they are annexed.
@@ -1338,12 +1284,6 @@ func IsDirect() bool {
 	return false
 }
 
-//isAnnexPath returns true if a given string represents the path to an annex object.
-func isAnnexPath(path string) bool {
-	// TODO: Check paths on Windows
-	return strings.Contains(path, ".git/annex/objects")
-}
-
 // IsVersion6 returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
@@ -1407,6 +1347,69 @@ func GetAnnexVersion() (string, error) {
 	return string(stdout), nil
 }
 
+// Local utility functions
+
 func logstd(out, err []byte) {
 	util.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
+}
+
+func splitRepoParts(repoPath string) (repoOwner, repoName string) {
+	repoPathParts := strings.SplitN(repoPath, "/", 2)
+	repoOwner = repoPathParts[0]
+	repoName = repoPathParts[1]
+	return
+}
+
+func cutline(b []byte) (string, bool) {
+	idx := -1
+	cridx := bytes.IndexByte(b, '\r')
+	nlidx := bytes.IndexByte(b, '\n')
+	if cridx >= 0 {
+		idx = cridx
+	} else {
+		cridx = len(b) + 1
+	}
+	if nlidx >= 0 && nlidx < cridx {
+		idx = nlidx
+	}
+	if idx == -1 {
+		return string(b), true
+	}
+	return string(b[:idx]), false
+}
+
+func setBare(state bool) error {
+	var statestr string
+	if state {
+		statestr = "true"
+	} else {
+		statestr = "false"
+	}
+	cmd := GitCommand("config", "--local", "--bool", "core.bare", statestr)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		util.LogWrite("Error switching bare status to %s", statestr)
+		logstd(stdout, stderr)
+		err = fmt.Errorf(string(stderr))
+	}
+	return err
+}
+
+func makeFileList(header string, fnames []string) string {
+	if len(fnames) == 0 {
+		return ""
+	}
+	var filelist bytes.Buffer
+	_, _ = filelist.WriteString(fmt.Sprintf("%s (%d)\n", header, len(fnames)))
+	for idx, name := range fnames {
+		_, _ = filelist.WriteString(fmt.Sprintf("  %d: %s\n", idx+1, name))
+	}
+	_, _ = filelist.WriteString("\n")
+	return filelist.String()
+}
+
+//isAnnexPath returns true if a given string represents the path to an annex object.
+func isAnnexPath(path string) bool {
+	// TODO: Check paths on Windows
+	return strings.Contains(path, ".git/annex/objects")
 }
