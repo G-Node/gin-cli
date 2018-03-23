@@ -69,7 +69,7 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 				msgparts = append(msgparts, stat.Progress, stat.Rate)
 			}
 		} else {
-			msgparts = append(msgparts, red(stat.Err.Error()))
+			msgparts = append(msgparts, stat.Err.Error())
 			filesuccess[stat.FileName] = false
 		}
 		newprint := fmt.Sprintf("\r%s", strings.Join(msgparts, " "))

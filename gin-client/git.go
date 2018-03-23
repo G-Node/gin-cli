@@ -100,6 +100,23 @@ func splitRepoParts(repoPath string) (repoOwner, repoName string) {
 	repoName = repoPathParts[1]
 	return
 }
+func cutline(b []byte) (string, bool) {
+	idx := -1
+	cridx := bytes.IndexByte(b, '\r')
+	nlidx := bytes.IndexByte(b, '\n')
+	if cridx >= 0 {
+		idx = cridx
+	} else {
+		cridx = len(b) + 1
+	}
+	if nlidx >= 0 && nlidx < cridx {
+		idx = nlidx
+	}
+	if idx == -1 {
+		return string(b), true
+	}
+	return string(b[:idx]), false
+}
 
 // Clone downloads a repository and sets the remote fetch and push urls.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
@@ -122,63 +139,59 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		return
 	}
 
-	var line, stderr string
-	cutline := func(b []byte) (string, bool) {
-		return string(b), true
-	}
+	var line string
+	var stderr []byte
 	var status RepoFileStatus
 	status.State = "Downloading repository"
 	var rerr error
 	readbuffer := make([]byte, 1024)
-	var nread int
-	var ok bool
+	var nread, errhead int
+	var eob, eof bool
 	// git clone progress prints to stderr
-	for rerr = nil; rerr == nil; nread, rerr = cmd.ErrReader.Read(readbuffer) {
-		// TODO: Read fixed number of bytes and parse lines (split on \r or \n)
-		if nread == 0 {
-			continue
+	for eof = false; !eof; nread, rerr = cmd.ErrReader.Read(readbuffer) {
+		if rerr != nil && errhead == len(stderr) {
+			eof = true
 		}
-		line, ok = cutline(readbuffer)
-		if !ok {
-			continue
-		}
-		stderr += string(readbuffer[:nread])
-		words := strings.Fields(line)
-		status.FileName = repoPath
-		if words[0] == "Receiving" && words[1] == "objects" {
-			if len(words) > 2 {
-				status.Progress = words[2]
+		stderr = append(stderr, readbuffer[:nread]...)
+		for eob = false; !eob; line, eob = cutline(stderr[errhead:]) {
+			if len(line) == 0 {
+				continue
 			}
-			if len(words) > 8 {
-				rate := fmt.Sprintf("%s%s", words[7], words[8])
-				if strings.HasSuffix(rate, ",") {
-					rate = strings.TrimSuffix(rate, ",")
+			errhead += len(line) + 1
+			words := strings.Fields(line)
+			status.FileName = repoPath
+			if strings.HasPrefix(line, "Receiving objects") {
+				if len(words) > 2 {
+					status.Progress = words[2]
 				}
-				status.Rate = rate
+				if len(words) > 8 {
+					rate := fmt.Sprintf("%s%s", words[7], words[8])
+					if strings.HasSuffix(rate, ",") {
+						rate = strings.TrimSuffix(rate, ",")
+					}
+					status.Rate = rate
+				}
 			}
+			clonechan <- status
 		}
-		clonechan <- status
 	}
-	// collect the rest of stderr
-	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\000') {
-		stderr += line
-	}
+	errstring := string(stderr)
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during clone command")
 		repoOwner, repoName := splitRepoParts(repoPath)
-		gerr := ginerror{UError: stderr, Origin: fn}
-		if strings.Contains(stderr, "does not exist") {
+		gerr := ginerror{UError: errstring, Origin: fn}
+		if strings.Contains(errstring, "does not exist") {
 			gerr.Description = fmt.Sprintf("Repository download failed\n"+
 				"Make sure you typed the repository path correctly\n"+
 				"Type 'gin repos %s' to see if the repository exists and if you have access to it",
 				repoOwner)
-		} else if strings.Contains(stderr, "already exists and is not an empty directory") {
+		} else if strings.Contains(errstring, "already exists and is not an empty directory") {
 			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
 				"'%s' already exists in the current directory and is not empty.", repoName)
-		} else if strings.Contains(stderr, "Host key verification failed") {
+		} else if strings.Contains(errstring, "Host key verification failed") {
 			gerr.Description = "Server key does not match known/configured host key."
 		} else {
-			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", stderr)
+			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", errstring)
 		}
 		status.Err = gerr
 		clonechan <- status
