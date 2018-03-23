@@ -142,7 +142,7 @@ func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
 
 // VersionCmd sets up the 'version' subcommand
 func VersionCmd() *cobra.Command {
-	description := "Roll back directories or files to older versions. See also the 'copy-version' command."
+	description := "Roll back directories or files to older versions."
 	args := map[string]string{"<filenames>": "One or more directories or files to roll back."}
 	examples := map[string]string{
 		"Show the 50 most recent versions of recordings.nix and prompt for version":                                                "$ gin version -n 50 recordings.nix",
