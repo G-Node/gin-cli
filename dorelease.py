@@ -160,6 +160,15 @@ def download_annex_sa():
     return download(annex_sa_url)
 
 
+def download_annex_dmg():
+    """
+    Download annex standaline tarball.
+    """
+    annex_dmg_url = ("https://downloads.kitenet.net/git-annex/OSX/"
+                     "current/10.10_Yosemite/git-annex.dmg")
+    return download(annex_dmg_url)
+
+
 def get_git_for_windows():
     """
     Download the (portable) git for windows package.
@@ -382,6 +391,59 @@ def package_mac_plain(binfiles):
     return archives
 
 
+def package_mac_bundle(binfiles, annex_dmg):
+    """
+    For each macOS binary make a zip that includes the annex.app with the gin
+    binary in its path.
+    """
+    macbundles = []
+    for binf in binfiles:
+        with TemporaryDirectory(suffix="gin-macos") as tmpdir:
+            # extract macOS git-annex dmg into pkgroot
+            cmd = ["7z", "x", "-o{}".format(tmpdir), annex_dmg]
+            print(f"Running {' '.join(cmd)}")
+            if call(cmd, stdout=DEVNULL) > 0:
+                print(f"Failed to extract {annex_dmg} to {tmpdir}",
+                      file=sys.stderr)
+                continue
+
+            pkgroot = os.path.join(tmpdir, "git-annex")
+            bindir = os.path.join(pkgroot, "git-annex.app",
+                                  "Contents", "MacOS", "bundle")
+            shutil.copy(binf, bindir)
+            shutil.copy("README.md", os.path.join(pkgroot, "GIN-README.md"))
+            # TODO: edit/replace Info.plist for launching runshell
+
+            dirname, _ = os.path.split(binf)
+            _, osarch = os.path.split(dirname)
+            osarch = osarch.replace("darwin", "macos")
+
+            arc = f"gin-cli-{VERSION['version']}-{osarch}-bundle.zip"
+            arc = os.path.join(PKGDIR, arc)
+            print("Creating macOS zip file")
+            # need to change paths before making zip file
+            if os.path.exists(arc):
+                os.remove(arc)
+            arc_abs = os.path.abspath(arc)
+            oldwd = os.getcwd()
+            os.chdir(pkgroot)
+
+            # TODO: Clean out Private Data, .Trashes, .journal, etc.
+
+            cmd = ["zip", "-r", arc_abs, "."]
+            print(f"Running {' '.join(cmd)} (from {pkgroot})")
+            if call(cmd, stdout=DEVNULL) > 0:
+                print(
+                    "Failed to create archive [{}]".format(arc),
+                    file=sys.stderr)
+                os.chdir(oldwd)
+                continue
+            os.chdir(oldwd)
+            macbundles.append(arc)
+            print("DONE")
+    return macbundles
+
+
 def winbundle(binfiles, git_pkg, annex_pkg):
     """
     For each Windows binary make a zip and include git and git annex portable
@@ -454,6 +516,7 @@ def main():
     annexsa_file = download_annex_sa()
     win_git_file = get_git_for_windows()
     win_git_annex_file = get_git_annex_for_windows()
+    mac_annex_dmg = download_annex_dmg()
     save_etags()
 
     print("Ready to package")
@@ -468,6 +531,7 @@ def main():
     rpm_pkgs = rpmify(linux_bins, annexsa_file)
 
     mac_pkgs = package_mac_plain(darwin_bins)
+    mac_bundles = package_mac_bundle(darwin_bins, mac_annex_dmg)
 
     win_pkgs = winbundle(win_bins, win_git_file, win_git_annex_file)
 
@@ -483,6 +547,8 @@ def main():
         Create symlinks with the version part replaced by 'latest' for the
         newly built packages.
         """
+        if not lst:
+            return
         for fname in lst:
             latestname = fname.replace(VERSION["version"], "latest")
             print("Linking {} to {}".format(fname, latestname))
@@ -508,6 +574,8 @@ def main():
     print("macOS packages:")
     printlist(mac_pkgs)
     link_latest(mac_pkgs)
+    printlist(mac_bundles)
+    link_latest(mac_bundles)
 
     print("Windows packages:")
     printlist(win_pkgs)
