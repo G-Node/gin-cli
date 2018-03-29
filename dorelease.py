@@ -11,6 +11,7 @@ Build gin-cli binaries and package them for distribution.
 import pickle
 import sys
 import os
+import stat
 import shutil
 import json
 import re
@@ -18,6 +19,7 @@ from glob import glob
 from subprocess import check_output, call, DEVNULL
 from tempfile import TemporaryDirectory
 import requests
+import plistlib
 from requests.exceptions import ConnectionError as ConnError
 
 DESTDIR = "dist"
@@ -407,12 +409,35 @@ def package_mac_bundle(binfiles, annex_dmg):
                       file=sys.stderr)
                 continue
 
-            pkgroot = os.path.join(tmpdir, "git-annex")
-            bindir = os.path.join(pkgroot, "git-annex.app",
-                                  "Contents", "MacOS", "bundle")
+            annexroot = os.path.join(tmpdir, "git-annex")
+            annexapproot = os.path.join(annexroot, "git-annex.app")
+            pkgroot = os.path.join(tmpdir, "gin-cli")
+            ginapproot = os.path.join(pkgroot, "gin-cli.app")
+            os.mkdir(pkgroot)
+
+            # move only git-annex.app and LICENSE.txt to pkgroot
+            shutil.move(annexapproot, ginapproot)
+            shutil.move(os.path.join(annexroot, "LICENSE.txt"),
+                        os.path.join(pkgroot, "git-annex-LICENSE.txt"))
+
+            macosdir = os.path.join(ginapproot, "Contents", "MacOS")
+            bindir = os.path.join(macosdir, "bundle")
             shutil.copy(binf, bindir)
             shutil.copy("README.md", os.path.join(pkgroot, "GIN-README.md"))
-            # TODO: edit/replace Info.plist for launching runshell
+
+            # remove git-annex icon
+            os.remove(os.path.join(ginapproot, "Contents", "Resources",
+                                   "git-annex.icns"))
+            # TODO: Add GIN icon
+
+            with open("./macapp/gin-Info.plist", "rb") as plistfile:
+                info = plistlib.load(plistfile, fmt=plistlib.FMT_XML)
+                info["CFBundleVersion"] = VERSION["version"]
+                info["CFBundleShortVersionString"] = VERSION["version"]
+                # info["CFBundleExecutable"] = "runshell"
+            with open(os.path.join(ginapproot, "Contents", "Info.plist"),
+                      "wb") as plistfile:
+                plistlib.dump(info, plistfile, fmt=plistlib.FMT_XML)
 
             dirname, _ = os.path.split(binf)
             _, osarch = os.path.split(dirname)
@@ -425,11 +450,29 @@ def package_mac_bundle(binfiles, annex_dmg):
             if os.path.exists(arc):
                 os.remove(arc)
             arc_abs = os.path.abspath(arc)
+
+            # rename git-annex LICENSE and add gin license
+            shutil.copy("./LICENSE", os.path.join(pkgroot, "LICENSE.txt"))
+
+            # same for README
+            os.rename(os.path.join(macosdir, "README"),
+                      os.path.join(macosdir, "git-annex-README"))
+            shutil.copy("./README.md", os.path.join(macosdir, "README"))
+
+            print("Fixing permissions")
+            with open("./macapp/appexeclist") as fn:
+                execlist = fn.read().splitlines()
+
+            execperm = (stat.S_IRWXU
+                        | stat.S_IRGRP | stat.S_IXGRP
+                        | stat.S_IROTH | stat.S_IXOTH)
+            for fn in execlist:
+                fullfn = os.path.join(ginapproot, fn)
+                os.chmod(fullfn, execperm)
+
+            # create the zip
             oldwd = os.getcwd()
             os.chdir(pkgroot)
-
-            # TODO: Clean out Private Data, .Trashes, .journal, etc.
-
             cmd = ["zip", "-r", arc_abs, "."]
             print(f"Running {' '.join(cmd)} (from {pkgroot})")
             if call(cmd, stdout=DEVNULL) > 0:
@@ -506,7 +549,10 @@ def main():
     os.makedirs(os.path.join(DESTDIR, "downloads"), exist_ok=True)
     os.makedirs(PKGDIR, exist_ok=True)
 
+    # build binaries
     binfiles = build()
+
+    # download stuff
     load_etags()
     annexsa_file = download_annex_sa()
     win_git_file = get_git_for_windows()
@@ -520,6 +566,7 @@ def main():
     win_bins = [b for b in binfiles if "windows" in b]
     darwin_bins = [b for b in binfiles if "darwin" in b]
 
+    # package stuff
     linux_pkgs = package_linux_plain(linux_bins)
     deb_pkgs = debianize(linux_bins, annexsa_file)
 
@@ -551,6 +598,7 @@ def main():
                 os.unlink(latestname)
             os.link(fname, latestname)
 
+    # print info
     print("------------------------------------------------")
     print("The following archives and packages were created")
     print("------------------------------------------------")
