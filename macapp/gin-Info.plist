@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleDisplayName</key>
+	<string>Start gin client shell</string>
+	<key>CFBundleExecutable</key>
+	<string>launch</string>
+	<key>CFBundleIdentifier</key>
+	<string>org.g-node.gin-cli</string>
+	<key>CFBundleName</key>
+	<string>GIN-CLI</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.00</string>
+	<key>CFBundleSignature</key>
+	<string>gin-cli</string>
+	<key>CFBundleVersion</key>
+	<string>0.00</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>10.5</string>
+	<key>LSMinimumSystemVersionByArchitecture</key>
+	<dict>
+		<key>i386</key>
+		<string>10.5.0</string>
+		<key>x86_64</key>
+		<string>10.6.0</string>
+	</dict>
+</dict>
+</plist>

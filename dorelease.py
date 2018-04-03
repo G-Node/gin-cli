@@ -11,6 +11,7 @@ Build gin-cli binaries and package them for distribution.
 import pickle
 import sys
 import os
+import stat
 import shutil
 import json
 import re
@@ -18,13 +19,14 @@ from glob import glob
 from subprocess import check_output, call, DEVNULL
 from tempfile import TemporaryDirectory
 import requests
+import plistlib
 from requests.exceptions import ConnectionError as ConnError
 
 DESTDIR = "dist"
 PKGDIR = os.path.join(DESTDIR, "pkg")
 
 ETAGFILE = os.path.join(DESTDIR, "etags")
-ETAGS = {}  # type: dict
+ETAGS = {}
 
 VERSION = {}
 
@@ -57,11 +59,11 @@ def download(url, fname=None):
     if fname is None:
         fname = url.split("/")[-1]
     fname = os.path.join(DESTDIR, "downloads", fname)
-    print("--> Downloading {} → {}".format(url, fname))
+    print(f"--> Downloading {url} → {fname}")
     try:
         req = requests.get(url, stream=True)
     except ConnError:
-        print("Error while trying to download {}".format(url), file=sys.stderr)
+        print(f"Error while trying to download {url}", file=sys.stderr)
         print("Skipping.", file=sys.stderr)
         return
     size = int(req.headers.get("content-length"))
@@ -78,7 +80,7 @@ def download(url, fname=None):
         for chunk in req.iter_content(chunk_size=256):
             dlfile.write(chunk)
             prog += len(chunk)
-            print("\r{:2.1f}%".format(prog / size * 100), end="", flush=True)
+            print(f"\r{prog/size*100:2.1f}%", end="", flush=True)
         print("\nDone!")
     print()
     return fname
@@ -108,7 +110,7 @@ def build():
     Build binaries.
     """
     platforms = ["linux/amd64", "windows/386", "darwin/amd64"]
-    print("--> Building binary for [{}]".format(", ".join(platforms)))
+    print(f"--> Building binary for {', '.join(platforms)}")
     verfilename = "version"
     with open(verfilename) as verfile:
         verinfo = verfile.read()
@@ -127,10 +129,10 @@ def build():
                "-X main.commit={commit}").format(**VERSION)
     output = os.path.join(DESTDIR, "{{.OS}}-{{.Arch}}", "gin")
     cmd = [
-        "gox", "-output={}".format(output), "-osarch={}".format(
-            " ".join(platforms)), "-ldflags={}".format(ldflags)
+        "gox", f"-output={output}",
+        f"-osarch={' '.join(platforms)}", f"-ldflags={ldflags}"
     ]
-    print("Running {}".format(" ".join(cmd)))
+    print(f"Running {' '.join(cmd)}")
     if call(cmd) > 0:
         die("Build failed")
 
@@ -146,7 +148,7 @@ def build():
         if plat in ginbin:
             cmd = [ginbin, "--version"]
             verstring = check_output(cmd).strip().decode()
-            print("{}\n↪ {}".format(" ".join(cmd), verstring))
+            print(f"{' '.join(cmd)}\n➥ {verstring}")
     print()
     return ginfiles
 
@@ -158,6 +160,18 @@ def download_annex_sa():
     annex_sa_url = ("https://downloads.kitenet.net/git-annex/linux/current/"
                     "git-annex-standalone-amd64.tar.gz")
     return download(annex_sa_url)
+
+
+def check_macos_tarball():
+    """
+    Checks if git-annex tarball is in the download location
+    """
+    path = "./dist/downloads/git-annex-latest.tar.bz2"
+    if os.path.exists(path):
+        print(f"Found {path}")
+        return path
+    print(f"macOS git-annex archive {path} not found")
+    return None
 
 
 def get_git_for_windows():
@@ -197,10 +211,10 @@ def package_linux_plain(binfiles):
         _, osarch = os.path.split(dirname)
         # simple binary archive
         shutil.copy("README.md", dirname)
-        arc = "gin-cli-{}-{}.tar.gz".format(VERSION["version"], osarch)
+        arc = f"gin-cli-{VERSION['version']}-{osarch}.tar.gz"
         arc = os.path.join(PKGDIR, arc)
         cmd = ["tar", "-czf", arc, "-C", dirname, fname, "README.md"]
-        print("Running {}".format(" ".join(cmd)))
+        print(f"Running {' '.join(cmd)}")
         if call(cmd) > 0:
             print(f"Failed to make tarball for {binf}", file=sys.stderr)
             continue
@@ -236,7 +250,7 @@ def debianize(binfiles, annexsa_archive):
 
         contdir = "/debbuild/"
         cmd = [
-            "docker", "run", "-i", "-v", "{}:{}".format(tmpdir, contdir),
+            "docker", "run", "-i", "-v", f"{tmpdir}:{contdir}",
             "--name", "gin-deb-build", "-d", "gin-deb", "bash"
         ]
         print("Starting debian docker container")
@@ -262,7 +276,7 @@ def debianize(binfiles, annexsa_archive):
 
             # create directory structure
             pkgname = "gin-cli"
-            pkgnamever = "{}-{}".format(pkgname, VERSION["version"])
+            pkgnamever = f"{pkgname}-{VERSION['version']}"
             debmdsrc = os.path.join("debdock", "debian")
             pkgdir = os.path.join(tmpdir, pkgname)
             debcapdir = os.path.join(pkgdir, "DEBIAN")
@@ -280,7 +294,7 @@ def debianize(binfiles, annexsa_archive):
             # copy binaries and program files
             shutil.copy(binf, opt_gin_bin_dir)
             print(f"Copied {binf} to {opt_gin_bin_dir}")
-            shutil.copy("scripts/gin.sh", opt_gin_bin_dir)
+            shutil.copy(os.path.join("scripts", "gin.sh"), opt_gin_bin_dir)
             print(f"Copied gin.sh to {opt_gin_bin_dir}")
 
             link_path = os.path.join(usr_local_bin_dir, "gin")
@@ -314,10 +328,10 @@ def debianize(binfiles, annexsa_archive):
 
             # extract annex standalone into pkg/opt/gin
             cmd = ["tar", "-xzf", annexsa_archive, "-C", opt_gin_dir]
-            print("Running {}".format(" ".join(cmd)))
+            print(f"Running {' '.join(cmd)}")
             if call(cmd) > 0:
-                print("Failed to extract git annex standalone [{}]".format(
-                    annexsa_archive, file=sys.stderr))
+                print(f"Failed to extract {annexsa_archive} to {opt_gin_dir}",
+                      file=sys.stderr)
                 continue
 
             dockerexec = ["docker", "exec", "-t", "gin-deb-build"]
@@ -371,15 +385,95 @@ def package_mac_plain(binfiles):
         osarch = osarch.replace("darwin", "macos")
         # simple binary archive
         shutil.copy("README.md", dirname)
-        arc = "gin-cli-{}-{}.tar.gz".format(VERSION["version"], osarch)
+        arc = f"gin-cli-{VERSION['version']}-{osarch}.tar.gz"
         arc = os.path.join(PKGDIR, arc)
         cmd = ["tar", "-czf", arc, "-C", dirname, fname, "README.md"]
-        print("Running {}".format(" ".join(cmd)))
+        print(f"Running {' '.join(cmd)}")
         if call(cmd) > 0:
             print(f"Failed to make tarball for {binf}", file=sys.stderr)
             continue
         archives.append(arc)
     return archives
+
+
+def package_mac_bundle(binfiles, annex_tar):
+    """
+    For each macOS binary make a zip that includes the annex.app with the gin
+    binary in its path.
+    """
+    macbundles = []
+    for binf in binfiles:
+        with TemporaryDirectory(suffix="gin-macos") as tmpdir:
+            # extract macOS git-annex tar into pkgroot
+            cmd = ["tar", "-xjf", annex_tar, "-C", tmpdir]
+            print(f"Running {' '.join(cmd)}")
+            if call(cmd, stdout=DEVNULL) > 0:
+                print(f"Failed to extract {annex_tar} to {tmpdir}",
+                      file=sys.stderr)
+                continue
+
+            annexapproot = os.path.join(tmpdir, "git-annex.app")
+            pkgroot = os.path.join(tmpdir, "gin-cli")
+            ginapproot = os.path.join(pkgroot, "gin-cli.app")
+            os.mkdir(pkgroot)
+
+            # move only git-annex.app and LICENSE.txt to pkgroot
+            shutil.move(annexapproot, ginapproot)
+            shutil.move(os.path.join(tmpdir, "LICENSE.txt"),
+                        os.path.join(pkgroot, "git-annex-LICENSE.txt"))
+
+            macosdir = os.path.join(ginapproot, "Contents", "MacOS")
+            bindir = os.path.join(macosdir, "bundle")
+            shutil.copy(binf, bindir)
+            shutil.copy("README.md", os.path.join(pkgroot, "GIN-README.md"))
+
+            # remove git-annex icon
+            os.remove(os.path.join(ginapproot, "Contents", "Resources",
+                                   "git-annex.icns"))
+            # TODO: Add GIN icon
+
+            with open("./macapp/gin-Info.plist", "rb") as plistfile:
+                info = plistlib.load(plistfile, fmt=plistlib.FMT_XML)
+                info["CFBundleVersion"] = VERSION["version"]
+                info["CFBundleShortVersionString"] = VERSION["version"]
+                # info["CFBundleExecutable"] = "runshell"
+            with open(os.path.join(ginapproot, "Contents", "Info.plist"),
+                      "wb") as plistfile:
+                plistlib.dump(info, plistfile, fmt=plistlib.FMT_XML)
+
+            dirname, _ = os.path.split(binf)
+            _, osarch = os.path.split(dirname)
+            osarch = osarch.replace("darwin", "macos")
+
+            arc = f"gin-cli-{VERSION['version']}-{osarch}-bundle.tar.gz"
+            arc = os.path.join(PKGDIR, arc)
+            print("Creating macOS bundle")
+            if os.path.exists(arc):
+                os.remove(arc)
+            arc_abs = os.path.abspath(arc)
+
+            # rename git-annex LICENSE and add gin license
+            shutil.copy("./LICENSE", os.path.join(pkgroot, "LICENSE.txt"))
+
+            # same for README
+            os.rename(os.path.join(macosdir, "README"),
+                      os.path.join(macosdir, "git-annex-README"))
+            shutil.copy("./README.md", os.path.join(macosdir, "README"))
+
+            # add launch script
+            shutil.copy("scripts/launch-macos.sh",
+                        os.path.join(macosdir, "launch"))
+
+            # create the archive
+            cmd = ["tar", "-cvf", arc_abs, "-C", pkgroot, "."]
+            print(f"Running {' '.join(cmd)} (from {pkgroot})")
+            if call(cmd, stdout=DEVNULL) > 0:
+                print(f"Failed to create archive {arc} in {pkgroot}",
+                      file=sys.stderr)
+                continue
+            macbundles.append(arc)
+            print("DONE")
+    return macbundles
 
 
 def winbundle(binfiles, git_pkg, annex_pkg):
@@ -395,31 +489,29 @@ def winbundle(binfiles, git_pkg, annex_pkg):
 
             shutil.copy(binf, bindir)
             shutil.copy("README.md", pkgroot)
-            shutil.copy("scripts/gin-shell.bat", pkgroot)
+            shutil.copy(os.path.join("scripts", "gin-shell.bat"), pkgroot)
 
             gitdir = os.path.join(pkgroot, "git")
             os.makedirs(gitdir)
 
             # extract git portable and annex into git dir
-            cmd = ["7z", "x", "-o{}".format(gitdir), git_pkg]
-            print("Running {}".format(" ".join(cmd)))
+            cmd = ["7z", "x", f"-o{gitdir}", git_pkg]
+            print(f"Running {' '.join(cmd)}")
             if call(cmd, stdout=DEVNULL) > 0:
-                print(
-                    "Failed to extract git archive [{}]".format(git_pkg),
-                    file=sys.stderr)
+                print(f"Failed to extract git archive {git_pkg} to {gitdir}",
+                      file=sys.stderr)
                 continue
 
-            cmd = ["7z", "x", "-o{}".format(gitdir), annex_pkg]
-            print("Running {}".format(" ".join(cmd)))
+            cmd = ["7z", "x", f"-o{gitdir}", annex_pkg]
+            print(f"Running {' '.join(cmd)}")
             if call(cmd, stdout=DEVNULL) > 0:
-                print(
-                    "Failed to extract git archive [{}]".format(annex_pkg),
-                    file=sys.stderr)
+                print(f"Failed to extract git archive {annex_pkg} to {gitdir}",
+                      file=sys.stderr)
                 continue
             dirname, _ = os.path.split(binf)
             _, osarch = os.path.split(dirname)
 
-            arc = "gin-cli-{}-{}.zip".format(VERSION["version"], osarch)
+            arc = f"gin-cli-{VERSION['version']}-{osarch}.zip"
             arc = os.path.join(PKGDIR, arc)
             print("Creating Windows zip file")
             # need to change paths before making zip file
@@ -429,11 +521,9 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             oldwd = os.getcwd()
             os.chdir(pkgroot)
             cmd = ["zip", "-r", arc_abs, "."]
-            print("Running {} (from {})".format(" ".join(cmd), pkgroot))
+            print(f"Running {' '.join(cmd)}")
             if call(cmd, stdout=DEVNULL) > 0:
-                print(
-                    "Failed to create archive [{}]".format(arc),
-                    file=sys.stderr)
+                print(f"Failed to create archive {arc}", file=sys.stderr)
                 os.chdir(oldwd)
                 continue
             os.chdir(oldwd)
@@ -449,11 +539,15 @@ def main():
     os.makedirs(os.path.join(DESTDIR, "downloads"), exist_ok=True)
     os.makedirs(PKGDIR, exist_ok=True)
 
+    # build binaries
     binfiles = build()
+
+    # download stuff
     load_etags()
     annexsa_file = download_annex_sa()
     win_git_file = get_git_for_windows()
     win_git_annex_file = get_git_annex_for_windows()
+    mac_annex_tar = check_macos_tarball()
     save_etags()
 
     print("Ready to package")
@@ -462,12 +556,14 @@ def main():
     win_bins = [b for b in binfiles if "windows" in b]
     darwin_bins = [b for b in binfiles if "darwin" in b]
 
+    # package stuff
     linux_pkgs = package_linux_plain(linux_bins)
     deb_pkgs = debianize(linux_bins, annexsa_file)
 
     rpm_pkgs = rpmify(linux_bins, annexsa_file)
 
     mac_pkgs = package_mac_plain(darwin_bins)
+    mac_bundles = package_mac_bundle(darwin_bins, mac_annex_tar)
 
     win_pkgs = winbundle(win_bins, win_git_file, win_git_annex_file)
 
@@ -483,13 +579,16 @@ def main():
         Create symlinks with the version part replaced by 'latest' for the
         newly built packages.
         """
+        if not lst:
+            return
         for fname in lst:
             latestname = fname.replace(VERSION["version"], "latest")
-            print("Linking {} to {}".format(fname, latestname))
+            print(f"Linking {fname} to {latestname}")
             if os.path.lexists(latestname):
                 os.unlink(latestname)
             os.link(fname, latestname)
 
+    # print info
     print("------------------------------------------------")
     print("The following archives and packages were created")
     print("------------------------------------------------")
@@ -508,6 +607,8 @@ def main():
     print("macOS packages:")
     printlist(mac_pkgs)
     link_latest(mac_pkgs)
+    printlist(mac_bundles)
+    link_latest(mac_bundles)
 
     print("Windows packages:")
     printlist(win_pkgs)
