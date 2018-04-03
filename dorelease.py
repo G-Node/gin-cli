@@ -404,7 +404,7 @@ def package_mac_bundle(binfiles, annex_tar):
     macbundles = []
     for binf in binfiles:
         with TemporaryDirectory(suffix="gin-macos") as tmpdir:
-            # extract macOS git-annex dmg into pkgroot
+            # extract macOS git-annex tar into pkgroot
             cmd = ["tar", "-xjf", annex_tar, "-C", tmpdir]
             print(f"Running {' '.join(cmd)}")
             if call(cmd, stdout=DEVNULL) > 0:
