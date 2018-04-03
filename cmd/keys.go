@@ -88,7 +88,7 @@ func delKey(gincl *ginclient.Client, idx int) {
 
 // KeysCmd sets up the 'keys' list, add, delete subcommand(s)
 func KeysCmd() *cobra.Command {
-	description := "List, add, or delete SSH keys. If No argument is provided, a numbered list of key names is printed. The key number can be used with the '--delete' flag to remove a key from the server.\n\nThe command can also be used to add a public key to your account from an existing filename (see '--add' flag)."
+	description := "List, add, or delete SSH keys. If no argument is provided, a numbered list of key names is printed. The key number can be used with the '--delete' flag to remove a key from the server.\n\nThe command can also be used to add a public key to your account from an existing filename (see '--add' flag)."
 	examples := map[string]string{
 		"Add a public key to your account, as generated from the default ssh-keygen command": "$ gin keys --add ~/.ssh/id_rsa.pub",
 	}
