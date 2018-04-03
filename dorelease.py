@@ -162,13 +162,16 @@ def download_annex_sa():
     return download(annex_sa_url)
 
 
-def download_annex_dmg():
+def check_macos_tarball():
     """
-    Download annex standaline tarball.
+    Checks if git-annex tarball is in the download location
     """
-    annex_dmg_url = ("https://downloads.kitenet.net/git-annex/OSX/"
-                     "current/10.10_Yosemite/git-annex.dmg")
-    return download(annex_dmg_url)
+    path = "./dist/downloads/git-annex-latest.tar.bz2"
+    if os.path.exists(path):
+        print(f"Found {path}")
+        return path
+    print(f"macOS git-annex archive {path} not found")
+    return None
 
 
 def get_git_for_windows():
@@ -291,7 +294,7 @@ def debianize(binfiles, annexsa_archive):
             # copy binaries and program files
             shutil.copy(binf, opt_gin_bin_dir)
             print(f"Copied {binf} to {opt_gin_bin_dir}")
-            shutil.copy("scripts/gin.sh", opt_gin_bin_dir)
+            shutil.copy(os.path.join("scripts", "gin.sh"), opt_gin_bin_dir)
             print(f"Copied gin.sh to {opt_gin_bin_dir}")
 
             link_path = os.path.join(usr_local_bin_dir, "gin")
@@ -393,7 +396,7 @@ def package_mac_plain(binfiles):
     return archives
 
 
-def package_mac_bundle(binfiles, annex_dmg):
+def package_mac_bundle(binfiles, annex_tar):
     """
     For each macOS binary make a zip that includes the annex.app with the gin
     binary in its path.
@@ -402,22 +405,21 @@ def package_mac_bundle(binfiles, annex_dmg):
     for binf in binfiles:
         with TemporaryDirectory(suffix="gin-macos") as tmpdir:
             # extract macOS git-annex dmg into pkgroot
-            cmd = ["7z", "x", f"-o{tmpdir}", annex_dmg]
+            cmd = ["tar", "-xjf", annex_tar, "-C", tmpdir]
             print(f"Running {' '.join(cmd)}")
             if call(cmd, stdout=DEVNULL) > 0:
-                print(f"Failed to extract {annex_dmg} to {tmpdir}",
+                print(f"Failed to extract {annex_tar} to {tmpdir}",
                       file=sys.stderr)
                 continue
 
-            annexroot = os.path.join(tmpdir, "git-annex")
-            annexapproot = os.path.join(annexroot, "git-annex.app")
+            annexapproot = os.path.join(tmpdir, "git-annex.app")
             pkgroot = os.path.join(tmpdir, "gin-cli")
             ginapproot = os.path.join(pkgroot, "gin-cli.app")
             os.mkdir(pkgroot)
 
             # move only git-annex.app and LICENSE.txt to pkgroot
             shutil.move(annexapproot, ginapproot)
-            shutil.move(os.path.join(annexroot, "LICENSE.txt"),
+            shutil.move(os.path.join(tmpdir, "LICENSE.txt"),
                         os.path.join(pkgroot, "git-annex-LICENSE.txt"))
 
             macosdir = os.path.join(ginapproot, "Contents", "MacOS")
@@ -443,10 +445,9 @@ def package_mac_bundle(binfiles, annex_dmg):
             _, osarch = os.path.split(dirname)
             osarch = osarch.replace("darwin", "macos")
 
-            arc = f"gin-cli-{VERSION['version']}-{osarch}-bundle.zip"
+            arc = f"gin-cli-{VERSION['version']}-{osarch}-bundle.tar.gz"
             arc = os.path.join(PKGDIR, arc)
-            print("Creating macOS zip file")
-            # need to change paths before making zip file
+            print("Creating macOS bundle")
             if os.path.exists(arc):
                 os.remove(arc)
             arc_abs = os.path.abspath(arc)
@@ -459,28 +460,17 @@ def package_mac_bundle(binfiles, annex_dmg):
                       os.path.join(macosdir, "git-annex-README"))
             shutil.copy("./README.md", os.path.join(macosdir, "README"))
 
-            print("Fixing permissions")
-            with open("./macapp/appexeclist") as fn:
-                execlist = fn.read().splitlines()
+            # add launch script
+            shutil.copy("scripts/launch-macos.sh",
+                        os.path.join(macosdir, "launch"))
 
-            execperm = (stat.S_IRWXU
-                        | stat.S_IRGRP | stat.S_IXGRP
-                        | stat.S_IROTH | stat.S_IXOTH)
-            for fn in execlist:
-                fullfn = os.path.join(ginapproot, fn)
-                os.chmod(fullfn, execperm)
-
-            # create the zip
-            oldwd = os.getcwd()
-            os.chdir(pkgroot)
-            cmd = ["zip", "-r", arc_abs, "."]
+            # create the archive
+            cmd = ["tar", "-cvf", arc_abs, "-C", pkgroot, "."]
             print(f"Running {' '.join(cmd)} (from {pkgroot})")
             if call(cmd, stdout=DEVNULL) > 0:
                 print(f"Failed to create archive {arc} in {pkgroot}",
                       file=sys.stderr)
-                os.chdir(oldwd)
                 continue
-            os.chdir(oldwd)
             macbundles.append(arc)
             print("DONE")
     return macbundles
@@ -499,7 +489,7 @@ def winbundle(binfiles, git_pkg, annex_pkg):
 
             shutil.copy(binf, bindir)
             shutil.copy("README.md", pkgroot)
-            shutil.copy("scripts/gin-shell.bat", pkgroot)
+            shutil.copy(os.path.join("scripts", "gin-shell.bat"), pkgroot)
 
             gitdir = os.path.join(pkgroot, "git")
             os.makedirs(gitdir)
@@ -557,7 +547,7 @@ def main():
     annexsa_file = download_annex_sa()
     win_git_file = get_git_for_windows()
     win_git_annex_file = get_git_annex_for_windows()
-    mac_annex_dmg = download_annex_dmg()
+    mac_annex_tar = check_macos_tarball()
     save_etags()
 
     print("Ready to package")
@@ -573,7 +563,7 @@ def main():
     rpm_pkgs = rpmify(linux_bins, annexsa_file)
 
     mac_pkgs = package_mac_plain(darwin_bins)
-    mac_bundles = package_mac_bundle(darwin_bins, mac_annex_dmg)
+    mac_bundles = package_mac_bundle(darwin_bins, mac_annex_tar)
 
     win_pkgs = winbundle(win_bins, win_git_file, win_git_annex_file)
 
