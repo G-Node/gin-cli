@@ -10,7 +10,6 @@ import (
 	ginclient "github.com/G-Node/gin-cli/gin-client"
 	util "github.com/G-Node/gin-cli/util"
 	version "github.com/hashicorp/go-version"
-	cobra "github.com/spf13/cobra"
 )
 
 var gincliversion string
@@ -88,72 +87,8 @@ func main() {
 	util.CheckError(err)
 	checkAnnexVersion()
 
-	var rootCmd = &cobra.Command{
-		Use:                   "gin",
-		Long:                  "GIN Command Line Interface and client for the GIN services", // TODO: Add license and web info
-		Version:               fmt.Sprintln(verstr),
-		DisableFlagsInUseLine: true,
-	}
+	rootCmd := gincmd.SetUpCommands(verstr)
 	rootCmd.SetVersionTemplate("{{ .Version }}")
-
-	cobra.AddTemplateFunc("wrappedFlagUsages", wrappedFlagUsages)
-	rootCmd.SetHelpTemplate(helpTemplate)
-	rootCmd.SetUsageTemplate(usageTemplate)
-
-	// Login
-	rootCmd.AddCommand(gincmd.LoginCmd())
-
-	// Logout
-	rootCmd.AddCommand(gincmd.LogoutCmd())
-
-	// Create repo
-	rootCmd.AddCommand(gincmd.CreateCmd())
-
-	// Delete repo (unlisted)
-	rootCmd.AddCommand(gincmd.DeleteCmd())
-
-	// Get repo
-	rootCmd.AddCommand(gincmd.GetCmd())
-
-	// List files
-	rootCmd.AddCommand(gincmd.LsRepoCmd())
-
-	// Unlock content
-	rootCmd.AddCommand(gincmd.UnlockCmd())
-
-	// Lock content
-	rootCmd.AddCommand(gincmd.LockCmd())
-
-	// Upload
-	rootCmd.AddCommand(gincmd.UploadCmd())
-
-	// Download
-	rootCmd.AddCommand(gincmd.DownloadCmd())
-
-	// Get content
-	rootCmd.AddCommand(gincmd.GetContentCmd())
-
-	// Remove content
-	rootCmd.AddCommand(gincmd.RemoveContentCmd())
-
-	// Account info
-	rootCmd.AddCommand(gincmd.InfoCmd())
-
-	// List repos
-	rootCmd.AddCommand(gincmd.ReposCmd())
-
-	// Repo info
-	rootCmd.AddCommand(gincmd.RepoInfoCmd())
-
-	// Keys
-	rootCmd.AddCommand(gincmd.KeysCmd())
-
-	// Version
-	rootCmd.AddCommand(gincmd.VersionCmd())
-
-	// git and annex passthrough (unlisted)
-	rootCmd.AddCommand(gincmd.GitCmd())
-	rootCmd.AddCommand(gincmd.AnnexCmd())
 
 	// Engage
 	rootCmd.Execute()

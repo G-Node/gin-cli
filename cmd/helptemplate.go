@@ -1,4 +1,4 @@
-package main
+package gincmd
 
 import (
 	"github.com/docker/docker/pkg/term"
