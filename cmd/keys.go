@@ -101,8 +101,8 @@ func KeysCmd() *cobra.Command {
 		Run:     keys,
 		DisableFlagsInUseLine: true,
 	}
-	keysCmd.Flags().String("add", "", "Specify a filename which contains a public key to be added to the GIN server.")
-	keysCmd.Flags().Int("delete", 0, "Specify a number to delete the corresponding key from the server. Use 'gin keys' to get the numbered listing of keys.")
+	keysCmd.Flags().String("add", "", "Specify a `filename` which contains a public key to be added to the GIN server.")
+	keysCmd.Flags().Int("delete", 0, "Specify a `number` to delete the corresponding key from the server. Use 'gin keys' to get the numbered listing of keys.")
 	keysCmd.Flags().BoolP("verbose", "v", false, "Verbose printing. Prints the entire public key.")
 	return keysCmd
 }
