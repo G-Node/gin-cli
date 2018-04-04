@@ -139,3 +139,73 @@ func formatexamples(examples map[string]string) (exdesc string) {
 	}
 	return
 }
+
+// SetUpCommands sets up all the subcommands for the client and returns the root command, ready to execute.
+func SetUpCommands(verstr string) *cobra.Command {
+	var rootCmd = &cobra.Command{
+		Use:                   "gin",
+		Long:                  "GIN Command Line Interface and client for the GIN services", // TODO: Add license and web info
+		Version:               fmt.Sprintln(verstr),
+		DisableFlagsInUseLine: true,
+	}
+	cobra.AddTemplateFunc("wrappedFlagUsages", wrappedFlagUsages)
+	rootCmd.SetHelpTemplate(helpTemplate)
+	rootCmd.SetUsageTemplate(usageTemplate)
+
+	// Login
+	rootCmd.AddCommand(LoginCmd())
+
+	// Logout
+	rootCmd.AddCommand(LogoutCmd())
+
+	// Create repo
+	rootCmd.AddCommand(CreateCmd())
+
+	// Delete repo (unlisted)
+	rootCmd.AddCommand(DeleteCmd())
+
+	// Get repo
+	rootCmd.AddCommand(GetCmd())
+
+	// List files
+	rootCmd.AddCommand(LsRepoCmd())
+
+	// Unlock content
+	rootCmd.AddCommand(UnlockCmd())
+
+	// Lock content
+	rootCmd.AddCommand(LockCmd())
+
+	// Upload
+	rootCmd.AddCommand(UploadCmd())
+
+	// Download
+	rootCmd.AddCommand(DownloadCmd())
+
+	// Get content
+	rootCmd.AddCommand(GetContentCmd())
+
+	// Remove content
+	rootCmd.AddCommand(RemoveContentCmd())
+
+	// Account info
+	rootCmd.AddCommand(InfoCmd())
+
+	// List repos
+	rootCmd.AddCommand(ReposCmd())
+
+	// Repo info
+	rootCmd.AddCommand(RepoInfoCmd())
+
+	// Keys
+	rootCmd.AddCommand(KeysCmd())
+
+	// Version
+	rootCmd.AddCommand(VersionCmd())
+
+	// git and annex passthrough (unlisted)
+	rootCmd.AddCommand(GitCmd())
+	rootCmd.AddCommand(AnnexCmd())
+
+	return rootCmd
+}

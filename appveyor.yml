@@ -42,6 +42,7 @@ build_script:
   - go get github.com/shibukawa/configdir
   - go get github.com/bbrks/wrap
   - go get github.com/docker/docker/pkg/term
+  - go get github.com/alecthomas/template
   - go vet ./...
   - gofmt -s -l .
   - golint github.com/G-Node/gin-cli...
