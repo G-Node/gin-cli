@@ -112,9 +112,10 @@ func main() {
 This page describes the purpose and usage of each command of the GIN command line client by elaborating on its *Usage*, *Description*, and *Arguments*.
 
 The same information can be obtained from the client with the commands
+
 `
 	buf.WriteString(header)
-	buf.WriteString("```\ngin help\ngin help <command>\n```")
+	buf.WriteString("```\ngin help\ngin help <command>\n```\n\n")
 
 	cmdmap := make(map[string]*cobra.Command)
 	for _, subcmd := range rootcmd.Commands() {
