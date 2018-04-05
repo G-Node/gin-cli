@@ -102,7 +102,11 @@ func FilterPaths(paths, excludes []string) (filtered []string) {
 // A path to the repository root is returned, or an error if the root of the filesystem is reached first.
 // The returned path is absolute.
 func FindRepoRoot(path string) (string, error) {
-	path, _ = filepath.Abs(path)
+	var err error
+	path, err = filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
 	gitdir := filepath.Join(path, ".git")
 	if PathExists(gitdir) {
 		return path, nil
