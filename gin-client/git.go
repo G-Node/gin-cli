@@ -306,6 +306,8 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 // (git annex sync --no-pull; git annex copy --to=origin)
 func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
+	// NOTE: Using origin which is the conventional default remote. This should change to work with alternate remotes.
+	remote := "origin"
 	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitmsg)}
 	cmd := AnnexCommand(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
@@ -320,15 +322,19 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 			errmsg = "upload failed: permission denied"
 		} else if strings.Contains(sstderr, "Host key verification failed") {
 			errmsg = "upload failed: server key does not match known host key"
+		} else if strings.Contains(sstderr, "rejected") {
+			// Check if local is behind remote
+			nbehind, _ := GitRevCount("HEAD", "@{push}")
+			if nbehind > 0 {
+				errmsg = "upload failed: changes were made on the server that have not been downloaded; run 'gin download' to update local copies"
+			}
 		}
 		pushchan <- RepoFileStatus{Err: fmt.Errorf(errmsg)}
 		return
 	}
 
-	cmdargs = []string{"copy", "--json-progress"}
+	cmdargs = []string{"copy", "--json-progress", fmt.Sprintf("--to=%s", remote)}
 	cmdargs = append(cmdargs, paths...)
-	// NOTE: Using origin which is the conventional default remote. This should change to work with alternate remotes.
-	cmdargs = append(cmdargs, "--to=origin")
 	cmd = AnnexCommand(cmdargs...)
 	err = cmd.Start()
 	if err != nil {
