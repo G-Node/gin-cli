@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1275,6 +1276,18 @@ func AnnexFromKey(key, filepath string) error {
 		return fmt.Errorf(string(stderr))
 	}
 	return nil
+}
+
+// GitRevCount returns the number of commits between two revisions.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func GitRevCount(a, b string) (int, error) {
+	cmd := GitCommand("rev-list", "--count", fmt.Sprintf("%s..%s", a, b))
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+		return 0, fmt.Errorf(string(stderr))
+	}
+	return strconv.Atoi(string(stdout))
 }
 
 var annexmodecache = make(map[string]bool)
