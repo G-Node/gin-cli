@@ -22,7 +22,7 @@ func upload(cmd *cobra.Command, args []string) {
 
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
-	printProgress(lockchan, jsonout)
+	formatOutput(lockchan, jsonout)
 
 	// add header commit line
 	hostname, err := os.Hostname()
@@ -33,7 +33,7 @@ func upload(cmd *cobra.Command, args []string) {
 	commitmsg := fmt.Sprintf("gin upload from %s\n\n%s", hostname, getchanges())
 	uploadchan := make(chan ginclient.RepoFileStatus)
 	go gincl.Upload(args, commitmsg, uploadchan)
-	printProgress(uploadchan, jsonout)
+	formatOutput(uploadchan, jsonout)
 }
 
 func getchanges() string {

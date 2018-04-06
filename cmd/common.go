@@ -36,21 +36,25 @@ func usageDie(cmd *cobra.Command) {
 	util.Die("")
 }
 
-func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
+func printJSON(statuschan <-chan ginclient.RepoFileStatus) (filesuccess map[string]bool) {
+	filesuccess = make(map[string]bool)
+	for stat := range statuschan {
+		j, _ := json.Marshal(stat)
+		fmt.Println(string(j))
+		filesuccess[stat.FileName] = true
+		if stat.Err != nil {
+			filesuccess[stat.FileName] = false
+		}
+	}
+	return
+}
+
+func printProgressOutput(statuschan <-chan ginclient.RepoFileStatus) (filesuccess map[string]bool) {
+	filesuccess = make(map[string]bool)
 	var fname, state string
 	var lastprint string
-	filesuccess := make(map[string]bool)
 	for stat := range statuschan {
 		var msgparts []string
-		if jsonout {
-			j, _ := json.Marshal(stat)
-			fmt.Println(string(j))
-			filesuccess[stat.FileName] = true
-			if stat.Err != nil {
-				filesuccess[stat.FileName] = false
-			}
-			continue
-		}
 		if stat.FileName != fname || stat.State != state {
 			// New line if new file or new state
 			if len(lastprint) > 0 {
@@ -81,6 +85,16 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 	}
 	if len(lastprint) > 0 {
 		fmt.Println()
+	}
+	return
+}
+
+func formatOutput(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
+	var filesuccess map[string]bool
+	if jsonout {
+		filesuccess = printJSON(statuschan)
+	} else {
+		filesuccess = printProgressOutput(statuschan)
 	}
 
 	// count unique file errors

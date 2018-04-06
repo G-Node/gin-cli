@@ -14,7 +14,7 @@ func lock(cmd *cobra.Command, args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
-	printProgress(lockchan, jsonout)
+	formatOutput(lockchan, jsonout)
 }
 
 // LockCmd sets up the file 'lock' subcommand

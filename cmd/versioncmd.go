@@ -60,7 +60,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 
 		uploadchan := make(chan ginclient.RepoFileStatus)
 		go gincl.Upload(paths, commitmsg, uploadchan)
-		printProgress(uploadchan, jsonout)
+		formatOutput(uploadchan, jsonout)
 	} else {
 		checkoutcopies(commit, paths, copyto)
 	}
