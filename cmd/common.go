@@ -1,6 +1,7 @@
 package gincmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -53,8 +54,13 @@ func printProgressOutput(statuschan <-chan ginclient.RepoFileStatus) (filesucces
 	filesuccess = make(map[string]bool)
 	var fname, state string
 	var lastprint string
+	outline := new(bytes.Buffer)
+	outappend := func(part string) {
+		outline.WriteString(part)
+		outline.WriteString(" ")
+	}
 	for stat := range statuschan {
-		var msgparts []string
+		outline.Reset()
 		if stat.FileName != fname || stat.State != state {
 			// New line if new file or new state
 			if len(lastprint) > 0 {
@@ -64,19 +70,21 @@ func printProgressOutput(statuschan <-chan ginclient.RepoFileStatus) (filesucces
 			fname = stat.FileName
 			state = stat.State
 		}
-		msgparts = append(msgparts, stat.State, stat.FileName)
+		outappend(stat.State)
+		outappend(stat.FileName)
 		if stat.Err == nil {
 			if stat.Progress == "100%" {
-				msgparts = append(msgparts, green("OK"))
+				outappend(green("OK"))
 				filesuccess[stat.FileName] = true
 			} else {
-				msgparts = append(msgparts, stat.Progress, stat.Rate)
+				outappend(stat.Progress)
+				outappend(stat.Rate)
 			}
 		} else {
-			msgparts = append(msgparts, stat.Err.Error())
+			outappend(stat.Err.Error())
 			filesuccess[stat.FileName] = false
 		}
-		newprint := fmt.Sprintf("\r%s", strings.Join(msgparts, " "))
+		newprint := outline.String()
 		if newprint != lastprint {
 			fmt.Printf("\r%s", strings.Repeat(" ", len(lastprint))) // clear the line
 			fmt.Fprint(color.Output, newprint)
