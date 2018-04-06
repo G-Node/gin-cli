@@ -235,12 +235,17 @@ func AnnexPull() error {
 		util.LogWrite("Error during AnnexPull.")
 		util.LogWrite("[Error]: %v", err)
 		logstd(stdout, stderr)
+		errmsg := "failed"
 		sstderr := string(stderr)
 		if strings.Contains(sstderr, "Permission denied") {
-			return fmt.Errorf("download failed: permission denied")
+			errmsg = "download failed: permission denied"
 		} else if strings.Contains(sstderr, "Host key verification failed") {
-			return fmt.Errorf("download failed: server key does not match known host key")
+			errmsg = "download failed: server key does not match known host key"
+		} else if strings.Contains(sstderr, "would be overwritten by merge") {
+			errmsg = "download failed: local modified or untracked file would be overwritten by download"
+			// TODO: Which file
 		}
+		err = fmt.Errorf(errmsg)
 	}
 	return err
 }
@@ -323,11 +328,7 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 		} else if strings.Contains(sstderr, "Host key verification failed") {
 			errmsg = "upload failed: server key does not match known host key"
 		} else if strings.Contains(sstderr, "rejected") {
-			// Check if local is behind remote
-			nbehind, _ := GitRevCount("HEAD", "@{push}")
-			if nbehind > 0 {
-				errmsg = "upload failed: changes were made on the server that have not been downloaded; run 'gin download' to update local copies"
-			}
+			errmsg = "upload failed: changes were made on the server that have not been downloaded; run 'gin download' to update local copies"
 		}
 		pushchan <- RepoFileStatus{Err: fmt.Errorf(errmsg)}
 		return
