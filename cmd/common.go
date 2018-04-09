@@ -86,7 +86,7 @@ func printProgressOutput(statuschan <-chan ginclient.RepoFileStatus) (filesucces
 		}
 		newprint := outline.String()
 		if newprint != lastprint {
-			fmt.Printf("\r%s", strings.Repeat(" ", len(lastprint))) // clear the line
+			fmt.Printf("\r%s\r", strings.Repeat(" ", len(lastprint))) // clear the line
 			fmt.Fprint(color.Output, newprint)
 			lastprint = newprint
 		}
