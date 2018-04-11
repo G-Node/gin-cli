@@ -198,6 +198,9 @@ func SetUpCommands(verstr string) *cobra.Command {
 	// Lock content
 	rootCmd.AddCommand(LockCmd())
 
+	// Commit changes
+	rootCmd.AddCommand(CommitCmd())
+
 	// Upload
 	rootCmd.AddCommand(UploadCmd())
 

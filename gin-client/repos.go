@@ -193,6 +193,38 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// Commit records changes to the repository.
+// The status channel 'commitchan' is closed when this function returns.
+func (gincl *Client) Commit(paths []string, commitmsg string, commitchan chan<- RepoFileStatus) {
+	defer close(commitchan)
+	util.LogWrite("Commit")
+
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		commitchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	if len(paths) > 0 {
+		// Run git annex add using exclusion filters and then add the rest to git
+		addchan := make(chan RepoFileStatus)
+		go AnnexAdd(paths, addchan)
+		for addstat := range addchan {
+			// Send UploadStatus
+			commitchan <- addstat
+		}
+
+		addchan = make(chan RepoFileStatus)
+		go GitAdd(paths, addchan)
+		for addstat := range addchan {
+			// Send UploadStatus
+			commitchan <- addstat
+		}
+	}
+
+	return
+}
+
 // Upload adds files to a repository and uploads them.
 // The status channel 'uploadchan' is closed when this function returns.
 func (gincl *Client) Upload(paths []string, commitmsg string, uploadchan chan<- RepoFileStatus) {
