@@ -33,6 +33,7 @@ func PathSplit(path string) (string, string) {
 }
 
 // ExpandGlobs expands a list of globs into paths (files and directories).
+// An error is returned if at least one element of the input slice does not match a real path.
 func ExpandGlobs(paths []string) (globexppaths []string, err error) {
 	if len(paths) == 0 {
 		// Nothing to do

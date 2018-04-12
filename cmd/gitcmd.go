@@ -13,18 +13,18 @@ func gitrun(cmd *cobra.Command, args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	_ = gincl.LoadToken() // OK to run without token
 
-	gitcmd, err := ginclient.RunGitCommand(args...)
+	gitcmd := ginclient.GitCommand(args...)
+	err := gitcmd.Start()
 	util.CheckError(err)
-	for {
-		line, readerr := gitcmd.OutPipe.ReadLine()
-		if readerr != nil {
-			break
-		}
+	var line string
+	var rerr error
+	for rerr = nil; rerr == nil; line, rerr = gitcmd.OutReader.ReadString('\n') {
 		fmt.Print(line)
 	}
-	fmt.Print(gitcmd.ErrPipe.ReadAll())
-	err = gitcmd.Wait()
-	if err != nil {
+	for rerr = nil; rerr == nil; line, rerr = gitcmd.ErrReader.ReadString('\n') {
+		fmt.Fprint(os.Stderr, line)
+	}
+	if gitcmd.Wait() != nil {
 		os.Exit(1)
 	}
 }

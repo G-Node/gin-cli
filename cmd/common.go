@@ -72,7 +72,7 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			msgparts = append(msgparts, red(stat.Err.Error()))
 			filesuccess[stat.FileName] = false
 		}
-		newprint := fmt.Sprintf("\r%s", util.CleanSpaces(strings.Join(msgparts, " ")))
+		newprint := fmt.Sprintf("\r%s", strings.Join(msgparts, " "))
 		if newprint != lastprint {
 			fmt.Printf("\r%s", strings.Repeat(" ", len(lastprint))) // clear the line
 			fmt.Fprint(color.Output, newprint)

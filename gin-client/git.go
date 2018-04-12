@@ -26,35 +26,25 @@ func SetGitUser(name, email string) error {
 	if !IsRepo() {
 		return fmt.Errorf("not a repository")
 	}
-	cmd, err := RunGitCommand("config", "--local", "user.name", name)
+	cmd := GitCommand("config", "--local", "user.name", name)
+	err := cmd.Run()
 	if err != nil {
 		return err
 	}
-	err = cmd.Wait()
-	if err != nil {
-		return err
-	}
-	cmd, err = RunGitCommand("config", "--local", "user.email", email)
-	if err != nil {
-		return err
-	}
-	return cmd.Wait()
+	cmd = GitCommand("config", "--local", "user.email", email)
+	return cmd.Run()
 }
 
 // AddRemote adds a remote named name for the repository at url.
 func AddRemote(name, url string) error {
 	fn := fmt.Sprintf("AddRemote(%s, %s)", name, url)
-	cmd, err := RunGitCommand("remote", "add", name, url)
-	if err != nil {
-		return err
-	}
-	err = cmd.Wait()
+	cmd := GitCommand("remote", "add", name, url)
+	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := ginerror{UError: err.Error(), Origin: fn}
 		util.LogWrite("Error during remote add command")
-		cmd.LogStdOutErr()
-		stderr := cmd.ErrPipe.ReadAll()
-		if strings.Contains(stderr, "already exists") {
+		logstd(stdout, stderr)
+		if strings.Contains(string(stderr), "already exists") {
 			gerr.Description = fmt.Sprintf("remote with name '%s' already exists", name)
 			return gerr
 		}
@@ -69,8 +59,9 @@ func CommitIfNew() (bool, error) {
 	if !IsRepo() {
 		return false, fmt.Errorf("not a repository")
 	}
-	cmd, err := RunGitCommand("rev-parse", "HEAD")
-	if err == nil && cmd.Wait() == nil {
+	cmd := GitCommand("rev-parse", "HEAD")
+	err := cmd.Wait()
+	if err == nil {
 		// All good. No need to do anything
 		return false, nil
 	}
@@ -81,15 +72,12 @@ func CommitIfNew() (bool, error) {
 		hostname = defaultHostname
 	}
 	commitargs := []string{"commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname)}
-	cmd, err = RunGitCommand(commitargs...)
+	cmd = GitCommand(commitargs...)
+	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error while creating initial commit")
-		return false, err
-	}
-	if err = cmd.Wait(); err != nil {
-		util.LogWrite("Error while creating initial commit")
-		cmd.LogStdOutErr()
-		return false, err
+		logstd(stdout, stderr)
+		return false, fmt.Errorf(string(stderr))
 	}
 	return true, nil
 }
@@ -126,23 +114,26 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
 		args = append([]string{"-c", "core.symlinks=false"}, args...)
 	}
-	cmd, err := RunGitCommand(args...)
+	cmd := GitCommand(args...)
+	err := cmd.Start()
 	if err != nil {
 		clonechan <- RepoFileStatus{Err: ginerror{UError: err.Error(), Origin: fn}}
 		return
 	}
 	var status RepoFileStatus
 	status.State = "Downloading repository"
-	for {
-		// git clone progress prints to stderr
-		line, rerr := cmd.ErrPipe.ReadLine()
-		if rerr != nil {
-			break
+	var line, stderr string
+	var rerr error
+	// git clone progress prints to stderr
+	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\n') {
+		stderr += line
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
 		}
-		line = util.CleanSpaces(line)
+		words := strings.Fields(line)
 		status.FileName = repoPath
-		if strings.HasPrefix(line, "Receiving objects") {
-			words := strings.Split(line, " ")
+		if words[0] == "Receiving" && words[1] == "objects" {
 			if len(words) > 2 {
 				status.Progress = words[2]
 			}
@@ -156,12 +147,9 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		}
 		clonechan <- status
 	}
-	if err != nil || cmd.Wait() != nil {
+	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during clone command")
-		cmd.LogStdOutErr()
 		repoOwner, repoName := splitRepoParts(repoPath)
-
-		stderr := cmd.ErrPipe.ReadAll()
 		gerr := ginerror{UError: stderr, Origin: fn}
 		if strings.Contains(stderr, "does not exist") {
 			gerr.Description = fmt.Sprintf("Repository download failed\n"+
@@ -192,23 +180,39 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 
 // Git annex commands
 
+type annexAction struct {
+	Command string `json:"command"`
+	Note    string `json:"note"`
+	Success bool   `json:"success"`
+	Key     string `json:"key"`
+	File    string `json:"file"`
+}
+
+type annexProgress struct {
+	Action          annexAction `json:"action"`
+	ByteProgress    int         `json:"byte-progress"`
+	TotalSize       int         `json:"total-size"`
+	PercentProgress string      `json:"percent-progress"`
+}
+
 // AnnexInit initialises the repository for annex.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex init)
 func AnnexInit(description string) error {
 	args := []string{"init", description}
-	cmd, err := RunAnnexCommand(args...)
-	cmd.LogStdOutErr()
-	if err != nil || cmd.Wait() != nil {
-		initError := fmt.Errorf("Repository annex initialisation failed.\n%s", cmd.ErrPipe.ReadAll())
-		util.LogWrite(initError.Error())
+	cmd := AnnexCommand(args...)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		initError := fmt.Errorf("Repository annex initialisation failed.\n%s", string(stderr))
+		logstd(stdout, stderr)
 		return initError
 	}
-	cmd, err = RunGitCommand("config", "annex.backends", "MD5")
-	if err != nil || cmd.Wait() != nil {
+	cmd = GitCommand("config", "annex.backends", "MD5")
+	stdout, stderr, err = cmd.OutputError()
+	if err != nil {
 		util.LogWrite("Failed to set default annex backend MD5")
-		util.LogWrite("[Error]: %v", cmd.ErrPipe.ReadAll())
-		cmd.LogStdOutErr()
+		util.LogWrite("[Error]: %v", string(stderr))
+		logstd(stdout, stderr)
 	}
 	return nil
 }
@@ -218,19 +222,16 @@ func AnnexInit(description string) error {
 // (git annex sync --no-push [--content])
 func AnnexPull() error {
 	args := []string{"sync", "--no-push", "--no-commit"}
-	cmd, err := RunAnnexCommand(args...)
-	if err != nil {
-		return err
-	}
-	err = cmd.Wait()
+	cmd := AnnexCommand(args...)
+	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during AnnexPull.")
 		util.LogWrite("[Error]: %v", err)
-		cmd.LogStdOutErr()
-		stderr := cmd.ErrPipe.ReadAll()
-		if strings.Contains(stderr, "Permission denied") {
+		logstd(stdout, stderr)
+		sstderr := string(stderr)
+		if strings.Contains(sstderr, "Permission denied") {
 			return fmt.Errorf("download failed: permission denied")
-		} else if strings.Contains(stderr, "Host key verification failed") {
+		} else if strings.Contains(sstderr, "Host key verification failed") {
 			return fmt.Errorf("download failed: server key does not match known host key")
 		}
 	}
@@ -248,38 +249,46 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 	if content {
 		args = append(args, "--content")
 	}
-	cmd, err := RunAnnexCommand(args...)
+	cmd := AnnexCommand(args...)
+	cmd.Start()
 	var status RepoFileStatus
 	status.State = "Synchronising repository"
 	syncchan <- status
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
+	var line, stdout string
+	var rerr error
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+		stdout += line
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
 		}
-		line = util.CleanSpaces(line)
-		if strings.HasPrefix(line, "copy") || strings.HasPrefix(line, "get") {
-			words := strings.Split(line, " ")
+		words := strings.Fields(line)
+		if words[0] == "copy" || words[0] == "get" {
 			status.FileName = strings.TrimSpace(words[1])
 			// new file - reset Progress and Rate
 			status.Progress = ""
 			status.Rate = ""
-			if !strings.HasSuffix(line, "ok") {
+			if words[len(words)-1] != "ok" {
 				// if the copy line ends with ok, the file is already done (no upload needed)
 				// so we shouldn't send the status to the caller
 				syncchan <- status
 			}
 		} else if strings.Contains(line, "%") {
-			words := strings.Split(line, " ")
 			status.Progress = words[1]
 			status.Rate = words[2]
 			syncchan <- status
 		}
 	}
-	if err != nil || cmd.Wait() != nil {
+
+	var stderr string
+	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\000') {
+		stderr += line
+	}
+	if err := cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexSync")
+		util.LogWrite("[stdout]\n%s", stdout)
+		util.LogWrite("[stderr]\n%s", stderr)
 		util.LogWrite("[Error]: %v", err)
-		cmd.LogStdOutErr()
 	}
 	status.Progress = progcomplete
 	syncchan <- status
@@ -289,77 +298,90 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 // AnnexPush uploads all annexed files.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'pushchan' is closed when this function returns.
-// (git annex sync --no-pull --content)
+// (git annex sync --no-pull; git annex copy --to=origin)
 func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
 	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitmsg)}
-	cmd, err := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
+	stdout, stderr, err := cmd.OutputError()
+	// TODO: Parse git push output for progress
 	if err != nil {
-		pushchan <- RepoFileStatus{Err: err}
-		return
-	}
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
-		// TODO: Parse git output to return git file upload status
-		util.LogWrite(line)
-	}
-	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexPush (sync --no-pull)")
 		util.LogWrite("[Error]: %v", err)
-		cmd.LogStdOutErr()
-		stderr := cmd.ErrPipe.ReadAll()
+		logstd(stdout, stderr)
 		errmsg := "failed"
-		if strings.Contains(stderr, "Permission denied") {
+		sstderr := string(stderr)
+		if strings.Contains(sstderr, "Permission denied") {
 			errmsg = "upload failed: permission denied"
-		} else if strings.Contains(stderr, "Host key verification failed") {
+		} else if strings.Contains(sstderr, "Host key verification failed") {
 			errmsg = "upload failed: server key does not match known host key"
 		}
 		pushchan <- RepoFileStatus{Err: fmt.Errorf(errmsg)}
 		return
 	}
 
-	cmdargs = []string{"copy"}
+	cmdargs = []string{"copy", "--json-progress"}
 	cmdargs = append(cmdargs, paths...)
-	// NOTE: Using origin which is the conventional default remote. This should be fixed.
+	// NOTE: Using origin which is the conventional default remote. This should change to work with alternate remotes.
 	cmdargs = append(cmdargs, "--to=origin")
-	cmd, err = RunAnnexCommand(cmdargs...)
+	cmd = AnnexCommand(cmdargs...)
+	err = cmd.Start()
 	if err != nil {
 		pushchan <- RepoFileStatus{Err: err}
 		return
 	}
+
 	var status RepoFileStatus
 	status.State = "Uploading"
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
+
+	var outline []byte
+	var rerr error
+	var progress annexProgress
+	var getresult annexAction
+	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+		if len(outline) == 0 {
+			// skip empty lines
+			continue
 		}
-		line = util.CleanSpaces(line)
-		if strings.HasPrefix(line, "copy") {
-			words := strings.Split(line, " ")
-			status.FileName = strings.TrimSpace(words[1])
-			// new file - reset Progress and Rate
-			status.Progress = ""
-			status.Rate = ""
-			if !strings.HasSuffix(line, "ok") {
-				// if the copy line ends with ok, the file is already done (no upload needed)
-				// so we shouldn't send the status to the caller
-				pushchan <- status
+		err := json.Unmarshal(outline, &progress)
+		if err != nil || progress == (annexProgress{}) {
+			// File done? Check if succeeded and continue to next line
+			err = json.Unmarshal(outline, &getresult)
+			if err != nil || getresult == (annexAction{}) {
+				// Couldn't parse output
+				util.LogWrite("Could not parse 'git annex copy' output")
+				util.LogWrite(string(outline))
+				util.LogWrite(err.Error())
+				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+				continue
 			}
-		} else if strings.Contains(line, "%") {
-			words := strings.Split(line, " ")
-			status.Progress = words[1]
-			status.Rate = words[2]
-			pushchan <- status
+			status.FileName = getresult.File
+			if getresult.Success {
+				status.Progress = "100%"
+				status.Err = nil
+			} else {
+				errmsg := getresult.Note
+				if strings.Contains(errmsg, "Unable to access") {
+					errmsg = "authorisation failed or remote storage unavailable"
+				}
+				status.Err = fmt.Errorf("failed: %s", errmsg)
+			}
+		} else {
+			status.FileName = progress.Action.File
+			status.Progress = progress.PercentProgress
+			status.Rate = fmt.Sprintf("%d/%d", progress.ByteProgress, progress.TotalSize) // calculate rate using d_byteprogress/d_t
+			status.Err = nil
 		}
+
+		pushchan <- status
 	}
-	if err = cmd.Wait(); err != nil {
-		util.LogWrite("Error during AnnexPush (copy)")
-		util.LogWrite("[Error]: %v", err)
-		cmd.LogStdOutErr()
+	if cmd.Wait() != nil {
+		var stderr, errline []byte
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
+		util.LogWrite("Error during AnnexGet")
+		util.LogWrite(string(stderr))
 	}
 	return
 }
@@ -370,53 +392,64 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 // (git annex get)
 func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 	defer close(getchan)
-	cmdargs := append([]string{"get"}, filepaths...)
-	cmd, err := RunAnnexCommand(cmdargs...)
-	if err != nil {
+	cmdargs := append([]string{"get", "--json-progress"}, filepaths...)
+	cmd := AnnexCommand(cmdargs...)
+	if err := cmd.Start(); err != nil {
 		getchan <- RepoFileStatus{Err: err}
 		return
 	}
+
 	var status RepoFileStatus
 	status.State = "Downloading"
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
+
+	var outline []byte
+	var rerr error
+	var progress annexProgress
+	var getresult annexAction
+	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+		if len(outline) == 0 {
+			// skip empty lines
+			continue
 		}
-		line = util.CleanSpaces(line)
-		if strings.HasPrefix(line, "get") {
-			words := strings.Split(line, " ")
-			status.FileName = strings.TrimSpace(words[1])
-			// new file - reset Progress, Rate, and Err
-			status.Progress = ""
-			status.Rate = ""
-			status.Err = nil
-			if !strings.HasSuffix(line, "ok") {
-				// if the copy line ends with ok, the file is already done (no upload needed)
-				// so we shouldn't send the status to the caller
-				getchan <- status
+		err := json.Unmarshal(outline, &progress)
+		if err != nil || progress == (annexProgress{}) {
+			// File done? Check if succeeded and continue to next line
+			err = json.Unmarshal(outline, &getresult)
+			if err != nil || getresult == (annexAction{}) {
+				// Couldn't parse output
+				util.LogWrite("Could not parse 'git annex get' output")
+				util.LogWrite(string(outline))
+				util.LogWrite(err.Error())
+				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+				continue
 			}
-		} else if strings.HasSuffix(line, "failed") {
-			// determine error type
-			errline := cmd.ErrPipe.ReadAll()
-			if strings.Contains(errline, "Permission denied") {
-				status.Err = fmt.Errorf("Authentication failed: try logging in again")
+			status.FileName = getresult.File
+			if getresult.Success {
+				status.Progress = "100%"
+				status.Err = nil
 			} else {
-				// TODO: Other reasons?
-				status.Err = fmt.Errorf("Content or server unavailable")
+				errmsg := getresult.Note
+				if strings.Contains(errmsg, "Unable to access") {
+					errmsg = "authorisation failed or remote storage unavailable"
+				}
+				status.Err = fmt.Errorf("failed: %s", errmsg)
 			}
-			getchan <- status
-		} else if strings.Contains(line, "%") {
-			words := strings.Split(line, " ")
-			status.Progress = words[1]
-			status.Rate = words[2]
-			getchan <- status
+		} else {
+			status.FileName = progress.Action.File
+			status.Progress = progress.PercentProgress
+			status.Rate = fmt.Sprintf("%d/%d", progress.ByteProgress, progress.TotalSize) // calculate rate using d_byteprogress/d_t
+			status.Err = nil
 		}
+
+		getchan <- status
 	}
-	if err = cmd.Wait(); err != nil {
+	if cmd.Wait() != nil {
+		var stderr, errline []byte
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
 		util.LogWrite("Error during AnnexGet")
-		util.LogWrite("[Error]: %v", err)
-		cmd.LogStdOutErr()
+		util.LogWrite(string(stderr))
 	}
 	return
 }
@@ -428,7 +461,8 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 	defer close(dropchan)
 	cmdargs := append([]string{"drop", "--json"}, filepaths...)
-	cmd, err := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
+	err := cmd.Start()
 	if err != nil {
 		dropchan <- RepoFileStatus{Err: err}
 		return
@@ -443,11 +477,9 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 	}
 
 	status.State = "Removing content"
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
+	var line string
+	var rerr error
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
 		line = strings.TrimSpace(line)
 		if len(line) == 0 {
 			// Empty line output. Ignore
@@ -465,15 +497,22 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			util.LogWrite("Error dropping %s", annexDropRes.File)
-			status.Err = fmt.Errorf("failed")
+			errmsg := annexDropRes.Note
+			if strings.Contains(errmsg, "unsafe") {
+				errmsg = "failed (unsafe): could not verify remote copy"
+			}
+			status.Err = fmt.Errorf(errmsg)
 		}
 		status.Progress = progcomplete
 		dropchan <- status
 	}
-	if err = cmd.Wait(); err != nil {
+	if cmd.Wait() != nil {
+		var stderr, errline []byte
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
 		util.LogWrite("Error during AnnexDrop")
-		util.LogWrite("[Error]: %v", err)
-		cmd.LogStdOutErr()
+		util.LogWrite("[stderr]\n%s", string(stderr))
 	}
 	return
 }
@@ -485,10 +524,12 @@ func setBare(state bool) error {
 	} else {
 		statestr = "false"
 	}
-	cmd, err := RunGitCommand("config", "--local", "--bool", "core.bare", statestr)
-	if err != nil || cmd.Wait() != nil {
+	cmd := GitCommand("config", "--local", "--bool", "core.bare", statestr)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
 		util.LogWrite("Error switching bare status to %s", statestr)
-		cmd.LogStdOutErr()
+		logstd(stdout, stderr)
+		err = fmt.Errorf(string(stderr))
 	}
 	return err
 }
@@ -500,25 +541,28 @@ func setBare(state bool) error {
 func GitLsFiles(args []string, lschan chan<- string) {
 	defer close(lschan)
 	cmdargs := append([]string{"ls-files"}, args...)
-	cmd, err := RunGitCommand(cmdargs...)
+	cmd := GitCommand(cmdargs...)
+	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("ls-files command set up failed: %s", err)
 		return
 	}
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
-		line = strings.TrimSpace(line)
+	var line string
+	var rerr error
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+		line = strings.TrimSuffix(line, "\n")
 		if line != "" {
 			lschan <- line
 		}
 	}
 
-	if err = cmd.Wait(); err != nil {
+	var stderr, errline []byte
+	if cmd.Wait() != nil {
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
 		util.LogWrite("Error during GitLsFiles")
-		cmd.LogStdOutErr()
+		logstd(nil, stderr)
 	}
 	return
 }
@@ -556,20 +600,22 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		filepaths = util.FilterPaths(filepaths, annexfiles)
 	}
 
-	cmdargs := append([]string{"add", "--verbose"}, filepaths...)
-	cmd, err := RunGitCommand(cmdargs...)
+	cmdargs := append([]string{"add", "--verbose", "--"}, filepaths...)
+	cmd := GitCommand(cmdargs...)
+	err := cmd.Start()
 	if err != nil {
 		addchan <- RepoFileStatus{Err: err}
 		return
 	}
-	// TODO: Parse output
 	var status RepoFileStatus
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
+	var line string
+	var rerr error
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
 		fname := strings.TrimSpace(line)
+		if len(fname) == 0 {
+			// skip empty lines
+			continue
+		}
 		if strings.HasPrefix(fname, "add") {
 			status.State = "Adding"
 			fname = strings.TrimPrefix(fname, "add '")
@@ -579,14 +625,18 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		}
 		fname = strings.TrimSuffix(fname, "'")
 		status.FileName = fname
-		util.LogWrite("%s added to git", fname)
+		util.LogWrite("'%s' added to git", fname)
 		// Error conditions?
 		status.Progress = progcomplete
 		addchan <- status
 	}
-	if err = cmd.Wait(); err != nil {
+	var stderr, errline []byte
+	if cmd.Wait() != nil {
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
 		util.LogWrite("Error during GitAdd")
-		cmd.LogStdOutErr()
+		logstd(nil, stderr)
 	}
 	return
 }
@@ -610,18 +660,18 @@ func annexExclArgs() (exclargs []string) {
 	return
 }
 
-// AnnexAdd adds paths to the annex.
-// Files specified for exclusion in the configuration are ignored automatically.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-// The status channel 'addchan' is closed when this function returns.
-// (git annex add)
-func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
+// annexAddCommon is the common function that serves both AnnexAdd() and AnnexLock().
+// AnnexLock() is performed by passing true to 'update'.
+func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStatus) {
 	defer close(addchan)
 	if len(filepaths) == 0 {
 		util.LogWrite("No paths to add to annex. Nothing to do.")
 		return
 	}
-	cmdargs := []string{"--json", "add"}
+	cmdargs := []string{"add", "--json"}
+	if update {
+		cmdargs = append(cmdargs, "--update")
+	}
 	cmdargs = append(cmdargs, filepaths...)
 
 	exclargs := annexExclArgs()
@@ -629,52 +679,64 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		cmdargs = append(cmdargs, exclargs...)
 	}
 
-	cmd, err := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
+	err := cmd.Start()
 	if err != nil {
 		addchan <- RepoFileStatus{Err: err}
 		return
 	}
 
-	var annexAddRes struct {
-		Command string `json:"command"`
-		File    string `json:"file"`
-		Key     string `json:"key"`
-		Success bool   `json:"success"`
-	}
+	var outline []byte
+	var rerr error
 	var status RepoFileStatus
+	var addresult annexAction
 	status.State = "Adding"
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
+	if update {
+		status.State = "Locking"
+	}
+	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+		if len(outline) == 0 {
 			// Empty line output. Ignore
 			continue
 		}
-		// Send file name
-		err = json.Unmarshal([]byte(line), &annexAddRes)
-		if err != nil {
-			addchan <- RepoFileStatus{Err: err}
-			return
+		err := json.Unmarshal(outline, &addresult)
+		if err != nil || addresult == (annexAction{}) {
+			// Couldn't parse output
+			util.LogWrite("Could not parse 'git annex add' output")
+			util.LogWrite(string(outline))
+			util.LogWrite(err.Error())
+			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+			continue
 		}
-		status.FileName = annexAddRes.File
-		if annexAddRes.Success {
-			util.LogWrite("%s added to annex", annexAddRes.File)
+		status.FileName = addresult.File
+		if addresult.Success {
+			util.LogWrite("%s added to annex", addresult.File)
 			status.Err = nil
 		} else {
-			util.LogWrite("Error adding %s", annexAddRes.File)
+			util.LogWrite("Error adding %s", addresult.File)
 			status.Err = fmt.Errorf("failed")
 		}
 		status.Progress = progcomplete
 		addchan <- status
 	}
-	if err = cmd.Wait(); err != nil {
+	var stderr, errline []byte
+	if cmd.Wait() != nil {
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
 		util.LogWrite("Error during AnnexAdd")
-		cmd.LogStdOutErr()
+		logstd(nil, stderr)
 	}
 	return
+}
+
+// AnnexAdd adds paths to the annex.
+// Files specified for exclusion in the configuration are ignored automatically.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'addchan' is closed when this function returns.
+// (git annex add)
+func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
+	annexAddCommon(filepaths, false, addchan)
 }
 
 // AnnexWhereisRes holds the output of a "git annex whereis" command
@@ -684,14 +746,14 @@ type AnnexWhereisRes struct {
 	Note      string   `json:"note"`
 	Success   bool     `json:"success"`
 	Untrusted []string `json:"untrusted"`
+	Key       string   `json:"key"`
 	Whereis   []struct {
 		Here        bool     `json:"here"`
 		UUID        string   `json:"uuid"`
 		URLs        []string `json:"urls"`
 		Description string   `json:"description"`
 	}
-	Key string `json:"key"`
-	Err error  `json:"err"`
+	Err error `json:"err"`
 }
 
 // AnnexWhereis returns information about annexed files in the repository
@@ -702,20 +764,18 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisRes) {
 	defer close(wichan)
 	cmdargs := []string{"whereis", "--json"}
 	cmdargs = append(cmdargs, paths...)
-	cmd, err := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
+	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("Error during AnnexWhereis")
-		cmd.LogStdOutErr()
 		wichan <- AnnexWhereisRes{Err: fmt.Errorf("Failed to run git-annex whereis: %s", err)}
 		return
 	}
 
+	var line string
+	var rerr error
 	var info AnnexWhereisRes
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
 		line = strings.TrimSpace(line)
 		if len(line) == 0 {
 			// Empty line output. Ignore
@@ -743,21 +803,19 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 	defer close(statuschan)
 	cmdargs := []string{"status", "--json"}
 	cmdargs = append(cmdargs, paths...)
-	cmd, err := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
 	// TODO: Parse output
+	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("Error setting up git-annex status")
-		cmd.LogStdOutErr()
 		statuschan <- AnnexStatusRes{Err: fmt.Errorf("Failed to run git-annex status: %s", err)}
 		return
 	}
 
+	var line string
+	var rerr error
 	var status AnnexStatusRes
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
 		line = strings.TrimSpace(line)
 		if len(line) == 0 {
 			// Empty line output. Ignore
@@ -843,63 +901,7 @@ func makeFileList(header string, fnames []string) string {
 // The status channel 'lockchan' is closed when this function returns.
 // (git annex add --update)
 func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
-	defer close(lockchan)
-	// Annex lock doesn't work like it used to. It's better to instead annex add, but only the files that are already known to annex (handled by --update).
-	var status RepoFileStatus
-	status.State = "Locking"
-
-	cmdargs := []string{"add", "--json", "--update"}
-	exclargs := annexExclArgs()
-	if len(exclargs) > 0 {
-		cmdargs = append(cmdargs, exclargs...)
-	}
-
-	cmdargs = append(cmdargs, filepaths...)
-	cmd, err := RunAnnexCommand(cmdargs...)
-	if err != nil {
-		lockchan <- RepoFileStatus{Err: err}
-		return
-	}
-
-	var annexAddRes struct {
-		Command string `json:"command"`
-		File    string `json:"file"`
-		Key     string `json:"key"`
-		Success bool   `json:"success"`
-	}
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
-			// Empty line output. Ignore
-			continue
-		}
-		// Send file name
-		err = json.Unmarshal([]byte(line), &annexAddRes)
-		if err != nil {
-			lockchan <- RepoFileStatus{Err: err}
-			return
-		}
-		status.FileName = annexAddRes.File
-		if annexAddRes.Success {
-			util.LogWrite("%s locked", annexAddRes.File)
-			status.Err = nil
-		} else {
-			util.LogWrite("Error locking %s", annexAddRes.File)
-			status.Err = fmt.Errorf("failed")
-		}
-		status.Progress = progcomplete
-		lockchan <- status
-	}
-	if err != nil || cmd.Wait() != nil {
-		util.LogWrite("Error during AnnexLock")
-		cmd.LogStdOutErr()
-	}
-	status.Progress = progcomplete
-	return
+	annexAddCommon(filepaths, true, lockchan)
 }
 
 // AnnexUnlock unlocks the specified files and directory contents if they are annexed
@@ -910,7 +912,8 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 	defer close(unlockchan)
 	cmdargs := []string{"unlock", "--json"}
 	cmdargs = append(cmdargs, filepaths...)
-	cmd, err := RunAnnexCommand(cmdargs...)
+	cmd := AnnexCommand(cmdargs...)
+	err := cmd.Start()
 	if err != nil {
 		unlockchan <- RepoFileStatus{Err: err}
 		return
@@ -918,44 +921,42 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 	var status RepoFileStatus
 	status.State = "Unlocking"
 
-	var annexUnlockRes struct {
-		Command string `json:"command"`
-		File    string `json:"file"`
-		Key     string `json:"key"`
-		Success bool   `json:"success"`
-		Note    string `json:"note"`
-	}
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
-		}
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
+	var outline []byte
+	var rerr error
+	var unlockres annexAction
+	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+		if len(outline) == 0 {
 			// Empty line output. Ignore
 			continue
 		}
 		// Send file name
-		err = json.Unmarshal([]byte(line), &annexUnlockRes)
-		if err != nil {
-			unlockchan <- RepoFileStatus{Err: err}
-			return
+		err = json.Unmarshal(outline, &unlockres)
+		if err != nil || unlockres == (annexAction{}) {
+			// Couldn't parse output
+			util.LogWrite("Could not parse 'git annex unlock' output")
+			util.LogWrite(string(outline))
+			util.LogWrite(err.Error())
+			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+			continue
 		}
-		status.FileName = annexUnlockRes.File
-		if annexUnlockRes.Success {
-			util.LogWrite("%s unlocked", annexUnlockRes.File)
+		status.FileName = unlockres.File
+		if unlockres.Success {
+			util.LogWrite("%s unlocked", unlockres.File)
 			status.Err = nil
 		} else {
-			util.LogWrite("Error unlocking %s", annexUnlockRes.File)
+			util.LogWrite("Error unlocking %s", unlockres.File)
 			status.Err = fmt.Errorf("Content not available locally\nUse 'gin get-content' to download")
 		}
 		status.Progress = progcomplete
 		unlockchan <- status
 	}
-	if err != nil || cmd.Wait() != nil {
+	var stderr, errline []byte
+	if cmd.Wait() != nil {
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
 		util.LogWrite("Error during AnnexUnlock")
-		cmd.LogStdOutErr()
-		return
+		logstd(nil, stderr)
 	}
 	status.Progress = progcomplete
 	return
@@ -991,21 +992,16 @@ type AnnexInfoRes struct {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex info)
 func AnnexInfo() (AnnexInfoRes, error) {
-	cmd, err := RunAnnexCommand("info", "--json")
+	cmd := AnnexCommand("info", "--json")
+	stdout, stderr, err := cmd.OutputError()
 	if err != nil || cmd.Wait() != nil {
 		util.LogWrite("Error during AnnexInfo")
-		cmd.LogStdOutErr()
+		logstd(stdout, stderr)
 		return AnnexInfoRes{}, fmt.Errorf("Error retrieving annex info")
 	}
 
-	stdout := cmd.OutPipe.ReadAll()
-	stdout = strings.TrimSpace(stdout)
 	var info AnnexInfoRes
-	if len(stdout) == 0 {
-		// empty output - error?
-		return info, nil
-	}
-	err = json.Unmarshal([]byte(stdout), &info)
+	err = json.Unmarshal(stdout, &info)
 	return info, err
 }
 
@@ -1022,14 +1018,17 @@ type GinCommit struct {
 }
 
 // GitLog returns the commit logs for the repository.
-// The number of commits can be limited by the 'count' argument.
+// The number of commits can be limited by the count argument.
 // If count <= 0, the entire commit history is returned.
-func GitLog(count uint, revrange string, paths []string) ([]GinCommit, error) {
-	// TODO: Use git log -z and split stdout on NULL (\x00)
-	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":""}`
-	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat)}
+// Revisions which match only the deletion of the matching paths can be filtered using the showdeletes argument.
+func GitLog(count uint, revrange string, paths []string, showdeletes bool) ([]GinCommit, error) {
+	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":"%b"}`
+	cmdargs := []string{"log", "-z", fmt.Sprintf("--format=%s", logformat)}
 	if count > 0 {
 		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
+	}
+	if !showdeletes {
+		cmdargs = append(cmdargs, "--diff-filter=d")
 	}
 	if revrange != "" {
 		cmdargs = append(cmdargs, revrange)
@@ -1039,42 +1038,52 @@ func GitLog(count uint, revrange string, paths []string) ([]GinCommit, error) {
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd, err := RunGitCommand(cmdargs...)
+	cmd := GitCommand(cmdargs...)
+	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("Error setting up git log command")
-		cmd.LogStdOutErr()
 		return nil, fmt.Errorf("error retrieving version logs - malformed git log command")
 	}
 
+	var line []byte
+	var rerr error
 	var commits []GinCommit
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadBytes('\000') {
+		line = bytes.TrimSuffix(line, []byte("\000"))
+		if len(line) == 0 {
+			continue
 		}
+		// Escape newlines and tabs (from body)
+		line = bytes.Replace(line, []byte("\n"), []byte("\\n"), -1)
+		line = bytes.Replace(line, []byte("\t"), []byte("\\t"), -1)
 		var commit GinCommit
-		ierr := json.Unmarshal([]byte(line), &commit)
+		ierr := json.Unmarshal(line, &commit)
 		if ierr != nil {
 			util.LogWrite("Error parsing git log")
+			util.LogWrite(string(line))
 			util.LogWrite(ierr.Error())
 			continue
 		}
+		// Trim potential newline or spaces at end of body
+		commit.Body = strings.TrimSpace(commit.Body)
 		commits = append(commits, commit)
 	}
 
-	err = cmd.Wait() // should be done by now
-	if err != nil {
-		util.LogWrite("Error getting git log")
-		cmd.LogStdOutErr()
-		stderr := cmd.ErrPipe.ReadAll()
-		if strings.Contains(stderr, "bad revision") {
-			stderr = fmt.Sprintf("'%s' does not match a known version ID or name", revrange)
+	var stderr, errline []byte
+	if cmd.Wait() != nil {
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
 		}
-		return nil, fmt.Errorf(stderr)
+		util.LogWrite("Error getting git log")
+		errmsg := string(stderr)
+		if strings.Contains(errmsg, "bad revision") {
+			errmsg = fmt.Sprintf("'%s' does not match a known version ID or name", revrange)
+		}
+		return nil, fmt.Errorf(errmsg)
 	}
 
 	// TODO: Combine diffstats into first git log invocation
-	logstats, err := GitLogDiffstat(count, paths)
+	logstats, err := GitLogDiffstat(count, paths, showdeletes)
 	if err != nil {
 		util.LogWrite("Failed to get diff stats")
 		return commits, nil
@@ -1093,41 +1102,49 @@ type DiffStat struct {
 	ModifiedFiles []string
 }
 
-func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
+func GitLogDiffstat(count uint, paths []string, showdeletes bool) (map[string]DiffStat, error) {
 	logformat := `::%H`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
 	if count > 0 {
 		cmdargs = append(cmdargs, fmt.Sprintf("--max-count=%d", count))
 	}
+	if !showdeletes {
+		cmdargs = append(cmdargs, "--diff-filter=d")
+	}
 	cmdargs = append(cmdargs, "--") // separate revisions from paths, even if there are no paths
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd, err := RunGitCommand(cmdargs...)
+	cmd := GitCommand(cmdargs...)
+	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("Error during GitLogDiffstat")
-		cmd.LogStdOutErr()
 		return nil, err
 	}
 
 	stats := make(map[string]DiffStat)
 	var curhash string
 	var curstat DiffStat
-	for {
-		line, rerr := cmd.OutPipe.ReadLine()
-		if rerr != nil {
-			break
+
+	var line string
+	var rerr error
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+		// Avoid trimming spaces at end of filenames
+		line = strings.TrimSuffix(line, "\n")
+		if len(strings.TrimSpace(line)) == 0 { // but still check if the line is only spaces
+			continue
 		}
-		line = util.CleanSpaces(line)
 		if strings.HasPrefix(line, "::") {
 			curhash = strings.TrimPrefix(line, "::")
 			curstat = DiffStat{}
-		} else if len(line) == 0 {
-			continue // Skip empty lines
 		} else {
 			// parse name-status
-			fstat := strings.SplitN(line, " ", 2) // stat (A, M, or D) and filename
-			stat, fname := fstat[0], fstat[1]
+			fstat := strings.SplitN(line, "\t", 2) // stat (A, M, or D) and filename
+			if len(fstat) < 2 {
+				continue
+			}
+			stat := fstat[0]
+			fname := fstat[1]
 			switch stat {
 			case "A":
 				nf := curstat.NewFiles
@@ -1138,6 +1155,8 @@ func GitLogDiffstat(count uint, paths []string) (map[string]DiffStat, error) {
 			case "D":
 				df := curstat.DeletedFiles
 				curstat.DeletedFiles = append(df, fname)
+			case "R100":
+				// Ignore renames
 			default:
 				util.LogWrite("Could not parse diffstat line")
 				util.LogWrite(line)
@@ -1155,81 +1174,171 @@ func GitCheckout(hash string, paths []string) error {
 	cmdargs := []string{"checkout", hash, "--"}
 	if paths == nil || len(paths) == 0 {
 		reporoot, _ := util.FindRepoRoot(".")
-		cmdargs = append(cmdargs, reporoot)
-	} else {
-		cmdargs = append(cmdargs, paths...)
+		Workingdir = reporoot
+		paths = []string{"."}
 	}
+	cmdargs = append(cmdargs, paths...)
 
-	cmd, err := RunGitCommand(cmdargs...)
-	if err != nil || cmd.Wait() != nil {
+	cmd := GitCommand(cmdargs...)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
 		util.LogWrite("Error during GitCheckout")
-		cmd.LogStdOutErr()
-		return fmt.Errorf(cmd.ErrPipe.ReadAll())
+		logstd(stdout, stderr)
+		return fmt.Errorf(string(stderr))
 	}
-
-	fmt.Print(cmd.OutPipe.ReadAll())
 	return nil
 }
 
-// GitCatFile performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-func GitCatFile(revision, filepath, output string) ([]byte, error) {
-	cmd, err := RunGitCommand("cat-file", "blob", fmt.Sprintf("%s:%s", revision, filepath))
-	if err != nil {
-		util.LogWrite("Error during GitCatFile")
-		cmd.LogStdOutErr()
-		return nil, err
-	}
-	return cmd.Output()
+// GitObject contains the information for a tree or blob object in git
+type GitObject struct {
+	Name string
+	Hash string
+	Type string
+	Mode string
 }
 
-var modecache = make(map[string]bool)
+// GitLsTree performs a recursive git ls-tree with a given revision (hash) and a list of paths.
+// For each item, it returns a struct which contains the type (blob, tree), the mode, the hash, and the absolute (repo rooted) path to the object (name).
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func GitLsTree(revision string, paths []string) ([]GitObject, error) {
+	cmdargs := []string{"ls-tree", "--full-tree", "-z", "-t", "-r", revision}
+	cmdargs = append(cmdargs, paths...)
+	cmd := GitCommand(cmdargs...)
+	// This command doesn't need to be read line-by-line
+	err := cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	var objects []GitObject
+	var line string
+	var rerr error
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\000') {
+		line = strings.TrimSuffix(line, "\000")
+		if len(line) == 0 {
+			continue
+		}
+		words := strings.Fields(line)
+		fnamesplit := strings.SplitN(line, "\t", 2)
+		if len(words) < 4 || len(fnamesplit) < 2 {
+			continue
+		}
+		obj := GitObject{
+			Mode: words[0],
+			Type: words[1],
+			Hash: words[2],
+			Name: fnamesplit[1],
+		}
+		objects = append(objects, obj)
+	}
+
+	var stderr, errline []byte
+	if cmd.Wait() != nil {
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
+		util.LogWrite("Error during GitLsTree")
+		logstd(nil, stderr)
+		return nil, fmt.Errorf(string(stderr))
+	}
+
+	return objects, nil
+}
+
+// GitCatFileContents performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func GitCatFileContents(revision, filepath string) ([]byte, error) {
+	cmd := GitCommand("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		util.LogWrite("Error during GitCatFile (Contents)")
+		logstd(nil, stderr)
+		return nil, fmt.Errorf(string(stderr))
+	}
+	return stdout, nil
+}
+
+// GitCatFileType returns the type of a given object at a given revision (blob, tree, or commit)
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func GitCatFileType(object string) (string, error) {
+	cmd := GitCommand("cat-file", "-t", object)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		util.LogWrite("Error during GitCatFile (Type)")
+		logstd(stdout, stderr)
+		err = fmt.Errorf(string(stderr))
+		return "", err
+	}
+	return string(stdout), nil
+}
+
+// AnnexFromKey creates an Annex placeholder file at a given location with a specific key.
+// The creation is forced, so there is no guarantee that the key refers to valid repository content, nor that the content is still available in any of the remotes.
+// The location where the file is to be created must be available (no directories are created).
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// (git annex fromkey --force)
+func AnnexFromKey(key, filepath string) error {
+	cmd := AnnexCommand("fromkey", "--force", key, filepath)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+		return fmt.Errorf(string(stderr))
+	}
+	return nil
+}
+
+var annexmodecache = make(map[string]bool)
 
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // If the path is a repository and no error was raised, the result it cached so that subsequent checks are faster.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsDirect() bool {
-	if mode, ok := modecache[Workingdir]; ok {
+	if mode, ok := annexmodecache[Workingdir]; ok {
 		return mode
 	}
-	cmd, err := RunGitCommand("config", "--local", "annex.direct")
-	if err != nil || cmd.Wait() != nil {
+	cmd := GitCommand("config", "--local", "annex.direct")
+	stdout, _, err := cmd.OutputError()
+	if err != nil {
 		// Don't cache this result
 		return false
 	}
 
-	stdout := cmd.OutPipe.ReadAll()
-	if strings.TrimSpace(stdout) == "true" {
-		modecache[Workingdir] = true
+	if strings.TrimSpace(string(stdout)) == "true" {
+		annexmodecache[Workingdir] = true
 		return true
 	}
-	modecache[Workingdir] = false
+	annexmodecache[Workingdir] = false
 	return false
+}
+
+//isAnnexPath returns true if a given string represents the path to an annex object.
+func isAnnexPath(path string) bool {
+	// TODO: Check paths on Windows
+	return strings.Contains(path, ".git/annex/objects")
 }
 
 // IsVersion6 returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsVersion6() bool {
-	cmd, err := RunGitCommand("config", "--local", "--get", "annex.version")
-	if err != nil || cmd.Wait() != nil {
+	cmd := GitCommand("config", "--local", "--get", "annex.version")
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
 		util.LogWrite("Error while checking repository annex version")
-		cmd.LogStdOutErr()
+		logstd(stdout, stderr)
 		return false
 	}
-	stdout := cmd.OutPipe.ReadAll()
-	ver := strings.TrimSpace(stdout)
+	ver := strings.TrimSpace(string(stdout))
 	util.LogWrite("Annex version is %s", ver)
 	return ver == "6"
 }
 
 // Utility functions for shelling out
 
-// RunGitCommand executes an external git command with the provided arguments and returns a GinCmd struct.
-// The command is started with Start() before returning.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-func RunGitCommand(args ...string) (util.GinCmd, error) {
+// GitCommand sets up an external git command with the provided arguments and returns a GinCmd struct.
+// Setting the Workingdir package global affects the working directory in which the command will be executed.
+func GitCommand(args ...string) util.GinCmd {
 	gitbin := util.Config.Bin.Git
 	cmd := util.Command(gitbin)
 	cmd.Dir = Workingdir
@@ -1239,14 +1348,12 @@ func RunGitCommand(args ...string) (util.GinCmd, error) {
 	env := os.Environ()
 	cmd.Env = append(env, util.GitSSHEnv(token.Username))
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
-	err := cmd.Start()
-	return cmd, err
+	return cmd
 }
 
-// RunAnnexCommand executes a git annex command with the provided arguments and returns a GinCmd struct.
-// The command is started with Start() before returning.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
-func RunAnnexCommand(args ...string) (util.GinCmd, error) {
+// AnnexCommand sets up a git annex command with the provided arguments and returns a GinCmd struct.
+// Setting the Workingdir package global affects the working directory in which the command will be executed.
+func AnnexCommand(args ...string) util.GinCmd {
 	gitannexbin := util.Config.Bin.GitAnnex
 	cmd := util.Command(gitannexbin, args...)
 	cmd.Dir = Workingdir
@@ -1256,13 +1363,13 @@ func RunAnnexCommand(args ...string) (util.GinCmd, error) {
 	cmd.Env = append(env, util.GitSSHEnv(token.Username))
 	cmd.Env = append(cmd.Env, "GIT_ANNEX_USE_GIT_SSH=1")
 	util.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
-	err := cmd.Start()
-	return cmd, err
+	return cmd
 }
 
 // GetAnnexVersion returns the version string of the system's git-annex.
 func GetAnnexVersion() (string, error) {
-	cmd, err := RunAnnexCommand("version", "--raw")
+	cmd := AnnexCommand("version", "--raw")
+	stdout, _, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error while preparing git-annex version command")
 		if strings.Contains(err.Error(), "executable file not found") ||
@@ -1271,12 +1378,9 @@ func GetAnnexVersion() (string, error) {
 		}
 		return "", err
 	}
-	if err = cmd.Wait(); err != nil {
-		util.LogWrite("Error while checking git-annex version")
-		cmd.LogStdOutErr()
-		return "", err
-	}
+	return string(stdout), nil
+}
 
-	stdout := cmd.OutPipe.ReadAll()
-	return stdout, nil
+func logstd(out, err []byte) {
+	util.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
 }
