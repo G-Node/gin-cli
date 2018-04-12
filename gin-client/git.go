@@ -629,7 +629,7 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			continue
 		}
 		if strings.HasPrefix(fname, "add") {
-			status.State = "Adding"
+			status.State = "Adding (git)  "
 			fname = strings.TrimPrefix(fname, "add '")
 		} else if strings.HasPrefix(fname, "remove") {
 			status.State = "Removing"
@@ -702,7 +702,7 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 	var rerr error
 	var status RepoFileStatus
 	var addresult annexAction
-	status.State = "Adding"
+	status.State = "Adding (annex)"
 	if update {
 		status.State = "Locking"
 	}
