@@ -121,6 +121,7 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 	var stderr []byte
 	var status RepoFileStatus
 	status.State = "Downloading repository"
+	clonechan <- status
 	var rerr error
 	readbuffer := make([]byte, 1024)
 	var nread, errhead int
@@ -251,7 +252,7 @@ func AnnexPull() error {
 }
 
 // AnnexSync synchronises the local repository with the remote.
-// Optionally synchronises content if content=True
+// Optionally synchronises content if content=True.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'syncchan' is closed when this function returns.
 // (git annex sync [--content])
