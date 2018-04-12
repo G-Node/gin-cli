@@ -19,7 +19,7 @@ import (
 	// but its only temporary...
 )
 
-var defaultHostname = "(unknown)"
+const unknownhostname = "(unknown)"
 
 // MakeSessionKey creates a private+public key pair.
 // The private key is saved in the user's configuration directory, to be used for git commands.
@@ -33,7 +33,7 @@ func (gincl *Client) MakeSessionKey() error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		util.LogWrite("Could not retrieve hostname")
-		hostname = defaultHostname
+		hostname = unknownhostname
 	}
 	description := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(keyPair.Public), description)
@@ -482,7 +482,7 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		hostname = defaultHostname
+		hostname = unknownhostname
 	}
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 

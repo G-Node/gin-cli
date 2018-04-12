@@ -51,7 +51,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 		hostname, herr := os.Hostname()
 		if herr != nil {
 			util.LogWrite("Could not retrieve hostname")
-			hostname = "(unknown)"
+			hostname = unknownhostname
 		}
 
 		commitsubject := fmt.Sprintf("Repository version changed by %s@%s", gincl.Username, hostname)

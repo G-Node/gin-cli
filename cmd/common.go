@@ -14,6 +14,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const unknownhostname = "(unknown)"
+
 var green = color.New(color.FgGreen).SprintFunc()
 var red = color.New(color.FgRed).SprintFunc()
 

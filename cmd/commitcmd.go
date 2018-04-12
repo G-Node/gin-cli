@@ -28,7 +28,7 @@ func commit(cmd *cobra.Command, args []string) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		util.LogWrite("Could not retrieve hostname")
-		hostname = "(unknown)"
+		hostname = unknownhostname
 	}
 	commitmsg := fmt.Sprintf("gin upload from %s\n\n%s", hostname, getchanges())
 	uploadchan := make(chan ginclient.RepoFileStatus)
