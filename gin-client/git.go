@@ -408,6 +408,31 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 	return
 }
 
+// AnnexCommit performs a commit by calling git-annex-sync, passing a commit message, and disabling both pull and push, so no actual synchronisation happens.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// The status channel 'commitchan' is closed when this function returns.
+// (git annex sync --no-push --no-pull)
+func AnnexCommit(commitmsg string, commitchan chan<- RepoFileStatus) {
+	defer close(commitchan)
+	cmdargs := []string{"sync", "--no-pull", "--no-push", "--commit", fmt.Sprintf("--message=%s", commitmsg)}
+	cmd := AnnexCommand(cmdargs...)
+	var status RepoFileStatus
+	status.State = "Recording changes"
+	commitchan <- status
+	stdout, stderr, err := cmd.OutputError()
+
+	if err != nil {
+		util.LogWrite("Error during AnnexCommit")
+		logstd(stdout, stderr)
+		status.Err = fmt.Errorf(string(stderr))
+		commitchan <- status
+		return
+	}
+	status.Progress = progcomplete
+	commitchan <- status
+	return
+}
+
 // AnnexGet retrieves the content of specified files.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'getchan' is closed when this function returns.

@@ -220,6 +220,13 @@ func (gincl *Client) Commit(paths []string, commitmsg string, commitchan chan<- 
 			// Send UploadStatus
 			commitchan <- addstat
 		}
+
+		// Run sync with no push or pull
+		annexcommitchan := make(chan RepoFileStatus)
+		go AnnexCommit("COMMIT", annexcommitchan)
+		for comstat := range annexcommitchan {
+			commitchan <- comstat
+		}
 	}
 
 	return
