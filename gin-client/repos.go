@@ -193,48 +193,35 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// Commit records changes to the repository.
-// The status channel 'commitchan' is closed when this function returns.
-func (gincl *Client) Commit(paths []string, commitmsg string, commitchan chan<- RepoFileStatus) {
-	defer close(commitchan)
-	util.LogWrite("Commit")
-
+// Add updates the index with the changes in the files specified by 'paths'.
+// The status channel 'addchan' is closed when this function returns.
+func (gincl *Client) Add(paths []string, addchan chan<- RepoFileStatus) {
+	defer close(addchan)
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
-		commitchan <- RepoFileStatus{Err: err}
+		addchan <- RepoFileStatus{Err: err}
 		return
 	}
 
 	if len(paths) > 0 {
 		// Run git annex add using exclusion filters and then add the rest to git
-		addchan := make(chan RepoFileStatus)
-		go AnnexAdd(paths, addchan)
-		for addstat := range addchan {
-			// Send UploadStatus
-			commitchan <- addstat
+		annexaddchan := make(chan RepoFileStatus)
+		go AnnexAdd(paths, annexaddchan)
+		for addstat := range annexaddchan {
+			addchan <- addstat
 		}
 
-		addchan = make(chan RepoFileStatus)
-		go GitAdd(paths, addchan)
-		for addstat := range addchan {
-			// Send UploadStatus
-			commitchan <- addstat
-		}
-
-		// Run sync with no push or pull
-		annexcommitchan := make(chan RepoFileStatus)
-		go AnnexCommit("COMMIT", annexcommitchan)
-		for comstat := range annexcommitchan {
-			commitchan <- comstat
+		gitaddchan := make(chan RepoFileStatus)
+		go GitAdd(paths, gitaddchan)
+		for addstat := range gitaddchan {
+			addchan <- addstat
 		}
 	}
-
-	return
 }
 
-// Upload adds files to a repository and uploads them.
+// Upload transfers locally recorded changes to a remote.
 // The status channel 'uploadchan' is closed when this function returns.
-func (gincl *Client) Upload(paths []string, commitmsg string, uploadchan chan<- RepoFileStatus) {
+func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 	defer close(uploadchan)
 	util.LogWrite("Upload")
 
@@ -244,25 +231,8 @@ func (gincl *Client) Upload(paths []string, commitmsg string, uploadchan chan<- 
 		return
 	}
 
-	if len(paths) > 0 {
-		// Run git annex add using exclusion filters and then add the rest to git
-		addchan := make(chan RepoFileStatus)
-		go AnnexAdd(paths, addchan)
-		for addstat := range addchan {
-			// Send UploadStatus
-			uploadchan <- addstat
-		}
-
-		addchan = make(chan RepoFileStatus)
-		go GitAdd(paths, addchan)
-		for addstat := range addchan {
-			// Send UploadStatus
-			uploadchan <- addstat
-		}
-	}
-
 	annexpushchan := make(chan RepoFileStatus)
-	go AnnexPush(paths, commitmsg, annexpushchan)
+	go AnnexPush(paths, annexpushchan)
 	for stat := range annexpushchan {
 		uploadchan <- stat
 	}

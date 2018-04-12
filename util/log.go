@@ -23,7 +23,7 @@ func LogInit(ver string) error {
 		return fmt.Errorf("Error creating file %s", logpath)
 	}
 
-	flags := log.Ldate | log.Ltime | log.LUTC | log.Llongfile
+	flags := log.Ldate | log.Ltime | log.LUTC
 	logger = log.New(logfile, "", flags)
 
 	LogWrite("=== LOGINIT ===")

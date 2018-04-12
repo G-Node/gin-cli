@@ -306,16 +306,15 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 	return
 }
 
-// AnnexPush uploads all annexed files.
+// AnnexPush uploads all changes and new content to the default remote.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull; git annex copy --to=origin)
-func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus) {
+func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
 	// NOTE: Using origin which is the conventional default remote. This should change to work with alternate remotes.
 	remote := "origin"
-	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitmsg)}
-	cmd := AnnexCommand(cmdargs...)
+	cmd := AnnexCommand("sync", "--no-pull", "--no-commit") // NEVER commit changes when doing annex-sync
 	stdout, stderr, err := cmd.OutputError()
 	// TODO: Parse git push output for progress
 	if err != nil {
@@ -335,9 +334,7 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 		return
 	}
 
-	cmdargs = []string{"copy", "--json-progress", fmt.Sprintf("--to=%s", remote)}
-	cmdargs = append(cmdargs, paths...)
-	cmd = AnnexCommand(cmdargs...)
+	cmd = AnnexCommand("copy", "--all", "--json-progress", fmt.Sprintf("--to=%s", remote))
 	err = cmd.Start()
 	if err != nil {
 		pushchan <- RepoFileStatus{Err: err}
@@ -384,6 +381,9 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 			}
 		} else {
 			status.FileName = progress.Action.File
+			if status.FileName == "" {
+				status.FileName = progress.Action.Key
+			}
 			status.Progress = progress.PercentProgress
 
 			dbytes := progress.ByteProgress - prevByteProgress
@@ -408,29 +408,24 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 	return
 }
 
-// AnnexCommit performs a commit by calling git-annex-sync, passing a commit message, and disabling both pull and push, so no actual synchronisation happens.
+// GitCommit records changes that have been added to the repository with a given message.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-// The status channel 'commitchan' is closed when this function returns.
-// (git annex sync --no-push --no-pull)
-func AnnexCommit(commitmsg string, commitchan chan<- RepoFileStatus) {
-	defer close(commitchan)
-	cmdargs := []string{"sync", "--no-pull", "--no-push", "--commit", fmt.Sprintf("--message=%s", commitmsg)}
-	cmd := AnnexCommand(cmdargs...)
-	var status RepoFileStatus
-	status.State = "Recording changes"
-	commitchan <- status
+// (git commit)
+func GitCommit(commitmsg string) error {
+	cmd := GitCommand("commit", fmt.Sprintf("--message=%s", commitmsg))
 	stdout, stderr, err := cmd.OutputError()
 
 	if err != nil {
+		if strings.Contains(string(stdout), "nothing to commit") {
+			// eat the error
+			util.LogWrite("Nothing to commit")
+			return nil
+		}
 		util.LogWrite("Error during AnnexCommit")
 		logstd(stdout, stderr)
-		status.Err = fmt.Errorf(string(stderr))
-		commitchan <- status
-		return
+		return fmt.Errorf(string(stderr))
 	}
-	status.Progress = progcomplete
-	commitchan <- status
-	return
+	return nil
 }
 
 // AnnexGet retrieves the content of specified files.
@@ -868,10 +863,11 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 // DescribeIndexShort returns a string which represents a condensed form of the git (annex) index.
 // It is constructed using the result of 'git annex status'.
 // The description is composed of the file count for each status: added, modified, deleted
-func DescribeIndexShort() (string, error) {
+// If 'paths' are specified, the status output is limited to files and directories matching those paths.
+func DescribeIndexShort(paths []string) (string, error) {
 	// TODO: 'git annex status' doesn't list added (A) files when in direct mode.
 	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus([]string{}, statuschan)
+	go AnnexStatus(paths, statuschan)
 	statusmap := make(map[string]int)
 	for item := range statuschan {
 		if item.Err != nil {

@@ -20,32 +20,34 @@ func commit(cmd *cobra.Command, args []string) {
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 
-	lockchan := make(chan ginclient.RepoFileStatus)
-	go gincl.LockContent(args, lockchan)
-	formatOutput(lockchan, jsonout)
+	paths := args
 
+	addchan := make(chan ginclient.RepoFileStatus)
+	go gincl.Add(paths, addchan)
+	formatOutput(addchan, jsonout)
+
+	fmt.Print("Recording changes ")
+	err := ginclient.GitCommit(makeCommitMessage("commit", paths))
+	if err != nil {
+		util.Die(err)
+	}
+	fmt.Println(green("OK"))
+}
+
+func makeCommitMessage(action string, paths []string) (commitmsg string) {
 	// add header commit line
 	hostname, err := os.Hostname()
 	if err != nil {
 		util.LogWrite("Could not retrieve hostname")
 		hostname = unknownhostname
 	}
-	commitmsg := fmt.Sprintf("gin upload from %s\n\n%s", hostname, getchanges())
-	uploadchan := make(chan ginclient.RepoFileStatus)
-	go gincl.Commit(args, commitmsg, uploadchan)
-	formatOutput(uploadchan, jsonout)
-}
-
-func getchanges() string {
-	// TODO FIXME: This function will often return "No changes" when changes are clearly made
-	changes, err := ginclient.DescribeIndexShort()
+	changes, err := ginclient.DescribeIndexShort(paths)
 	if err != nil {
-		util.LogWrite("Failed to determine file changes for commit message")
+		util.LogWrite("Failed to determine changes for commit message")
+		changes = ""
 	}
-	if changes == "" {
-		changes = "No changes recorded"
-	}
-	return changes
+	commitmsg = fmt.Sprintf("gin %s from %s\n\n%s", action, hostname, changes)
+	return
 }
 
 // CommitCmd sets up the 'commit' subcommand
