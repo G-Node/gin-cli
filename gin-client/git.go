@@ -11,11 +11,13 @@ import (
 
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
+	humanize "github.com/dustin/go-humanize"
 )
 
 // Workingdir sets the directory for shell commands
 var Workingdir = "."
-var progcomplete = "100%"
+
+const progcomplete = "100%"
 
 // **************** //
 
@@ -93,13 +95,6 @@ func IsRepo() bool {
 	return yes
 }
 
-func splitRepoParts(repoPath string) (repoOwner, repoName string) {
-	repoPathParts := strings.SplitN(repoPath, "/", 2)
-	repoOwner = repoPathParts[0]
-	repoName = repoPathParts[1]
-	return
-}
-
 // Clone downloads a repository and sets the remote fetch and push urls.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'clonechan' is closed when this function returns.
@@ -120,50 +115,61 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 		clonechan <- RepoFileStatus{Err: ginerror{UError: err.Error(), Origin: fn}}
 		return
 	}
+
+	var line string
+	var stderr []byte
 	var status RepoFileStatus
 	status.State = "Downloading repository"
-	var line, stderr string
 	var rerr error
+	readbuffer := make([]byte, 1024)
+	var nread, errhead int
+	var eob, eof bool
 	// git clone progress prints to stderr
-	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\n') {
-		stderr += line
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
-			continue
+	for eof = false; !eof; nread, rerr = cmd.ErrReader.Read(readbuffer) {
+		if rerr != nil && errhead == len(stderr) {
+			eof = true
 		}
-		words := strings.Fields(line)
-		status.FileName = repoPath
-		if words[0] == "Receiving" && words[1] == "objects" {
-			if len(words) > 2 {
-				status.Progress = words[2]
+		stderr = append(stderr, readbuffer[:nread]...)
+		for eob = false; !eob || errhead < len(stderr); line, eob = cutline(stderr[errhead:]) {
+			if len(line) == 0 {
+				errhead++
+				break
 			}
-			if len(words) > 8 {
-				rate := fmt.Sprintf("%s%s", words[7], words[8])
-				if strings.HasSuffix(rate, ",") {
-					rate = strings.TrimSuffix(rate, ",")
+			errhead += len(line) + 1
+			words := strings.Fields(line)
+			status.FileName = repoPath
+			if strings.HasPrefix(line, "Receiving objects") {
+				if len(words) > 2 {
+					status.Progress = words[2]
 				}
-				status.Rate = rate
+				if len(words) > 8 {
+					rate := fmt.Sprintf("%s%s", words[7], words[8])
+					if strings.HasSuffix(rate, ",") {
+						rate = strings.TrimSuffix(rate, ",")
+					}
+					status.Rate = rate
+				}
 			}
+			clonechan <- status
 		}
-		clonechan <- status
 	}
+	errstring := string(stderr)
 	if err = cmd.Wait(); err != nil {
 		util.LogWrite("Error during clone command")
 		repoOwner, repoName := splitRepoParts(repoPath)
-		gerr := ginerror{UError: stderr, Origin: fn}
-		if strings.Contains(stderr, "does not exist") {
+		gerr := ginerror{UError: errstring, Origin: fn}
+		if strings.Contains(errstring, "does not exist") {
 			gerr.Description = fmt.Sprintf("Repository download failed\n"+
 				"Make sure you typed the repository path correctly\n"+
 				"Type 'gin repos %s' to see if the repository exists and if you have access to it",
 				repoOwner)
-		} else if strings.Contains(stderr, "already exists and is not an empty directory") {
+		} else if strings.Contains(errstring, "already exists and is not an empty directory") {
 			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
 				"'%s' already exists in the current directory and is not empty.", repoName)
-		} else if strings.Contains(stderr, "Host key verification failed") {
+		} else if strings.Contains(errstring, "Host key verification failed") {
 			gerr.Description = "Server key does not match known/configured host key."
 		} else {
-			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", stderr)
-			clonechan <- RepoFileStatus{Err: gerr}
+			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", errstring)
 		}
 		status.Err = gerr
 		clonechan <- status
@@ -254,10 +260,9 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 	var status RepoFileStatus
 	status.State = "Synchronising repository"
 	syncchan <- status
-	var line, stdout string
+	var line string
 	var rerr error
 	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		stdout += line
 		line = strings.TrimSpace(line)
 		if len(line) == 0 {
 			continue
@@ -286,7 +291,6 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 	}
 	if err := cmd.Wait(); err != nil {
 		util.LogWrite("Error during AnnexSync")
-		util.LogWrite("[stdout]\n%s", stdout)
 		util.LogWrite("[stderr]\n%s", stderr)
 		util.LogWrite("[Error]: %v", err)
 	}
@@ -338,6 +342,9 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 	var rerr error
 	var progress annexProgress
 	var getresult annexAction
+
+	var prevByteProgress int
+	var prevT time.Time
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// skip empty lines
@@ -357,7 +364,7 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 			}
 			status.FileName = getresult.File
 			if getresult.Success {
-				status.Progress = "100%"
+				status.Progress = progcomplete
 				status.Err = nil
 			} else {
 				errmsg := getresult.Note
@@ -369,7 +376,13 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 		} else {
 			status.FileName = progress.Action.File
 			status.Progress = progress.PercentProgress
-			status.Rate = fmt.Sprintf("%d/%d", progress.ByteProgress, progress.TotalSize) // calculate rate using d_byteprogress/d_t
+
+			dbytes := progress.ByteProgress - prevByteProgress
+			now := time.Now()
+			dt := now.Sub(prevT)
+			status.Rate = calcRate(dbytes, dt)
+			prevByteProgress = progress.ByteProgress
+			prevT = now
 			status.Err = nil
 		}
 
@@ -406,6 +419,8 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 	var rerr error
 	var progress annexProgress
 	var getresult annexAction
+	var prevByteProgress int
+	var prevT time.Time
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// skip empty lines
@@ -425,7 +440,7 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 			}
 			status.FileName = getresult.File
 			if getresult.Success {
-				status.Progress = "100%"
+				status.Progress = progcomplete
 				status.Err = nil
 			} else {
 				errmsg := getresult.Note
@@ -437,7 +452,12 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 		} else {
 			status.FileName = progress.Action.File
 			status.Progress = progress.PercentProgress
-			status.Rate = fmt.Sprintf("%d/%d", progress.ByteProgress, progress.TotalSize) // calculate rate using d_byteprogress/d_t
+			dbytes := progress.ByteProgress - prevByteProgress
+			now := time.Now()
+			dt := now.Sub(prevT)
+			status.Rate = calcRate(dbytes, dt)
+			prevByteProgress = progress.ByteProgress
+			prevT = now
 			status.Err = nil
 		}
 
@@ -515,23 +535,6 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 		util.LogWrite("[stderr]\n%s", string(stderr))
 	}
 	return
-}
-
-func setBare(state bool) error {
-	var statestr string
-	if state {
-		statestr = "true"
-	} else {
-		statestr = "false"
-	}
-	cmd := GitCommand("config", "--local", "--bool", "core.bare", statestr)
-	stdout, stderr, err := cmd.OutputError()
-	if err != nil {
-		util.LogWrite("Error switching bare status to %s", statestr)
-		logstd(stdout, stderr)
-		err = fmt.Errorf(string(stderr))
-	}
-	return err
 }
 
 // GitLsFiles lists all files known to git.
@@ -879,19 +882,6 @@ func DescribeIndex() (string, error) {
 	_, _ = changesBuffer.WriteString(makeFileList("Untracked files ", statusmap["?"]))
 
 	return changesBuffer.String(), nil
-}
-
-func makeFileList(header string, fnames []string) string {
-	if len(fnames) == 0 {
-		return ""
-	}
-	var filelist bytes.Buffer
-	_, _ = filelist.WriteString(fmt.Sprintf("%s (%d)\n", header, len(fnames)))
-	for idx, name := range fnames {
-		_, _ = filelist.WriteString(fmt.Sprintf("  %d: %s\n", idx+1, name))
-	}
-	_, _ = filelist.WriteString("\n")
-	return filelist.String()
 }
 
 // AnnexLock locks the specified files and directory contents if they are annexed.
@@ -1312,12 +1302,6 @@ func IsDirect() bool {
 	return false
 }
 
-//isAnnexPath returns true if a given string represents the path to an annex object.
-func isAnnexPath(path string) bool {
-	// TODO: Check paths on Windows
-	return strings.Contains(path, ".git/annex/objects")
-}
-
 // IsVersion6 returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
@@ -1381,6 +1365,78 @@ func GetAnnexVersion() (string, error) {
 	return string(stdout), nil
 }
 
+// Local utility functions
+
 func logstd(out, err []byte) {
 	util.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
+}
+
+func splitRepoParts(repoPath string) (repoOwner, repoName string) {
+	repoPathParts := strings.SplitN(repoPath, "/", 2)
+	repoOwner = repoPathParts[0]
+	repoName = repoPathParts[1]
+	return
+}
+
+func cutline(b []byte) (string, bool) {
+	idx := -1
+	cridx := bytes.IndexByte(b, '\r')
+	nlidx := bytes.IndexByte(b, '\n')
+	if cridx > 0 {
+		idx = cridx
+	} else {
+		cridx = len(b) + 1
+	}
+	if nlidx > 0 && nlidx < cridx {
+		idx = nlidx
+	}
+	if idx <= 0 {
+		return string(b), true
+	}
+	return string(b[:idx]), false
+}
+
+func setBare(state bool) error {
+	var statestr string
+	if state {
+		statestr = "true"
+	} else {
+		statestr = "false"
+	}
+	cmd := GitCommand("config", "--local", "--bool", "core.bare", statestr)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		util.LogWrite("Error switching bare status to %s", statestr)
+		logstd(stdout, stderr)
+		err = fmt.Errorf(string(stderr))
+	}
+	return err
+}
+
+func makeFileList(header string, fnames []string) string {
+	if len(fnames) == 0 {
+		return ""
+	}
+	var filelist bytes.Buffer
+	_, _ = filelist.WriteString(fmt.Sprintf("%s (%d)\n", header, len(fnames)))
+	for idx, name := range fnames {
+		_, _ = filelist.WriteString(fmt.Sprintf("  %d: %s\n", idx+1, name))
+	}
+	_, _ = filelist.WriteString("\n")
+	return filelist.String()
+}
+
+//isAnnexPath returns true if a given string represents the path to an annex object.
+func isAnnexPath(path string) bool {
+	// TODO: Check paths on Windows
+	return strings.Contains(path, ".git/annex/objects")
+}
+
+func calcRate(dbytes int, dt time.Duration) string {
+	dtns := dt.Nanoseconds()
+	if dtns <= 0 || dbytes <= 0 {
+		return ""
+	}
+	rate := int64(dbytes) * 1000000000 / dtns
+	return fmt.Sprintf("%s/s", humanize.IBytes(uint64(rate)))
 }
