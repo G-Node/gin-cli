@@ -195,7 +195,7 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 
 // Add updates the index with the changes in the files specified by 'paths'.
 // The status channel 'addchan' is closed when this function returns.
-func (gincl *Client) Add(paths []string, addchan chan<- RepoFileStatus) {
+func Add(paths []string, addchan chan<- RepoFileStatus) {
 	defer close(addchan)
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
