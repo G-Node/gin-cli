@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -351,6 +352,12 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 
 	var prevByteProgress int
 	var prevT time.Time
+
+	// 'git-annex copy --all' copies all local keys to the server.
+	// When no filenames are specified, the command doesn't print filenames, just keys.
+	// getAnnexMetadataNames gives us a key:name map
+	annexitems := getAnnexMetadataNames()
+	var currentkey = ""
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// skip empty lines
@@ -358,6 +365,7 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 		}
 		err := json.Unmarshal(outline, &progress)
 		if err != nil || progress == (annexProgress{}) {
+			time.Sleep(1 * time.Second)
 			// File done? Check if succeeded and continue to next line
 			err = json.Unmarshal(outline, &getresult)
 			if err != nil || getresult == (annexAction{}) {
@@ -380,10 +388,22 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 				status.Err = fmt.Errorf("failed: %s", errmsg)
 			}
 		} else {
-			status.FileName = progress.Action.File
-			if status.FileName == "" {
-				status.FileName = progress.Action.Key
+			key := progress.Action.Key
+			if currentkey != key {
+				// determine new name
+				if progress.Action.File != "" {
+					// Copy command knows the filename
+					status.FileName = progress.Action.File
+				} else if fname, ok := annexitems[key]; ok {
+					// Check result of annexitems
+					status.FileName = fname
+				} else {
+					// Give up and print the key
+					status.FileName = key
+				}
+				currentkey = key
 			}
+			// otherwise the same name as before is used
 			status.Progress = progress.PercentProgress
 
 			dbytes := progress.ByteProgress - prevByteProgress
@@ -406,6 +426,45 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 		util.LogWrite(string(stderr))
 	}
 	return
+}
+
+// AnnexFindRes holds the result of a git annex find invocation for one file.
+type AnnexFindRes struct {
+	Hashdirlower string
+	Hashdirmixed string
+	Key          string
+	Humansize    string
+	Backend      string
+	File         string
+	Keyname      string
+	Bytesize     string
+	Mtime        string
+}
+
+// AnnexFind lists available annexed files in the current directory.
+// Specifying 'paths' limits the search to files matching a given path.
+// Returned items are indexed by their annex key.
+// git annex find)
+func AnnexFind(paths []string) (map[string]AnnexFindRes, error) {
+	cmdargs := []string{"find", "--json"}
+	if len(paths) > 0 {
+		cmdargs = append(cmdargs, paths...)
+	}
+	cmd := AnnexCommand(cmdargs...)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+		return nil, fmt.Errorf(string(stderr))
+	}
+
+	outlines := bytes.Split(stdout, []byte("\n"))
+	items := make(map[string]AnnexFindRes, len(outlines))
+	for _, line := range outlines {
+		var afr AnnexFindRes
+		json.Unmarshal(line, &afr)
+		items[afr.Key] = afr
+	}
+	return items, nil
 }
 
 // GitCommit records changes that have been added to the repository with a given message.
@@ -735,6 +794,11 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 	if update {
 		status.State = "Locking"
 	}
+
+	// Start the metadata setter routine
+	mdchan := make(chan string)
+	defer close(mdchan)
+	go setAnnexMetadataName(mdchan)
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// Empty line output. Ignore
@@ -753,6 +817,8 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		if addresult.Success {
 			util.LogWrite("%s added to annex", addresult.File)
 			status.Err = nil
+			// Write filename metadata key
+			mdchan <- status.FileName
 		} else {
 			util.LogWrite("Error adding %s", addresult.File)
 			status.Err = fmt.Errorf("failed")
@@ -769,6 +835,62 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		logstd(nil, stderr)
 	}
 	return
+}
+
+// setAnnexMetadataName starts a routine and waits for input on the provided channel.
+// For each path specified, the name of the file is added to the metadata of the annexed file.
+// The function exits when the channel is closed.
+func setAnnexMetadataName(pathchan <-chan string) {
+	for path := range pathchan {
+		_, fname := filepath.Split(path)
+		cmd := AnnexCommand("metadata", fmt.Sprintf("--set=ginfilename=%s", fname), path)
+		stdout, stderr, err := cmd.OutputError()
+		if err != nil {
+			logstd(stdout, stderr)
+		} else {
+			util.LogWrite("ginfilename metadata key set to %s", fname)
+		}
+	}
+	return
+}
+
+type annexMetadata struct {
+	annexAction
+	Fields struct {
+		Lastchanged    []string
+		Ginfilename    []string
+		GinefilenameLC []string `json:"ginfilename-lastchanged"`
+	}
+}
+
+// getAnnexMetadataNames constructs a key:name map from the metadata stored in annexed files or the current filename, if the key is still in use.
+// If an unused key does not have a name associated with it, the name is left empty.
+func getAnnexMetadataNames() map[string]string {
+	cmd := AnnexCommand("metadata", "--json", "-A")
+	err := cmd.Start()
+	if err != nil {
+		util.LogWrite("Error retrieving annexed content metadata")
+		return nil
+	}
+
+	var line string
+	var rerr error
+	names := make(map[string]string)
+	var annexmd annexMetadata
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		json.Unmarshal([]byte(line), &annexmd)
+		key := annexmd.Key
+		name := annexmd.File
+		if name == "" && len(annexmd.Fields.Ginfilename) > 0 {
+			name = annexmd.Fields.Ginfilename[0]
+		}
+		names[key] = name
+	}
+	return names
 }
 
 // AnnexAdd adds paths to the annex.
