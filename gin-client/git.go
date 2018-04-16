@@ -412,6 +412,15 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git commit)
 func GitCommit(commitmsg string) error {
+	if IsDirect() {
+		// Set bare false and revert at the end of the function
+		err := setBare(false)
+		if err != nil {
+			return fmt.Errorf("failed to toggle repository bare mode")
+		}
+		defer setBare(true)
+	}
+
 	cmd := GitCommand("commit", fmt.Sprintf("--message=%s", commitmsg))
 	stdout, stderr, err := cmd.OutputError()
 
@@ -421,7 +430,7 @@ func GitCommit(commitmsg string) error {
 			util.LogWrite("Nothing to commit")
 			return nil
 		}
-		util.LogWrite("Error during AnnexCommit")
+		util.LogWrite("Error during GitCommit")
 		logstd(stdout, stderr)
 		return fmt.Errorf(string(stderr))
 	}
