@@ -21,16 +21,19 @@ func upload(cmd *cobra.Command, args []string) {
 
 	paths := args
 
-	addchan := make(chan ginclient.RepoFileStatus)
-	go ginclient.Add(paths, addchan)
-	formatOutput(addchan, jsonout)
+	if len(paths) > 0 {
+		// Don't add + commit files if nothing was specified
+		addchan := make(chan ginclient.RepoFileStatus)
+		go ginclient.Add(paths, addchan)
+		formatOutput(addchan, jsonout)
 
-	fmt.Print("Recording changes ")
-	err := ginclient.GitCommit(makeCommitMessage("upload", paths))
-	if err != nil {
-		util.Die(err)
+		fmt.Print("Recording changes ")
+		err := ginclient.GitCommit(makeCommitMessage("upload", paths))
+		if err != nil {
+			util.Die(err)
+		}
+		fmt.Println(green("OK"))
 	}
-	fmt.Println(green("OK"))
 
 	uploadchan := make(chan ginclient.RepoFileStatus)
 	go gincl.Upload(paths, uploadchan)
