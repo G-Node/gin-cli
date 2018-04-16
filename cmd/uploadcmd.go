@@ -22,7 +22,7 @@ func upload(cmd *cobra.Command, args []string) {
 	paths := args
 
 	addchan := make(chan ginclient.RepoFileStatus)
-	go gincl.Add(paths, addchan)
+	go ginclient.Add(paths, addchan)
 	formatOutput(addchan, jsonout)
 
 	fmt.Print("Recording changes ")

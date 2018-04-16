@@ -11,19 +11,13 @@ import (
 
 func commit(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(cmd, gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 
-	gincl.GitHost = util.Config.GitHost
-	gincl.GitUser = util.Config.GitUser
-
 	paths := args
-
 	addchan := make(chan ginclient.RepoFileStatus)
-	go gincl.Add(paths, addchan)
+	go ginclient.Add(paths, addchan)
 	formatOutput(addchan, jsonout)
 
 	fmt.Print("Recording changes ")
