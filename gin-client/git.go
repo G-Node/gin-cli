@@ -390,16 +390,11 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 		} else {
 			key := progress.Action.Key
 			if currentkey != key {
-				// determine new name
-				if progress.Action.File != "" {
-					// Copy command knows the filename
-					status.FileName = progress.Action.File
-				} else if fname, ok := annexitems[key]; ok {
-					// Check result of annexitems
-					status.FileName = fname
+				if finfo, ok := annexitems[key]; ok {
+					timestamp := finfo.ModTime.Format("2006-01-02 15:04:05")
+					status.FileName = fmt.Sprintf("%s (version: %s)", finfo.FileName, timestamp)
 				} else {
-					// Give up and print the key
-					status.FileName = key
+					status.FileName = "(unknown)"
 				}
 				currentkey = key
 			}
@@ -415,7 +410,10 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 			status.Err = nil
 		}
 
-		pushchan <- status
+		// Don't push message if no filename was set
+		if status.FileName != "" {
+			pushchan <- status
+		}
 	}
 	if cmd.Wait() != nil {
 		var stderr, errline []byte
@@ -863,9 +861,15 @@ type annexMetadata struct {
 	}
 }
 
+type annexFilenameDate struct {
+	Key      string
+	FileName string
+	ModTime  time.Time
+}
+
 // getAnnexMetadataNames constructs a key:name map from the metadata stored in annexed files or the current filename, if the key is still in use.
 // If an unused key does not have a name associated with it, the name is left empty.
-func getAnnexMetadataNames() map[string]string {
+func getAnnexMetadataNames() map[string]annexFilenameDate {
 	cmd := AnnexCommand("metadata", "--json", "-A")
 	err := cmd.Start()
 	if err != nil {
@@ -875,7 +879,7 @@ func getAnnexMetadataNames() map[string]string {
 
 	var line string
 	var rerr error
-	names := make(map[string]string)
+	names := make(map[string]annexFilenameDate)
 	var annexmd annexMetadata
 	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
 		line = strings.TrimSpace(line)
@@ -887,8 +891,9 @@ func getAnnexMetadataNames() map[string]string {
 		name := annexmd.File
 		if name == "" && len(annexmd.Fields.Ginfilename) > 0 {
 			name = annexmd.Fields.Ginfilename[0]
+			modtime, _ := time.Parse("2006-01-02@15-04-05", annexmd.Fields.GinefilenameLC[0])
+			names[key] = annexFilenameDate{Key: key, FileName: name, ModTime: modtime}
 		}
-		names[key] = name
 	}
 	return names
 }
