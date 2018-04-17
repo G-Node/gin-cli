@@ -33,3 +33,9 @@ func (cmd *GinCmd) OutputError() ([]byte, []byte, error) {
 	err := cmd.Run()
 	return bout.Bytes(), berr.Bytes(), err
 }
+
+// Output runs the command and returns its standard output.
+func (cmd *GinCmd) Output() ([]byte, error) {
+	cmd.Stdout = nil
+	return cmd.Cmd.Output()
+}
