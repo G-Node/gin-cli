@@ -355,8 +355,7 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 
 	// 'git-annex copy --all' copies all local keys to the server.
 	// When no filenames are specified, the command doesn't print filenames, just keys.
-	// getAnnexMetadataNames gives us a key:name map
-	annexitems := getAnnexMetadataNames()
+	// getAnnexMetadataName gives us the original filename and the time it was set.
 	var currentkey = ""
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
@@ -390,9 +389,9 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 		} else {
 			key := progress.Action.Key
 			if currentkey != key {
-				if finfo, ok := annexitems[key]; ok {
-					timestamp := finfo.ModTime.Format("2006-01-02 15:04:05")
-					status.FileName = fmt.Sprintf("%s (version: %s)", finfo.FileName, timestamp)
+				if md := getAnnexMetadataName(key); md.FileName != "" {
+					timestamp := md.ModTime.Format("2006-01-02 15:04:05")
+					status.FileName = fmt.Sprintf("%s (version: %s)", md.FileName, timestamp)
 				} else {
 					status.FileName = "(unknown)"
 				}
@@ -867,35 +866,24 @@ type annexFilenameDate struct {
 	ModTime  time.Time
 }
 
-// getAnnexMetadataNames constructs a key:name map from the metadata stored in annexed files or the current filename, if the key is still in use.
-// If an unused key does not have a name associated with it, the name is left empty.
-func getAnnexMetadataNames() map[string]annexFilenameDate {
-	cmd := AnnexCommand("metadata", "--json", "-A")
-	err := cmd.Start()
+// getAnnexMetadataName returns the filename, key, and last modification time stored in the metadata of an annexed file given the key.
+// If an unused key does not have a name associated with it, the filename will be empty.
+func getAnnexMetadataName(key string) annexFilenameDate {
+	cmd := AnnexCommand("metadata", "--json", fmt.Sprintf("--key=%s", key))
+	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error retrieving annexed content metadata")
-		return nil
+		logstd(stdout, stderr)
+		return annexFilenameDate{}
 	}
-
-	var line string
-	var rerr error
-	names := make(map[string]annexFilenameDate)
 	var annexmd annexMetadata
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		}
-		json.Unmarshal([]byte(line), &annexmd)
-		key := annexmd.Key
-		name := annexmd.File
-		if name == "" && len(annexmd.Fields.Ginfilename) > 0 {
-			name = annexmd.Fields.Ginfilename[0]
-			modtime, _ := time.Parse("2006-01-02@15-04-05", annexmd.Fields.GinefilenameLC[0])
-			names[key] = annexFilenameDate{Key: key, FileName: name, ModTime: modtime}
-		}
+	json.Unmarshal(bytes.TrimSpace(stdout), &annexmd)
+	if len(annexmd.Fields.Ginfilename) > 0 {
+		name := annexmd.Fields.Ginfilename[0]
+		modtime, _ := time.Parse("2006-01-02@15-04-05", annexmd.Fields.GinefilenameLC[0])
+		return annexFilenameDate{Key: key, FileName: name, ModTime: modtime}
 	}
-	return names
+	return annexFilenameDate{Key: key, FileName: annexmd.File}
 }
 
 // AnnexAdd adds paths to the annex.
