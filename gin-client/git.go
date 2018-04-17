@@ -64,7 +64,7 @@ func CommitIfNew() (bool, error) {
 		return false, fmt.Errorf("not a repository")
 	}
 	cmd := GitCommand("rev-parse", "HEAD")
-	err := cmd.Wait()
+	err := cmd.Run()
 	if err == nil {
 		// All good. No need to do anything
 		return false, nil
