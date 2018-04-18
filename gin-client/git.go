@@ -57,9 +57,10 @@ func AddRemote(name, url string) error {
 }
 
 // CommitIfNew creates an empty initial git commit if the current repository is completely new.
+// If 'upstream' is not an empty string, and an initial commit was created, it sets the current branch to track the same-named branch at the specified remote.
 // Returns 'true' if (and only if) a commit was created.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func CommitIfNew() (bool, error) {
+func CommitIfNew(upstream string) (bool, error) {
 	if !IsRepo() {
 		return false, fmt.Errorf("not a repository")
 	}
@@ -75,9 +76,20 @@ func CommitIfNew() (bool, error) {
 	if err != nil {
 		hostname = unknownhostname
 	}
-	commitargs := []string{"commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname)}
-	cmd = GitCommand(commitargs...)
+	cmd = GitCommand("commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
 	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		util.LogWrite("Error while creating initial commit")
+		logstd(stdout, stderr)
+		return false, fmt.Errorf(string(stderr))
+	}
+
+	if upstream == "" {
+		return true, nil
+	}
+
+	cmd = GitCommand("push", "--set-upstream", upstream, "HEAD")
+	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error while creating initial commit")
 		logstd(stdout, stderr)

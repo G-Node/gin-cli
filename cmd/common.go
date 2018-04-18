@@ -58,8 +58,10 @@ func printProgressOutput(statuschan <-chan ginclient.RepoFileStatus) (filesucces
 	var lastprint string
 	outline := new(bytes.Buffer)
 	outappend := func(part string) {
-		outline.WriteString(part)
-		outline.WriteString(" ")
+		if len(part) > 0 {
+			outline.WriteString(part)
+			outline.WriteString(" ")
+		}
 	}
 	for stat := range statuschan {
 		outline.Reset()

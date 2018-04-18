@@ -28,6 +28,8 @@ func getRepo(cmd *cobra.Command, args []string) {
 	clonechan := make(chan ginclient.RepoFileStatus)
 	go gincl.CloneRepo(repostr, clonechan)
 	formatOutput(clonechan, jsonout)
+	_, err := ginclient.CommitIfNew("origin")
+	util.CheckError(err)
 }
 
 // GetCmd sets up the 'get' repository subcommand
