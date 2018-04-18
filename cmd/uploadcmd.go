@@ -28,10 +28,8 @@ func upload(cmd *cobra.Command, args []string) {
 		formatOutput(addchan, jsonout)
 
 		fmt.Print("Recording changes ")
-		err := ginclient.GitCommit(makeCommitMessage("upload", paths))
-		if err != nil {
-			util.Die(err)
-		}
+		// ignore error for now :: call commit() instead
+		ginclient.GitCommit(makeCommitMessage("upload", paths))
 		fmt.Println(green("OK"))
 	}
 
