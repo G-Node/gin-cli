@@ -182,6 +182,9 @@ func SetUpCommands(verstr string) *cobra.Command {
 	// Logout
 	rootCmd.AddCommand(LogoutCmd())
 
+	// Init repo
+	rootCmd.AddCommand(InitCmd())
+
 	// Create repo
 	rootCmd.AddCommand(CreateCmd())
 
