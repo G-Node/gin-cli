@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
 )
@@ -12,7 +13,7 @@ func upload(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	gincl := ginclient.New(util.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
-	if !ginclient.IsRepo() {
+	if !git.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 
@@ -23,17 +24,17 @@ func upload(cmd *cobra.Command, args []string) {
 
 	if len(paths) > 0 {
 		// Don't add + commit files if nothing was specified
-		addchan := make(chan ginclient.RepoFileStatus)
+		addchan := make(chan git.RepoFileStatus)
 		go ginclient.Add(paths, addchan)
 		formatOutput(addchan, jsonout)
 
 		fmt.Print("Recording changes ")
 		// ignore error for now :: call commit() instead
-		ginclient.GitCommit(makeCommitMessage("upload", paths))
+		git.GitCommit(makeCommitMessage("upload", paths))
 		fmt.Println(green("OK"))
 	}
 
-	uploadchan := make(chan ginclient.RepoFileStatus)
+	uploadchan := make(chan git.RepoFileStatus)
 	go gincl.Upload(paths, uploadchan)
 	formatOutput(uploadchan, jsonout)
 }

@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
 )
 
 func lsRepo(cmd *cobra.Command, args []string) {
-	if !ginclient.IsRepo() {
+	if !git.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 

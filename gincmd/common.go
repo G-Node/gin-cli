@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/bbrks/wrap"
 	"github.com/docker/docker/pkg/term"
@@ -39,7 +40,7 @@ func usageDie(cmd *cobra.Command) {
 	util.Die("")
 }
 
-func printJSON(statuschan <-chan ginclient.RepoFileStatus) (filesuccess map[string]bool) {
+func printJSON(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
 	for stat := range statuschan {
 		j, _ := json.Marshal(stat)
@@ -52,7 +53,7 @@ func printJSON(statuschan <-chan ginclient.RepoFileStatus) (filesuccess map[stri
 	return
 }
 
-func printProgressOutput(statuschan <-chan ginclient.RepoFileStatus) (filesuccess map[string]bool) {
+func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
 	var fname, state string
 	var lastprint string
@@ -101,7 +102,7 @@ func printProgressOutput(statuschan <-chan ginclient.RepoFileStatus) (filesucces
 	return
 }
 
-func formatOutput(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
+func formatOutput(statuschan <-chan git.RepoFileStatus, jsonout bool) {
 	var filesuccess map[string]bool
 	if jsonout {
 		filesuccess = printJSON(statuschan)

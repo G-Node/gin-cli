@@ -11,12 +11,26 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/gogits/go-gogs-client"
 )
 
 const unknownhostname = "(unknown)"
+
+// Workingdir sets the directory for shell commands
+var Workingdir = "."
+
+//isAnnexPath returns true if a given string represents the path to an annex object.
+func isAnnexPath(path string) bool {
+	// TODO: Check paths on Windows
+	return strings.Contains(path, ".git/annex/objects")
+}
+
+func logstd(out, err []byte) {
+	util.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
+}
 
 // MakeSessionKey creates a private+public key pair.
 // The private key is saved in the user's configuration directory, to be used for git commands.
@@ -160,56 +174,26 @@ func (gincl *Client) DelRepo(name string) error {
 	return nil
 }
 
-// RepoFileStatus describes the status of files when being added to the repo or transfered to/from remotes.
-type RepoFileStatus struct {
-	// The name of the file.
-	FileName string `json:"filename"`
-	// The state of the operation.
-	State string `json:"state"`
-	// Progress of the operation, if available. If partial progress isn't available or applicable, this will be empty.
-	Progress string `json:"progress"`
-	// The data rate, if available.
-	Rate string `json:"rate"`
-	// Errors
-	Err error `json:"err"`
-}
-
-// MarshalJSON overrides the default marshalling of RepoFileStatus to return the error string for the Err field.
-func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
-	type RFSAlias RepoFileStatus
-	errmsg := ""
-	if s.Err != nil {
-		errmsg = s.Err.Error()
-	}
-	return json.Marshal(struct {
-		RFSAlias
-		Err string `json:"err"`
-	}{
-		RFSAlias: RFSAlias(s),
-		Err:      errmsg,
-	})
-}
-
 // Add updates the index with the changes in the files specified by 'paths'.
 // The status channel 'addchan' is closed when this function returns.
-func Add(paths []string, addchan chan<- RepoFileStatus) {
+func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 	defer close(addchan)
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
-		addchan <- RepoFileStatus{Err: err}
+		addchan <- git.RepoFileStatus{Err: err}
 		return
 	}
 
 	if len(paths) > 0 {
 		// Run git annex add using exclusion filters and then add the rest to git
-		annexaddchan := make(chan RepoFileStatus)
-		go AnnexAdd(paths, annexaddchan)
+		annexaddchan := make(chan git.RepoFileStatus)
+		go git.AnnexAdd(paths, annexaddchan)
 		for addstat := range annexaddchan {
 			addchan <- addstat
 		}
 
-		gitaddchan := make(chan RepoFileStatus)
-		go GitAdd(paths, gitaddchan)
+		gitaddchan := make(chan git.RepoFileStatus)
+		go git.GitAdd(paths, gitaddchan)
 		for addstat := range gitaddchan {
 			addchan <- addstat
 		}
@@ -218,18 +202,18 @@ func Add(paths []string, addchan chan<- RepoFileStatus) {
 
 // Upload transfers locally recorded changes to a remote.
 // The status channel 'uploadchan' is closed when this function returns.
-func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
+func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus) {
 	defer close(uploadchan)
 	util.LogWrite("Upload")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
-		uploadchan <- RepoFileStatus{Err: err}
+		uploadchan <- git.RepoFileStatus{Err: err}
 		return
 	}
 
-	annexpushchan := make(chan RepoFileStatus)
-	go AnnexPush(paths, annexpushchan)
+	annexpushchan := make(chan git.RepoFileStatus)
+	go git.AnnexPush(paths, annexpushchan)
 	for stat := range annexpushchan {
 		uploadchan <- stat
 	}
@@ -238,19 +222,19 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 
 // GetContent downloads the contents of placeholder files in a checked out repository.
 // The status channel 'getcontchan' is closed when this function returns.
-func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatus) {
+func (gincl *Client) GetContent(paths []string, getcontchan chan<- git.RepoFileStatus) {
 	defer close(getcontchan)
 	util.LogWrite("GetContent")
 
 	paths, err := util.ExpandGlobs(paths)
 
 	if err != nil {
-		getcontchan <- RepoFileStatus{Err: err}
+		getcontchan <- git.RepoFileStatus{Err: err}
 		return
 	}
 
-	annexgetchan := make(chan RepoFileStatus)
-	go AnnexGet(paths, annexgetchan)
+	annexgetchan := make(chan git.RepoFileStatus)
+	go git.AnnexGet(paths, annexgetchan)
 	for stat := range annexgetchan {
 		getcontchan <- stat
 	}
@@ -259,18 +243,18 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- RepoFileStatu
 
 // RemoveContent removes the contents of local files, turning them into placeholders but only if the content is available on a remote.
 // The status channel 'rmcchan' is closed when this function returns.
-func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- RepoFileStatus) {
+func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- git.RepoFileStatus) {
 	defer close(rmcchan)
 	util.LogWrite("RemoveContent")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
-		rmcchan <- RepoFileStatus{Err: err}
+		rmcchan <- git.RepoFileStatus{Err: err}
 		return
 	}
 
-	dropchan := make(chan RepoFileStatus)
-	go AnnexDrop(paths, dropchan)
+	dropchan := make(chan git.RepoFileStatus)
+	go git.AnnexDrop(paths, dropchan)
 	for stat := range dropchan {
 		rmcchan <- stat
 	}
@@ -279,18 +263,18 @@ func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- RepoFileStatus
 
 // LockContent locks local files, turning them into symlinks (if supported by the filesystem).
 // The status channel 'lockchan' is closed when this function returns.
-func (gincl *Client) LockContent(paths []string, lcchan chan<- RepoFileStatus) {
+func (gincl *Client) LockContent(paths []string, lcchan chan<- git.RepoFileStatus) {
 	defer close(lcchan)
 	util.LogWrite("LockContent")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
-		lcchan <- RepoFileStatus{Err: err}
+		lcchan <- git.RepoFileStatus{Err: err}
 		return
 	}
 
-	lockchan := make(chan RepoFileStatus)
-	go AnnexLock(paths, lockchan)
+	lockchan := make(chan git.RepoFileStatus)
+	go git.AnnexLock(paths, lockchan)
 	for stat := range lockchan {
 		lcchan <- stat
 	}
@@ -299,18 +283,18 @@ func (gincl *Client) LockContent(paths []string, lcchan chan<- RepoFileStatus) {
 
 // UnlockContent unlocks local files turning them into normal files, if the content is locally available.
 // The status channel 'unlockchan' is closed when this function returns.
-func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- RepoFileStatus) {
+func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileStatus) {
 	defer close(ulcchan)
 	util.LogWrite("UnlockContent")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
-		ulcchan <- RepoFileStatus{Err: err}
+		ulcchan <- git.RepoFileStatus{Err: err}
 		return
 	}
 
-	unlockchan := make(chan RepoFileStatus)
-	go AnnexUnlock(paths, unlockchan)
+	unlockchan := make(chan git.RepoFileStatus)
+	go git.AnnexUnlock(paths, unlockchan)
 	for stat := range unlockchan {
 		ulcchan <- stat
 	}
@@ -321,15 +305,15 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- RepoFileStatus
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) Download() error {
 	util.LogWrite("Download")
-	return AnnexPull()
+	return git.AnnexPull()
 }
 
 // CloneRepo clones a remote repository and initialises annex.
 // The status channel 'clonechan' is closed when this function returns.
-func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus) {
+func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileStatus) {
 	defer close(clonechan)
 	util.LogWrite("CloneRepo")
-	clonestatus := make(chan RepoFileStatus)
+	clonestatus := make(chan git.RepoFileStatus)
 	go gincl.Clone(repoPath, clonestatus)
 	for stat := range clonestatus {
 		clonechan <- stat
@@ -338,9 +322,12 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 		}
 	}
 	_, repoName := splitRepoParts(repoPath)
-	Workingdir = repoName
 
-	status := RepoFileStatus{State: "Initialising local storage"}
+	// TODO: Needs to change
+	Workingdir = repoName
+	git.Workingdir = repoName
+
+	status := git.RepoFileStatus{State: "Initialising local storage"}
 	clonechan <- status
 	err := gincl.InitDir()
 	if err != nil {
@@ -355,7 +342,7 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 
 // CheckoutVersion checks out all files specified by paths from the revision with the specified commithash.
 func CheckoutVersion(commithash string, paths []string) error {
-	return GitCheckout(commithash, paths)
+	return git.GitCheckout(commithash, paths)
 }
 
 // FileCheckoutStatus is used to report the status of a CheckoutFileCopies() operation.
@@ -371,7 +358,7 @@ type FileCheckoutStatus struct {
 // The timestamp of the revision is appended to the original filenames.
 func CheckoutFileCopies(commithash string, paths []string, outpath string, suffix string, cochan chan<- FileCheckoutStatus) {
 	defer close(cochan)
-	objects, err := GitLsTree(commithash, paths)
+	objects, err := git.GitLsTree(commithash, paths)
 	if err != nil {
 		cochan <- FileCheckoutStatus{Err: err}
 		return
@@ -388,7 +375,7 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 			status.Destination = outfile
 
 			// determine if it's an annexed link
-			content, cerr := GitCatFileContents(commithash, obj.Name)
+			content, cerr := git.GitCatFileContents(commithash, obj.Name)
 			if cerr != nil {
 				cochan <- FileCheckoutStatus{Err: cerr}
 				return
@@ -402,7 +389,7 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 				if isAnnexPath(linkdst) {
 					status.Type = "Annex"
 					_, key := path.Split(linkdst)
-					fkerr := AnnexFromKey(key, outfile)
+					fkerr := git.AnnexFromKey(key, outfile)
 					if fkerr != nil {
 						status.Err = fmt.Errorf("Error creating placeholder file %s: %s", outfile, fkerr.Error())
 					}
@@ -425,15 +412,15 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 // AddRemote constructs the proper remote URL given a repository path (user/reponame) and adds it as a named remote to the repository configuration.
 func (gincl *Client) AddRemote(name, repopath string) error {
 	remotepath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repopath)
-	return AddRemote(name, remotepath)
+	return git.AddRemote(name, remotepath)
 }
 
 // InitDir initialises the local directory with the default remote and annex configuration.
 // The status channel 'initchan' is closed when this function returns.
 func (gincl *Client) InitDir() error {
 	initerr := ginerror{Origin: "InitDir", Description: "Error initialising local directory"}
-	if !IsRepo() {
-		cmd := GitCommand("init")
+	if !git.IsRepo() {
+		cmd := git.GitCommand("init")
 		stdout, stderr, err := cmd.OutputError()
 		if err != nil {
 			util.LogWrite("Error during Init command: %s", string(stderr))
@@ -451,9 +438,9 @@ func (gincl *Client) InitDir() error {
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 
 	// If there is no global git user.name or user.email set local ones
-	cmd := GitCommand("config", "--global", "user.name")
+	cmd := git.GitCommand("config", "--global", "user.name")
 	globalGitName, _ := cmd.Output()
-	cmd = GitCommand("config", "--global", "user.email")
+	cmd = git.GitCommand("config", "--global", "user.email")
 	globalGitEmail, _ := cmd.Output()
 	if len(globalGitName) == 0 && len(globalGitEmail) == 0 {
 		info, ierr := gincl.RequestAccount(gincl.Username)
@@ -461,7 +448,7 @@ func (gincl *Client) InitDir() error {
 		if ierr != nil || name == "" {
 			name = gincl.Username
 		}
-		ierr = SetGitUser(name, info.Email)
+		ierr = git.SetGitUser(name, info.Email)
 		if ierr != nil {
 			util.LogWrite("Failed to set local git user configuration")
 		}
@@ -469,10 +456,10 @@ func (gincl *Client) InitDir() error {
 	if runtime.GOOS == "windows" {
 		// force disable symlinks even if user can create them
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
-		GitCommand("config", "--local", "core.symlinks", "false").Run()
+		git.GitCommand("config", "--local", "core.symlinks", "false").Run()
 	}
 
-	err = AnnexInit(description)
+	err = git.AnnexInit(description)
 	if err != nil {
 		initerr.UError = err.Error()
 		return initerr
@@ -573,8 +560,8 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
-	wichan := make(chan AnnexWhereisRes)
-	go AnnexWhereis(paths, wichan)
+	wichan := make(chan git.AnnexWhereisRes)
+	go git.AnnexWhereis(paths, wichan)
 	for wiInfo := range wichan {
 		if wiInfo.Err != nil {
 			continue
@@ -600,8 +587,8 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		asargs = []string{"."}
 	}
 
-	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus(asargs, statuschan)
+	statuschan := make(chan git.AnnexStatusRes)
+	go git.AnnexStatus(asargs, statuschan)
 	for item := range statuschan {
 		if item.Err != nil {
 			return nil, item.Err
@@ -618,7 +605,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	// Unmodified files that are checked into git (not annex) do not show up
 	// Need to run git ls-files and add only files that haven't been added yet
 	lschan := make(chan string)
-	go GitLsFiles(paths, lschan)
+	go git.GitLsFiles(paths, lschan)
 	for fname := range lschan {
 		if _, ok := statuses[fname]; !ok {
 			statuses[fname] = Synced
@@ -636,22 +623,22 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	var cachedfiles, modifiedfiles, untrackedfiles, deletedfiles []string
 	// Collect checked in files
 	lsfilesargs := append([]string{"--cached"}, paths...)
-	go GitLsFiles(lsfilesargs, cachedchan)
+	go git.GitLsFiles(lsfilesargs, cachedchan)
 
 	// Collect modified files
 	modifiedchan := make(chan string)
 	lsfilesargs = append([]string{"--modified"}, paths...)
-	go GitLsFiles(lsfilesargs, modifiedchan)
+	go git.GitLsFiles(lsfilesargs, modifiedchan)
 
 	// Collect untracked files
 	otherschan := make(chan string)
 	lsfilesargs = append([]string{"--others"}, paths...)
-	go GitLsFiles(lsfilesargs, otherschan)
+	go git.GitLsFiles(lsfilesargs, otherschan)
 
 	// Collect deleted files
 	deletedchan := make(chan string)
 	lsfilesargs = append([]string{"--deleted"}, paths...)
-	go GitLsFiles(lsfilesargs, deletedchan)
+	go git.GitLsFiles(lsfilesargs, deletedchan)
 
 	for {
 		select {
@@ -686,8 +673,8 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	}
 
 	// Run whereis on cached files
-	wichan := make(chan AnnexWhereisRes)
-	go AnnexWhereis(cachedfiles, wichan)
+	wichan := make(chan git.AnnexWhereisRes)
+	go git.AnnexWhereis(cachedfiles, wichan)
 	for wiInfo := range wichan {
 		if wiInfo.Err != nil {
 			continue
@@ -710,7 +697,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	// If cached files are diff from upstream, mark as LocalChanges
 	diffargs := []string{"diff", "-z", "--name-only", "--relative", "@{upstream}"}
 	diffargs = append(diffargs, cachedfiles...)
-	cmd := GitCommand(diffargs...)
+	cmd := git.GitCommand(diffargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during diff command for status")
@@ -742,12 +729,12 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 
 	// Check if modified files are actually annex unlocked instead
 	if len(modifiedfiles) > 0 {
-		statuschan := make(chan AnnexStatusRes)
-		go AnnexStatus(modifiedfiles, statuschan)
+		statuschan := make(chan git.AnnexStatusRes)
+		go git.AnnexStatus(modifiedfiles, statuschan)
 		for item := range statuschan {
 			if item.Err != nil {
 				util.LogWrite("Error during annex status while searching for unlocked files")
-				// lockchan <- RepoFileStatus{Err: item.Err}
+				// lockchan <- git.RepoFileStatus{Err: item.Err}
 			}
 			if item.Status == "T" {
 				statuses[item.File] = Unlocked
@@ -775,7 +762,7 @@ func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	if IsDirect() {
+	if git.IsDirect() {
 		return lfDirect(paths...)
 	}
 	return lfIndirect(paths...)

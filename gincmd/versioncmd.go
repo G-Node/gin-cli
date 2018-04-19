@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
 )
 
 func repoversion(cmd *cobra.Command, args []string) {
-	if !ginclient.IsRepo() {
+	if !git.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 	count, _ := cmd.Flags().GetUint("max-count")
@@ -21,9 +22,9 @@ func repoversion(cmd *cobra.Command, args []string) {
 	copyto, _ := cmd.Flags().GetString("copy-to")
 	paths := args
 
-	var commit ginclient.GinCommit
+	var commit git.GinCommit
 	if commithash == "" {
-		commits, err := ginclient.GitLog(count, "", paths, false)
+		commits, err := git.GitLog(count, "", paths, false)
 		util.CheckError(err)
 		if jsonout {
 			j, _ := json.Marshal(commits)
@@ -35,7 +36,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 		}
 		commit = verprompt(commits)
 	} else {
-		commits, err := ginclient.GitLog(1, commithash, paths, false)
+		commits, err := git.GitLog(1, commithash, paths, false)
 		util.CheckError(err)
 		commit = commits[0]
 	}
@@ -46,12 +47,12 @@ func repoversion(cmd *cobra.Command, args []string) {
 		err := ginclient.CheckoutVersion(commit.AbbreviatedHash, paths)
 		util.CheckError(err)
 
-		addchan := make(chan ginclient.RepoFileStatus)
+		addchan := make(chan git.RepoFileStatus)
 		go ginclient.Add(paths, addchan)
 		formatOutput(addchan, jsonout)
 
 		fmt.Print("Recording changes ")
-		err = ginclient.GitCommit(makeCommitMessage("commit", paths))
+		err = git.GitCommit(makeCommitMessage("commit", paths))
 		if err != nil {
 			util.Die(err)
 		}
@@ -62,7 +63,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 	}
 }
 
-func checkoutcopies(commit ginclient.GinCommit, paths []string, destination string) {
+func checkoutcopies(commit git.GinCommit, paths []string, destination string) {
 	hash := commit.AbbreviatedHash
 	isodate := commit.Date.Format("2006-01-02-1504")
 	prettydate := commit.Date.Format("Jan 2 15:04:05 2006 (-0700)")
@@ -88,13 +89,13 @@ func checkoutcopies(commit ginclient.GinCommit, paths []string, destination stri
 		}
 	}
 	// Add new files to index but do not upload
-	addchan := make(chan ginclient.RepoFileStatus)
-	go ginclient.GitAdd(newfiles, addchan)
+	addchan := make(chan git.RepoFileStatus)
+	go git.GitAdd(newfiles, addchan)
 	<-addchan
 	// TODO: Instead of adding git files, would it be better if we did get-content on annex files and then removed them from the index?
 }
 
-func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
+func verprompt(commits []git.GinCommit) git.GinCommit {
 	ndigits := len(strconv.Itoa(len(commits) + 1))
 	numfmt := fmt.Sprintf("[%%%dd]", ndigits)
 	width := termwidth()
@@ -133,7 +134,7 @@ func verprompt(commits []ginclient.GinCommit) ginclient.GinCommit {
 	}
 
 	util.Die("Aborting")
-	return ginclient.GinCommit{}
+	return git.GinCommit{}
 }
 
 // VersionCmd sets up the 'version' subcommand

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -13,14 +14,14 @@ func download(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	gincl := ginclient.New(util.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
-	if !ginclient.IsRepo() {
+	if !git.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
 
 	content, _ := cmd.Flags().GetBool("content")
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	lockchan := make(chan ginclient.RepoFileStatus)
+	lockchan := make(chan git.RepoFileStatus)
 	go gincl.LockContent([]string{}, lockchan)
 	formatOutput(lockchan, jsonout)
 	if !jsonout {

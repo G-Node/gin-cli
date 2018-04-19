@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
 )
@@ -25,10 +26,10 @@ func getRepo(cmd *cobra.Command, args []string) {
 
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
-	clonechan := make(chan ginclient.RepoFileStatus)
+	clonechan := make(chan git.RepoFileStatus)
 	go gincl.CloneRepo(repostr, clonechan)
 	formatOutput(clonechan, jsonout)
-	_, err := ginclient.CommitIfNew("origin")
+	_, err := git.CommitIfNew("origin")
 	util.CheckError(err)
 }
 

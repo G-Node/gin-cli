@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -47,7 +48,7 @@ func createRepo(cmd *cobra.Command, args []string) {
 		util.CheckError(err)
 		err = gincl.AddRemote("origin", repoPath)
 		util.CheckError(err)
-		_, err := ginclient.CommitIfNew("origin")
+		_, err := git.CommitIfNew("origin")
 		util.CheckError(err)
 	} else if !noclone {
 		// Clone repository after creation

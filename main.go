@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/gincmd"
+	"github.com/G-Node/gin-cli/git"
 	util "github.com/G-Node/gin-cli/util"
 	version "github.com/hashicorp/go-version"
 )
@@ -20,7 +20,7 @@ var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 
 func checkAnnexVersion() {
 	errmsg := fmt.Sprintf("The GIN Client requires git-annex %s or newer", minAnnexVersion)
-	verstring, err := ginclient.GetAnnexVersion()
+	verstring, err := git.GetAnnexVersion()
 	util.CheckError(err)
 	systemver, err := version.NewVersion(verstring)
 	if err != nil {

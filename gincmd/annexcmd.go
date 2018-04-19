@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
 )
@@ -12,7 +13,7 @@ import (
 func annexrun(cmd *cobra.Command, args []string) {
 	gincl := ginclient.New(util.Config.GinHost)
 	_ = gincl.LoadToken() // OK to run without token
-	annexcmd := ginclient.AnnexCommand(args...)
+	annexcmd := git.AnnexCommand(args...)
 	err := annexcmd.Start()
 	util.CheckError(err)
 	var line string
