@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	ginclient "github.com/G-Node/gin-cli/gin-client"
+	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/bbrks/wrap"
 	"github.com/docker/docker/pkg/term"

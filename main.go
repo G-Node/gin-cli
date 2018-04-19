@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	ginclient "github.com/G-Node/gin-cli/gin-client"
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/gincmd"
 	util "github.com/G-Node/gin-cli/util"
 	version "github.com/hashicorp/go-version"

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	ginclient "github.com/G-Node/gin-cli/gin-client"
+	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/util"
 	gogs "github.com/gogits/go-gogs-client"
 	"github.com/spf13/cobra"
