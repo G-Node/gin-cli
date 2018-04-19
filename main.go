@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	gincmd "github.com/G-Node/gin-cli/cmd"
 	ginclient "github.com/G-Node/gin-cli/gin-client"
+	"github.com/G-Node/gin-cli/gincmd"
 	util "github.com/G-Node/gin-cli/util"
 	version "github.com/hashicorp/go-version"
 )
