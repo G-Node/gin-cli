@@ -30,7 +30,7 @@ func printRepoInfo(repo gogs.Repository) {
 func repoinfo(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags()
 	jsonout, _ := flags.GetBool("json")
-	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl := ginclient.New(util.Config.GinHost)
 	requirelogin(cmd, gincl, true)
 	repoinfo, err := gincl.GetRepo(args[0])
 	util.CheckError(err)

@@ -14,8 +14,6 @@ import (
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/gogits/go-gogs-client"
-	// its a bit unfortunate that we have that import now
-	// but its only temporary...
 )
 
 const unknownhostname = "(unknown)"

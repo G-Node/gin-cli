@@ -11,7 +11,7 @@ func lock(cmd *cobra.Command, args []string) {
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")
 	}
-	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl := ginclient.New(util.Config.GinHost)
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
 	formatOutput(lockchan, jsonout)

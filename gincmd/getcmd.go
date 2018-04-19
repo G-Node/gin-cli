@@ -16,7 +16,7 @@ func isValidRepoPath(path string) bool {
 func getRepo(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	repostr := args[0]
-	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl := ginclient.New(util.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 
 	if !isValidRepoPath(repostr) {

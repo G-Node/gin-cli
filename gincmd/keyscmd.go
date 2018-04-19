@@ -18,7 +18,7 @@ func keys(cmd *cobra.Command, args []string) {
 		usageDie(cmd)
 	}
 
-	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl := ginclient.New(util.Config.GinHost)
 	requirelogin(cmd, gincl, true)
 
 	keyfilename, _ := flags.GetString("add")

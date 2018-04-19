@@ -9,7 +9,7 @@ import (
 )
 
 func deleteRepo(cmd *cobra.Command, args []string) {
-	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl := ginclient.New(util.Config.GinHost)
 	requirelogin(cmd, gincl, true)
 	var repostr, confirmation string
 

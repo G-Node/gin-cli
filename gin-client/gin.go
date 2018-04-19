@@ -32,8 +32,8 @@ type Client struct {
 	GitUser string
 }
 
-// NewClient returns a new client for the GIN server.
-func NewClient(host string) *Client {
+// New returns a new client for the GIN server.
+func New(host string) *Client {
 	return &Client{Client: web.NewClient(host)}
 }
 

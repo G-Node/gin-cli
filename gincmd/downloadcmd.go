@@ -11,7 +11,7 @@ import (
 
 func download(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
-	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl := ginclient.New(util.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 	if !ginclient.IsRepo() {
 		util.Die("This command must be run from inside a gin repository.")

@@ -10,7 +10,7 @@ import (
 )
 
 func annexrun(cmd *cobra.Command, args []string) {
-	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl := ginclient.New(util.Config.GinHost)
 	_ = gincl.LoadToken() // OK to run without token
 	annexcmd := ginclient.AnnexCommand(args...)
 	err := annexcmd.Start()

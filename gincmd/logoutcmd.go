@@ -12,7 +12,7 @@ func logout(cmd *cobra.Command, args []string) {
 	if len(args) > 0 {
 		usageDie(cmd)
 	}
-	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl := ginclient.New(util.Config.GinHost)
 	err := gincl.LoadToken()
 	if err != nil {
 		util.Die("You are not logged in.")

@@ -23,7 +23,7 @@ func lsRepo(cmd *cobra.Command, args []string) {
 	jsonout, _ := flags.GetBool("json")
 	short, _ := flags.GetBool("short")
 
-	gincl := ginclient.NewClient(util.Config.GinHost)
+	gincl := ginclient.New(util.Config.GinHost)
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 
