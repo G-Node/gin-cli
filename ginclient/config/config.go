@@ -30,7 +30,6 @@ type GinConfiguration struct {
 	}
 }
 
-// NOTE: Duplicate function
 // pathExists returns true if the path exists
 func pathExists(path string) bool {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -39,8 +38,7 @@ func pathExists(path string) bool {
 	return true
 }
 
-// NOTE: Duplicate function
-func FindRepoRoot(path string) (string, error) {
+func findreporoot(path string) (string, error) {
 	var err error
 	path, err = filepath.Abs(path)
 	if err != nil {
@@ -56,7 +54,7 @@ func FindRepoRoot(path string) (string, error) {
 		return "", fmt.Errorf("Not a repository")
 	}
 
-	return FindRepoRoot(updir)
+	return findreporoot(updir)
 }
 
 // local configuration cache
@@ -114,7 +112,7 @@ func Read() GinConfiguration {
 	configuration.GitHostKey = viper.GetString("git.hostkey")
 
 	// configuration file in the repository root (annex excludes and size threshold only)
-	reporoot, err := FindRepoRoot(".")
+	reporoot, err := findreporoot(".")
 	if err == nil {
 		confpath := filepath.Join(reporoot, configFileName)
 		viper.SetConfigFile(confpath)
