@@ -18,7 +18,7 @@ var configDirs = configdir.New("g-node", "gin")
 // Init initialises the log file and logger.
 func Init(ver string) error {
 	// TODO: Log rotation
-	cachepath, err := CachePath(true)
+	cachepath, err := logpath(true)
 	if err != nil {
 		return err
 	}
@@ -37,8 +37,8 @@ func Init(ver string) error {
 	return nil
 }
 
-// CachePath returns the path where gin cache files (logs) should be stored.
-func CachePath(create bool) (string, error) {
+// logpath returns the path where gin cache files (logs) should be stored.
+func logpath(create bool) (string, error) {
 	var err error
 	logpath := os.Getenv("GIN_LOG_DIR")
 	if logpath == "" {
