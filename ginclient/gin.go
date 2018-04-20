@@ -11,7 +11,7 @@ import (
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git"
-	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/git/shell"
 	"github.com/G-Node/gin-cli/web"
 	gogs "github.com/gogits/go-gogs-client"
 )
@@ -20,7 +20,7 @@ import (
 // These functions end up performing web calls (using the web package).
 
 // ginerror convenience alias to util.Error
-type ginerror = util.Error
+type ginerror = shell.Error
 
 // GINUser represents a API user.
 type GINUser struct {

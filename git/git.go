@@ -24,7 +24,7 @@ const progcomplete = "100%"
 const unknownhostname = "(unknown)"
 
 // giterror convenience alias to util.Error
-type giterror = util.Error
+type giterror = shell.Error
 
 // **************** //
 

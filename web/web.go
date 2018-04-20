@@ -20,12 +20,12 @@ import (
 
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/ginclient/log"
-	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/git/shell"
 	gogs "github.com/gogits/go-gogs-client"
 )
 
 // weberror alias to util.Error
-type weberror = util.Error
+type weberror = shell.Error
 
 // UserToken struct for username and token
 type UserToken struct {
