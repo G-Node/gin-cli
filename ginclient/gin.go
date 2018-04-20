@@ -13,6 +13,9 @@ import (
 	gogs "github.com/gogits/go-gogs-client"
 )
 
+// High level functions for managing user auth.
+// These functions end up performing web calls (using the web package).
+
 // ginerror convenience alias to util.Error
 type ginerror = util.Error
 
@@ -25,16 +28,22 @@ type GINUser struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
+// New returns a new client for the GIN server.
+func New(host string) *Client {
+	return &Client{Client: web.NewClient(host)}
+}
+
+// AccessToken represents a API access token.
+type AccessToken struct {
+	Name string `json:"name"`
+	Sha1 string `json:"sha1"`
+}
+
 // Client is a client interface to the GIN server. Embeds web.Client.
 type Client struct {
 	*web.Client
 	GitHost string
 	GitUser string
-}
-
-// New returns a new client for the GIN server.
-func New(host string) *Client {
-	return &Client{Client: web.NewClient(host)}
 }
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
@@ -231,14 +240,6 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	return gincl.MakeSessionKey()
 }
 
-// MakeHostsFile creates a known_hosts file in the config directory based on the server configuration for host key checking.
-func MakeHostsFile() {
-	hostkeyfile := util.HostKeyPath()
-	ginhostkey := fmt.Sprintln(util.Config.GitHostKey)
-	_ = ioutil.WriteFile(hostkeyfile, []byte(ginhostkey), 0600)
-	return
-}
-
 // Logout logs out the currently logged in user in 3 steps:
 // 1. Remove the public key matching the current hostname from the server.
 // 2. Delete the private key file from the local machine.
@@ -272,8 +273,10 @@ func (gincl *Client) Logout() {
 	}
 }
 
-// AccessToken represents a API access token.
-type AccessToken struct {
-	Name string `json:"name"`
-	Sha1 string `json:"sha1"`
+// MakeHostsFile creates a known_hosts file in the config directory based on the server configuration for host key checking.
+func MakeHostsFile() {
+	hostkeyfile := util.HostKeyPath()
+	ginhostkey := fmt.Sprintln(util.Config.GitHostKey)
+	_ = ioutil.WriteFile(hostkeyfile, []byte(ginhostkey), 0600)
+	return
 }

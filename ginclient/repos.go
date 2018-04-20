@@ -17,10 +17,63 @@ import (
 	"github.com/gogits/go-gogs-client"
 )
 
+// High level functions for managing repositories.
+// These functions either end up performing web calls (using the web package) or git shell commands (using the git package).
+
 const unknownhostname = "(unknown)"
 
 // Workingdir sets the directory for shell commands
 var Workingdir = "."
+
+// Types
+
+// FileCheckoutStatus is used to report the status of a CheckoutFileCopies() operation.
+type FileCheckoutStatus struct {
+	Filename    string
+	Type        string
+	Destination string
+	Err         error
+}
+
+// FileStatus represents the state a file is in with respect to local and remote changes.
+type FileStatus uint8
+
+const (
+	// Synced indicates that an annexed file is synced between local and remote
+	Synced FileStatus = iota
+	// NoContent indicates that a file represents an annexed file that has not had its contents synced yet
+	NoContent
+	// Modified indicatres that a file has local modifications that have not been committed
+	Modified
+	// LocalChanges indicates that a file has local, committed modifications that have not been pushed
+	LocalChanges
+	// RemoteChanges indicates that a file has remote modifications that have not been pulled
+	RemoteChanges
+	// Unlocked indicates that a file is being tracked and is unlocked for editing
+	Unlocked
+	// Removed indicates that a (previously) tracked file has been deleted or moved
+	Removed
+	// Untracked indicates that a file is not being tracked by neither git nor git annex
+	Untracked
+)
+
+// FileStatusSlice is a slice of FileStatus which implements Len() and Less() to allow sorting.
+type FileStatusSlice []FileStatus
+
+// Len is the number of elements in FileStatusSlice.
+func (fsSlice FileStatusSlice) Len() int {
+	return len(fsSlice)
+}
+
+// Swap swaps the elements with intexes i and j.
+func (fsSlice FileStatusSlice) Swap(i, j int) {
+	fsSlice[i], fsSlice[j] = fsSlice[j], fsSlice[i]
+}
+
+// Less reports whether the element with index i should sort before the element with index j.
+func (fsSlice FileStatusSlice) Less(i, j int) bool {
+	return fsSlice[i] < fsSlice[j]
+}
 
 //isAnnexPath returns true if a given string represents the path to an annex object.
 func isAnnexPath(path string) bool {
@@ -345,14 +398,6 @@ func CheckoutVersion(commithash string, paths []string) error {
 	return git.Checkout(commithash, paths)
 }
 
-// FileCheckoutStatus is used to report the status of a CheckoutFileCopies() operation.
-type FileCheckoutStatus struct {
-	Filename    string
-	Type        string
-	Destination string
-	Err         error
-}
-
 // CheckoutFileCopies checks out copies of files specified by path from the revision with the specified commithash.
 // The checked out files are stored in the location specified by outpath.
 // The timestamp of the revision is appended to the original filenames.
@@ -468,28 +513,6 @@ func (gincl *Client) InitDir() error {
 	return nil
 }
 
-// FileStatus represents the state a file is in with respect to local and remote changes.
-type FileStatus uint8
-
-const (
-	// Synced indicates that an annexed file is synced between local and remote
-	Synced FileStatus = iota
-	// NoContent indicates that a file represents an annexed file that has not had its contents synced yet
-	NoContent
-	// Modified indicatres that a file has local modifications that have not been committed
-	Modified
-	// LocalChanges indicates that a file has local, committed modifications that have not been pushed
-	LocalChanges
-	// RemoteChanges indicates that a file has remote modifications that have not been pulled
-	RemoteChanges
-	// Unlocked indicates that a file is being tracked and is unlocked for editing
-	Unlocked
-	// Removed indicates that a (previously) tracked file has been deleted or moved
-	Removed
-	// Untracked indicates that a file is not being tracked by neither git nor git annex
-	Untracked
-)
-
 // Description returns the long description of the file status
 func (fs FileStatus) Description() string {
 	switch {
@@ -537,24 +560,6 @@ func (fs FileStatus) Abbrev() string {
 	default:
 		return "??"
 	}
-}
-
-// FileStatusSlice is a slice of FileStatus which implements Len() and Less() to allow sorting.
-type FileStatusSlice []FileStatus
-
-// Len is the number of elements in FileStatusSlice.
-func (fsSlice FileStatusSlice) Len() int {
-	return len(fsSlice)
-}
-
-// Swap swaps the elements with intexes i and j.
-func (fsSlice FileStatusSlice) Swap(i, j int) {
-	fsSlice[i], fsSlice[j] = fsSlice[j], fsSlice[i]
-}
-
-// Less reports whether the element with index i should sort before the element with index j.
-func (fsSlice FileStatusSlice) Less(i, j int) bool {
-	return fsSlice[i] < fsSlice[j]
 }
 
 func lfDirect(paths ...string) (map[string]FileStatus, error) {
