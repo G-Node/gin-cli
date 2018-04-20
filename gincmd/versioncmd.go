@@ -148,7 +148,7 @@ func VersionCmd() *cobra.Command {
 		"Show the 15 most recent versions of data.zip, prompt for version, and copy the selected version to the current directory": "$ gin version -n 15 --copy-to . data.zip",
 	}
 	var versionCmd = &cobra.Command{
-		Use:     "version [--json] [--max-count n | --id hash] [<filenames>]...",
+		Use:     "version [--json] [--max-count n | --id hash | --copy-to location] [<filenames>]...",
 		Short:   "Roll back files or directories to older versions",
 		Long:    formatdesc(description, args),
 		Example: formatexamples(examples),
@@ -157,8 +157,8 @@ func VersionCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	versionCmd.Flags().Bool("json", false, "Print output in JSON format.")
-	versionCmd.Flags().UintP("max-count", "n", 10, "Maximum number of versions to display before prompting. 0 means 'all'.")
-	versionCmd.Flags().String("id", "", "Commit ID (hash) to return to.")
-	versionCmd.Flags().String("copy-to", "", "Retrieve files from history and copy them to a new location instead of overwriting the existing ones. The new files will be placed in the directory specified and will be renamed to include the date and time of their version.")
+	versionCmd.Flags().UintP("max-count", "n", 10, "Maximum `number` of versions to display before prompting. 0 means 'all'.")
+	versionCmd.Flags().String("id", "", "Commit `ID` (hash) to return to.")
+	versionCmd.Flags().String("copy-to", "", "Retrieve files from history and copy them to a new `location` instead of overwriting the existing ones. The new files will be placed in the directory specified and will be renamed to include the date and time of their version.")
 	return versionCmd
 }
