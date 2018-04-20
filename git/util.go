@@ -88,3 +88,38 @@ func pathExists(path string) bool {
 	}
 	return true
 }
+
+func stringInSlice(element string, strlist []string) bool {
+	for _, str := range strlist {
+		if element == str {
+			return true
+		}
+	}
+	return false
+}
+
+// filterpaths takes path descriptions (full paths, relative paths, files, or directories) and returns a slice of filepaths (as strings) excluding the files listed in excludes.
+func filterpaths(paths, excludes []string) (filtered []string) {
+
+	// walker adds files to filtered if they don't match excludes
+	walker := func(path string, info os.FileInfo, err error) error {
+		if filepath.Base(path) == ".git" {
+			return filepath.SkipDir
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if !stringInSlice(path, excludes) {
+			filtered = append(filtered, path)
+		}
+		return nil
+	}
+
+	for _, p := range paths {
+		err := filepath.Walk(p, walker)
+		if err != nil {
+			log.LogWrite("Error occured during path filtering: %s", err.Error())
+		}
+	}
+	return
+}

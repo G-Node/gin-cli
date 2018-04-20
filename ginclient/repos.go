@@ -13,7 +13,6 @@ import (
 
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git"
-	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	"github.com/gogits/go-gogs-client"
 )
@@ -228,7 +227,7 @@ func (gincl *Client) DelRepo(name string) error {
 // The status channel 'addchan' is closed when this function returns.
 func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 	defer close(addchan)
-	paths, err := util.ExpandGlobs(paths)
+	paths, err := expandglobs(paths)
 	if err != nil {
 		addchan <- git.RepoFileStatus{Err: err}
 		return
@@ -256,7 +255,7 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus
 	defer close(uploadchan)
 	log.LogWrite("Upload")
 
-	paths, err := util.ExpandGlobs(paths)
+	paths, err := expandglobs(paths)
 	if err != nil {
 		uploadchan <- git.RepoFileStatus{Err: err}
 		return
@@ -276,7 +275,7 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- git.RepoFileS
 	defer close(getcontchan)
 	log.LogWrite("GetContent")
 
-	paths, err := util.ExpandGlobs(paths)
+	paths, err := expandglobs(paths)
 
 	if err != nil {
 		getcontchan <- git.RepoFileStatus{Err: err}
@@ -297,7 +296,7 @@ func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- git.RepoFileSt
 	defer close(rmcchan)
 	log.LogWrite("RemoveContent")
 
-	paths, err := util.ExpandGlobs(paths)
+	paths, err := expandglobs(paths)
 	if err != nil {
 		rmcchan <- git.RepoFileStatus{Err: err}
 		return
@@ -317,7 +316,7 @@ func (gincl *Client) LockContent(paths []string, lcchan chan<- git.RepoFileStatu
 	defer close(lcchan)
 	log.LogWrite("LockContent")
 
-	paths, err := util.ExpandGlobs(paths)
+	paths, err := expandglobs(paths)
 	if err != nil {
 		lcchan <- git.RepoFileStatus{Err: err}
 		return
@@ -337,7 +336,7 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileSt
 	defer close(ulcchan)
 	log.LogWrite("UnlockContent")
 
-	paths, err := util.ExpandGlobs(paths)
+	paths, err := expandglobs(paths)
 	if err != nil {
 		ulcchan <- git.RepoFileStatus{Err: err}
 		return
@@ -760,7 +759,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 // ListFiles lists the files and directories specified by paths and their sync status.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
-	paths, err := util.ExpandGlobs(paths)
+	paths, err := expandglobs(paths)
 	if err != nil {
 		return nil, err
 	}
@@ -768,4 +767,35 @@ func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
 		return lfDirect(paths...)
 	}
 	return lfIndirect(paths...)
+}
+
+// expandglobs expands a list of globs into paths (files and directories).
+// An error is returned if at least one element of the input slice does not match a real path.
+func expandglobs(paths []string) (globexppaths []string, err error) {
+	if len(paths) == 0 {
+		// Nothing to do
+		globexppaths = paths
+		return
+	}
+	// expand potential globs
+	for _, p := range paths {
+		log.LogWrite("ExpandGlobs: Checking for glob expansion for %s", p)
+		exp, globerr := filepath.Glob(p)
+		if globerr != nil {
+			log.LogWrite(globerr.Error())
+			log.LogWrite("Bad file pattern %s", p)
+			return nil, globerr
+		}
+		if exp == nil {
+			log.LogWrite("ExpandGlobs: No files matched")
+			return nil, fmt.Errorf("No files matched %v", p)
+		}
+		globexppaths = append(globexppaths, exp...)
+	}
+	if len(globexppaths) == 0 {
+		// Invalid paths
+		log.LogWrite("ExpandGlobs: No files matched")
+		err = fmt.Errorf("No files matched %v", paths)
+	}
+	return
 }

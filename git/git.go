@@ -13,7 +13,6 @@ import (
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git/shell"
-	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 )
 
@@ -208,7 +207,7 @@ func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 			}
 			annexfiles = append(annexfiles, wiInfo.File)
 		}
-		filepaths = util.FilterPaths(filepaths, annexfiles)
+		filepaths = filterpaths(filepaths, annexfiles)
 	}
 
 	cmdargs := append([]string{"add", "--verbose", "--"}, filepaths...)
