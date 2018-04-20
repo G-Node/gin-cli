@@ -164,10 +164,10 @@ func (gincl *Client) DeletePubKey(id int64) error {
 
 // DeletePubKeyByTitle removes the key that matches the given title from the current user's authorised keys.
 func (gincl *Client) DeletePubKeyByTitle(title string) error {
-	log.LogWrite("Searching for key with title '%s'", title)
+	log.Write("Searching for key with title '%s'", title)
 	keys, err := gincl.GetUserKeys()
 	if err != nil {
-		log.LogWrite("Error when getting user keys: %v", err)
+		log.Write("Error when getting user keys: %v", err)
 		return err
 	}
 	for _, key := range keys {
@@ -182,19 +182,19 @@ func (gincl *Client) DeletePubKeyByTitle(title string) error {
 // Upon deletion, it returns the title of the key that was deleted.
 // Note that the first key has index 1.
 func (gincl *Client) DeletePubKeyByIdx(idx int) (string, error) {
-	log.LogWrite("Searching for key with index '%d'", idx)
+	log.Write("Searching for key with index '%d'", idx)
 	if idx < 1 {
-		log.LogWrite("Invalid index [idx %d]", idx)
+		log.Write("Invalid index [idx %d]", idx)
 		return "", fmt.Errorf("Invalid key index '%d'", idx)
 	}
-	log.LogWrite("Searching for key with index '%d'", idx)
+	log.Write("Searching for key with index '%d'", idx)
 	keys, err := gincl.GetUserKeys()
 	if err != nil {
-		log.LogWrite("Error when getting user keys: %v", err)
+		log.Write("Error when getting user keys: %v", err)
 		return "", err
 	}
 	if idx > len(keys) {
-		log.LogWrite("Invalid index [idx %d > N %d]", idx, len(keys))
+		log.Write("Invalid index [idx %d > N %d]", idx, len(keys))
 		return "", fmt.Errorf("Invalid key index '%d'", idx)
 	}
 	key := keys[idx-1]
@@ -223,7 +223,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	if err != nil {
 		return err
 	}
-	log.LogWrite("Got response: %s", res.Status)
+	log.Write("Got response: %s", res.Status)
 	token := AccessToken{}
 	err = json.Unmarshal(data, &token)
 	if err != nil {
@@ -231,7 +231,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	}
 	gincl.Username = username
 	gincl.Token = token.Sha1
-	log.LogWrite("Login successful. Username: %s", username)
+	log.Write("Login successful. Username: %s", username)
 
 	err = gincl.StoreToken()
 	if err != nil {
@@ -251,28 +251,28 @@ func (gincl *Client) Logout() {
 	// 1. Delete public key
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.LogWrite("Could not retrieve hostname")
+		log.Write("Could not retrieve hostname")
 		hostname = unknownhostname
 	}
 
 	currentkeyname := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)
 	err = gincl.DeletePubKeyByTitle(currentkeyname)
 	if err != nil {
-		log.LogWrite(err.Error())
+		log.Write(err.Error())
 	}
 
 	// 2. Delete private key
 	privKeyFile := git.PrivKeyPath(gincl.UserToken.Username)
 	err = os.Remove(privKeyFile)
 	if err != nil {
-		log.LogWrite("Error deleting key file")
+		log.Write("Error deleting key file")
 	} else {
-		log.LogWrite("Private key file deleted")
+		log.Write("Private key file deleted")
 	}
 
 	err = web.DeleteToken()
 	if err != nil {
-		log.LogWrite("Error deleting token file")
+		log.Write("Error deleting token file")
 	}
 }
 

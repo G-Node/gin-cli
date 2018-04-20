@@ -148,7 +148,7 @@ func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) 
 
 	errstring := string(stderr)
 	if err = cmd.Wait(); err != nil {
-		log.LogWrite("Error during clone command")
+		log.Write("Error during clone command")
 		repoPathParts := strings.SplitN(repopath, "/", 2)
 		repoOwner := repoPathParts[0]
 		repoName := repoPathParts[1]
@@ -186,7 +186,7 @@ func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) 
 func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 	defer close(addchan)
 	if len(filepaths) == 0 {
-		log.LogWrite("No paths to add to git. Nothing to do.")
+		log.Write("No paths to add to git. Nothing to do.")
 		return
 	}
 
@@ -235,7 +235,7 @@ func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 		}
 		fname = strings.TrimSuffix(fname, "'")
 		status.FileName = fname
-		log.LogWrite("'%s' added to git", fname)
+		log.Write("'%s' added to git", fname)
 		// Error conditions?
 		status.Progress = progcomplete
 		addchan <- status
@@ -245,7 +245,7 @@ func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.LogWrite("Error during GitAdd")
+		log.Write("Error during GitAdd")
 		logstd(nil, stderr)
 	}
 	return
@@ -272,7 +272,7 @@ func AddRemote(name, url string) error {
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := giterror{UError: err.Error(), Origin: fn}
-		log.LogWrite("Error during remote add command")
+		log.Write("Error during remote add command")
 		logstd(stdout, stderr)
 		if strings.Contains(string(stderr), "already exists") {
 			gerr.Description = fmt.Sprintf("remote with name '%s' already exists", name)
@@ -305,7 +305,7 @@ func CommitIfNew(upstream string) (bool, error) {
 	cmd = Command("commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error while creating initial commit")
+		log.Write("Error while creating initial commit")
 		logstd(stdout, stderr)
 		return false, fmt.Errorf(string(stderr))
 	}
@@ -317,7 +317,7 @@ func CommitIfNew(upstream string) (bool, error) {
 	cmd = Command("push", "--set-upstream", upstream, "HEAD")
 	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error while creating initial commit")
+		log.Write("Error while creating initial commit")
 		logstd(stdout, stderr)
 		return false, fmt.Errorf(string(stderr))
 	}
@@ -328,10 +328,10 @@ func CommitIfNew(upstream string) (bool, error) {
 // This function will also return true for bare repositories that use git annex (direct mode).
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsRepo() bool {
-	log.LogWrite("IsRepo '%s'?", Workingdir)
+	log.Write("IsRepo '%s'?", Workingdir)
 	_, err := FindRepoRoot(Workingdir)
 	yes := err == nil
-	log.LogWrite("%v", yes)
+	log.Write("%v", yes)
 	return yes
 }
 
@@ -356,10 +356,10 @@ func Commit(commitmsg string) error {
 	if err != nil {
 		if strings.Contains(string(stdout), "nothing to commit") {
 			// eat the error
-			log.LogWrite("Nothing to commit")
+			log.Write("Nothing to commit")
 			return nil
 		}
-		log.LogWrite("Error during GitCommit")
+		log.Write("Error during GitCommit")
 		logstd(stdout, stderr)
 		return fmt.Errorf(string(stderr))
 	}
@@ -376,7 +376,7 @@ func LsFiles(args []string, lschan chan<- string) {
 	cmd := Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
-		log.LogWrite("ls-files command set up failed: %s", err)
+		log.Write("ls-files command set up failed: %s", err)
 		return
 	}
 	var line string
@@ -393,7 +393,7 @@ func LsFiles(args []string, lschan chan<- string) {
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.LogWrite("Error during GitLsFiles")
+		log.Write("Error during GitLsFiles")
 		logstd(nil, stderr)
 	}
 	return
@@ -477,7 +477,7 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 	cmd := Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
-		log.LogWrite("Error setting up git log command")
+		log.Write("Error setting up git log command")
 		return nil, fmt.Errorf("error retrieving version logs - malformed git log command")
 	}
 
@@ -495,9 +495,9 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 		var commit GinCommit
 		ierr := json.Unmarshal(line, &commit)
 		if ierr != nil {
-			log.LogWrite("Error parsing git log")
-			log.LogWrite(string(line))
-			log.LogWrite(ierr.Error())
+			log.Write("Error parsing git log")
+			log.Write(string(line))
+			log.Write(ierr.Error())
 			continue
 		}
 		// Trim potential newline or spaces at end of body
@@ -510,7 +510,7 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.LogWrite("Error getting git log")
+		log.Write("Error getting git log")
 		errmsg := string(stderr)
 		if strings.Contains(errmsg, "bad revision") {
 			errmsg = fmt.Sprintf("'%s' does not match a known version ID or name", revrange)
@@ -521,7 +521,7 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 	// TODO: Combine diffstats into first git log invocation
 	logstats, err := LogDiffStat(count, paths, showdeletes)
 	if err != nil {
-		log.LogWrite("Failed to get diff stats")
+		log.Write("Failed to get diff stats")
 		return commits, nil
 	}
 
@@ -547,7 +547,7 @@ func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffS
 	cmd := Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
-		log.LogWrite("Error during LogDiffstat")
+		log.Write("Error during LogDiffstat")
 		return nil, err
 	}
 
@@ -587,8 +587,8 @@ func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffS
 			case "R100":
 				// Ignore renames
 			default:
-				log.LogWrite("Could not parse diffstat line")
-				log.LogWrite(line)
+				log.Write("Could not parse diffstat line")
+				log.Write(line)
 			}
 			stats[curhash] = curstat
 		}
@@ -611,7 +611,7 @@ func Checkout(hash string, paths []string) error {
 	cmd := Command(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error during GitCheckout")
+		log.Write("Error during GitCheckout")
 		logstd(stdout, stderr)
 		return fmt.Errorf(string(stderr))
 	}
@@ -658,7 +658,7 @@ func LsTree(revision string, paths []string) ([]Object, error) {
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.LogWrite("Error during GitLsTree")
+		log.Write("Error during GitLsTree")
 		logstd(nil, stderr)
 		return nil, fmt.Errorf(string(stderr))
 	}
@@ -672,7 +672,7 @@ func CatFileContents(revision, filepath string) ([]byte, error) {
 	cmd := Command("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error during GitCatFile (Contents)")
+		log.Write("Error during GitCatFile (Contents)")
 		logstd(nil, stderr)
 		return nil, fmt.Errorf(string(stderr))
 	}
@@ -685,7 +685,7 @@ func CatFileType(object string) (string, error) {
 	cmd := Command("cat-file", "-t", object)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error during GitCatFile (Type)")
+		log.Write("Error during GitCatFile (Type)")
 		logstd(stdout, stderr)
 		err = fmt.Errorf(string(stderr))
 		return "", err
@@ -735,12 +735,12 @@ func IsVersion6() bool {
 	cmd := Command("config", "--local", "--get", "annex.version")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error while checking repository annex version")
+		log.Write("Error while checking repository annex version")
 		logstd(stdout, stderr)
 		return false
 	}
 	ver := strings.TrimSpace(string(stdout))
-	log.LogWrite("Annex version is %s", ver)
+	log.Write("Annex version is %s", ver)
 	return ver == "6"
 }
 
@@ -754,7 +754,7 @@ func setBare(state bool) error {
 	cmd := Command("config", "--local", "--bool", "core.bare", statestr)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error switching bare status to %s", statestr)
+		log.Write("Error switching bare status to %s", statestr)
 		logstd(stdout, stderr)
 		err = fmt.Errorf(string(stderr))
 	}
@@ -772,6 +772,6 @@ func Command(args ...string) shell.Cmd {
 	_ = token.LoadToken()
 	env := os.Environ()
 	cmd.Env = append(env, GitSSHEnv(token.Username))
-	log.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
+	log.Write("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	return cmd
 }

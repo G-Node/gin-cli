@@ -128,8 +128,8 @@ func AnnexInit(description string) error {
 	cmd = Command("config", "annex.backends", "MD5")
 	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Failed to set default annex backend MD5")
-		log.LogWrite("[Error]: %v", string(stderr))
+		log.Write("Failed to set default annex backend MD5")
+		log.Write("[Error]: %v", string(stderr))
 		logstd(stdout, stderr)
 	}
 	return nil
@@ -181,9 +181,9 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 		stderr += line
 	}
 	if err := cmd.Wait(); err != nil {
-		log.LogWrite("Error during AnnexSync")
-		log.LogWrite("[stderr]\n%s", stderr)
-		log.LogWrite("[Error]: %v", err)
+		log.Write("Error during AnnexSync")
+		log.Write("[stderr]\n%s", stderr)
+		log.Write("[Error]: %v", err)
 	}
 	status.Progress = progcomplete
 	syncchan <- status
@@ -198,8 +198,8 @@ func AnnexPull() error {
 	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error during AnnexPull.")
-		log.LogWrite("[Error]: %v", err)
+		log.Write("Error during AnnexPull.")
+		log.Write("[Error]: %v", err)
 		logstd(stdout, stderr)
 		errmsg := "failed"
 		sstderr := string(stderr)
@@ -228,8 +228,8 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 	stdout, stderr, err := cmd.OutputError()
 	// TODO: Parse git push output for progress
 	if err != nil {
-		log.LogWrite("Error during AnnexPush (sync --no-pull)")
-		log.LogWrite("[Error]: %v", err)
+		log.Write("Error during AnnexPush (sync --no-pull)")
+		log.Write("[Error]: %v", err)
 		logstd(stdout, stderr)
 		errmsg := "failed"
 		sstderr := string(stderr)
@@ -278,9 +278,9 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 			err = json.Unmarshal(outline, &getresult)
 			if err != nil || getresult == (annexAction{}) {
 				// Couldn't parse output
-				log.LogWrite("Could not parse 'git annex copy' output")
-				log.LogWrite(string(outline))
-				log.LogWrite(err.Error())
+				log.Write("Could not parse 'git annex copy' output")
+				log.Write(string(outline))
+				log.Write(err.Error())
 				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
 				continue
 			}
@@ -328,8 +328,8 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.LogWrite("Error during AnnexGet")
-		log.LogWrite(string(stderr))
+		log.Write("Error during AnnexGet")
+		log.Write(string(stderr))
 	}
 	return
 }
@@ -367,9 +367,9 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 			err = json.Unmarshal(outline, &getresult)
 			if err != nil || getresult == (annexAction{}) {
 				// Couldn't parse output
-				log.LogWrite("Could not parse 'git annex get' output")
-				log.LogWrite(string(outline))
-				log.LogWrite(err.Error())
+				log.Write("Could not parse 'git annex get' output")
+				log.Write(string(outline))
+				log.Write(err.Error())
 				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
 				continue
 			}
@@ -403,8 +403,8 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.LogWrite("Error during AnnexGet")
-		log.LogWrite(string(stderr))
+		log.Write("Error during AnnexGet")
+		log.Write(string(stderr))
 	}
 	return
 }
@@ -448,10 +448,10 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 		}
 		status.FileName = annexDropRes.File
 		if annexDropRes.Success {
-			log.LogWrite("%s content dropped", annexDropRes.File)
+			log.Write("%s content dropped", annexDropRes.File)
 			status.Err = nil
 		} else {
-			log.LogWrite("Error dropping %s", annexDropRes.File)
+			log.Write("Error dropping %s", annexDropRes.File)
 			errmsg := annexDropRes.Note
 			if strings.Contains(errmsg, "unsafe") {
 				errmsg = "failed (unsafe): could not verify remote copy"
@@ -466,8 +466,8 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.LogWrite("Error during AnnexDrop")
-		log.LogWrite("[stderr]\n%s", string(stderr))
+		log.Write("Error during AnnexDrop")
+		log.Write("[stderr]\n%s", string(stderr))
 	}
 	return
 }
@@ -478,7 +478,7 @@ func getAnnexMetadataName(key string) annexFilenameDate {
 	cmd := AnnexCommand("metadata", "--json", fmt.Sprintf("--key=%s", key))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error retrieving annexed content metadata")
+		log.Write("Error retrieving annexed content metadata")
 		logstd(stdout, stderr)
 		return annexFilenameDate{}
 	}
@@ -512,7 +512,7 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisRes) {
 	cmd := AnnexCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
-		log.LogWrite("Error during AnnexWhereis")
+		log.Write("Error during AnnexWhereis")
 		wichan <- AnnexWhereisRes{Err: fmt.Errorf("Failed to run git-annex whereis: %s", err)}
 		return
 	}
@@ -545,7 +545,7 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 	// TODO: Parse output
 	err := cmd.Start()
 	if err != nil {
-		log.LogWrite("Error setting up git-annex status")
+		log.Write("Error setting up git-annex status")
 		statuschan <- AnnexStatusRes{Err: fmt.Errorf("Failed to run git-annex status: %s", err)}
 		return
 	}
@@ -573,7 +573,7 @@ func AnnexInfo() (AnnexInfoRes, error) {
 	cmd := AnnexCommand("info", "--json")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil || cmd.Wait() != nil {
-		log.LogWrite("Error during AnnexInfo")
+		log.Write("Error during AnnexInfo")
 		logstd(stdout, stderr)
 		return AnnexInfoRes{}, fmt.Errorf("Error retrieving annex info")
 	}
@@ -625,18 +625,18 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 		err = json.Unmarshal(outline, &unlockres)
 		if err != nil || unlockres == (annexAction{}) {
 			// Couldn't parse output
-			log.LogWrite("Could not parse 'git annex unlock' output")
-			log.LogWrite(string(outline))
-			log.LogWrite(err.Error())
+			log.Write("Could not parse 'git annex unlock' output")
+			log.Write(string(outline))
+			log.Write(err.Error())
 			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
 			continue
 		}
 		status.FileName = unlockres.File
 		if unlockres.Success {
-			log.LogWrite("%s unlocked", unlockres.File)
+			log.Write("%s unlocked", unlockres.File)
 			status.Err = nil
 		} else {
-			log.LogWrite("Error unlocking %s", unlockres.File)
+			log.Write("Error unlocking %s", unlockres.File)
 			status.Err = fmt.Errorf("Content not available locally\nUse 'gin get-content' to download")
 		}
 		status.Progress = progcomplete
@@ -647,7 +647,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.LogWrite("Error during AnnexUnlock")
+		log.Write("Error during AnnexUnlock")
 		logstd(nil, stderr)
 	}
 	status.Progress = progcomplete
@@ -716,7 +716,7 @@ func annexExclArgs() (exclargs []string) {
 func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStatus) {
 	defer close(addchan)
 	if len(filepaths) == 0 {
-		log.LogWrite("No paths to add to annex. Nothing to do.")
+		log.Write("No paths to add to annex. Nothing to do.")
 		return
 	}
 	cmdargs := []string{"add", "--json"}
@@ -758,20 +758,20 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		err := json.Unmarshal(outline, &addresult)
 		if err != nil || addresult == (annexAction{}) {
 			// Couldn't parse output
-			log.LogWrite("Could not parse 'git annex add' output")
-			log.LogWrite(string(outline))
-			log.LogWrite(err.Error())
+			log.Write("Could not parse 'git annex add' output")
+			log.Write(string(outline))
+			log.Write(err.Error())
 			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
 			continue
 		}
 		status.FileName = addresult.File
 		if addresult.Success {
-			log.LogWrite("%s added to annex", addresult.File)
+			log.Write("%s added to annex", addresult.File)
 			status.Err = nil
 			// Write filename metadata key
 			mdchan <- status.FileName
 		} else {
-			log.LogWrite("Error adding %s", addresult.File)
+			log.Write("Error adding %s", addresult.File)
 			status.Err = fmt.Errorf("failed")
 		}
 		status.Progress = progcomplete
@@ -782,7 +782,7 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.LogWrite("Error during AnnexAdd")
+		log.Write("Error during AnnexAdd")
 		logstd(nil, stderr)
 	}
 	return
@@ -799,7 +799,7 @@ func setAnnexMetadataName(pathchan <-chan string) {
 		if err != nil {
 			logstd(stdout, stderr)
 		} else {
-			log.LogWrite("ginfilename metadata key set to %s", fname)
+			log.Write("ginfilename metadata key set to %s", fname)
 		}
 	}
 	return
@@ -810,7 +810,7 @@ func GetAnnexVersion() (string, error) {
 	cmd := AnnexCommand("version", "--raw")
 	stdout, _, err := cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error while preparing git-annex version command")
+		log.Write("Error while preparing git-annex version command")
 		if strings.Contains(err.Error(), "executable file not found") ||
 			strings.Contains(err.Error(), "no such file or directory") {
 			return "", fmt.Errorf("git-annex executable '%s' not found", config.Config.Bin.GitAnnex)
@@ -831,6 +831,6 @@ func AnnexCommand(args ...string) shell.Cmd {
 	env := os.Environ()
 	cmd.Env = append(env, GitSSHEnv(token.Username))
 	cmd.Env = append(cmd.Env, "GIT_ANNEX_USE_GIT_SSH=1")
-	log.LogWrite("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
+	log.Write("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	return cmd
 }

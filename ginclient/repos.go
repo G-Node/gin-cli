@@ -92,7 +92,7 @@ func (gincl *Client) MakeSessionKey() error {
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.LogWrite("Could not retrieve hostname")
+		log.Write("Could not retrieve hostname")
 		hostname = unknownhostname
 	}
 	description := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)
@@ -111,7 +111,7 @@ func (gincl *Client) MakeSessionKey() error {
 // GetRepo retrieves the information of a repository.
 func (gincl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
 	fn := fmt.Sprintf("GetRepo(%s)", repoPath)
-	log.LogWrite("GetRepo")
+	log.Write("GetRepo")
 	var repo gogs.Repository
 
 	res, err := gincl.Get(fmt.Sprintf("/api/v1/repos/%s", repoPath))
@@ -143,7 +143,7 @@ func (gincl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
 // ListRepos gets a list of repositories (public or user specific)
 func (gincl *Client) ListRepos(user string) ([]gogs.Repository, error) {
 	fn := fmt.Sprintf("ListRepos(%s)", user)
-	log.LogWrite("Retrieving repo list")
+	log.Write("Retrieving repo list")
 	var repoList []gogs.Repository
 	var res *http.Response
 	var err error
@@ -176,9 +176,9 @@ func (gincl *Client) ListRepos(user string) ([]gogs.Repository, error) {
 // CreateRepo creates a repository on the server.
 func (gincl *Client) CreateRepo(name, description string) error {
 	fn := fmt.Sprintf("CreateRepo(name)")
-	log.LogWrite("Creating repository")
+	log.Write("Creating repository")
 	newrepo := gogs.CreateRepoOption{Name: name, Description: description, Private: true}
-	log.LogWrite("Name: %s :: Description: %s", name, description)
+	log.Write("Name: %s :: Description: %s", name, description)
 	res, err := gincl.Post("/api/v1/user/repos", newrepo)
 	if err != nil {
 		return err // return error from Post() directly
@@ -194,14 +194,14 @@ func (gincl *Client) CreateRepo(name, description string) error {
 		return ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 	web.CloseRes(res.Body)
-	log.LogWrite("Repository created")
+	log.Write("Repository created")
 	return nil
 }
 
 // DelRepo deletes a repository from the server.
 func (gincl *Client) DelRepo(name string) error {
 	fn := fmt.Sprintf("DelRepo(%s)", name)
-	log.LogWrite("Deleting repository")
+	log.Write("Deleting repository")
 	res, err := gincl.Delete(fmt.Sprintf("/api/v1/repos/%s", name))
 	if err != nil {
 		return err // return error from Post() directly
@@ -219,7 +219,7 @@ func (gincl *Client) DelRepo(name string) error {
 		return ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 	web.CloseRes(res.Body)
-	log.LogWrite("Repository deleted")
+	log.Write("Repository deleted")
 	return nil
 }
 
@@ -253,7 +253,7 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 // The status channel 'uploadchan' is closed when this function returns.
 func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus) {
 	defer close(uploadchan)
-	log.LogWrite("Upload")
+	log.Write("Upload")
 
 	paths, err := expandglobs(paths)
 	if err != nil {
@@ -273,7 +273,7 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus
 // The status channel 'getcontchan' is closed when this function returns.
 func (gincl *Client) GetContent(paths []string, getcontchan chan<- git.RepoFileStatus) {
 	defer close(getcontchan)
-	log.LogWrite("GetContent")
+	log.Write("GetContent")
 
 	paths, err := expandglobs(paths)
 
@@ -294,7 +294,7 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- git.RepoFileS
 // The status channel 'rmcchan' is closed when this function returns.
 func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- git.RepoFileStatus) {
 	defer close(rmcchan)
-	log.LogWrite("RemoveContent")
+	log.Write("RemoveContent")
 
 	paths, err := expandglobs(paths)
 	if err != nil {
@@ -314,7 +314,7 @@ func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- git.RepoFileSt
 // The status channel 'lockchan' is closed when this function returns.
 func (gincl *Client) LockContent(paths []string, lcchan chan<- git.RepoFileStatus) {
 	defer close(lcchan)
-	log.LogWrite("LockContent")
+	log.Write("LockContent")
 
 	paths, err := expandglobs(paths)
 	if err != nil {
@@ -334,7 +334,7 @@ func (gincl *Client) LockContent(paths []string, lcchan chan<- git.RepoFileStatu
 // The status channel 'unlockchan' is closed when this function returns.
 func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileStatus) {
 	defer close(ulcchan)
-	log.LogWrite("UnlockContent")
+	log.Write("UnlockContent")
 
 	paths, err := expandglobs(paths)
 	if err != nil {
@@ -353,7 +353,7 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileSt
 // Download downloads changes and placeholder files in an already checked out repository.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) Download() error {
-	log.LogWrite("Download")
+	log.Write("Download")
 	return git.AnnexPull()
 }
 
@@ -361,7 +361,7 @@ func (gincl *Client) Download() error {
 // The status channel 'clonechan' is closed when this function returns.
 func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileStatus) {
 	defer close(clonechan)
-	log.LogWrite("CloneRepo")
+	log.Write("CloneRepo")
 	clonestatus := make(chan git.RepoFileStatus)
 	remotepath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 	go git.Clone(remotepath, repoPath, clonestatus)
@@ -464,8 +464,8 @@ func (gincl *Client) InitDir() error {
 		cmd := git.Command("init")
 		stdout, stderr, err := cmd.OutputError()
 		if err != nil {
-			log.LogWrite("Error during Init command: %s", string(stderr))
-			log.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(stdout), string(stderr))
+			log.Write("Error during Init command: %s", string(stderr))
+			log.Write("[stdout]\n%s\n[stderr]\n%s", string(stdout), string(stderr))
 			initerr.UError = err.Error()
 			return initerr
 		}
@@ -491,7 +491,7 @@ func (gincl *Client) InitDir() error {
 		}
 		ierr = git.SetGitUser(name, info.Email)
 		if ierr != nil {
-			log.LogWrite("Failed to set local git user configuration")
+			log.Write("Failed to set local git user configuration")
 		}
 	}
 	if runtime.GOOS == "windows" {
@@ -701,8 +701,8 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	cmd := git.Command(diffargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.LogWrite("Error during diff command for status")
-		log.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(stdout), string(stderr))
+		log.Write("Error during diff command for status")
+		log.Write("[stdout]\n%s\n[stderr]\n%s", string(stdout), string(stderr))
 		// ignoring error and continuing
 	}
 
@@ -734,7 +734,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		go git.AnnexStatus(modifiedfiles, statuschan)
 		for item := range statuschan {
 			if item.Err != nil {
-				log.LogWrite("Error during annex status while searching for unlocked files")
+				log.Write("Error during annex status while searching for unlocked files")
 				// lockchan <- git.RepoFileStatus{Err: item.Err}
 			}
 			if item.Status == "T" {
@@ -779,22 +779,22 @@ func expandglobs(paths []string) (globexppaths []string, err error) {
 	}
 	// expand potential globs
 	for _, p := range paths {
-		log.LogWrite("ExpandGlobs: Checking for glob expansion for %s", p)
+		log.Write("ExpandGlobs: Checking for glob expansion for %s", p)
 		exp, globerr := filepath.Glob(p)
 		if globerr != nil {
-			log.LogWrite(globerr.Error())
-			log.LogWrite("Bad file pattern %s", p)
+			log.Write(globerr.Error())
+			log.Write("Bad file pattern %s", p)
 			return nil, globerr
 		}
 		if exp == nil {
-			log.LogWrite("ExpandGlobs: No files matched")
+			log.Write("ExpandGlobs: No files matched")
 			return nil, fmt.Errorf("No files matched %v", p)
 		}
 		globexppaths = append(globexppaths, exp...)
 	}
 	if len(globexppaths) == 0 {
 		// Invalid paths
-		log.LogWrite("ExpandGlobs: No files matched")
+		log.Write("ExpandGlobs: No files matched")
 		err = fmt.Errorf("No files matched %v", paths)
 	}
 	return

@@ -29,7 +29,7 @@ type KeyFile struct {
 
 // MakeKeyPair generates and returns a private-public key pair.
 func MakeKeyPair() (*KeyPair, error) {
-	log.LogWrite("Creating key pair")
+	log.Write("Creating key pair")
 	privkey, err := rsa.GenerateKey(rand.Reader, 2048) // TODO: Key size as parameter
 	if err != nil {
 		return nil, fmt.Errorf("Error generating key pair: %s", err)
@@ -58,8 +58,8 @@ func MakeKeyPair() (*KeyPair, error) {
 func PrivKeyPath(user string) string {
 	configpath, err := config.ConfigPath(false)
 	if err != nil {
-		log.LogWrite("Error getting user's config path. Can't load key file.")
-		log.LogWrite(err.Error())
+		log.Write("Error getting user's config path. Can't load key file.")
+		log.Write(err.Error())
 		return ""
 	}
 	return filepath.Join(configpath, fmt.Sprintf("%s.key", user))
@@ -69,8 +69,8 @@ func PrivKeyPath(user string) string {
 func HostKeyPath() string {
 	configpath, err := config.ConfigPath(false)
 	if err != nil {
-		log.LogWrite("Error getting user's config path. Can't create host key file.")
-		log.LogWrite(err.Error())
+		log.Write("Error getting user's config path. Can't create host key file.")
+		log.Write(err.Error())
 		return ""
 	}
 	return filepath.Join(configpath, "ginhostkey")
@@ -90,6 +90,6 @@ func GitSSHEnv(user string) string {
 	// hostkeyfile := fixpathsep(HostKeyPath())
 	hostkeyfile := HostKeyPath()
 	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=\"%s\"'", sshbin, keyfile, hostkeyfile)
-	log.LogWrite("env %s", gitSSHCmd)
+	log.Write("env %s", gitSSHCmd)
 	return gitSSHCmd
 }

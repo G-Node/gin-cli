@@ -27,12 +27,12 @@ func Die(msg interface{}) {
 	// Swap the line above for the line below when (if) https://github.com/fatih/color/pull/87 gets merged
 	msgstring := fmt.Sprintf("%s", msg)
 	if len(msgstring) > 0 {
-		log.LogWrite("Exiting with ERROR message: %s", msgstring)
+		log.Write("Exiting with ERROR message: %s", msgstring)
 		fmt.Fprintln(os.Stderr, msgstring)
 	} else {
-		log.LogWrite("Exiting with ERROR (no message)")
+		log.Write("Exiting with ERROR (no message)")
 	}
-	log.LogClose()
+	log.Close()
 	os.Exit(1)
 }
 
@@ -41,7 +41,7 @@ func Die(msg interface{}) {
 // Otherwise, the error message is printed to stderr.
 func CheckError(err error) {
 	if err != nil {
-		log.LogWrite(err.Error())
+		log.Write(err.Error())
 		if strings.Contains(err.Error(), "Error loading user token") {
 			Die("This operation requires login.")
 		}
@@ -53,7 +53,7 @@ func CheckError(err error) {
 // Before exiting, the given msg string is printed to stderr.
 func CheckErrorMsg(err error, msg string) {
 	if err != nil {
-		log.LogWrite("The following error occurred:\n%sExiting with message: %s", err, msg)
+		log.Write("The following error occurred:\n%sExiting with message: %s", err, msg)
 		Die(msg)
 	}
 }

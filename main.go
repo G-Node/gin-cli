@@ -69,9 +69,9 @@ func init() {
 }
 
 func main() {
-	err := log.LogInit(verstr)
+	err := log.Init(verstr)
 	gincmd.CheckError(err)
-	defer log.LogClose()
+	defer log.Close()
 
 	var args = make([]string, len(os.Args))
 	for idx, a := range os.Args {
@@ -80,9 +80,9 @@ func main() {
 			args[idx] = fmt.Sprintf("'%s'", a)
 		}
 	}
-	log.LogWrite("COMMAND: %s", strings.Join(args, " "))
+	log.Write("COMMAND: %s", strings.Join(args, " "))
 	cwd, _ := os.Getwd()
-	log.LogWrite("CWD: %s", cwd)
+	log.Write("CWD: %s", cwd)
 
 	err = config.LoadConfig()
 	gincmd.CheckError(err)
@@ -94,5 +94,5 @@ func main() {
 	// Engage
 	rootCmd.Execute()
 
-	log.LogWrite("EXIT OK")
+	log.Write("EXIT OK")
 }

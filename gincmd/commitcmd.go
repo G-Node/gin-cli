@@ -33,12 +33,12 @@ func makeCommitMessage(action string, paths []string) (commitmsg string) {
 	// add header commit line
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.LogWrite("Could not retrieve hostname")
+		log.Write("Could not retrieve hostname")
 		hostname = unknownhostname
 	}
 	changes, err := git.DescribeIndexShort(paths)
 	if err != nil {
-		log.LogWrite("Failed to determine changes for commit message")
+		log.Write("Failed to determine changes for commit message")
 		changes = ""
 	}
 	commitmsg = fmt.Sprintf("gin %s from %s\n\n%s", action, hostname, changes)

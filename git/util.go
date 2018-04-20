@@ -38,7 +38,7 @@ func calcRate(dbytes int, dt time.Duration) string {
 }
 
 func logstd(out, err []byte) {
-	log.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
+	log.Write("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
 }
 
 func cutline(b []byte) (string, bool) {
@@ -118,7 +118,7 @@ func filterpaths(paths, excludes []string) (filtered []string) {
 	for _, p := range paths {
 		err := filepath.Walk(p, walker)
 		if err != nil {
-			log.LogWrite("Error occured during path filtering: %s", err.Error())
+			log.Write("Error occured during path filtering: %s", err.Error())
 		}
 	}
 	return

@@ -24,7 +24,7 @@ func deleteRepo(cmd *cobra.Command, args []string) {
 	CheckError(err)
 
 	if repoinfo.FullName != repostr {
-		log.LogWrite("ERROR: Mismatch in repository names: %s != %s", repoinfo.FullName, repostr)
+		log.Write("ERROR: Mismatch in repository names: %s != %s", repoinfo.FullName, repostr)
 		Die("An unexpected error occurred while communicating with the server.")
 	}
 

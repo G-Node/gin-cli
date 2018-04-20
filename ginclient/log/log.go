@@ -14,8 +14,8 @@ var logger *log.Logger
 
 var configDirs = configdir.New("g-node", "gin")
 
-// LogInit initialises the log file and logger.
-func LogInit(ver string) error {
+// Init initialises the log file and logger.
+func Init(ver string) error {
 	// TODO: Log rotation
 	cachepath, err := CachePath(true)
 	if err != nil {
@@ -30,8 +30,8 @@ func LogInit(ver string) error {
 	flags := log.Ldate | log.Ltime | log.LUTC
 	logger = log.New(logfile, "", flags)
 
-	LogWrite("=== LOGINIT ===")
-	LogWrite("VERSION: %s", ver)
+	Write("=== LOGINIT ===")
+	Write("VERSION: %s", ver)
 
 	return nil
 }
@@ -52,9 +52,9 @@ func CachePath(create bool) (string, error) {
 	return logpath, err
 }
 
-// LogWrite writes a string to the log file. Nothing happens if the log file is not initialised (see LogInit).
-// Depending on the number of arguments passed, LogWrite either behaves as a Print or a Printf. The first argument must always be a string. If more than one argument is given, the function behaves as Printf.
-func LogWrite(fmtstr string, args ...interface{}) {
+// Write writes a string to the log file. Nothing happens if the log file is not initialised (see LogInit).
+// Depending on the number of arguments passed, Write either behaves as a Print or a Printf. The first argument must always be a string. If more than one argument is given, the function behaves as Printf.
+func Write(fmtstr string, args ...interface{}) {
 	if logger == nil {
 		return
 	}
@@ -65,16 +65,16 @@ func LogWrite(fmtstr string, args ...interface{}) {
 	}
 }
 
-// LogError prints err to the logfile and returns, effectively ignoring the error.
+// WriteError prints err to the logfile and returns, effectively ignoring the error.
 // No logging is performed if err == nil.
-func LogError(err error) {
+func WriteError(err error) {
 	if err != nil {
-		LogWrite("The following error occured:\n%s", err)
+		Write("The following error occured:\n%s", err)
 	}
 }
 
-// LogClose closes the log file.
-func LogClose() {
-	LogWrite("=== LOGEND ===")
+// Close closes the log file.
+func Close() {
+	Write("=== LOGEND ===")
 	_ = logfile.Close()
 }

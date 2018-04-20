@@ -88,7 +88,7 @@ func LoadConfig() error {
 	viper.SetConfigFile(confpath)
 	cerr := viper.MergeInConfig()
 	if cerr == nil {
-		log.LogWrite("Found config file %s", confpath)
+		log.Write("Found config file %s", confpath)
 	}
 
 	Config.Bin.Git = viper.GetString("bin.git")
@@ -112,14 +112,14 @@ func LoadConfig() error {
 		viper.SetConfigFile(confpath)
 		cerr = viper.MergeInConfig()
 		if cerr == nil {
-			log.LogWrite("Found config file %s", confpath)
+			log.Write("Found config file %s", confpath)
 		}
 	}
 	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
 	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
-	log.LogWrite("Configuration values")
-	log.LogWrite("%+v", Config)
+	log.Write("Configuration values")
+	log.Write("%+v", Config)
 
 	// TODO: Validate URLs on config read
 
