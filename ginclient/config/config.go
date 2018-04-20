@@ -13,6 +13,23 @@ import (
 
 var configDirs = configdir.New("g-node", "gin")
 
+// GinConfiguration holds the client configuration values
+type GinConfiguration struct {
+	GinHost    string
+	GitHost    string
+	GitUser    string
+	GitHostKey string
+	Bin        struct {
+		Git      string
+		GitAnnex string
+		SSH      string
+	}
+	Annex struct {
+		Exclude []string
+		MinSize string
+	}
+}
+
 // NOTE: Duplicate function
 // pathExists returns true if the path exists
 func pathExists(path string) bool {
@@ -42,24 +59,16 @@ func FindRepoRoot(path string) (string, error) {
 	return FindRepoRoot(updir)
 }
 
-type GinConfiguration struct {
-	GinHost    string
-	GitHost    string
-	GitUser    string
-	GitHostKey string
-	Bin        struct {
-		Git      string
-		GitAnnex string
-		SSH      string
-	}
-	Annex struct {
-		Exclude []string
-		MinSize string
-	}
-}
+// local configuration cache
+var configuration GinConfiguration
+var set = false
 
-// Read reads in the configuration and makes it available through Config package global
-func Read() (Config GinConfiguration) {
+// Read loads in the configuration from the config file(s) and returns a populated GinConfiguration struct.
+// The configuration is cached. Subsequent reads reuse the already loaded configuration.
+func Read() GinConfiguration {
+	if set {
+		return configuration
+	}
 	viper.Reset()
 	viper.SetTypeByDefaultValue(true)
 	// Binaries
@@ -90,21 +99,21 @@ func Read() (Config GinConfiguration) {
 		log.Write("Found config file %s", confpath)
 	}
 
-	Config.Bin.Git = viper.GetString("bin.git")
-	Config.Bin.GitAnnex = viper.GetString("bin.gitannex")
-	Config.Bin.SSH = viper.GetString("bin.ssh")
+	configuration.Bin.Git = viper.GetString("bin.git")
+	configuration.Bin.GitAnnex = viper.GetString("bin.gitannex")
+	configuration.Bin.SSH = viper.GetString("bin.ssh")
 
 	ginAddress := viper.GetString("gin.address")
 	ginPort := viper.GetInt("gin.port")
-	Config.GinHost = fmt.Sprintf("%s:%d", ginAddress, ginPort)
+	configuration.GinHost = fmt.Sprintf("%s:%d", ginAddress, ginPort)
 
 	gitAddress := viper.GetString("git.address")
 	gitPort := viper.GetInt("git.port")
-	Config.GitHost = fmt.Sprintf("%s:%d", gitAddress, gitPort)
-	Config.GitUser = viper.GetString("git.user")
-	Config.GitHostKey = viper.GetString("git.hostkey")
+	configuration.GitHost = fmt.Sprintf("%s:%d", gitAddress, gitPort)
+	configuration.GitUser = viper.GetString("git.user")
+	configuration.GitHostKey = viper.GetString("git.hostkey")
 
-	// Config file in the repository root (annex excludes and size threshold only)
+	// configuration file in the repository root (annex excludes and size threshold only)
 	reporoot, err := FindRepoRoot(".")
 	if err == nil {
 		confpath := filepath.Join(reporoot, configFileName)
@@ -114,14 +123,15 @@ func Read() (Config GinConfiguration) {
 			log.Write("Found config file %s", confpath)
 		}
 	}
-	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
-	Config.Annex.MinSize = viper.GetString("annex.minsize")
+	configuration.Annex.Exclude = viper.GetStringSlice("annex.exclude")
+	configuration.Annex.MinSize = viper.GetString("annex.minsize")
 
-	log.Write("Configuration values")
-	log.Write("%+v", Config)
+	log.Write("configurationuration values")
+	log.Write("%+v", configuration)
 
 	// TODO: Validate URLs on config read
-	return
+	set = true
+	return configuration
 }
 
 // Path returns the configuration path where configuration files should be stored.
