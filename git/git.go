@@ -58,8 +58,8 @@ type DiffStat struct {
 	ModifiedFiles []string
 }
 
-// GitObject contains the information for a tree or blob object in git
-type GitObject struct {
+// Object contains the information for a tree or blob object in git
+type Object struct {
 	Name string
 	Hash string
 	Type string
@@ -84,13 +84,13 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 
 // Git commands
 
-// GitAdd adds paths to git directly (not annex).
+// Add adds paths to git directly (not annex).
 // In direct mode, files that are already in the annex are explicitly ignored.
 // In indirect mode, adding annexed files to git has no effect.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'addchan' is closed when this function returns.
 // (git add)
-func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
+func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 	defer close(addchan)
 	if len(filepaths) == 0 {
 		util.LogWrite("No paths to add to git. Nothing to do.")
@@ -118,7 +118,7 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	}
 
 	cmdargs := append([]string{"add", "--verbose", "--"}, filepaths...)
-	cmd := GitCommand(cmdargs...)
+	cmd := Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		addchan <- RepoFileStatus{Err: err}
@@ -163,19 +163,19 @@ func SetGitUser(name, email string) error {
 	if !IsRepo() {
 		return fmt.Errorf("not a repository")
 	}
-	cmd := GitCommand("config", "--local", "user.name", name)
+	cmd := Command("config", "--local", "user.name", name)
 	err := cmd.Run()
 	if err != nil {
 		return err
 	}
-	cmd = GitCommand("config", "--local", "user.email", email)
+	cmd = Command("config", "--local", "user.email", email)
 	return cmd.Run()
 }
 
 // AddRemote adds a remote named name for the repository at url.
 func AddRemote(name, url string) error {
 	fn := fmt.Sprintf("AddRemote(%s, %s)", name, url)
-	cmd := GitCommand("remote", "add", name, url)
+	cmd := Command("remote", "add", name, url)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := giterror{UError: err.Error(), Origin: fn}
@@ -197,7 +197,7 @@ func CommitIfNew(upstream string) (bool, error) {
 	if !IsRepo() {
 		return false, fmt.Errorf("not a repository")
 	}
-	cmd := GitCommand("rev-parse", "HEAD")
+	cmd := Command("rev-parse", "HEAD")
 	err := cmd.Run()
 	if err == nil {
 		// All good. No need to do anything
@@ -209,7 +209,7 @@ func CommitIfNew(upstream string) (bool, error) {
 	if err != nil {
 		hostname = unknownhostname
 	}
-	cmd = GitCommand("commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
+	cmd = Command("commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error while creating initial commit")
@@ -221,7 +221,7 @@ func CommitIfNew(upstream string) (bool, error) {
 		return true, nil
 	}
 
-	cmd = GitCommand("push", "--set-upstream", upstream, "HEAD")
+	cmd = Command("push", "--set-upstream", upstream, "HEAD")
 	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error while creating initial commit")
@@ -244,10 +244,10 @@ func IsRepo() bool {
 
 // **************** //
 
-// GitCommit records changes that have been added to the repository with a given message.
+// Commit records changes that have been added to the repository with a given message.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git commit)
-func GitCommit(commitmsg string) error {
+func Commit(commitmsg string) error {
 	if IsDirect() {
 		// Set bare false and revert at the end of the function
 		err := setBare(false)
@@ -257,7 +257,7 @@ func GitCommit(commitmsg string) error {
 		defer setBare(true)
 	}
 
-	cmd := GitCommand("commit", fmt.Sprintf("--message=%s", commitmsg))
+	cmd := Command("commit", fmt.Sprintf("--message=%s", commitmsg))
 	stdout, stderr, err := cmd.OutputError()
 
 	if err != nil {
@@ -273,14 +273,14 @@ func GitCommit(commitmsg string) error {
 	return nil
 }
 
-// GitLsFiles lists all files known to git.
+// LsFiles lists all files known to git.
 // In direct mode, the bare flag is temporarily switched off before running the command.
 // The output channel 'lschan' is closed when this function returns.
 // (git ls-files)
-func GitLsFiles(args []string, lschan chan<- string) {
+func LsFiles(args []string, lschan chan<- string) {
 	defer close(lschan)
 	cmdargs := append([]string{"ls-files"}, args...)
-	cmd := GitCommand(cmdargs...)
+	cmd := Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("ls-files command set up failed: %s", err)
@@ -360,11 +360,11 @@ func DescribeIndex() (string, error) {
 	return changesBuffer.String(), nil
 }
 
-// GitLog returns the commit logs for the repository.
+// Log returns the commit logs for the repository.
 // The number of commits can be limited by the count argument.
 // If count <= 0, the entire commit history is returned.
 // Revisions which match only the deletion of the matching paths can be filtered using the showdeletes argument.
-func GitLog(count uint, revrange string, paths []string, showdeletes bool) ([]GinCommit, error) {
+func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCommit, error) {
 	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":"%b"}`
 	cmdargs := []string{"log", "-z", fmt.Sprintf("--format=%s", logformat)}
 	if count > 0 {
@@ -381,7 +381,7 @@ func GitLog(count uint, revrange string, paths []string, showdeletes bool) ([]Gi
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd := GitCommand(cmdargs...)
+	cmd := Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		util.LogWrite("Error setting up git log command")
@@ -426,7 +426,7 @@ func GitLog(count uint, revrange string, paths []string, showdeletes bool) ([]Gi
 	}
 
 	// TODO: Combine diffstats into first git log invocation
-	logstats, err := GitLogDiffstat(count, paths, showdeletes)
+	logstats, err := LogDiffStat(count, paths, showdeletes)
 	if err != nil {
 		util.LogWrite("Failed to get diff stats")
 		return commits, nil
@@ -438,7 +438,7 @@ func GitLog(count uint, revrange string, paths []string, showdeletes bool) ([]Gi
 
 	return commits, nil
 }
-func GitLogDiffstat(count uint, paths []string, showdeletes bool) (map[string]DiffStat, error) {
+func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffStat, error) {
 	logformat := `::%H`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
 	if count > 0 {
@@ -451,10 +451,10 @@ func GitLogDiffstat(count uint, paths []string, showdeletes bool) (map[string]Di
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd := GitCommand(cmdargs...)
+	cmd := Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
-		util.LogWrite("Error during GitLogDiffstat")
+		util.LogWrite("Error during LogDiffstat")
 		return nil, err
 	}
 
@@ -504,9 +504,9 @@ func GitLogDiffstat(count uint, paths []string, showdeletes bool) (map[string]Di
 	return stats, nil
 }
 
-// GitCheckout performs a git checkout of a specific commit.
+// Checkout performs a git checkout of a specific commit.
 // Individual files or directories may be specified, otherwise the entire tree is checked out.
-func GitCheckout(hash string, paths []string) error {
+func Checkout(hash string, paths []string) error {
 	cmdargs := []string{"checkout", hash, "--"}
 	if paths == nil || len(paths) == 0 {
 		reporoot, _ := util.FindRepoRoot(".")
@@ -515,7 +515,7 @@ func GitCheckout(hash string, paths []string) error {
 	}
 	cmdargs = append(cmdargs, paths...)
 
-	cmd := GitCommand(cmdargs...)
+	cmd := Command(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during GitCheckout")
@@ -525,20 +525,20 @@ func GitCheckout(hash string, paths []string) error {
 	return nil
 }
 
-// GitLsTree performs a recursive git ls-tree with a given revision (hash) and a list of paths.
+// LsTree performs a recursive git ls-tree with a given revision (hash) and a list of paths.
 // For each item, it returns a struct which contains the type (blob, tree), the mode, the hash, and the absolute (repo rooted) path to the object (name).
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func GitLsTree(revision string, paths []string) ([]GitObject, error) {
+func LsTree(revision string, paths []string) ([]Object, error) {
 	cmdargs := []string{"ls-tree", "--full-tree", "-z", "-t", "-r", revision}
 	cmdargs = append(cmdargs, paths...)
-	cmd := GitCommand(cmdargs...)
+	cmd := Command(cmdargs...)
 	// This command doesn't need to be read line-by-line
 	err := cmd.Start()
 	if err != nil {
 		return nil, err
 	}
 
-	var objects []GitObject
+	var objects []Object
 	var line string
 	var rerr error
 	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\000') {
@@ -551,7 +551,7 @@ func GitLsTree(revision string, paths []string) ([]GitObject, error) {
 		if len(words) < 4 || len(fnamesplit) < 2 {
 			continue
 		}
-		obj := GitObject{
+		obj := Object{
 			Mode: words[0],
 			Type: words[1],
 			Hash: words[2],
@@ -573,10 +573,10 @@ func GitLsTree(revision string, paths []string) ([]GitObject, error) {
 	return objects, nil
 }
 
-// GitCatFileContents performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
+// CatFileContents performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func GitCatFileContents(revision, filepath string) ([]byte, error) {
-	cmd := GitCommand("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
+func CatFileContents(revision, filepath string) ([]byte, error) {
+	cmd := Command("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during GitCatFile (Contents)")
@@ -586,10 +586,10 @@ func GitCatFileContents(revision, filepath string) ([]byte, error) {
 	return stdout, nil
 }
 
-// GitCatFileType returns the type of a given object at a given revision (blob, tree, or commit)
+// CatFileType returns the type of a given object at a given revision (blob, tree, or commit)
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func GitCatFileType(object string) (string, error) {
-	cmd := GitCommand("cat-file", "-t", object)
+func CatFileType(object string) (string, error) {
+	cmd := Command("cat-file", "-t", object)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during GitCatFile (Type)")
@@ -600,10 +600,10 @@ func GitCatFileType(object string) (string, error) {
 	return string(stdout), nil
 }
 
-// GitRevCount returns the number of commits between two revisions.
+// RevCount returns the number of commits between two revisions.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func GitRevCount(a, b string) (int, error) {
-	cmd := GitCommand("rev-list", "--count", fmt.Sprintf("%s..%s", a, b))
+func RevCount(a, b string) (int, error) {
+	cmd := Command("rev-list", "--count", fmt.Sprintf("%s..%s", a, b))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		logstd(stdout, stderr)
@@ -611,8 +611,6 @@ func GitRevCount(a, b string) (int, error) {
 	}
 	return strconv.Atoi(string(stdout))
 }
-
-var annexmodecache = make(map[string]bool)
 
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
@@ -622,7 +620,7 @@ func IsDirect() bool {
 	if mode, ok := annexmodecache[Workingdir]; ok {
 		return mode
 	}
-	cmd := GitCommand("config", "--local", "annex.direct")
+	cmd := Command("config", "--local", "annex.direct")
 	stdout, _, err := cmd.OutputError()
 	if err != nil {
 		// Don't cache this result
@@ -641,7 +639,7 @@ func IsDirect() bool {
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsVersion6() bool {
-	cmd := GitCommand("config", "--local", "--get", "annex.version")
+	cmd := Command("config", "--local", "--get", "annex.version")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error while checking repository annex version")
@@ -660,7 +658,7 @@ func setBare(state bool) error {
 	} else {
 		statestr = "false"
 	}
-	cmd := GitCommand("config", "--local", "--bool", "core.bare", statestr)
+	cmd := Command("config", "--local", "--bool", "core.bare", statestr)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error switching bare status to %s", statestr)
@@ -670,9 +668,9 @@ func setBare(state bool) error {
 	return err
 }
 
-// GitCommand sets up an external git command with the provided arguments and returns a GinCmd struct.
+// Command sets up an external git command with the provided arguments and returns a GinCmd struct.
 // Setting the Workingdir package global affects the working directory in which the command will be executed.
-func GitCommand(args ...string) util.GinCmd {
+func Command(args ...string) util.GinCmd {
 	gitbin := util.Config.Bin.Git
 	cmd := util.Command(gitbin)
 	cmd.Dir = Workingdir

@@ -30,7 +30,7 @@ func upload(cmd *cobra.Command, args []string) {
 
 		fmt.Print("Recording changes ")
 		// ignore error for now :: call commit() instead
-		git.GitCommit(makeCommitMessage("upload", paths))
+		git.Commit(makeCommitMessage("upload", paths))
 		fmt.Println(green("OK"))
 	}
 

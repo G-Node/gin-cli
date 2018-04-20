@@ -14,7 +14,7 @@ func gitrun(cmd *cobra.Command, args []string) {
 	gincl := ginclient.New(util.Config.GinHost)
 	_ = gincl.LoadToken() // OK to run without token
 
-	gitcmd := git.GitCommand(args...)
+	gitcmd := git.Command(args...)
 	err := gitcmd.Start()
 	util.CheckError(err)
 	var line string

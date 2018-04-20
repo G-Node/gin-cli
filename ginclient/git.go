@@ -55,7 +55,7 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- git.RepoFileStatus)
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
 		args = append([]string{"-c", "core.symlinks=false"}, args...)
 	}
-	cmd := git.GitCommand(args...)
+	cmd := git.Command(args...)
 	err := cmd.Start()
 	if err != nil {
 		clonechan <- git.RepoFileStatus{Err: ginerror{UError: err.Error(), Origin: fn}}

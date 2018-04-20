@@ -22,7 +22,7 @@ func commit(cmd *cobra.Command, args []string) {
 	formatOutput(addchan, jsonout)
 
 	fmt.Print("Recording changes ")
-	err := git.GitCommit(makeCommitMessage("commit", paths))
+	err := git.Commit(makeCommitMessage("commit", paths))
 	if err != nil {
 		util.Die(err)
 	}

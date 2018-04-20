@@ -12,6 +12,8 @@ import (
 
 // General utility functions for the git and git-annex shell commands and their output.
 
+var annexmodecache = make(map[string]bool)
+
 func makeFileList(header string, fnames []string) string {
 	if len(fnames) == 0 {
 		return ""

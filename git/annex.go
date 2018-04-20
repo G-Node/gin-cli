@@ -123,7 +123,7 @@ func AnnexInit(description string) error {
 		logstd(stdout, stderr)
 		return initError
 	}
-	cmd = GitCommand("config", "annex.backends", "MD5")
+	cmd = Command("config", "annex.backends", "MD5")
 	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Failed to set default annex backend MD5")

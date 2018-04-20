@@ -24,7 +24,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 
 	var commit git.GinCommit
 	if commithash == "" {
-		commits, err := git.GitLog(count, "", paths, false)
+		commits, err := git.Log(count, "", paths, false)
 		util.CheckError(err)
 		if jsonout {
 			j, _ := json.Marshal(commits)
@@ -36,7 +36,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 		}
 		commit = verprompt(commits)
 	} else {
-		commits, err := git.GitLog(1, commithash, paths, false)
+		commits, err := git.Log(1, commithash, paths, false)
 		util.CheckError(err)
 		commit = commits[0]
 	}
@@ -52,7 +52,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 		formatOutput(addchan, jsonout)
 
 		fmt.Print("Recording changes ")
-		err = git.GitCommit(makeCommitMessage("commit", paths))
+		err = git.Commit(makeCommitMessage("commit", paths))
 		if err != nil {
 			util.Die(err)
 		}
@@ -90,7 +90,7 @@ func checkoutcopies(commit git.GinCommit, paths []string, destination string) {
 	}
 	// Add new files to index but do not upload
 	addchan := make(chan git.RepoFileStatus)
-	go git.GitAdd(newfiles, addchan)
+	go git.Add(newfiles, addchan)
 	<-addchan
 	// TODO: Instead of adding git files, would it be better if we did get-content on annex files and then removed them from the index?
 }

@@ -193,7 +193,7 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 		}
 
 		gitaddchan := make(chan git.RepoFileStatus)
-		go git.GitAdd(paths, gitaddchan)
+		go git.Add(paths, gitaddchan)
 		for addstat := range gitaddchan {
 			addchan <- addstat
 		}
@@ -342,7 +342,7 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 
 // CheckoutVersion checks out all files specified by paths from the revision with the specified commithash.
 func CheckoutVersion(commithash string, paths []string) error {
-	return git.GitCheckout(commithash, paths)
+	return git.Checkout(commithash, paths)
 }
 
 // FileCheckoutStatus is used to report the status of a CheckoutFileCopies() operation.
@@ -358,7 +358,7 @@ type FileCheckoutStatus struct {
 // The timestamp of the revision is appended to the original filenames.
 func CheckoutFileCopies(commithash string, paths []string, outpath string, suffix string, cochan chan<- FileCheckoutStatus) {
 	defer close(cochan)
-	objects, err := git.GitLsTree(commithash, paths)
+	objects, err := git.LsTree(commithash, paths)
 	if err != nil {
 		cochan <- FileCheckoutStatus{Err: err}
 		return
@@ -375,7 +375,7 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 			status.Destination = outfile
 
 			// determine if it's an annexed link
-			content, cerr := git.GitCatFileContents(commithash, obj.Name)
+			content, cerr := git.CatFileContents(commithash, obj.Name)
 			if cerr != nil {
 				cochan <- FileCheckoutStatus{Err: cerr}
 				return
@@ -420,7 +420,7 @@ func (gincl *Client) AddRemote(name, repopath string) error {
 func (gincl *Client) InitDir() error {
 	initerr := ginerror{Origin: "InitDir", Description: "Error initialising local directory"}
 	if !git.IsRepo() {
-		cmd := git.GitCommand("init")
+		cmd := git.Command("init")
 		stdout, stderr, err := cmd.OutputError()
 		if err != nil {
 			util.LogWrite("Error during Init command: %s", string(stderr))
@@ -438,9 +438,9 @@ func (gincl *Client) InitDir() error {
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 
 	// If there is no global git user.name or user.email set local ones
-	cmd := git.GitCommand("config", "--global", "user.name")
+	cmd := git.Command("config", "--global", "user.name")
 	globalGitName, _ := cmd.Output()
-	cmd = git.GitCommand("config", "--global", "user.email")
+	cmd = git.Command("config", "--global", "user.email")
 	globalGitEmail, _ := cmd.Output()
 	if len(globalGitName) == 0 && len(globalGitEmail) == 0 {
 		info, ierr := gincl.RequestAccount(gincl.Username)
@@ -456,7 +456,7 @@ func (gincl *Client) InitDir() error {
 	if runtime.GOOS == "windows" {
 		// force disable symlinks even if user can create them
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
-		git.GitCommand("config", "--local", "core.symlinks", "false").Run()
+		git.Command("config", "--local", "core.symlinks", "false").Run()
 	}
 
 	err = git.AnnexInit(description)
@@ -605,7 +605,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	// Unmodified files that are checked into git (not annex) do not show up
 	// Need to run git ls-files and add only files that haven't been added yet
 	lschan := make(chan string)
-	go git.GitLsFiles(paths, lschan)
+	go git.LsFiles(paths, lschan)
 	for fname := range lschan {
 		if _, ok := statuses[fname]; !ok {
 			statuses[fname] = Synced
@@ -623,22 +623,22 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	var cachedfiles, modifiedfiles, untrackedfiles, deletedfiles []string
 	// Collect checked in files
 	lsfilesargs := append([]string{"--cached"}, paths...)
-	go git.GitLsFiles(lsfilesargs, cachedchan)
+	go git.LsFiles(lsfilesargs, cachedchan)
 
 	// Collect modified files
 	modifiedchan := make(chan string)
 	lsfilesargs = append([]string{"--modified"}, paths...)
-	go git.GitLsFiles(lsfilesargs, modifiedchan)
+	go git.LsFiles(lsfilesargs, modifiedchan)
 
 	// Collect untracked files
 	otherschan := make(chan string)
 	lsfilesargs = append([]string{"--others"}, paths...)
-	go git.GitLsFiles(lsfilesargs, otherschan)
+	go git.LsFiles(lsfilesargs, otherschan)
 
 	// Collect deleted files
 	deletedchan := make(chan string)
 	lsfilesargs = append([]string{"--deleted"}, paths...)
-	go git.GitLsFiles(lsfilesargs, deletedchan)
+	go git.LsFiles(lsfilesargs, deletedchan)
 
 	for {
 		select {
@@ -697,7 +697,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	// If cached files are diff from upstream, mark as LocalChanges
 	diffargs := []string{"diff", "-z", "--name-only", "--relative", "@{upstream}"}
 	diffargs = append(diffargs, cachedfiles...)
-	cmd := git.GitCommand(diffargs...)
+	cmd := git.Command(diffargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error during diff command for status")
