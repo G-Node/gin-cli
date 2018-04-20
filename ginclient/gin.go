@@ -278,8 +278,9 @@ func (gincl *Client) Logout() {
 
 // MakeHostsFile creates a known_hosts file in the config directory based on the server configuration for host key checking.
 func MakeHostsFile() {
+	conf := config.Read()
 	hostkeyfile := git.HostKeyPath()
-	ginhostkey := fmt.Sprintln(config.Config.GitHostKey)
+	ginhostkey := fmt.Sprintln(conf.GitHostKey)
 	_ = ioutil.WriteFile(hostkeyfile, []byte(ginhostkey), 0600)
 	return
 }

@@ -696,12 +696,13 @@ func AnnexFromKey(key, filepath string) error {
 }
 
 func annexExclArgs() (exclargs []string) {
-	if config.Config.Annex.MinSize != "" {
-		sizefilterarg := fmt.Sprintf("--largerthan=%s", config.Config.Annex.MinSize)
+	config := config.Read()
+	if config.Annex.MinSize != "" {
+		sizefilterarg := fmt.Sprintf("--largerthan=%s", config.Annex.MinSize)
 		exclargs = append(exclargs, sizefilterarg)
 	}
 
-	for _, pattern := range config.Config.Annex.Exclude {
+	for _, pattern := range config.Annex.Exclude {
 		arg := fmt.Sprintf("--exclude=%s", pattern)
 		exclargs = append(exclargs, arg)
 	}
@@ -808,14 +809,21 @@ func setAnnexMetadataName(pathchan <-chan string) {
 // GetAnnexVersion returns the version string of the system's git-annex.
 func GetAnnexVersion() (string, error) {
 	cmd := AnnexCommand("version", "--raw")
-	stdout, _, err := cmd.OutputError()
+	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
+		errmsg := string(stderr)
 		log.Write("Error while preparing git-annex version command")
-		if strings.Contains(err.Error(), "executable file not found") ||
-			strings.Contains(err.Error(), "no such file or directory") {
-			return "", fmt.Errorf("git-annex executable '%s' not found", config.Config.Bin.GitAnnex)
+		if strings.Contains(err.Error(), "executable file not found") {
+			return "", fmt.Errorf("git-annex executable not found: %s", err.Error())
+		}
+		if strings.Contains(errmsg, "no such file or directory") {
+			return "", fmt.Errorf("git-annex executable not found: %s", errmsg)
+		}
+		if errmsg != "" {
+			return "", fmt.Errorf(errmsg)
 		}
 		return "", err
+
 	}
 	return string(stdout), nil
 }
@@ -823,7 +831,8 @@ func GetAnnexVersion() (string, error) {
 // AnnexCommand sets up a git annex command with the provided arguments and returns a GinCmd struct.
 // Setting the Workingdir package global affects the working directory in which the command will be executed.
 func AnnexCommand(args ...string) shell.Cmd {
-	gitannexbin := config.Config.Bin.GitAnnex
+	config := config.Read()
+	gitannexbin := config.Bin.GitAnnex
 	cmd := shell.Command(gitannexbin, args...)
 	cmd.Dir = Workingdir
 	token := web.UserToken{}

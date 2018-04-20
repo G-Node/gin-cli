@@ -171,7 +171,7 @@ func (ut *UserToken) LoadToken() error {
 	if ut.Username != "" && ut.Token != "" {
 		return nil
 	}
-	path, _ := config.ConfigPath(false) // Error can only occur when create=True
+	path, _ := config.Path(false) // Error can only occur when create=True
 	filepath := filepath.Join(path, "token")
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -191,7 +191,7 @@ func (ut *UserToken) LoadToken() error {
 func (ut *UserToken) StoreToken() error {
 	fn := "StoreToken()"
 	log.Write("Saving token")
-	path, err := config.ConfigPath(true)
+	path, err := config.Path(true)
 	if err != nil {
 		return weberror{UError: err.Error(), Origin: fn}
 	}
@@ -215,7 +215,7 @@ func (ut *UserToken) StoreToken() error {
 
 // DeleteToken deletes the token file if it exists (for finalising a logout).
 func DeleteToken() error {
-	path, _ := config.ConfigPath(false) // Error can only occur when create=True
+	path, _ := config.Path(false) // Error can only occur when create=True
 	tokenpath := filepath.Join(path, "token")
 	err := os.Remove(tokenpath)
 	if err != nil {

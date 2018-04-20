@@ -56,7 +56,7 @@ func MakeKeyPair() (*KeyPair, error) {
 
 // PrivKeyPath returns the full path for the location of the user's private key file.
 func PrivKeyPath(user string) string {
-	configpath, err := config.ConfigPath(false)
+	configpath, err := config.Path(false)
 	if err != nil {
 		log.Write("Error getting user's config path. Can't load key file.")
 		log.Write(err.Error())
@@ -67,7 +67,7 @@ func PrivKeyPath(user string) string {
 
 // HostKeyPath returns the full path for the location of the gin host key file.
 func HostKeyPath() string {
-	configpath, err := config.ConfigPath(false)
+	configpath, err := config.Path(false)
 	if err != nil {
 		log.Write("Error getting user's config path. Can't create host key file.")
 		log.Write(err.Error())
@@ -85,7 +85,8 @@ func GitSSHEnv(user string) string {
 		p = strings.Replace(p, " ", "\\ ", -1)
 		return p
 	}
-	sshbin := fixpathsep(config.Config.Bin.SSH)
+	config := config.Read()
+	sshbin := fixpathsep(config.Bin.SSH)
 	keyfile := fixpathsep(PrivKeyPath(user))
 	// hostkeyfile := fixpathsep(HostKeyPath())
 	hostkeyfile := HostKeyPath()

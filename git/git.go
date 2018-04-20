@@ -764,7 +764,8 @@ func setBare(state bool) error {
 // Command sets up an external git command with the provided arguments and returns a GinCmd struct.
 // Setting the Workingdir package global affects the working directory in which the command will be executed.
 func Command(args ...string) shell.Cmd {
-	gitbin := config.Config.Bin.Git
+	config := config.Read()
+	gitbin := config.Bin.Git
 	cmd := shell.Command(gitbin)
 	cmd.Dir = Workingdir
 	cmd.Args = append(cmd.Args, args...)

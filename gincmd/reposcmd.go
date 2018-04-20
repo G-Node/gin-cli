@@ -24,7 +24,8 @@ func repos(cmd *cobra.Command, args []string) {
 	if (allrepos && sharedrepos) || ((allrepos || sharedrepos) && len(args) > 0) {
 		usageDie(cmd)
 	}
-	gincl := ginclient.New(config.Config.GinHost)
+	conf := config.Read()
+	gincl := ginclient.New(conf.GinHost)
 	requirelogin(cmd, gincl, true)
 	username := gincl.Username
 	if len(args) == 1 && args[0] != username {

@@ -12,15 +12,16 @@ import (
 
 func download(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
-	gincl := ginclient.New(config.Config.GinHost)
+	conf := config.Read()
+	gincl := ginclient.New(conf.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 	if !git.IsRepo() {
 		Die("This command must be run from inside a gin repository.")
 	}
 
 	content, _ := cmd.Flags().GetBool("content")
-	gincl.GitHost = config.Config.GitHost
-	gincl.GitUser = config.Config.GitUser
+	gincl.GitHost = conf.GitHost
+	gincl.GitUser = conf.GitUser
 	lockchan := make(chan git.RepoFileStatus)
 	go gincl.LockContent([]string{}, lockchan)
 	formatOutput(lockchan, jsonout)

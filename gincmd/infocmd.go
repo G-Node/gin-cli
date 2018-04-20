@@ -12,7 +12,8 @@ import (
 func printAccountInfo(cmd *cobra.Command, args []string) {
 	var username string
 
-	gincl := ginclient.New(config.Config.GinHost)
+	conf := config.Read()
+	gincl := ginclient.New(conf.GinHost)
 	_ = gincl.LoadToken() // does not REQUIRE login
 
 	if len(args) == 0 {

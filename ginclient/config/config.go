@@ -1,3 +1,4 @@
+// Package config handles reading of the user configuration for the client.
 package config
 
 import (
@@ -41,7 +42,7 @@ func FindRepoRoot(path string) (string, error) {
 	return FindRepoRoot(updir)
 }
 
-type conf struct {
+type GinConfiguration struct {
 	GinHost    string
 	GitHost    string
 	GitUser    string
@@ -57,11 +58,9 @@ type conf struct {
 	}
 }
 
-// Config makes the configuration options available after LoadConfig is called
-var Config conf
-
-// LoadConfig reads in the configuration and makes it available through Config package global
-func LoadConfig() error {
+// Read reads in the configuration and makes it available through Config package global
+func Read() (Config GinConfiguration) {
+	viper.Reset()
 	viper.SetTypeByDefaultValue(true)
 	// Binaries
 	viper.SetDefault("bin.git", "git")
@@ -81,7 +80,7 @@ func LoadConfig() error {
 	viper.SetDefault("annex.minsize", "10M")
 
 	// Merge in user config file
-	confpath, _ := ConfigPath(false)
+	confpath, _ := Path(false)
 	configFileName := "config.yml"
 	confpath = filepath.Join(confpath, configFileName)
 
@@ -122,14 +121,13 @@ func LoadConfig() error {
 	log.Write("%+v", Config)
 
 	// TODO: Validate URLs on config read
-
-	return nil
+	return
 }
 
-// ConfigPath returns the configuration path where configuration files should be stored.
+// Path returns the configuration path where configuration files should be stored.
 // If the GIN_CONFIG_DIR environment variable is set, its value is returned, otherwise the platform default is used.
 // If create is true and the directory does not exist, the full path is created.
-func ConfigPath(create bool) (string, error) {
+func Path(create bool) (string, error) {
 	confpath := os.Getenv("GIN_CONFIG_DIR")
 	if confpath == "" {
 		confpath = configDirs.QueryFolders(configdir.Global)[0].Path

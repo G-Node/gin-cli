@@ -45,7 +45,8 @@ func login(cmd *cobra.Command, args []string) {
 		Die("No password provided. Aborting.")
 	}
 
-	gincl := ginclient.New(config.Config.GinHost)
+	conf := config.Read()
+	gincl := ginclient.New(conf.GinHost)
 	err = gincl.Login(username, password, "gin-cli")
 	CheckError(err)
 	info, err := gincl.RequestAccount(username)

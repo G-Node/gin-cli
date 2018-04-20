@@ -1,3 +1,4 @@
+// Package log handles logging for the client.
 package log
 
 import (

@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/gincmd"
 	"github.com/G-Node/gin-cli/git"
@@ -84,8 +83,6 @@ func main() {
 	cwd, _ := os.Getwd()
 	log.Write("CWD: %s", cwd)
 
-	err = config.LoadConfig()
-	gincmd.CheckError(err)
 	checkAnnexVersion()
 
 	rootCmd := gincmd.SetUpCommands(verstr)

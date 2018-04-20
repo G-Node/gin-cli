@@ -11,7 +11,8 @@ import (
 )
 
 func createRepo(cmd *cobra.Command, args []string) {
-	gincl := ginclient.New(config.Config.GinHost)
+	conf := config.Read()
+	gincl := ginclient.New(conf.GinHost)
 	requirelogin(cmd, gincl, true)
 
 	var repoName, repoDesc string
@@ -33,8 +34,8 @@ func createRepo(cmd *cobra.Command, args []string) {
 			repoDesc = args[1]
 		}
 	}
-	gincl.GitHost = config.Config.GitHost
-	gincl.GitUser = config.Config.GitUser
+	gincl.GitHost = conf.GitHost
+	gincl.GitUser = conf.GitUser
 	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
 	fmt.Printf("Creating repository '%s' ", repoPath)
 	err := gincl.CreateRepo(repoName, repoDesc)

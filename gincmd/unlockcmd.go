@@ -12,7 +12,8 @@ func unlock(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die("This command must be run from inside a gin repository.")
 	}
-	gincl := ginclient.New(config.Config.GinHost)
+	conf := config.Read()
+	gincl := ginclient.New(conf.GinHost)
 	unlockchan := make(chan git.RepoFileStatus)
 	go gincl.UnlockContent(args, unlockchan)
 	formatOutput(unlockchan, jsonout)

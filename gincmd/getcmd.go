@@ -17,15 +17,16 @@ func isValidRepoPath(path string) bool {
 func getRepo(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	repostr := args[0]
-	gincl := ginclient.New(config.Config.GinHost)
+	conf := config.Read()
+	gincl := ginclient.New(conf.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 
 	if !isValidRepoPath(repostr) {
 		Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
 	}
 
-	gincl.GitHost = config.Config.GitHost
-	gincl.GitUser = config.Config.GitUser
+	gincl.GitHost = conf.GitHost
+	gincl.GitUser = conf.GitUser
 	clonechan := make(chan git.RepoFileStatus)
 	go gincl.CloneRepo(repostr, clonechan)
 	formatOutput(clonechan, jsonout)

@@ -24,9 +24,10 @@ func lsRepo(cmd *cobra.Command, args []string) {
 	jsonout, _ := flags.GetBool("json")
 	short, _ := flags.GetBool("short")
 
-	gincl := ginclient.New(config.Config.GinHost)
-	gincl.GitHost = config.Config.GitHost
-	gincl.GitUser = config.Config.GitUser
+	conf := config.Read()
+	gincl := ginclient.New(conf.GinHost)
+	gincl.GitHost = conf.GitHost
+	gincl.GitUser = conf.GitUser
 
 	filesStatus, err := gincl.ListFiles(args...)
 	CheckError(err)
