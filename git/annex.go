@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/G-Node/gin-cli/git/shell"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 )
@@ -820,9 +821,9 @@ func GetAnnexVersion() (string, error) {
 
 // AnnexCommand sets up a git annex command with the provided arguments and returns a GinCmd struct.
 // Setting the Workingdir package global affects the working directory in which the command will be executed.
-func AnnexCommand(args ...string) util.GinCmd {
+func AnnexCommand(args ...string) shell.Cmd {
 	gitannexbin := util.Config.Bin.GitAnnex
-	cmd := util.Command(gitannexbin, args...)
+	cmd := shell.Command(gitannexbin, args...)
 	cmd.Dir = Workingdir
 	token := web.UserToken{}
 	_ = token.LoadToken()

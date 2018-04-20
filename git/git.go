@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/G-Node/gin-cli/git/shell"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 )
@@ -761,9 +762,9 @@ func setBare(state bool) error {
 
 // Command sets up an external git command with the provided arguments and returns a GinCmd struct.
 // Setting the Workingdir package global affects the working directory in which the command will be executed.
-func Command(args ...string) util.GinCmd {
+func Command(args ...string) shell.Cmd {
 	gitbin := util.Config.Bin.Git
-	cmd := util.Command(gitbin)
+	cmd := shell.Command(gitbin)
 	cmd.Dir = Workingdir
 	cmd.Args = append(cmd.Args, args...)
 	token := web.UserToken{}
