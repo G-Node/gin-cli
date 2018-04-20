@@ -367,17 +367,17 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 	defer close(clonechan)
 	util.LogWrite("CloneRepo")
 	clonestatus := make(chan git.RepoFileStatus)
-	go gincl.Clone(repoPath, clonestatus)
+	remotepath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
+	go git.Clone(remotepath, repoPath, clonestatus)
 	for stat := range clonestatus {
 		clonechan <- stat
 		if stat.Err != nil {
 			return
 		}
 	}
-	_, repoName := splitRepoParts(repoPath)
 
-	// TODO: Needs to change
-	Workingdir = repoName
+	repoPathParts := strings.SplitN(repoPath, "/", 2)
+	repoName := repoPathParts[1]
 	git.Workingdir = repoName
 
 	status := git.RepoFileStatus{State: "Initialising local storage"}
@@ -388,7 +388,7 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 		clonechan <- status
 		return
 	}
-	status.Progress = progcomplete
+	status.Progress = "100%"
 	clonechan <- status
 	return
 }

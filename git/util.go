@@ -3,7 +3,6 @@ package git
 import (
 	"bytes"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/G-Node/gin-cli/util"
@@ -38,13 +37,6 @@ func calcRate(dbytes int, dt time.Duration) string {
 
 func logstd(out, err []byte) {
 	util.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
-}
-
-func splitRepoParts(repoPath string) (repoOwner, repoName string) {
-	repoPathParts := strings.SplitN(repoPath, "/", 2)
-	repoOwner = repoPathParts[0]
-	repoName = repoPathParts[1]
-	return
 }
 
 func cutline(b []byte) (string, bool) {
