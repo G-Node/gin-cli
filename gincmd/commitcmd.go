@@ -5,15 +5,15 @@ import (
 	"os"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git"
-	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
 )
 
 func commit(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	if !git.IsRepo() {
-		util.Die("This command must be run from inside a gin repository.")
+		Die("This command must be run from inside a gin repository.")
 	}
 
 	paths := args
@@ -24,7 +24,7 @@ func commit(cmd *cobra.Command, args []string) {
 	fmt.Print("Recording changes ")
 	err := git.Commit(makeCommitMessage("commit", paths))
 	if err != nil {
-		util.Die(err)
+		Die(err)
 	}
 	fmt.Println(green("OK"))
 }
@@ -33,12 +33,12 @@ func makeCommitMessage(action string, paths []string) (commitmsg string) {
 	// add header commit line
 	hostname, err := os.Hostname()
 	if err != nil {
-		util.LogWrite("Could not retrieve hostname")
+		log.LogWrite("Could not retrieve hostname")
 		hostname = unknownhostname
 	}
 	changes, err := git.DescribeIndexShort(paths)
 	if err != nil {
-		util.LogWrite("Failed to determine changes for commit message")
+		log.LogWrite("Failed to determine changes for commit message")
 		changes = ""
 	}
 	commitmsg = fmt.Sprintf("gin %s from %s\n\n%s", action, hostname, changes)

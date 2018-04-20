@@ -8,13 +8,12 @@ import (
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/git"
-	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
 )
 
 func repoversion(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
-		util.Die("This command must be run from inside a gin repository.")
+		Die("This command must be run from inside a gin repository.")
 	}
 	count, _ := cmd.Flags().GetUint("max-count")
 	jsonout, _ := cmd.Flags().GetBool("json")
@@ -25,19 +24,19 @@ func repoversion(cmd *cobra.Command, args []string) {
 	var commit git.GinCommit
 	if commithash == "" {
 		commits, err := git.Log(count, "", paths, false)
-		util.CheckError(err)
+		CheckError(err)
 		if jsonout {
 			j, _ := json.Marshal(commits)
 			fmt.Println(string(j))
 			return
 		}
 		if len(commits) == 0 {
-			util.Die("No revisions matched request")
+			Die("No revisions matched request")
 		}
 		commit = verprompt(commits)
 	} else {
 		commits, err := git.Log(1, commithash, paths, false)
-		util.CheckError(err)
+		CheckError(err)
 		commit = commits[0]
 	}
 
@@ -45,7 +44,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 		// TODO: Print some sort of output (similar to copy-to variant)
 		// e.g., File 'fname' restored to version <revision> (date)
 		err := ginclient.CheckoutVersion(commit.AbbreviatedHash, paths)
-		util.CheckError(err)
+		CheckError(err)
 
 		addchan := make(chan git.RepoFileStatus)
 		go ginclient.Add(paths, addchan)
@@ -54,7 +53,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 		fmt.Print("Recording changes ")
 		err = git.Commit(makeCommitMessage("commit", paths))
 		if err != nil {
-			util.Die(err)
+			Die(err)
 		}
 		fmt.Println(green("OK"))
 
@@ -133,7 +132,7 @@ func verprompt(commits []git.GinCommit) git.GinCommit {
 		}
 	}
 
-	util.Die("Aborting")
+	Die("Aborting")
 	return git.GinCommit{}
 }
 

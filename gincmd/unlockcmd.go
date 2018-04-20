@@ -2,17 +2,17 @@ package gincmd
 
 import (
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/git"
-	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
 )
 
 func unlock(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	if !git.IsRepo() {
-		util.Die("This command must be run from inside a gin repository.")
+		Die("This command must be run from inside a gin repository.")
 	}
-	gincl := ginclient.New(util.Config.GinHost)
+	gincl := ginclient.New(config.Config.GinHost)
 	unlockchan := make(chan git.RepoFileStatus)
 	go gincl.UnlockContent(args, unlockchan)
 	formatOutput(unlockchan, jsonout)

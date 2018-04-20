@@ -18,6 +18,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/util"
 	gogs "github.com/gogits/go-gogs-client"
 )
@@ -42,7 +44,7 @@ func urlJoin(parts ...string) string {
 	// First part must be a valid URL
 	u, err := url.Parse(parts[0])
 	if err != nil {
-		util.LogWrite("Bad URL in urlJoin: %v", parts)
+		log.LogWrite("Bad URL in urlJoin: %v", parts)
 		return ""
 	}
 
@@ -76,7 +78,7 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 		return nil, weberror{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl)}
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
-	util.LogWrite("Performing GET: %s", req.URL)
+	log.LogWrite("Performing GET: %s", req.URL)
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
 	}
@@ -103,9 +105,9 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	req.Header.Set("content-type", "application/jsonAuthorization")
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
-		util.LogWrite("Added token to POST")
+		log.LogWrite("Added token to POST")
 	}
-	util.LogWrite("Performing POST: %s", req.URL)
+	log.LogWrite("Performing POST: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
 		err = weberror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
@@ -128,7 +130,7 @@ func (cl *Client) PostBasicAuth(address, username, password string, data interfa
 	}
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", gogs.BasicAuthEncode(username, password)))
-	util.LogWrite("Performing POST: %s", req.URL)
+	log.LogWrite("Performing POST: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
 		err = weberror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
@@ -147,9 +149,9 @@ func (cl *Client) Delete(address string) (*http.Response, error) {
 	req.Header.Set("content-type", "application/jsonAuthorization")
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
-		util.LogWrite("Added token to DELETE")
+		log.LogWrite("Added token to DELETE")
 	}
-	util.LogWrite("Performing DELETE: %s", req.URL)
+	log.LogWrite("Performing DELETE: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
 		err = weberror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
@@ -169,7 +171,7 @@ func (ut *UserToken) LoadToken() error {
 	if ut.Username != "" && ut.Token != "" {
 		return nil
 	}
-	path, _ := util.ConfigPath(false) // Error can only occur when create=True
+	path, _ := config.ConfigPath(false) // Error can only occur when create=True
 	filepath := filepath.Join(path, "token")
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -188,15 +190,15 @@ func (ut *UserToken) LoadToken() error {
 // StoreToken saves the username and auth token to the token file.
 func (ut *UserToken) StoreToken() error {
 	fn := "StoreToken()"
-	util.LogWrite("Saving token")
-	path, err := util.ConfigPath(true)
+	log.LogWrite("Saving token")
+	path, err := config.ConfigPath(true)
 	if err != nil {
 		return weberror{UError: err.Error(), Origin: fn}
 	}
 	filepath := filepath.Join(path, "token")
 	file, err := os.Create(filepath)
 	if err != nil {
-		util.LogWrite("Failed to create token file %s", filepath)
+		log.LogWrite("Failed to create token file %s", filepath)
 		return weberror{UError: err.Error(), Origin: fn, Description: fmt.Sprintf("failed to create token file %s", filepath)}
 	}
 	defer closeFile(file)
@@ -204,29 +206,28 @@ func (ut *UserToken) StoreToken() error {
 	encoder := gob.NewEncoder(file)
 	err = encoder.Encode(ut)
 	if err != nil {
-		util.LogWrite("Failed to write token to file %s", filepath)
+		log.LogWrite("Failed to write token to file %s", filepath)
 		return weberror{UError: err.Error(), Origin: fn, Description: "failed to store token"}
 	}
-	util.LogWrite("Saved")
+	log.LogWrite("Saved")
 	return nil
 }
 
 // DeleteToken deletes the token file if it exists (for finalising a logout).
 func DeleteToken() error {
-	path, _ := util.ConfigPath(false) // Error can only occur when create=True
+	path, _ := config.ConfigPath(false) // Error can only occur when create=True
 	tokenpath := filepath.Join(path, "token")
 	err := os.Remove(tokenpath)
 	if err != nil {
 		return weberror{UError: err.Error(), Origin: "DeleteToken()", Description: "could not delete token"}
 	}
-	util.LogWrite("Token deleted")
+	log.LogWrite("Token deleted")
 	return nil
 }
 
 // CloseRes closes a given result buffer (for use with defer).
 func CloseRes(b io.ReadCloser) {
-	err := b.Close()
-	util.CheckErrorMsg(err, "Error during cleanup.")
+	b.Close()
 }
 
 func closeFile(f *os.File) {

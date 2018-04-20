@@ -1,4 +1,4 @@
-package util
+package git
 
 import (
 	"crypto/rand"
@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/ginclient/log"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -27,7 +29,7 @@ type KeyFile struct {
 
 // MakeKeyPair generates and returns a private-public key pair.
 func MakeKeyPair() (*KeyPair, error) {
-	LogWrite("Creating key pair")
+	log.LogWrite("Creating key pair")
 	privkey, err := rsa.GenerateKey(rand.Reader, 2048) // TODO: Key size as parameter
 	if err != nil {
 		return nil, fmt.Errorf("Error generating key pair: %s", err)
@@ -54,10 +56,10 @@ func MakeKeyPair() (*KeyPair, error) {
 
 // PrivKeyPath returns the full path for the location of the user's private key file.
 func PrivKeyPath(user string) string {
-	configpath, err := ConfigPath(false)
+	configpath, err := config.ConfigPath(false)
 	if err != nil {
-		LogWrite("Error getting user's config path. Can't load key file.")
-		LogWrite(err.Error())
+		log.LogWrite("Error getting user's config path. Can't load key file.")
+		log.LogWrite(err.Error())
 		return ""
 	}
 	return filepath.Join(configpath, fmt.Sprintf("%s.key", user))
@@ -65,10 +67,10 @@ func PrivKeyPath(user string) string {
 
 // HostKeyPath returns the full path for the location of the gin host key file.
 func HostKeyPath() string {
-	configpath, err := ConfigPath(false)
+	configpath, err := config.ConfigPath(false)
 	if err != nil {
-		LogWrite("Error getting user's config path. Can't create host key file.")
-		LogWrite(err.Error())
+		log.LogWrite("Error getting user's config path. Can't create host key file.")
+		log.LogWrite(err.Error())
 		return ""
 	}
 	return filepath.Join(configpath, "ginhostkey")
@@ -83,11 +85,11 @@ func GitSSHEnv(user string) string {
 		p = strings.Replace(p, " ", "\\ ", -1)
 		return p
 	}
-	sshbin := fixpathsep(Config.Bin.SSH)
+	sshbin := fixpathsep(config.Config.Bin.SSH)
 	keyfile := fixpathsep(PrivKeyPath(user))
 	// hostkeyfile := fixpathsep(HostKeyPath())
 	hostkeyfile := HostKeyPath()
 	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=\"%s\"'", sshbin, keyfile, hostkeyfile)
-	LogWrite("env %s", gitSSHCmd)
+	log.LogWrite("env %s", gitSSHCmd)
 	return gitSSHCmd
 }

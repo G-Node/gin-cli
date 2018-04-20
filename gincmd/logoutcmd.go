@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/spf13/cobra"
 )
 
@@ -12,10 +12,10 @@ func logout(cmd *cobra.Command, args []string) {
 	if len(args) > 0 {
 		usageDie(cmd)
 	}
-	gincl := ginclient.New(util.Config.GinHost)
+	gincl := ginclient.New(config.Config.GinHost)
 	err := gincl.LoadToken()
 	if err != nil {
-		util.Die("You are not logged in.")
+		Die("You are not logged in.")
 	}
 
 	gincl.Logout()

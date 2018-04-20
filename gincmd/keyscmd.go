@@ -8,7 +8,7 @@ import (
 	"time"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +18,7 @@ func keys(cmd *cobra.Command, args []string) {
 		usageDie(cmd)
 	}
 
-	gincl := ginclient.New(util.Config.GinHost)
+	gincl := ginclient.New(config.Config.GinHost)
 	requirelogin(cmd, gincl, true)
 
 	keyfilename, _ := flags.GetString("add")
@@ -38,7 +38,7 @@ func keys(cmd *cobra.Command, args []string) {
 
 func printKeys(gincl *ginclient.Client, verbose bool) {
 	keys, err := gincl.GetUserKeys()
-	util.CheckError(err)
+	CheckError(err)
 
 	nkeys := len(keys)
 	var plural string
@@ -65,7 +65,7 @@ func printKeys(gincl *ginclient.Client, verbose bool) {
 
 func addKey(gincl *ginclient.Client, filename string) {
 	keyBytes, err := ioutil.ReadFile(filename)
-	util.CheckError(err)
+	CheckError(err)
 	key := string(keyBytes)
 	strSlice := strings.Split(key, " ")
 	var description string
@@ -76,13 +76,13 @@ func addKey(gincl *ginclient.Client, filename string) {
 	}
 
 	err = gincl.AddKey(string(keyBytes), description, false)
-	util.CheckError(err)
+	CheckError(err)
 	fmt.Printf("New key added '%s'\n", description)
 }
 
 func delKey(gincl *ginclient.Client, idx int) {
 	name, err := gincl.DeletePubKeyByIdx(idx)
-	util.CheckError(err)
+	CheckError(err)
 	fmt.Printf("Deleted key with name '%s'\n", name)
 }
 

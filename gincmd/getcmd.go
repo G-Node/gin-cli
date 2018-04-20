@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/git"
-	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
 )
 
@@ -17,20 +17,20 @@ func isValidRepoPath(path string) bool {
 func getRepo(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	repostr := args[0]
-	gincl := ginclient.New(util.Config.GinHost)
+	gincl := ginclient.New(config.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 
 	if !isValidRepoPath(repostr) {
-		util.Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
+		Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
 	}
 
-	gincl.GitHost = util.Config.GitHost
-	gincl.GitUser = util.Config.GitUser
+	gincl.GitHost = config.Config.GitHost
+	gincl.GitUser = config.Config.GitUser
 	clonechan := make(chan git.RepoFileStatus)
 	go gincl.CloneRepo(repostr, clonechan)
 	formatOutput(clonechan, jsonout)
 	_, err := git.CommitIfNew("origin")
-	util.CheckError(err)
+	CheckError(err)
 }
 
 // GetCmd sets up the 'get' repository subcommand

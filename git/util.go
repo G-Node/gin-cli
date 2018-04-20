@@ -3,9 +3,11 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/ginclient/log"
 	humanize "github.com/dustin/go-humanize"
 )
 
@@ -36,7 +38,7 @@ func calcRate(dbytes int, dt time.Duration) string {
 }
 
 func logstd(out, err []byte) {
-	util.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
+	log.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
 }
 
 func cutline(b []byte) (string, bool) {
@@ -55,4 +57,34 @@ func cutline(b []byte) (string, bool) {
 		return string(b), true
 	}
 	return string(b[:idx]), false
+}
+
+// FindRepoRoot starts from a given directory and searches upwards through a directory structure looking for the root of a repository, indicated by the existence of a .git directory.
+// A path to the repository root is returned, or an error if the root of the filesystem is reached first.
+// The returned path is absolute.
+func FindRepoRoot(path string) (string, error) {
+	var err error
+	path, err = filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	gitdir := filepath.Join(path, ".git")
+	if pathExists(gitdir) {
+		return path, nil
+	}
+	updir := filepath.Dir(path)
+	if updir == path {
+		// root reached
+		return "", fmt.Errorf("Not a repository")
+	}
+
+	return FindRepoRoot(updir)
+}
+
+// pathExists returns true if the path exists
+func pathExists(path string) bool {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }

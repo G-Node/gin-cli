@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/howeyc/gopass"
 	"github.com/spf13/cobra"
 )
@@ -31,25 +31,25 @@ func login(cmd *cobra.Command, args []string) {
 	if err != nil {
 		// read error or gopass.ErrInterrupted
 		if err == gopass.ErrInterrupted {
-			util.Die("Cancelled.")
+			Die("Cancelled.")
 		}
 		if err == gopass.ErrMaxLengthExceeded {
-			util.Die("Input too long")
+			Die("Input too long")
 		}
-		util.Die(err)
+		Die(err)
 	}
 
 	password = string(pwbytes)
 
 	if password == "" {
-		util.Die("No password provided. Aborting.")
+		Die("No password provided. Aborting.")
 	}
 
-	gincl := ginclient.New(util.Config.GinHost)
+	gincl := ginclient.New(config.Config.GinHost)
 	err = gincl.Login(username, password, "gin-cli")
-	util.CheckError(err)
+	CheckError(err)
 	info, err := gincl.RequestAccount(username)
-	util.CheckError(err)
+	CheckError(err)
 	fmt.Printf("Hello %s. You are now logged in.\n", info.UserName)
 }
 

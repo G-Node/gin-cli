@@ -4,23 +4,23 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/git"
-	"github.com/G-Node/gin-cli/util"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
 func download(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
-	gincl := ginclient.New(util.Config.GinHost)
+	gincl := ginclient.New(config.Config.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 	if !git.IsRepo() {
-		util.Die("This command must be run from inside a gin repository.")
+		Die("This command must be run from inside a gin repository.")
 	}
 
 	content, _ := cmd.Flags().GetBool("content")
-	gincl.GitHost = util.Config.GitHost
-	gincl.GitUser = util.Config.GitUser
+	gincl.GitHost = config.Config.GitHost
+	gincl.GitUser = config.Config.GitUser
 	lockchan := make(chan git.RepoFileStatus)
 	go gincl.LockContent([]string{}, lockchan)
 	formatOutput(lockchan, jsonout)
@@ -28,12 +28,12 @@ func download(cmd *cobra.Command, args []string) {
 		fmt.Print("Downloading changes ")
 	}
 	err := gincl.Download()
-	util.CheckError(err)
+	CheckError(err)
 	if !jsonout {
 		fmt.Fprintln(color.Output, green("OK"))
 	}
 	if content {
-		reporoot, _ := util.FindRepoRoot(".")
+		reporoot, _ := git.FindRepoRoot(".")
 		ginclient.Workingdir = reporoot
 		getContent(cmd, nil)
 	}

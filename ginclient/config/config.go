@@ -1,15 +1,45 @@
-package util
+package config
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/shibukawa/configdir"
 	"github.com/spf13/viper"
 )
 
 var configDirs = configdir.New("g-node", "gin")
+
+// NOTE: Duplicate function
+// pathExists returns true if the path exists
+func pathExists(path string) bool {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+// NOTE: Duplicate function
+func FindRepoRoot(path string) (string, error) {
+	var err error
+	path, err = filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	gitdir := filepath.Join(path, ".git")
+	if pathExists(gitdir) {
+		return path, nil
+	}
+	updir := filepath.Dir(path)
+	if updir == path {
+		// root reached
+		return "", fmt.Errorf("Not a repository")
+	}
+
+	return FindRepoRoot(updir)
+}
 
 type conf struct {
 	GinHost    string
@@ -58,7 +88,7 @@ func LoadConfig() error {
 	viper.SetConfigFile(confpath)
 	cerr := viper.MergeInConfig()
 	if cerr == nil {
-		LogWrite("Found config file %s", confpath)
+		log.LogWrite("Found config file %s", confpath)
 	}
 
 	Config.Bin.Git = viper.GetString("bin.git")
@@ -82,14 +112,14 @@ func LoadConfig() error {
 		viper.SetConfigFile(confpath)
 		cerr = viper.MergeInConfig()
 		if cerr == nil {
-			LogWrite("Found config file %s", confpath)
+			log.LogWrite("Found config file %s", confpath)
 		}
 	}
 	Config.Annex.Exclude = viper.GetStringSlice("annex.exclude")
 	Config.Annex.MinSize = viper.GetString("annex.minsize")
 
-	LogWrite("Configuration values")
-	LogWrite("%+v", Config)
+	log.LogWrite("Configuration values")
+	log.LogWrite("%+v", Config)
 
 	// TODO: Validate URLs on config read
 

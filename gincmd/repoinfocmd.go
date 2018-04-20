@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	gogs "github.com/gogits/go-gogs-client"
 	"github.com/spf13/cobra"
 )
@@ -30,10 +30,10 @@ func printRepoInfo(repo gogs.Repository) {
 func repoinfo(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags()
 	jsonout, _ := flags.GetBool("json")
-	gincl := ginclient.New(util.Config.GinHost)
+	gincl := ginclient.New(config.Config.GinHost)
 	requirelogin(cmd, gincl, true)
 	repoinfo, err := gincl.GetRepo(args[0])
-	util.CheckError(err)
+	CheckError(err)
 
 	if jsonout {
 		j, _ := json.Marshal(repoinfo)

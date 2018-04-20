@@ -4,12 +4,13 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/spf13/cobra"
 )
 
 func deleteRepo(cmd *cobra.Command, args []string) {
-	gincl := ginclient.New(util.Config.GinHost)
+	gincl := ginclient.New(config.Config.GinHost)
 	requirelogin(cmd, gincl, true)
 	var repostr, confirmation string
 
@@ -20,11 +21,11 @@ func deleteRepo(cmd *cobra.Command, args []string) {
 	}
 
 	repoinfo, err := gincl.GetRepo(repostr)
-	util.CheckError(err)
+	CheckError(err)
 
 	if repoinfo.FullName != repostr {
-		util.LogWrite("ERROR: Mismatch in repository names: %s != %s", repoinfo.FullName, repostr)
-		util.Die("An unexpected error occurred while communicating with the server.")
+		log.LogWrite("ERROR: Mismatch in repository names: %s != %s", repoinfo.FullName, repostr)
+		Die("An unexpected error occurred while communicating with the server.")
 	}
 
 	fmt.Println("--- WARNING ---")
@@ -37,9 +38,9 @@ func deleteRepo(cmd *cobra.Command, args []string) {
 
 	if repoinfo.FullName == confirmation && repostr == confirmation {
 		err = gincl.DelRepo(repostr)
-		util.CheckError(err)
+		CheckError(err)
 	} else {
-		util.Die("Confirmation does not match repository name. Cancelling.")
+		Die("Confirmation does not match repository name. Cancelling.")
 	}
 
 	fmt.Printf("Repository %s has been deleted!\n", repostr)

@@ -6,9 +6,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/gincmd"
 	"github.com/G-Node/gin-cli/git"
-	util "github.com/G-Node/gin-cli/util"
 	version "github.com/hashicorp/go-version"
 )
 
@@ -21,7 +22,7 @@ var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 func checkAnnexVersion() {
 	errmsg := fmt.Sprintf("The GIN Client requires git-annex %s or newer", minAnnexVersion)
 	verstring, err := git.GetAnnexVersion()
-	util.CheckError(err)
+	gincmd.CheckError(err)
 	systemver, err := version.NewVersion(verstring)
 	if err != nil {
 		// Special case for neurodebian git-annex version
@@ -31,12 +32,12 @@ func checkAnnexVersion() {
 		systemver, err = version.NewVersion(verstring)
 		if err != nil {
 			// Can't figure out the version. Giving up.
-			util.Die(fmt.Sprintf("%s\ngit-annex version %s not understood", errmsg, verstring))
+			gincmd.Die(fmt.Sprintf("%s\ngit-annex version %s not understood", errmsg, verstring))
 		}
 	}
 	minver, _ := version.NewVersion(minAnnexVersion)
 	if systemver.LessThan(minver) {
-		util.Die(fmt.Sprintf("%s\nFound version %s", errmsg, verstring))
+		gincmd.Die(fmt.Sprintf("%s\nFound version %s", errmsg, verstring))
 	}
 }
 
@@ -68,9 +69,9 @@ func init() {
 }
 
 func main() {
-	err := util.LogInit(verstr)
-	util.CheckError(err)
-	defer util.LogClose()
+	err := log.LogInit(verstr)
+	gincmd.CheckError(err)
+	defer log.LogClose()
 
 	var args = make([]string, len(os.Args))
 	for idx, a := range os.Args {
@@ -79,12 +80,12 @@ func main() {
 			args[idx] = fmt.Sprintf("'%s'", a)
 		}
 	}
-	util.LogWrite("COMMAND: %s", strings.Join(args, " "))
+	log.LogWrite("COMMAND: %s", strings.Join(args, " "))
 	cwd, _ := os.Getwd()
-	util.LogWrite("CWD: %s", cwd)
+	log.LogWrite("CWD: %s", cwd)
 
-	err = util.LoadConfig()
-	util.CheckError(err)
+	err = config.LoadConfig()
+	gincmd.CheckError(err)
 	checkAnnexVersion()
 
 	rootCmd := gincmd.SetUpCommands(verstr)
@@ -93,5 +94,5 @@ func main() {
 	// Engage
 	rootCmd.Execute()
 
-	util.LogWrite("EXIT OK")
+	log.LogWrite("EXIT OK")
 }

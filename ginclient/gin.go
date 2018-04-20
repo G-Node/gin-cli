@@ -8,6 +8,9 @@ import (
 
 	"net/http"
 
+	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/ginclient/log"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
 	gogs "github.com/gogits/go-gogs-client"
@@ -161,10 +164,10 @@ func (gincl *Client) DeletePubKey(id int64) error {
 
 // DeletePubKeyByTitle removes the key that matches the given title from the current user's authorised keys.
 func (gincl *Client) DeletePubKeyByTitle(title string) error {
-	util.LogWrite("Searching for key with title '%s'", title)
+	log.LogWrite("Searching for key with title '%s'", title)
 	keys, err := gincl.GetUserKeys()
 	if err != nil {
-		util.LogWrite("Error when getting user keys: %v", err)
+		log.LogWrite("Error when getting user keys: %v", err)
 		return err
 	}
 	for _, key := range keys {
@@ -179,19 +182,19 @@ func (gincl *Client) DeletePubKeyByTitle(title string) error {
 // Upon deletion, it returns the title of the key that was deleted.
 // Note that the first key has index 1.
 func (gincl *Client) DeletePubKeyByIdx(idx int) (string, error) {
-	util.LogWrite("Searching for key with index '%d'", idx)
+	log.LogWrite("Searching for key with index '%d'", idx)
 	if idx < 1 {
-		util.LogWrite("Invalid index [idx %d]", idx)
+		log.LogWrite("Invalid index [idx %d]", idx)
 		return "", fmt.Errorf("Invalid key index '%d'", idx)
 	}
-	util.LogWrite("Searching for key with index '%d'", idx)
+	log.LogWrite("Searching for key with index '%d'", idx)
 	keys, err := gincl.GetUserKeys()
 	if err != nil {
-		util.LogWrite("Error when getting user keys: %v", err)
+		log.LogWrite("Error when getting user keys: %v", err)
 		return "", err
 	}
 	if idx > len(keys) {
-		util.LogWrite("Invalid index [idx %d > N %d]", idx, len(keys))
+		log.LogWrite("Invalid index [idx %d > N %d]", idx, len(keys))
 		return "", fmt.Errorf("Invalid key index '%d'", idx)
 	}
 	key := keys[idx-1]
@@ -220,7 +223,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	if err != nil {
 		return err
 	}
-	util.LogWrite("Got response: %s", res.Status)
+	log.LogWrite("Got response: %s", res.Status)
 	token := AccessToken{}
 	err = json.Unmarshal(data, &token)
 	if err != nil {
@@ -228,7 +231,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	}
 	gincl.Username = username
 	gincl.Token = token.Sha1
-	util.LogWrite("Login successful. Username: %s", username)
+	log.LogWrite("Login successful. Username: %s", username)
 
 	err = gincl.StoreToken()
 	if err != nil {
@@ -248,35 +251,35 @@ func (gincl *Client) Logout() {
 	// 1. Delete public key
 	hostname, err := os.Hostname()
 	if err != nil {
-		util.LogWrite("Could not retrieve hostname")
+		log.LogWrite("Could not retrieve hostname")
 		hostname = unknownhostname
 	}
 
 	currentkeyname := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)
 	err = gincl.DeletePubKeyByTitle(currentkeyname)
 	if err != nil {
-		util.LogWrite(err.Error())
+		log.LogWrite(err.Error())
 	}
 
 	// 2. Delete private key
-	privKeyFile := util.PrivKeyPath(gincl.UserToken.Username)
+	privKeyFile := git.PrivKeyPath(gincl.UserToken.Username)
 	err = os.Remove(privKeyFile)
 	if err != nil {
-		util.LogWrite("Error deleting key file")
+		log.LogWrite("Error deleting key file")
 	} else {
-		util.LogWrite("Private key file deleted")
+		log.LogWrite("Private key file deleted")
 	}
 
 	err = web.DeleteToken()
 	if err != nil {
-		util.LogWrite("Error deleting token file")
+		log.LogWrite("Error deleting token file")
 	}
 }
 
 // MakeHostsFile creates a known_hosts file in the config directory based on the server configuration for host key checking.
 func MakeHostsFile() {
-	hostkeyfile := util.HostKeyPath()
-	ginhostkey := fmt.Sprintln(util.Config.GitHostKey)
+	hostkeyfile := git.HostKeyPath()
+	ginhostkey := fmt.Sprintln(config.Config.GitHostKey)
 	_ = ioutil.WriteFile(hostkeyfile, []byte(ginhostkey), 0600)
 	return
 }

@@ -7,14 +7,14 @@ import (
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/git"
-	"github.com/G-Node/gin-cli/util"
 	"github.com/spf13/cobra"
 )
 
 func lsRepo(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
-		util.Die("This command must be run from inside a gin repository.")
+		Die("This command must be run from inside a gin repository.")
 	}
 
 	flags := cmd.Flags()
@@ -24,12 +24,12 @@ func lsRepo(cmd *cobra.Command, args []string) {
 	jsonout, _ := flags.GetBool("json")
 	short, _ := flags.GetBool("short")
 
-	gincl := ginclient.New(util.Config.GinHost)
-	gincl.GitHost = util.Config.GitHost
-	gincl.GitUser = util.Config.GitUser
+	gincl := ginclient.New(config.Config.GinHost)
+	gincl.GitHost = config.Config.GitHost
+	gincl.GitUser = config.Config.GitUser
 
 	filesStatus, err := gincl.ListFiles(args...)
-	util.CheckError(err)
+	CheckError(err)
 
 	if short {
 		for fname, status := range filesStatus {
@@ -45,7 +45,7 @@ func lsRepo(cmd *cobra.Command, args []string) {
 			statuses = append(statuses, fstat{FileName: fname, Status: status.Abbrev()})
 		}
 		jsonbytes, err := json.Marshal(statuses)
-		util.CheckError(err)
+		CheckError(err)
 		fmt.Println(string(jsonbytes))
 	} else {
 		// Files are printed separated by status and sorted by name

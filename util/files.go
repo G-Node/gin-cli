@@ -4,15 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-)
 
-// PathExists returns true if the path exists
-func PathExists(path string) bool {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
+	"github.com/G-Node/gin-cli/ginclient/log"
+)
 
 // PathSplit returns the directory path separated from the filename. If the
 // argument is a directory, the filename "." is returned. Errors are ignored.
@@ -42,22 +36,22 @@ func ExpandGlobs(paths []string) (globexppaths []string, err error) {
 	}
 	// expand potential globs
 	for _, p := range paths {
-		LogWrite("ExpandGlobs: Checking for glob expansion for %s", p)
+		log.LogWrite("ExpandGlobs: Checking for glob expansion for %s", p)
 		exp, globerr := filepath.Glob(p)
 		if globerr != nil {
-			LogWrite(globerr.Error())
-			LogWrite("Bad file pattern %s", p)
+			log.LogWrite(globerr.Error())
+			log.LogWrite("Bad file pattern %s", p)
 			return nil, globerr
 		}
 		if exp == nil {
-			LogWrite("ExpandGlobs: No files matched")
+			log.LogWrite("ExpandGlobs: No files matched")
 			return nil, fmt.Errorf("No files matched %v", p)
 		}
 		globexppaths = append(globexppaths, exp...)
 	}
 	if len(globexppaths) == 0 {
 		// Invalid paths
-		LogWrite("ExpandGlobs: No files matched")
+		log.LogWrite("ExpandGlobs: No files matched")
 		err = fmt.Errorf("No files matched %v", paths)
 	}
 	return
@@ -92,30 +86,8 @@ func FilterPaths(paths, excludes []string) (filtered []string) {
 	for _, p := range paths {
 		err := filepath.Walk(p, walker)
 		if err != nil {
-			LogWrite("Error occured during path filtering: %s", err.Error())
+			log.LogWrite("Error occured during path filtering: %s", err.Error())
 		}
 	}
 	return
-}
-
-// FindRepoRoot starts from a given directory and searches upwards through a directory structure looking for the root of a repository, indicated by the existence of a .git directory.
-// A path to the repository root is returned, or an error if the root of the filesystem is reached first.
-// The returned path is absolute.
-func FindRepoRoot(path string) (string, error) {
-	var err error
-	path, err = filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-	gitdir := filepath.Join(path, ".git")
-	if PathExists(gitdir) {
-		return path, nil
-	}
-	updir := filepath.Dir(path)
-	if updir == path {
-		// root reached
-		return "", fmt.Errorf("Not a repository")
-	}
-
-	return FindRepoRoot(updir)
 }

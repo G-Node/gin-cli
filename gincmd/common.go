@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git"
-	"github.com/G-Node/gin-cli/util"
 	"github.com/bbrks/wrap"
 	"github.com/docker/docker/pkg/term"
 	"github.com/fatih/color"
@@ -19,6 +20,43 @@ const unknownhostname = "(unknown)"
 
 var green = color.New(color.FgGreen).SprintFunc()
 var red = color.New(color.FgRed).SprintFunc()
+
+//Die prints an error message to stderr and exits the program with status 1.
+func Die(msg interface{}) {
+	// fmt.Fprintf(color.Error, "%s %s\n", red("ERROR"), msg)
+	// Swap the line above for the line below when (if) https://github.com/fatih/color/pull/87 gets merged
+	msgstring := fmt.Sprintf("%s", msg)
+	if len(msgstring) > 0 {
+		log.LogWrite("Exiting with ERROR message: %s", msgstring)
+		fmt.Fprintln(os.Stderr, msgstring)
+	} else {
+		log.LogWrite("Exiting with ERROR (no message)")
+	}
+	log.LogClose()
+	os.Exit(1)
+}
+
+// CheckError exits the program if an error is passed to the function.
+// The error message is checked for known error messages and an informative message is printed.
+// Otherwise, the error message is printed to stderr.
+func CheckError(err error) {
+	if err != nil {
+		log.LogWrite(err.Error())
+		if strings.Contains(err.Error(), "Error loading user token") {
+			Die("This operation requires login.")
+		}
+		Die(err)
+	}
+}
+
+// CheckErrorMsg exits the program if an error is passed to the function.
+// Before exiting, the given msg string is printed to stderr.
+func CheckErrorMsg(err error, msg string) {
+	if err != nil {
+		log.LogWrite("The following error occurred:\n%sExiting with message: %s", err, msg)
+		Die(msg)
+	}
+}
 
 // requirelogin prompts for login if the user is not already logged in.
 // It only checks if a local token exists and does not confirm its validity with the server.
@@ -31,13 +69,13 @@ func requirelogin(cmd *cobra.Command, gincl *ginclient.Client, prompt bool) {
 		}
 		err = gincl.LoadToken()
 	}
-	util.CheckError(err)
+	CheckError(err)
 }
 
 func usageDie(cmd *cobra.Command) {
 	cmd.Help()
 	// exit without message
-	util.Die("")
+	Die("")
 }
 
 func printJSON(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
@@ -123,7 +161,7 @@ func formatOutput(statuschan <-chan git.RepoFileStatus, jsonout bool) {
 		if nerrors > 1 {
 			plural = "s"
 		}
-		util.Die(fmt.Sprintf("%d operation%s failed", nerrors, plural))
+		Die(fmt.Sprintf("%d operation%s failed", nerrors, plural))
 	}
 }
 

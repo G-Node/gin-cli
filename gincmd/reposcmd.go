@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/util"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	gogs "github.com/gogits/go-gogs-client"
 	"github.com/spf13/cobra"
 )
@@ -24,7 +24,7 @@ func repos(cmd *cobra.Command, args []string) {
 	if (allrepos && sharedrepos) || ((allrepos || sharedrepos) && len(args) > 0) {
 		usageDie(cmd)
 	}
-	gincl := ginclient.New(util.Config.GinHost)
+	gincl := ginclient.New(config.Config.GinHost)
 	requirelogin(cmd, gincl, true)
 	username := gincl.Username
 	if len(args) == 1 && args[0] != username {
@@ -33,7 +33,7 @@ func repos(cmd *cobra.Command, args []string) {
 		allrepos = true
 	}
 	repolist, err := gincl.ListRepos(username)
-	util.CheckError(err)
+	CheckError(err)
 
 	var userrepos []gogs.Repository
 	var otherrepos []gogs.Repository

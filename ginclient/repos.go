@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/util"
 	"github.com/G-Node/gin-cli/web"
@@ -81,22 +82,18 @@ func isAnnexPath(path string) bool {
 	return strings.Contains(path, ".git/annex/objects")
 }
 
-func logstd(out, err []byte) {
-	util.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
-}
-
 // MakeSessionKey creates a private+public key pair.
 // The private key is saved in the user's configuration directory, to be used for git commands.
 // The public key is added to the GIN server for the current logged in user.
 func (gincl *Client) MakeSessionKey() error {
-	keyPair, err := util.MakeKeyPair()
+	keyPair, err := git.MakeKeyPair()
 	if err != nil {
 		return err
 	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		util.LogWrite("Could not retrieve hostname")
+		log.LogWrite("Could not retrieve hostname")
 		hostname = unknownhostname
 	}
 	description := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)
@@ -106,7 +103,7 @@ func (gincl *Client) MakeSessionKey() error {
 		return err
 	}
 
-	privKeyFile := util.PrivKeyPath(gincl.Username)
+	privKeyFile := git.PrivKeyPath(gincl.Username)
 	_ = ioutil.WriteFile(privKeyFile, []byte(keyPair.Private), 0600)
 
 	return nil
@@ -115,7 +112,7 @@ func (gincl *Client) MakeSessionKey() error {
 // GetRepo retrieves the information of a repository.
 func (gincl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
 	fn := fmt.Sprintf("GetRepo(%s)", repoPath)
-	util.LogWrite("GetRepo")
+	log.LogWrite("GetRepo")
 	var repo gogs.Repository
 
 	res, err := gincl.Get(fmt.Sprintf("/api/v1/repos/%s", repoPath))
@@ -147,7 +144,7 @@ func (gincl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
 // ListRepos gets a list of repositories (public or user specific)
 func (gincl *Client) ListRepos(user string) ([]gogs.Repository, error) {
 	fn := fmt.Sprintf("ListRepos(%s)", user)
-	util.LogWrite("Retrieving repo list")
+	log.LogWrite("Retrieving repo list")
 	var repoList []gogs.Repository
 	var res *http.Response
 	var err error
@@ -180,9 +177,9 @@ func (gincl *Client) ListRepos(user string) ([]gogs.Repository, error) {
 // CreateRepo creates a repository on the server.
 func (gincl *Client) CreateRepo(name, description string) error {
 	fn := fmt.Sprintf("CreateRepo(name)")
-	util.LogWrite("Creating repository")
+	log.LogWrite("Creating repository")
 	newrepo := gogs.CreateRepoOption{Name: name, Description: description, Private: true}
-	util.LogWrite("Name: %s :: Description: %s", name, description)
+	log.LogWrite("Name: %s :: Description: %s", name, description)
 	res, err := gincl.Post("/api/v1/user/repos", newrepo)
 	if err != nil {
 		return err // return error from Post() directly
@@ -198,14 +195,14 @@ func (gincl *Client) CreateRepo(name, description string) error {
 		return ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 	web.CloseRes(res.Body)
-	util.LogWrite("Repository created")
+	log.LogWrite("Repository created")
 	return nil
 }
 
 // DelRepo deletes a repository from the server.
 func (gincl *Client) DelRepo(name string) error {
 	fn := fmt.Sprintf("DelRepo(%s)", name)
-	util.LogWrite("Deleting repository")
+	log.LogWrite("Deleting repository")
 	res, err := gincl.Delete(fmt.Sprintf("/api/v1/repos/%s", name))
 	if err != nil {
 		return err // return error from Post() directly
@@ -223,7 +220,7 @@ func (gincl *Client) DelRepo(name string) error {
 		return ginerror{UError: res.Status, Origin: fn} // Unexpected error
 	}
 	web.CloseRes(res.Body)
-	util.LogWrite("Repository deleted")
+	log.LogWrite("Repository deleted")
 	return nil
 }
 
@@ -257,7 +254,7 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 // The status channel 'uploadchan' is closed when this function returns.
 func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus) {
 	defer close(uploadchan)
-	util.LogWrite("Upload")
+	log.LogWrite("Upload")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
@@ -277,7 +274,7 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus
 // The status channel 'getcontchan' is closed when this function returns.
 func (gincl *Client) GetContent(paths []string, getcontchan chan<- git.RepoFileStatus) {
 	defer close(getcontchan)
-	util.LogWrite("GetContent")
+	log.LogWrite("GetContent")
 
 	paths, err := util.ExpandGlobs(paths)
 
@@ -298,7 +295,7 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- git.RepoFileS
 // The status channel 'rmcchan' is closed when this function returns.
 func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- git.RepoFileStatus) {
 	defer close(rmcchan)
-	util.LogWrite("RemoveContent")
+	log.LogWrite("RemoveContent")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
@@ -318,7 +315,7 @@ func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- git.RepoFileSt
 // The status channel 'lockchan' is closed when this function returns.
 func (gincl *Client) LockContent(paths []string, lcchan chan<- git.RepoFileStatus) {
 	defer close(lcchan)
-	util.LogWrite("LockContent")
+	log.LogWrite("LockContent")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
@@ -338,7 +335,7 @@ func (gincl *Client) LockContent(paths []string, lcchan chan<- git.RepoFileStatu
 // The status channel 'unlockchan' is closed when this function returns.
 func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileStatus) {
 	defer close(ulcchan)
-	util.LogWrite("UnlockContent")
+	log.LogWrite("UnlockContent")
 
 	paths, err := util.ExpandGlobs(paths)
 	if err != nil {
@@ -357,7 +354,7 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileSt
 // Download downloads changes and placeholder files in an already checked out repository.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) Download() error {
-	util.LogWrite("Download")
+	log.LogWrite("Download")
 	return git.AnnexPull()
 }
 
@@ -365,7 +362,7 @@ func (gincl *Client) Download() error {
 // The status channel 'clonechan' is closed when this function returns.
 func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileStatus) {
 	defer close(clonechan)
-	util.LogWrite("CloneRepo")
+	log.LogWrite("CloneRepo")
 	clonestatus := make(chan git.RepoFileStatus)
 	remotepath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
 	go git.Clone(remotepath, repoPath, clonestatus)
@@ -468,8 +465,8 @@ func (gincl *Client) InitDir() error {
 		cmd := git.Command("init")
 		stdout, stderr, err := cmd.OutputError()
 		if err != nil {
-			util.LogWrite("Error during Init command: %s", string(stderr))
-			logstd(stdout, stderr)
+			log.LogWrite("Error during Init command: %s", string(stderr))
+			log.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(stdout), string(stderr))
 			initerr.UError = err.Error()
 			return initerr
 		}
@@ -495,7 +492,7 @@ func (gincl *Client) InitDir() error {
 		}
 		ierr = git.SetGitUser(name, info.Email)
 		if ierr != nil {
-			util.LogWrite("Failed to set local git user configuration")
+			log.LogWrite("Failed to set local git user configuration")
 		}
 	}
 	if runtime.GOOS == "windows" {
@@ -705,8 +702,8 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	cmd := git.Command(diffargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		util.LogWrite("Error during diff command for status")
-		logstd(stdout, stderr)
+		log.LogWrite("Error during diff command for status")
+		log.LogWrite("[stdout]\n%s\n[stderr]\n%s", string(stdout), string(stderr))
 		// ignoring error and continuing
 	}
 
@@ -738,7 +735,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		go git.AnnexStatus(modifiedfiles, statuschan)
 		for item := range statuschan {
 			if item.Err != nil {
-				util.LogWrite("Error during annex status while searching for unlocked files")
+				log.LogWrite("Error during annex status while searching for unlocked files")
 				// lockchan <- git.RepoFileStatus{Err: item.Err}
 			}
 			if item.Status == "T" {

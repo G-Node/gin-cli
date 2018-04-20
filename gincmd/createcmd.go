@@ -3,15 +3,15 @@ package gincmd
 import (
 	"fmt"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/git"
-	"github.com/G-Node/gin-cli/util"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
 func createRepo(cmd *cobra.Command, args []string) {
-	gincl := ginclient.New(util.Config.GinHost)
+	gincl := ginclient.New(config.Config.GinHost)
 	requirelogin(cmd, gincl, true)
 
 	var repoName, repoDesc string
@@ -33,23 +33,23 @@ func createRepo(cmd *cobra.Command, args []string) {
 			repoDesc = args[1]
 		}
 	}
-	gincl.GitHost = util.Config.GitHost
-	gincl.GitUser = util.Config.GitUser
+	gincl.GitHost = config.Config.GitHost
+	gincl.GitUser = config.Config.GitUser
 	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
 	fmt.Printf("Creating repository '%s' ", repoPath)
 	err := gincl.CreateRepo(repoName, repoDesc)
-	util.CheckError(err)
+	CheckError(err)
 	fmt.Fprintln(color.Output, green("OK"))
 
 	if here {
 		// Init cwd
 		ginclient.Workingdir = "."
 		err = gincl.InitDir()
-		util.CheckError(err)
+		CheckError(err)
 		err = gincl.AddRemote("origin", repoPath)
-		util.CheckError(err)
+		CheckError(err)
 		_, err := git.CommitIfNew("origin")
-		util.CheckError(err)
+		CheckError(err)
 	} else if !noclone {
 		// Clone repository after creation
 		getRepo(cmd, []string{repoPath})
