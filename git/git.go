@@ -198,16 +198,8 @@ func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 			return
 		}
 		defer setBare(true)
-		wichan := make(chan AnnexWhereisRes)
-		go AnnexWhereis(filepaths, wichan)
-		var annexfiles []string
-		for wiInfo := range wichan {
-			if wiInfo.Err != nil {
-				continue
-			}
-			annexfiles = append(annexfiles, wiInfo.File)
-		}
-		filepaths = filterpaths(filepaths, annexfiles)
+		// Call addPathsDirect to collect filenames not in annex and deleted files
+		filepaths = gitAddDirect(filepaths)
 	}
 
 	cmdargs := append([]string{"add", "--verbose", "--"}, filepaths...)
@@ -759,6 +751,35 @@ func setBare(state bool) error {
 		err = fmt.Errorf(string(stderr))
 	}
 	return err
+}
+
+// gitAddDirect determines which files to be added to git when in direct mode.
+// In direct mode, in order to perform a 'git add' operation, the client temporarily disables bare mode in the repository.
+// This has a side effect that annexed files change type (from symlinks to "direct" files), since now git's view of the repository is not modified by annex.
+// This function filters out any files known to annex to avoid re-adding them to git as files.
+// The filtering is done twice:
+// Once against the provided paths in the current directory (recursively) and once more against the output of 'git ls-files <paths>', in order to include any files that might have been deleted.
+func gitAddDirect(paths []string) (filtered []string) {
+	wichan := make(chan AnnexWhereisRes)
+	go AnnexWhereis(paths, wichan)
+	var annexfiles []string
+	for wiInfo := range wichan {
+		if wiInfo.Err != nil {
+			continue
+		}
+		annexfiles = append(annexfiles, wiInfo.File)
+	}
+	filtered = filterpaths(paths, annexfiles)
+
+	lschan := make(chan string)
+	go LsFiles(paths, lschan)
+	for gitfile := range lschan {
+		if !stringInSlice(gitfile, annexfiles) && !stringInSlice(gitfile, filtered) {
+			filtered = append(filtered, gitfile)
+		}
+	}
+
+	return
 }
 
 // Command sets up an external git command with the provided arguments and returns a GinCmd struct.

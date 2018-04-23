@@ -121,5 +121,6 @@ func filterpaths(paths, excludes []string) (filtered []string) {
 			log.Write("Error occured during path filtering: %s", err.Error())
 		}
 	}
+
 	return
 }
