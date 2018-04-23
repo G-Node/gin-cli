@@ -46,9 +46,9 @@ script:
   - make
   - make installtest
   - if [ ${TRAVIS_GO_VERSION} != "tip" ]; then
-        ./tests/start-server.sh;
+        ./tests/start-server;
         while ! curl localhost:3000 -so /dev/null; do sleep 1; done;
-        ./tests/run-cont-tests.sh;
+        ./tests/run-cont-tests;
     fi
 
 after_script:
@@ -57,6 +57,6 @@ after_script:
         echo $GISTTOKEN > ./tests/testuserhome/.gist;
         mv ./scripts/log/gin.log ./scripts/log/gin-${TRAVIS_BRANCH}.log;
         mv ./scripts/log/tests.log ./scripts/log/tests-${TRAVIS_BRANCH}.log;
-        ./tests/run-cont.sh gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c ./scripts/log/*.log;
+        ./tests/run-cont gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c ./scripts/log/*.log;
         rm ./tests/testuserhome/.gist;
     fi

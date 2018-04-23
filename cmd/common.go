@@ -1,6 +1,7 @@
 package gincmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -12,6 +13,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
+
+const unknownhostname = "(unknown)"
 
 var green = color.New(color.FgGreen).SprintFunc()
 var red = color.New(color.FgRed).SprintFunc()
@@ -36,21 +39,32 @@ func usageDie(cmd *cobra.Command) {
 	util.Die("")
 }
 
-func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
+func printJSON(statuschan <-chan ginclient.RepoFileStatus) (filesuccess map[string]bool) {
+	filesuccess = make(map[string]bool)
+	for stat := range statuschan {
+		j, _ := json.Marshal(stat)
+		fmt.Println(string(j))
+		filesuccess[stat.FileName] = true
+		if stat.Err != nil {
+			filesuccess[stat.FileName] = false
+		}
+	}
+	return
+}
+
+func printProgressOutput(statuschan <-chan ginclient.RepoFileStatus) (filesuccess map[string]bool) {
+	filesuccess = make(map[string]bool)
 	var fname, state string
 	var lastprint string
-	filesuccess := make(map[string]bool)
-	for stat := range statuschan {
-		var msgparts []string
-		if jsonout {
-			j, _ := json.Marshal(stat)
-			fmt.Println(string(j))
-			filesuccess[stat.FileName] = true
-			if stat.Err != nil {
-				filesuccess[stat.FileName] = false
-			}
-			continue
+	outline := new(bytes.Buffer)
+	outappend := func(part string) {
+		if len(part) > 0 {
+			outline.WriteString(part)
+			outline.WriteString(" ")
 		}
+	}
+	for stat := range statuschan {
+		outline.Reset()
 		if stat.FileName != fname || stat.State != state {
 			// New line if new file or new state
 			if len(lastprint) > 0 {
@@ -60,27 +74,39 @@ func printProgress(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
 			fname = stat.FileName
 			state = stat.State
 		}
-		msgparts = append(msgparts, stat.State, stat.FileName)
+		outappend(stat.State)
+		outappend(stat.FileName)
 		if stat.Err == nil {
 			if stat.Progress == "100%" {
-				msgparts = append(msgparts, green("OK"))
+				outappend(green("OK"))
 				filesuccess[stat.FileName] = true
 			} else {
-				msgparts = append(msgparts, stat.Progress, stat.Rate)
+				outappend(stat.Progress)
+				outappend(stat.Rate)
 			}
 		} else {
-			msgparts = append(msgparts, stat.Err.Error())
+			outappend(stat.Err.Error())
 			filesuccess[stat.FileName] = false
 		}
-		newprint := fmt.Sprintf("\r%s", strings.Join(msgparts, " "))
+		newprint := outline.String()
 		if newprint != lastprint {
-			fmt.Printf("\r%s", strings.Repeat(" ", len(lastprint))) // clear the line
+			fmt.Printf("\r%s\r", strings.Repeat(" ", len(lastprint))) // clear the line
 			fmt.Fprint(color.Output, newprint)
 			lastprint = newprint
 		}
 	}
 	if len(lastprint) > 0 {
 		fmt.Println()
+	}
+	return
+}
+
+func formatOutput(statuschan <-chan ginclient.RepoFileStatus, jsonout bool) {
+	var filesuccess map[string]bool
+	if jsonout {
+		filesuccess = printJSON(statuschan)
+	} else {
+		filesuccess = printProgressOutput(statuschan)
 	}
 
 	// count unique file errors
@@ -158,6 +184,9 @@ func SetUpCommands(verstr string) *cobra.Command {
 	// Logout
 	rootCmd.AddCommand(LogoutCmd())
 
+	// Init repo
+	rootCmd.AddCommand(InitCmd())
+
 	// Create repo
 	rootCmd.AddCommand(CreateCmd())
 
@@ -175,6 +204,9 @@ func SetUpCommands(verstr string) *cobra.Command {
 
 	// Lock content
 	rootCmd.AddCommand(LockCmd())
+
+	// Commit changes
+	rootCmd.AddCommand(CommitCmd())
 
 	// Upload
 	rootCmd.AddCommand(UploadCmd())

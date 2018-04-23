@@ -9,7 +9,6 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/G-Node/gin-cli/util"
@@ -19,7 +18,7 @@ import (
 	// but its only temporary...
 )
 
-var defaultHostname = "(unknown)"
+const unknownhostname = "(unknown)"
 
 // MakeSessionKey creates a private+public key pair.
 // The private key is saved in the user's configuration directory, to be used for git commands.
@@ -33,7 +32,7 @@ func (gincl *Client) MakeSessionKey() error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		util.LogWrite("Could not retrieve hostname")
-		hostname = defaultHostname
+		hostname = unknownhostname
 	}
 	description := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)
 	pubkey := fmt.Sprintf("%s %s", strings.TrimSpace(keyPair.Public), description)
@@ -193,9 +192,35 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// Upload adds files to a repository and uploads them.
+// Add updates the index with the changes in the files specified by 'paths'.
+// The status channel 'addchan' is closed when this function returns.
+func Add(paths []string, addchan chan<- RepoFileStatus) {
+	defer close(addchan)
+	paths, err := util.ExpandGlobs(paths)
+	if err != nil {
+		addchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	if len(paths) > 0 {
+		// Run git annex add using exclusion filters and then add the rest to git
+		annexaddchan := make(chan RepoFileStatus)
+		go AnnexAdd(paths, annexaddchan)
+		for addstat := range annexaddchan {
+			addchan <- addstat
+		}
+
+		gitaddchan := make(chan RepoFileStatus)
+		go GitAdd(paths, gitaddchan)
+		for addstat := range gitaddchan {
+			addchan <- addstat
+		}
+	}
+}
+
+// Upload transfers locally recorded changes to a remote.
 // The status channel 'uploadchan' is closed when this function returns.
-func (gincl *Client) Upload(paths []string, commitmsg string, uploadchan chan<- RepoFileStatus) {
+func (gincl *Client) Upload(paths []string, uploadchan chan<- RepoFileStatus) {
 	defer close(uploadchan)
 	util.LogWrite("Upload")
 
@@ -205,25 +230,8 @@ func (gincl *Client) Upload(paths []string, commitmsg string, uploadchan chan<- 
 		return
 	}
 
-	if len(paths) > 0 {
-		// Run git annex add using exclusion filters and then add the rest to git
-		addchan := make(chan RepoFileStatus)
-		go AnnexAdd(paths, addchan)
-		for addstat := range addchan {
-			// Send UploadStatus
-			uploadchan <- addstat
-		}
-
-		addchan = make(chan RepoFileStatus)
-		go GitAdd(paths, addchan)
-		for addstat := range addchan {
-			// Send UploadStatus
-			uploadchan <- addstat
-		}
-	}
-
 	annexpushchan := make(chan RepoFileStatus)
-	go AnnexPush(paths, commitmsg, annexpushchan)
+	go AnnexPush(paths, annexpushchan)
 	for stat := range annexpushchan {
 		uploadchan <- stat
 	}
@@ -334,14 +342,16 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- RepoFileStatus)
 	_, repoName := splitRepoParts(repoPath)
 	Workingdir = repoName
 
-	initstatus := make(chan RepoFileStatus)
-	go gincl.InitDir(repoPath, initstatus)
-	for stat := range initstatus {
-		clonechan <- stat
-		if stat.Err != nil {
-			return
-		}
+	status := RepoFileStatus{State: "Initialising local storage"}
+	clonechan <- status
+	err := gincl.InitDir()
+	if err != nil {
+		status.Err = err
+		clonechan <- status
+		return
 	}
+	status.Progress = progcomplete
+	clonechan <- status
 	return
 }
 
@@ -414,17 +424,16 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 	}
 }
 
+// AddRemote constructs the proper remote URL given a repository path (user/reponame) and adds it as a named remote to the repository configuration.
+func (gincl *Client) AddRemote(name, repopath string) error {
+	remotepath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repopath)
+	return AddRemote(name, remotepath)
+}
+
 // InitDir initialises the local directory with the default remote and annex configuration.
 // The status channel 'initchan' is closed when this function returns.
-func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
-	fn := fmt.Sprintf("InitDir")
-	defer close(initchan)
-	initerr := ginerror{Origin: fn, Description: "Error initialising local directory"}
-	remotePath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
-
-	var stat RepoFileStatus
-	stat.State = "Initialising local storage"
-	initchan <- stat
+func (gincl *Client) InitDir() error {
+	initerr := ginerror{Origin: "InitDir", Description: "Error initialising local directory"}
 	if !IsRepo() {
 		cmd := GitCommand("init")
 		stdout, stderr, err := cmd.OutputError()
@@ -432,18 +441,14 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 			util.LogWrite("Error during Init command: %s", string(stderr))
 			logstd(stdout, stderr)
 			initerr.UError = err.Error()
-			initchan <- RepoFileStatus{Err: initerr}
-			return
+			return initerr
 		}
 		Workingdir = "."
 	}
 
-	stat.Progress = "10%"
-	initchan <- stat
-
 	hostname, err := os.Hostname()
 	if err != nil {
-		hostname = defaultHostname
+		hostname = unknownhostname
 	}
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 
@@ -463,74 +468,19 @@ func (gincl *Client) InitDir(repoPath string, initchan chan<- RepoFileStatus) {
 			util.LogWrite("Failed to set local git user configuration")
 		}
 	}
-	stat.Progress = "20%"
-	initchan <- stat
-
 	if runtime.GOOS == "windows" {
 		// force disable symlinks even if user can create them
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
 		GitCommand("config", "--local", "core.symlinks", "false").Run()
 	}
 
-	// If there are no commits, create the initial commit.
-	// While this isn't strictly necessary, it sets the active remote with commits that makes it easier to work with.
-	new, err := CommitIfNew()
-	if err != nil {
-		initchan <- RepoFileStatus{Err: err}
-		return
-	}
-	stat.Progress = "30%"
-	initchan <- stat
-
 	err = AnnexInit(description)
 	if err != nil {
-		initchan <- RepoFileStatus{Err: err}
-		return
+		initerr.UError = err.Error()
+		return initerr
 	}
-	stat.Progress = "40%"
-	initchan <- stat
 
-	err = AddRemote("origin", remotePath)
-	// Ignore if it already exists
-	if err != nil && !strings.Contains(err.Error(), "already exists") {
-		initchan <- RepoFileStatus{Err: err}
-		return
-	}
-	stat.Progress = "50%"
-	initchan <- stat
-
-	if new {
-		// Push initial commit and set default remote
-		cmd := GitCommand("push", "--set-upstream", "origin", "master")
-		stdout, stderr, err := cmd.OutputError()
-		if err != nil {
-			logstd(stdout, stderr)
-			initchan <- RepoFileStatus{Err: initerr}
-			return
-		}
-
-		// Sync if an initial commit was created
-		syncchan := make(chan RepoFileStatus)
-		go AnnexSync(false, syncchan)
-		for syncstat := range syncchan {
-			if len(syncstat.Progress) > 0 {
-				progstr := strings.TrimSuffix(syncstat.Progress, "%")
-				progint, converr := strconv.ParseInt(progstr, 10, 32)
-				if converr != nil {
-					continue
-				}
-				stat.Progress = fmt.Sprintf("%d%%", 50+progint/2)
-			}
-			initchan <- stat
-		}
-		if err != nil {
-			initchan <- RepoFileStatus{Err: initerr}
-			return
-		}
-	}
-	stat.Progress = "100%"
-	initchan <- stat
-	return
+	return nil
 }
 
 // FileStatus represents the state a file is in with respect to local and remote changes.

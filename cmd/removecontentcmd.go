@@ -17,10 +17,10 @@ func remove(cmd *cobra.Command, args []string) {
 	gincl.GitUser = util.Config.GitUser
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
-	printProgress(lockchan, jsonout)
+	formatOutput(lockchan, jsonout)
 	rmchan := make(chan ginclient.RepoFileStatus)
 	go gincl.RemoveContent(args, rmchan)
-	printProgress(rmchan, jsonout)
+	formatOutput(rmchan, jsonout)
 }
 
 // RemoveContentCmd sets up the 'remove-content' subcommand

@@ -22,7 +22,7 @@ func download(cmd *cobra.Command, args []string) {
 	gincl.GitUser = util.Config.GitUser
 	lockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.LockContent([]string{}, lockchan)
-	printProgress(lockchan, jsonout)
+	formatOutput(lockchan, jsonout)
 	if !jsonout {
 		fmt.Print("Downloading changes ")
 	}

@@ -3,7 +3,6 @@ package gincmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -41,26 +40,23 @@ func repoversion(cmd *cobra.Command, args []string) {
 		commit = commits[0]
 	}
 
-	gincl := ginclient.NewClient(util.Config.GinHost)
-	requirelogin(cmd, gincl, true) // TODO: change when we support offline-only
 	if copyto == "" {
 		// TODO: Print some sort of output (similar to copy-to variant)
 		// e.g., File 'fname' restored to version <revision> (date)
 		err := ginclient.CheckoutVersion(commit.AbbreviatedHash, paths)
 		util.CheckError(err)
-		hostname, herr := os.Hostname()
-		if herr != nil {
-			util.LogWrite("Could not retrieve hostname")
-			hostname = "(unknown)"
+
+		addchan := make(chan ginclient.RepoFileStatus)
+		go ginclient.Add(paths, addchan)
+		formatOutput(addchan, jsonout)
+
+		fmt.Print("Recording changes ")
+		err = ginclient.GitCommit(makeCommitMessage("commit", paths))
+		if err != nil {
+			util.Die(err)
 		}
+		fmt.Println(green("OK"))
 
-		commitsubject := fmt.Sprintf("Repository version changed by %s@%s", gincl.Username, hostname)
-		commitbody := fmt.Sprintf("Returning to version as of %s\nVersion ID: %s\n%s", commit.Date.Format("Mon Jan 2 15:04:05 2006 (-0700)"), commit.AbbreviatedHash, getchanges())
-		commitmsg := fmt.Sprintf("%s\n\n%s", commitsubject, commitbody)
-
-		uploadchan := make(chan ginclient.RepoFileStatus)
-		go gincl.Upload(paths, commitmsg, uploadchan)
-		printProgress(uploadchan, jsonout)
 	} else {
 		checkoutcopies(commit, paths, copyto)
 	}

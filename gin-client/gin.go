@@ -248,7 +248,7 @@ func (gincl *Client) Logout() {
 	hostname, err := os.Hostname()
 	if err != nil {
 		util.LogWrite("Could not retrieve hostname")
-		hostname = defaultHostname
+		hostname = unknownhostname
 	}
 
 	currentkeyname := fmt.Sprintf("GIN Client: %s@%s", gincl.Username, hostname)

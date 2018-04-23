@@ -2,7 +2,6 @@ package gincmd
 
 import (
 	"fmt"
-	"os"
 
 	ginclient "github.com/G-Node/gin-cli/gin-client"
 	"github.com/G-Node/gin-cli/util"
@@ -20,31 +19,23 @@ func upload(cmd *cobra.Command, args []string) {
 	gincl.GitHost = util.Config.GitHost
 	gincl.GitUser = util.Config.GitUser
 
-	lockchan := make(chan ginclient.RepoFileStatus)
-	go gincl.LockContent(args, lockchan)
-	printProgress(lockchan, jsonout)
+	paths := args
 
-	// add header commit line
-	hostname, err := os.Hostname()
-	if err != nil {
-		util.LogWrite("Could not retrieve hostname")
-		hostname = "(unknown)"
+	if len(paths) > 0 {
+		// Don't add + commit files if nothing was specified
+		addchan := make(chan ginclient.RepoFileStatus)
+		go ginclient.Add(paths, addchan)
+		formatOutput(addchan, jsonout)
+
+		fmt.Print("Recording changes ")
+		// ignore error for now :: call commit() instead
+		ginclient.GitCommit(makeCommitMessage("upload", paths))
+		fmt.Println(green("OK"))
 	}
-	commitmsg := fmt.Sprintf("gin upload from %s\n\n%s", hostname, getchanges())
+
 	uploadchan := make(chan ginclient.RepoFileStatus)
-	go gincl.Upload(args, commitmsg, uploadchan)
-	printProgress(uploadchan, jsonout)
-}
-
-func getchanges() string {
-	changes, err := ginclient.DescribeIndexShort()
-	if err != nil {
-		util.LogWrite("Failed to determine file changes for commit message")
-	}
-	if changes == "" {
-		changes = "No changes recorded"
-	}
-	return changes
+	go gincl.Upload(paths, uploadchan)
+	formatOutput(uploadchan, jsonout)
 }
 
 // UploadCmd sets up the 'upload' subcommand

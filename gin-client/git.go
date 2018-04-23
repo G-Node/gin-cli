@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,14 +57,15 @@ func AddRemote(name, url string) error {
 }
 
 // CommitIfNew creates an empty initial git commit if the current repository is completely new.
+// If 'upstream' is not an empty string, and an initial commit was created, it sets the current branch to track the same-named branch at the specified remote.
 // Returns 'true' if (and only if) a commit was created.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
-func CommitIfNew() (bool, error) {
+func CommitIfNew(upstream string) (bool, error) {
 	if !IsRepo() {
 		return false, fmt.Errorf("not a repository")
 	}
 	cmd := GitCommand("rev-parse", "HEAD")
-	err := cmd.Wait()
+	err := cmd.Run()
 	if err == nil {
 		// All good. No need to do anything
 		return false, nil
@@ -71,11 +74,22 @@ func CommitIfNew() (bool, error) {
 	// Create an empty initial commit and run annex sync to synchronise everything
 	hostname, err := os.Hostname()
 	if err != nil {
-		hostname = defaultHostname
+		hostname = unknownhostname
 	}
-	commitargs := []string{"commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname)}
-	cmd = GitCommand(commitargs...)
+	cmd = GitCommand("commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
 	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		util.LogWrite("Error while creating initial commit")
+		logstd(stdout, stderr)
+		return false, fmt.Errorf(string(stderr))
+	}
+
+	if upstream == "" {
+		return true, nil
+	}
+
+	cmd = GitCommand("push", "--set-upstream", upstream, "HEAD")
+	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
 		util.LogWrite("Error while creating initial commit")
 		logstd(stdout, stderr)
@@ -120,6 +134,7 @@ func (gincl *Client) Clone(repoPath string, clonechan chan<- RepoFileStatus) {
 	var stderr []byte
 	var status RepoFileStatus
 	status.State = "Downloading repository"
+	clonechan <- status
 	var rerr error
 	readbuffer := make([]byte, 1024)
 	var nread, errhead int
@@ -234,18 +249,23 @@ func AnnexPull() error {
 		util.LogWrite("Error during AnnexPull.")
 		util.LogWrite("[Error]: %v", err)
 		logstd(stdout, stderr)
+		errmsg := "failed"
 		sstderr := string(stderr)
 		if strings.Contains(sstderr, "Permission denied") {
-			return fmt.Errorf("download failed: permission denied")
+			errmsg = "download failed: permission denied"
 		} else if strings.Contains(sstderr, "Host key verification failed") {
-			return fmt.Errorf("download failed: server key does not match known host key")
+			errmsg = "download failed: server key does not match known host key"
+		} else if strings.Contains(sstderr, "would be overwritten by merge") {
+			errmsg = "download failed: local modified or untracked file would be overwritten by download"
+			// TODO: Which file
 		}
+		err = fmt.Errorf(errmsg)
 	}
 	return err
 }
 
 // AnnexSync synchronises the local repository with the remote.
-// Optionally synchronises content if content=True
+// Optionally synchronises content if content=True.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'syncchan' is closed when this function returns.
 // (git annex sync [--content])
@@ -299,14 +319,15 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 	return
 }
 
-// AnnexPush uploads all annexed files.
+// AnnexPush uploads all changes and new content to the default remote.
 // Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull; git annex copy --to=origin)
-func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus) {
+func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
-	cmdargs := []string{"sync", "--no-pull", "--commit", fmt.Sprintf("--message=%s", commitmsg)}
-	cmd := AnnexCommand(cmdargs...)
+	// NOTE: Using origin which is the conventional default remote. This should change to work with alternate remotes.
+	remote := "origin"
+	cmd := AnnexCommand("sync", "--no-pull", "--no-commit") // NEVER commit changes when doing annex-sync
 	stdout, stderr, err := cmd.OutputError()
 	// TODO: Parse git push output for progress
 	if err != nil {
@@ -319,16 +340,14 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 			errmsg = "upload failed: permission denied"
 		} else if strings.Contains(sstderr, "Host key verification failed") {
 			errmsg = "upload failed: server key does not match known host key"
+		} else if strings.Contains(sstderr, "rejected") {
+			errmsg = "upload failed: changes were made on the server that have not been downloaded; run 'gin download' to update local copies"
 		}
 		pushchan <- RepoFileStatus{Err: fmt.Errorf(errmsg)}
 		return
 	}
 
-	cmdargs = []string{"copy", "--json-progress"}
-	cmdargs = append(cmdargs, paths...)
-	// NOTE: Using origin which is the conventional default remote. This should change to work with alternate remotes.
-	cmdargs = append(cmdargs, "--to=origin")
-	cmd = AnnexCommand(cmdargs...)
+	cmd = AnnexCommand("copy", "--all", "--json-progress", fmt.Sprintf("--to=%s", remote))
 	err = cmd.Start()
 	if err != nil {
 		pushchan <- RepoFileStatus{Err: err}
@@ -345,6 +364,11 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 
 	var prevByteProgress int
 	var prevT time.Time
+
+	// 'git-annex copy --all' copies all local keys to the server.
+	// When no filenames are specified, the command doesn't print filenames, just keys.
+	// getAnnexMetadataName gives us the original filename and the time it was set.
+	var currentkey = ""
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// skip empty lines
@@ -352,6 +376,7 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 		}
 		err := json.Unmarshal(outline, &progress)
 		if err != nil || progress == (annexProgress{}) {
+			time.Sleep(1 * time.Second)
 			// File done? Check if succeeded and continue to next line
 			err = json.Unmarshal(outline, &getresult)
 			if err != nil || getresult == (annexAction{}) {
@@ -374,7 +399,17 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 				status.Err = fmt.Errorf("failed: %s", errmsg)
 			}
 		} else {
-			status.FileName = progress.Action.File
+			key := progress.Action.Key
+			if currentkey != key {
+				if md := getAnnexMetadataName(key); md.FileName != "" {
+					timestamp := md.ModTime.Format("2006-01-02 15:04:05")
+					status.FileName = fmt.Sprintf("%s (version: %s)", md.FileName, timestamp)
+				} else {
+					status.FileName = "(unknown)"
+				}
+				currentkey = key
+			}
+			// otherwise the same name as before is used
 			status.Progress = progress.PercentProgress
 
 			dbytes := progress.ByteProgress - prevByteProgress
@@ -386,7 +421,10 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 			status.Err = nil
 		}
 
-		pushchan <- status
+		// Don't push message if no filename was set
+		if status.FileName != "" {
+			pushchan <- status
+		}
 	}
 	if cmd.Wait() != nil {
 		var stderr, errline []byte
@@ -397,6 +435,74 @@ func AnnexPush(paths []string, commitmsg string, pushchan chan<- RepoFileStatus)
 		util.LogWrite(string(stderr))
 	}
 	return
+}
+
+// AnnexFindRes holds the result of a git annex find invocation for one file.
+type AnnexFindRes struct {
+	Hashdirlower string
+	Hashdirmixed string
+	Key          string
+	Humansize    string
+	Backend      string
+	File         string
+	Keyname      string
+	Bytesize     string
+	Mtime        string
+}
+
+// AnnexFind lists available annexed files in the current directory.
+// Specifying 'paths' limits the search to files matching a given path.
+// Returned items are indexed by their annex key.
+// git annex find)
+func AnnexFind(paths []string) (map[string]AnnexFindRes, error) {
+	cmdargs := []string{"find", "--json"}
+	if len(paths) > 0 {
+		cmdargs = append(cmdargs, paths...)
+	}
+	cmd := AnnexCommand(cmdargs...)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+		return nil, fmt.Errorf(string(stderr))
+	}
+
+	outlines := bytes.Split(stdout, []byte("\n"))
+	items := make(map[string]AnnexFindRes, len(outlines))
+	for _, line := range outlines {
+		var afr AnnexFindRes
+		json.Unmarshal(line, &afr)
+		items[afr.Key] = afr
+	}
+	return items, nil
+}
+
+// GitCommit records changes that have been added to the repository with a given message.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+// (git commit)
+func GitCommit(commitmsg string) error {
+	if IsDirect() {
+		// Set bare false and revert at the end of the function
+		err := setBare(false)
+		if err != nil {
+			return fmt.Errorf("failed to toggle repository bare mode")
+		}
+		defer setBare(true)
+	}
+
+	cmd := GitCommand("commit", fmt.Sprintf("--message=%s", commitmsg))
+	stdout, stderr, err := cmd.OutputError()
+
+	if err != nil {
+		if strings.Contains(string(stdout), "nothing to commit") {
+			// eat the error
+			util.LogWrite("Nothing to commit")
+			return nil
+		}
+		util.LogWrite("Error during GitCommit")
+		logstd(stdout, stderr)
+		return fmt.Errorf(string(stderr))
+	}
+	return nil
 }
 
 // AnnexGet retrieves the content of specified files.
@@ -620,7 +726,7 @@ func GitAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			continue
 		}
 		if strings.HasPrefix(fname, "add") {
-			status.State = "Adding"
+			status.State = "Adding (git)  "
 			fname = strings.TrimPrefix(fname, "add '")
 		} else if strings.HasPrefix(fname, "remove") {
 			status.State = "Removing"
@@ -693,10 +799,15 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 	var rerr error
 	var status RepoFileStatus
 	var addresult annexAction
-	status.State = "Adding"
+	status.State = "Adding (annex)"
 	if update {
 		status.State = "Locking"
 	}
+
+	// Start the metadata setter routine
+	mdchan := make(chan string)
+	defer close(mdchan)
+	go setAnnexMetadataName(mdchan)
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// Empty line output. Ignore
@@ -715,6 +826,8 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		if addresult.Success {
 			util.LogWrite("%s added to annex", addresult.File)
 			status.Err = nil
+			// Write filename metadata key
+			mdchan <- status.FileName
 		} else {
 			util.LogWrite("Error adding %s", addresult.File)
 			status.Err = fmt.Errorf("failed")
@@ -731,6 +844,58 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		logstd(nil, stderr)
 	}
 	return
+}
+
+// setAnnexMetadataName starts a routine and waits for input on the provided channel.
+// For each path specified, the name of the file is added to the metadata of the annexed file.
+// The function exits when the channel is closed.
+func setAnnexMetadataName(pathchan <-chan string) {
+	for path := range pathchan {
+		_, fname := filepath.Split(path)
+		cmd := AnnexCommand("metadata", fmt.Sprintf("--set=ginfilename=%s", fname), path)
+		stdout, stderr, err := cmd.OutputError()
+		if err != nil {
+			logstd(stdout, stderr)
+		} else {
+			util.LogWrite("ginfilename metadata key set to %s", fname)
+		}
+	}
+	return
+}
+
+type annexMetadata struct {
+	annexAction
+	Fields struct {
+		Lastchanged    []string
+		Ginfilename    []string
+		GinefilenameLC []string `json:"ginfilename-lastchanged"`
+	}
+}
+
+type annexFilenameDate struct {
+	Key      string
+	FileName string
+	ModTime  time.Time
+}
+
+// getAnnexMetadataName returns the filename, key, and last modification time stored in the metadata of an annexed file given the key.
+// If an unused key does not have a name associated with it, the filename will be empty.
+func getAnnexMetadataName(key string) annexFilenameDate {
+	cmd := AnnexCommand("metadata", "--json", fmt.Sprintf("--key=%s", key))
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		util.LogWrite("Error retrieving annexed content metadata")
+		logstd(stdout, stderr)
+		return annexFilenameDate{}
+	}
+	var annexmd annexMetadata
+	json.Unmarshal(bytes.TrimSpace(stdout), &annexmd)
+	if len(annexmd.Fields.Ginfilename) > 0 {
+		name := annexmd.Fields.Ginfilename[0]
+		modtime, _ := time.Parse("2006-01-02@15-04-05", annexmd.Fields.GinefilenameLC[0])
+		return annexFilenameDate{Key: key, FileName: name, ModTime: modtime}
+	}
+	return annexFilenameDate{Key: key, FileName: annexmd.File}
 }
 
 // AnnexAdd adds paths to the annex.
@@ -834,10 +999,11 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 // DescribeIndexShort returns a string which represents a condensed form of the git (annex) index.
 // It is constructed using the result of 'git annex status'.
 // The description is composed of the file count for each status: added, modified, deleted
-func DescribeIndexShort() (string, error) {
+// If 'paths' are specified, the status output is limited to files and directories matching those paths.
+func DescribeIndexShort(paths []string) (string, error) {
 	// TODO: 'git annex status' doesn't list added (A) files when in direct mode.
 	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus([]string{}, statuschan)
+	go AnnexStatus(paths, statuschan)
 	statusmap := make(map[string]int)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -1275,6 +1441,18 @@ func AnnexFromKey(key, filepath string) error {
 		return fmt.Errorf(string(stderr))
 	}
 	return nil
+}
+
+// GitRevCount returns the number of commits between two revisions.
+// Setting the Workingdir package global affects the working directory in which the command is executed.
+func GitRevCount(a, b string) (int, error) {
+	cmd := GitCommand("rev-list", "--count", fmt.Sprintf("%s..%s", a, b))
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+		return 0, fmt.Errorf(string(stderr))
+	}
+	return strconv.Atoi(string(stdout))
 }
 
 var annexmodecache = make(map[string]bool)

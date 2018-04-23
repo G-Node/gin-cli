@@ -14,7 +14,7 @@ func unlock(cmd *cobra.Command, args []string) {
 	gincl := ginclient.NewClient(util.Config.GinHost)
 	unlockchan := make(chan ginclient.RepoFileStatus)
 	go gincl.UnlockContent(args, unlockchan)
-	printProgress(unlockchan, jsonout)
+	formatOutput(unlockchan, jsonout)
 }
 
 // UnlockCmd sets up the file 'unlock' subcommand

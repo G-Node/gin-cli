@@ -16,8 +16,8 @@ func Die(msg interface{}) {
 	// Swap the line above for the line below when (if) https://github.com/fatih/color/pull/87 gets merged
 	msgstring := fmt.Sprintf("%s", msg)
 	if len(msgstring) > 0 {
-		LogWrite("Exiting with ERROR message: %s", msg)
-		fmt.Fprintln(os.Stderr, msg)
+		LogWrite("Exiting with ERROR message: %s", msgstring)
+		fmt.Fprintln(os.Stderr, msgstring)
 	} else {
 		LogWrite("Exiting with ERROR (no message)")
 	}

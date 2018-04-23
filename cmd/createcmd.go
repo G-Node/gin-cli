@@ -43,9 +43,12 @@ func createRepo(cmd *cobra.Command, args []string) {
 	if here {
 		// Init cwd
 		ginclient.Workingdir = "."
-		initchan := make(chan ginclient.RepoFileStatus)
-		go gincl.InitDir(repoPath, initchan)
-		printProgress(initchan, false)
+		err = gincl.InitDir()
+		util.CheckError(err)
+		err = gincl.AddRemote("origin", repoPath)
+		util.CheckError(err)
+		_, err := ginclient.CommitIfNew("origin")
+		util.CheckError(err)
 	} else if !noclone {
 		// Clone repository after creation
 		getRepo(cmd, []string{repoPath})
