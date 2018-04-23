@@ -583,9 +583,6 @@ func AnnexInfo() (AnnexInfoRes, error) {
 	return info, err
 }
 
-// build exclusion argument list
-// files < annex.minsize or matching exclusion extensions will not be annexed and
-// will instead be handled by git
 // AnnexLock locks the specified files and directory contents if they are annexed.
 // Note that this function uses 'git annex add' to lock files, but only if they are marked as unlocked (T) by git annex.
 // Attempting to lock an untracked file, or a file in any state other than T will have no effect.
@@ -695,6 +692,9 @@ func AnnexFromKey(key, filepath string) error {
 	return nil
 }
 
+// build exclusion argument list
+// files < annex.minsize or matching exclusion extensions will not be annexed and
+// will instead be handled by git
 func annexExclArgs() (exclargs []string) {
 	config := config.Read()
 	if config.Annex.MinSize != "" {
