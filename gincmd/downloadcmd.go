@@ -2,6 +2,7 @@ package gincmd
 
 import (
 	"fmt"
+	"os"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
@@ -35,7 +36,7 @@ func download(cmd *cobra.Command, args []string) {
 	}
 	if content {
 		reporoot, _ := git.FindRepoRoot(".")
-		ginclient.Workingdir = reporoot
+		os.Chdir(reporoot)
 		getContent(cmd, nil)
 	}
 }

@@ -114,7 +114,6 @@ type AnnexInfoRes struct {
 }
 
 // AnnexInit initialises the repository for annex.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex init)
 func AnnexInit(description string) error {
 	args := []string{"init", description}
@@ -137,7 +136,6 @@ func AnnexInit(description string) error {
 
 // AnnexSync synchronises the local repository with the remote.
 // Optionally synchronises content if content=True.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'syncchan' is closed when this function returns.
 // (git annex sync [--content])
 func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
@@ -191,7 +189,6 @@ func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
 }
 
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex sync --no-push [--content])
 func AnnexPull() error {
 	args := []string{"sync", "--no-push", "--no-commit"}
@@ -217,7 +214,6 @@ func AnnexPull() error {
 }
 
 // AnnexPush uploads all changes and new content to the default remote.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull; git annex copy --to=origin)
 func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
@@ -335,7 +331,6 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 }
 
 // AnnexGet retrieves the content of specified files.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'getchan' is closed when this function returns.
 // (git annex get)
 func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
@@ -410,7 +405,6 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 }
 
 // AnnexDrop drops the content of specified files.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'dropchan' is closed when this function returns.
 // (git annex drop)
 func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
@@ -494,7 +488,6 @@ func getAnnexMetadataName(key string) annexFilenameDate {
 
 // AnnexAdd adds paths to the annex.
 // Files specified for exclusion in the configuration are ignored automatically.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'addchan' is closed when this function returns.
 // (git annex add)
 func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
@@ -502,7 +495,6 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 }
 
 // AnnexWhereis returns information about annexed files in the repository
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The output channel 'wichan' is closed when this function returns.
 // (git annex whereis)
 func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisRes) {
@@ -534,7 +526,6 @@ func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisRes) {
 }
 
 // AnnexStatus returns the status of a file or files in a directory
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The output channel 'statuschan' is closed when this function returns.
 // (git annex status)
 func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
@@ -567,7 +558,6 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 }
 
 // AnnexInfo returns the annex information for a given repository
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex info)
 func AnnexInfo() (AnnexInfoRes, error) {
 	cmd := AnnexCommand("info", "--json")
@@ -586,7 +576,6 @@ func AnnexInfo() (AnnexInfoRes, error) {
 // AnnexLock locks the specified files and directory contents if they are annexed.
 // Note that this function uses 'git annex add' to lock files, but only if they are marked as unlocked (T) by git annex.
 // Attempting to lock an untracked file, or a file in any state other than T will have no effect.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'lockchan' is closed when this function returns.
 // (git annex add --update)
 func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
@@ -594,7 +583,6 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 }
 
 // AnnexUnlock unlocks the specified files and directory contents if they are annexed
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'unlockchan' is closed when this function returns.
 // (git annex unlock)
 func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
@@ -680,7 +668,6 @@ func AnnexFind(paths []string) (map[string]AnnexFindRes, error) {
 // AnnexFromKey creates an Annex placeholder file at a given location with a specific key.
 // The creation is forced, so there is no guarantee that the key refers to valid repository content, nor that the content is still available in any of the remotes.
 // The location where the file is to be created must be available (no directories are created).
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git annex fromkey --force)
 func AnnexFromKey(key, filepath string) error {
 	cmd := AnnexCommand("fromkey", "--force", key, filepath)
@@ -829,17 +816,16 @@ func GetAnnexVersion() (string, error) {
 }
 
 // AnnexCommand sets up a git annex command with the provided arguments and returns a GinCmd struct.
-// Setting the Workingdir package global affects the working directory in which the command will be executed.
 func AnnexCommand(args ...string) shell.Cmd {
 	config := config.Read()
 	gitannexbin := config.Bin.GitAnnex
 	cmd := shell.Command(gitannexbin, args...)
-	cmd.Dir = Workingdir
 	token := web.UserToken{}
 	_ = token.LoadToken()
 	env := os.Environ()
 	cmd.Env = append(env, sshEnv(token.Username))
 	cmd.Env = append(cmd.Env, "GIT_ANNEX_USE_GIT_SSH=1")
-	log.Write("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
+	workingdir, _ := filepath.Abs(".")
+	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
 	return cmd
 }

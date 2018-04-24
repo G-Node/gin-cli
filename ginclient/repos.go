@@ -22,9 +22,6 @@ import (
 
 const unknownhostname = "(unknown)"
 
-// Workingdir sets the directory for shell commands
-var Workingdir = "."
-
 // Types
 
 // FileCheckoutStatus is used to report the status of a CheckoutFileCopies() operation.
@@ -351,7 +348,6 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileSt
 }
 
 // Download downloads changes and placeholder files in an already checked out repository.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) Download() error {
 	log.Write("Download")
 	return git.AnnexPull()
@@ -374,10 +370,10 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 
 	repoPathParts := strings.SplitN(repoPath, "/", 2)
 	repoName := repoPathParts[1]
-	git.Workingdir = repoName
 
 	status := git.RepoFileStatus{State: "Initialising local storage"}
 	clonechan <- status
+	os.Chdir(repoName)
 	err := gincl.InitDir()
 	if err != nil {
 		status.Err = err
@@ -469,7 +465,6 @@ func (gincl *Client) InitDir() error {
 			initerr.UError = err.Error()
 			return initerr
 		}
-		Workingdir = "."
 	}
 
 	hostname, err := os.Hostname()
@@ -757,7 +752,6 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 }
 
 // ListFiles lists the files and directories specified by paths and their sync status.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
 	paths, err := expandglobs(paths)
 	if err != nil {
