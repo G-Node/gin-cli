@@ -1,4 +1,4 @@
-// Package shell augments the builtin os/exec Cmd struct and functions with convenience functions for reading piped output.
+// Package shell augments the standard library os/exec Cmd struct and functions with convenience functions for reading piped output.
 package shell
 
 import (
