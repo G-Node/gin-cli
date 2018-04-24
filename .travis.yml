@@ -19,7 +19,7 @@ before_install:
 
 install:
   # tools
-  - go get github.com/golang/lint/golint
+  # - go get github.com/golang/lint/golint
   # dependencies
   - go get github.com/spf13/viper
   - go get github.com/spf13/cobra
@@ -40,7 +40,7 @@ install:
   - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -vs $(pwd) ${GOPATH}/src/github.com/G-Node/gin-cli; fi
   - go vet ./...
   - gofmt -s -l .
-  - golint github.com/G-Node/gin-cli...
+  # - golint github.com/G-Node/gin-cli...
 
 script:
   - make
