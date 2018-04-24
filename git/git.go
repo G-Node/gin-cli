@@ -772,7 +772,7 @@ func Command(args ...string) shell.Cmd {
 	token := web.UserToken{}
 	_ = token.LoadToken()
 	env := os.Environ()
-	cmd.Env = append(env, GitSSHEnv(token.Username))
+	cmd.Env = append(env, sshEnv(token.Username))
 	log.Write("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
 	return cmd
 }

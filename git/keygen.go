@@ -76,9 +76,9 @@ func HostKeyPath() string {
 	return filepath.Join(configpath, "ginhostkey")
 }
 
-// GitSSHEnv returns the value that should be set for the GIT_SSH_COMMAND environment variable
+// sshEnv returns the value that should be set for the GIT_SSH_COMMAND environment variable
 // in order to use the user's private key.
-func GitSSHEnv(user string) string {
+func sshEnv(user string) string {
 	// Windows git seems to require Unix paths for the SSH command -- this is dirty but works
 	fixpathsep := func(p string) string {
 		p = filepath.ToSlash(p)
