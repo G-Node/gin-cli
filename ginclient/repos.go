@@ -690,19 +690,9 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		}
 	}
 
-	// If cached files are diff from upstream, mark as LocalChanges
-	diffargs := []string{"diff", "-z", "--name-only", "--relative", "@{upstream}"}
-	diffargs = append(diffargs, cachedfiles...)
-	cmd := git.Command(diffargs...)
-	stdout, stderr, err := cmd.OutputError()
-	if err != nil {
-		log.Write("Error during diff command for status")
-		log.Write("[stdout]\n%s\n[stderr]\n%s", string(stdout), string(stderr))
-		// ignoring error and continuing
-	}
-
-	diffresults := strings.Split(string(stdout), "\000")
-	for _, fname := range diffresults {
+	diffchan := make(chan string)
+	go git.DiffUpstream(cachedfiles, diffchan)
+	for fname := range diffchan {
 		// Two notes:
 		//		1. There will definitely be overlap here with the same status in annex (not a problem)
 		//		2. The diff might be due to remote or local changes, but for now we're going to assume local

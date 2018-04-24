@@ -352,6 +352,39 @@ func Commit(commitmsg string) error {
 	return nil
 }
 
+// DiffUpstream returns, through the provided channel, the names of all files that differ from the default remote branch.
+// The output channel 'diffchan' is closed when this function returns
+// (git diff --name-only --relative @{upstream})
+func DiffUpstream(paths []string, diffchan chan<- string) {
+	defer close(diffchan)
+	diffargs := []string{"diff", "-z", "--name-only", "--relative", "@{upstream}"}
+	diffargs = append(diffargs, paths...)
+	cmd := Command(diffargs...)
+	err := cmd.Start()
+	if err != nil {
+		log.Write("ls-files command set up failed: %s", err)
+		return
+	}
+	var line []byte
+	var rerr error
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadBytes('\000') {
+		line = bytes.TrimSuffix(line, []byte("\000"))
+		if len(line) > 0 {
+			diffchan <- string(line)
+		}
+	}
+
+	var stderr, errline []byte
+	if cmd.Wait() != nil {
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
+		log.Write("Error during DiffUpstream")
+		logstd(nil, stderr)
+	}
+	return
+}
+
 // LsFiles lists all files known to git.
 // The output channel 'lschan' is closed when this function returns.
 // (git ls-files)
@@ -516,6 +549,7 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 
 	return commits, nil
 }
+
 func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffStat, error) {
 	logformat := `::%H`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
