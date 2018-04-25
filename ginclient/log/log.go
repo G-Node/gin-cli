@@ -15,9 +15,30 @@ var logger *log.Logger
 
 var configDirs = configdir.New("g-node", "gin")
 
+const loglimit = 1048576 // 1 MiB
+
+// trim reduces the size of a file to `loglimit`.
+// It reads the contents and writes them back, removing the initial bytes to fit the limit.
+// If any error occurs, it returns silently.
+func trim(file *os.File) {
+	filestat, err := file.Stat()
+	if err != nil {
+		return
+	}
+	if filestat.Size() < loglimit {
+		return
+	}
+	contents := make([]byte, filestat.Size())
+	nbytes, err := file.ReadAt(contents, 0)
+	if err != nil {
+		return
+	}
+	file.Truncate(0)
+	file.Write(contents[nbytes-loglimit : nbytes])
+}
+
 // Init initialises the log file and logger.
 func Init(ver string) error {
-	// TODO: Log rotation
 	cachepath, err := logpath(true)
 	if err != nil {
 		return err
@@ -77,5 +98,6 @@ func WriteError(err error) {
 // Close closes the log file.
 func Close() {
 	Write("=== LOGEND ===")
+	trim(logfile)
 	_ = logfile.Close()
 }
