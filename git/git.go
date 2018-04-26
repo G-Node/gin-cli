@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -15,9 +16,6 @@ import (
 	"github.com/G-Node/gin-cli/git/shell"
 	"github.com/G-Node/gin-cli/web"
 )
-
-// Workingdir sets the directory for shell commands
-var Workingdir = "."
 
 const progcomplete = "100%"
 const unknownhostname = "(unknown)"
@@ -88,7 +86,6 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 // Git commands
 
 // Clone downloads a repository and sets the remote fetch and push urls.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'clonechan' is closed when this function returns.
 // (git clone ...)
 func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) {
@@ -180,7 +177,6 @@ func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) 
 // Add adds paths to git directly (not annex).
 // In direct mode, files that are already in the annex are explicitly ignored.
 // In indirect mode, adding annexed files to git has no effect.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // The status channel 'addchan' is closed when this function returns.
 // (git add)
 func Add(filepaths []string, addchan chan<- RepoFileStatus) {
@@ -198,16 +194,8 @@ func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 			return
 		}
 		defer setBare(true)
-		wichan := make(chan AnnexWhereisRes)
-		go AnnexWhereis(filepaths, wichan)
-		var annexfiles []string
-		for wiInfo := range wichan {
-			if wiInfo.Err != nil {
-				continue
-			}
-			annexfiles = append(annexfiles, wiInfo.File)
-		}
-		filepaths = filterpaths(filepaths, annexfiles)
+		// Call addPathsDirect to collect filenames not in annex and deleted files
+		filepaths = gitAddDirect(filepaths)
 	}
 
 	cmdargs := append([]string{"add", "--verbose", "--"}, filepaths...)
@@ -285,7 +273,6 @@ func AddRemote(name, url string) error {
 // CommitIfNew creates an empty initial git commit if the current repository is completely new.
 // If 'upstream' is not an empty string, and an initial commit was created, it sets the current branch to track the same-named branch at the specified remote.
 // Returns 'true' if (and only if) a commit was created.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func CommitIfNew(upstream string) (bool, error) {
 	if !IsRepo() {
 		return false, fmt.Errorf("not a repository")
@@ -326,10 +313,10 @@ func CommitIfNew(upstream string) (bool, error) {
 
 // IsRepo checks whether the current working directory is in a git repository.
 // This function will also return true for bare repositories that use git annex (direct mode).
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsRepo() bool {
-	log.Write("IsRepo '%s'?", Workingdir)
-	_, err := FindRepoRoot(Workingdir)
+	path, _ := filepath.Abs(".")
+	log.Write("IsRepo '%s'?", path)
+	_, err := FindRepoRoot(path)
 	yes := err == nil
 	log.Write("%v", yes)
 	return yes
@@ -338,7 +325,6 @@ func IsRepo() bool {
 // **************** //
 
 // Commit records changes that have been added to the repository with a given message.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 // (git commit)
 func Commit(commitmsg string) error {
 	if IsDirect() {
@@ -366,8 +352,40 @@ func Commit(commitmsg string) error {
 	return nil
 }
 
+// DiffUpstream returns, through the provided channel, the names of all files that differ from the default remote branch.
+// The output channel 'diffchan' is closed when this function returns
+// (git diff --name-only --relative @{upstream})
+func DiffUpstream(paths []string, diffchan chan<- string) {
+	defer close(diffchan)
+	diffargs := []string{"diff", "-z", "--name-only", "--relative", "@{upstream}"}
+	diffargs = append(diffargs, paths...)
+	cmd := Command(diffargs...)
+	err := cmd.Start()
+	if err != nil {
+		log.Write("ls-files command set up failed: %s", err)
+		return
+	}
+	var line []byte
+	var rerr error
+	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadBytes('\000') {
+		line = bytes.TrimSuffix(line, []byte("\000"))
+		if len(line) > 0 {
+			diffchan <- string(line)
+		}
+	}
+
+	var stderr, errline []byte
+	if cmd.Wait() != nil {
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
+		log.Write("Error during DiffUpstream")
+		logstd(nil, stderr)
+	}
+	return
+}
+
 // LsFiles lists all files known to git.
-// In direct mode, the bare flag is temporarily switched off before running the command.
 // The output channel 'lschan' is closed when this function returns.
 // (git ls-files)
 func LsFiles(args []string, lschan chan<- string) {
@@ -531,6 +549,7 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 
 	return commits, nil
 }
+
 func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffStat, error) {
 	logformat := `::%H`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
@@ -603,7 +622,7 @@ func Checkout(hash string, paths []string) error {
 	cmdargs := []string{"checkout", hash, "--"}
 	if paths == nil || len(paths) == 0 {
 		reporoot, _ := FindRepoRoot(".")
-		Workingdir = reporoot
+		os.Chdir(reporoot)
 		paths = []string{"."}
 	}
 	cmdargs = append(cmdargs, paths...)
@@ -620,7 +639,6 @@ func Checkout(hash string, paths []string) error {
 
 // LsTree performs a recursive git ls-tree with a given revision (hash) and a list of paths.
 // For each item, it returns a struct which contains the type (blob, tree), the mode, the hash, and the absolute (repo rooted) path to the object (name).
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func LsTree(revision string, paths []string) ([]Object, error) {
 	cmdargs := []string{"ls-tree", "--full-tree", "-z", "-t", "-r", revision}
 	cmdargs = append(cmdargs, paths...)
@@ -667,7 +685,6 @@ func LsTree(revision string, paths []string) ([]Object, error) {
 }
 
 // CatFileContents performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func CatFileContents(revision, filepath string) ([]byte, error) {
 	cmd := Command("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
 	stdout, stderr, err := cmd.OutputError()
@@ -680,7 +697,6 @@ func CatFileContents(revision, filepath string) ([]byte, error) {
 }
 
 // CatFileType returns the type of a given object at a given revision (blob, tree, or commit)
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func CatFileType(object string) (string, error) {
 	cmd := Command("cat-file", "-t", object)
 	stdout, stderr, err := cmd.OutputError()
@@ -694,7 +710,6 @@ func CatFileType(object string) (string, error) {
 }
 
 // RevCount returns the number of commits between two revisions.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func RevCount(a, b string) (int, error) {
 	cmd := Command("rev-list", "--count", fmt.Sprintf("%s..%s", a, b))
 	stdout, stderr, err := cmd.OutputError()
@@ -708,9 +723,9 @@ func RevCount(a, b string) (int, error) {
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // If the path is a repository and no error was raised, the result it cached so that subsequent checks are faster.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsDirect() bool {
-	if mode, ok := annexmodecache[Workingdir]; ok {
+	abspath, _ := filepath.Abs(".")
+	if mode, ok := annexmodecache[abspath]; ok {
 		return mode
 	}
 	cmd := Command("config", "--local", "annex.direct")
@@ -721,16 +736,15 @@ func IsDirect() bool {
 	}
 
 	if strings.TrimSpace(string(stdout)) == "true" {
-		annexmodecache[Workingdir] = true
+		annexmodecache[abspath] = true
 		return true
 	}
-	annexmodecache[Workingdir] = false
+	annexmodecache[abspath] = false
 	return false
 }
 
 // IsVersion6 returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func IsVersion6() bool {
 	cmd := Command("config", "--local", "--get", "annex.version")
 	stdout, stderr, err := cmd.OutputError()
@@ -761,18 +775,46 @@ func setBare(state bool) error {
 	return err
 }
 
+// gitAddDirect determines which files to be added to git when in direct mode.
+// In direct mode, in order to perform a 'git add' operation, the client temporarily disables bare mode in the repository.
+// This has a side effect that annexed files change type (from symlinks to "direct" files), since now git's view of the repository is not modified by annex.
+// This function filters out any files known to annex to avoid re-adding them to git as files.
+// The filtering is done twice:
+// Once against the provided paths in the current directory (recursively) and once more against the output of 'git ls-files <paths>', in order to include any files that might have been deleted.
+func gitAddDirect(paths []string) (filtered []string) {
+	wichan := make(chan AnnexWhereisRes)
+	go AnnexWhereis(paths, wichan)
+	var annexfiles []string
+	for wiInfo := range wichan {
+		if wiInfo.Err != nil {
+			continue
+		}
+		annexfiles = append(annexfiles, wiInfo.File)
+	}
+	filtered = filterpaths(paths, annexfiles)
+
+	lschan := make(chan string)
+	go LsFiles(paths, lschan)
+	for gitfile := range lschan {
+		if !stringInSlice(gitfile, annexfiles) && !stringInSlice(gitfile, filtered) {
+			filtered = append(filtered, gitfile)
+		}
+	}
+
+	return
+}
+
 // Command sets up an external git command with the provided arguments and returns a GinCmd struct.
-// Setting the Workingdir package global affects the working directory in which the command will be executed.
 func Command(args ...string) shell.Cmd {
 	config := config.Read()
 	gitbin := config.Bin.Git
 	cmd := shell.Command(gitbin)
-	cmd.Dir = Workingdir
 	cmd.Args = append(cmd.Args, args...)
 	token := web.UserToken{}
 	_ = token.LoadToken()
 	env := os.Environ()
 	cmd.Env = append(env, sshEnv(token.Username))
-	log.Write("Running shell command (Dir: %s): %s", Workingdir, strings.Join(cmd.Args, " "))
+	workingdir, _ := filepath.Abs(".")
+	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
 	return cmd
 }

@@ -44,7 +44,6 @@ func createRepo(cmd *cobra.Command, args []string) {
 
 	if here {
 		// Init cwd
-		ginclient.Workingdir = "."
 		err = gincl.InitDir()
 		CheckError(err)
 		err = gincl.AddRemote("origin", repoPath)

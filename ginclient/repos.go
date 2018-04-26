@@ -22,9 +22,6 @@ import (
 
 const unknownhostname = "(unknown)"
 
-// Workingdir sets the directory for shell commands
-var Workingdir = "."
-
 // Types
 
 // FileCheckoutStatus is used to report the status of a CheckoutFileCopies() operation.
@@ -351,7 +348,6 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileSt
 }
 
 // Download downloads changes and placeholder files in an already checked out repository.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) Download() error {
 	log.Write("Download")
 	return git.AnnexPull()
@@ -374,10 +370,10 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 
 	repoPathParts := strings.SplitN(repoPath, "/", 2)
 	repoName := repoPathParts[1]
-	git.Workingdir = repoName
 
 	status := git.RepoFileStatus{State: "Initialising local storage"}
 	clonechan <- status
+	os.Chdir(repoName)
 	err := gincl.InitDir()
 	if err != nil {
 		status.Err = err
@@ -469,7 +465,6 @@ func (gincl *Client) InitDir() error {
 			initerr.UError = err.Error()
 			return initerr
 		}
-		Workingdir = "."
 	}
 
 	hostname, err := os.Hostname()
@@ -695,19 +690,9 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		}
 	}
 
-	// If cached files are diff from upstream, mark as LocalChanges
-	diffargs := []string{"diff", "-z", "--name-only", "--relative", "@{upstream}"}
-	diffargs = append(diffargs, cachedfiles...)
-	cmd := git.Command(diffargs...)
-	stdout, stderr, err := cmd.OutputError()
-	if err != nil {
-		log.Write("Error during diff command for status")
-		log.Write("[stdout]\n%s\n[stderr]\n%s", string(stdout), string(stderr))
-		// ignoring error and continuing
-	}
-
-	diffresults := strings.Split(string(stdout), "\000")
-	for _, fname := range diffresults {
+	diffchan := make(chan string)
+	go git.DiffUpstream(cachedfiles, diffchan)
+	for fname := range diffchan {
 		// Two notes:
 		//		1. There will definitely be overlap here with the same status in annex (not a problem)
 		//		2. The diff might be due to remote or local changes, but for now we're going to assume local
@@ -757,7 +742,6 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 }
 
 // ListFiles lists the files and directories specified by paths and their sync status.
-// Setting the Workingdir package global affects the working directory in which the command is executed.
 func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
 	paths, err := expandglobs(paths)
 	if err != nil {

@@ -32,6 +32,8 @@ func lsRepo(cmd *cobra.Command, args []string) {
 	filesStatus, err := gincl.ListFiles(args...)
 	CheckError(err)
 
+	// TODO: Print warning when in direct mode: git files that have not been uploaded will show up as synced.
+
 	if short {
 		for fname, status := range filesStatus {
 			fmt.Printf("%s %s\n", status.Abbrev(), fname)
