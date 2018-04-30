@@ -23,9 +23,9 @@ func unlock(cmd *cobra.Command, args []string) {
 	}
 	conf := config.Read()
 	gincl := ginclient.New(conf.GinHost)
+	nitems := countItemsUnlock(args)
 	unlockchan := make(chan git.RepoFileStatus)
 	go gincl.UnlockContent(args, unlockchan)
-	nitems := countItemsUnlock(args)
 	formatOutput(unlockchan, nitems, jsonout)
 }
 
