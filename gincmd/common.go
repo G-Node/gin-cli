@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 
@@ -91,6 +92,55 @@ func printJSON(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]boo
 	return
 }
 
+func printProgressWithBar(statuschan <-chan git.RepoFileStatus, nitems int) (filesuccess map[string]bool) {
+	if nitems <= 0 {
+		// If nitems is invalid, just print the classic progress output
+		return printProgressOutput(statuschan)
+	}
+	ndigits := len(fmt.Sprintf("%d", nitems))
+	dfmt := fmt.Sprintf("%%%dd/%%%dd", ndigits, ndigits)
+	filesuccess = make(map[string]bool)
+	var barratio float64
+	var ncomplt int
+	linewidth := termwidth()
+	if linewidth > 80 {
+		linewidth = 80
+	}
+	barwidth := linewidth - (5 + ndigits*2)
+	barratio = float64(barwidth) / float64(nitems)
+	outline := new(bytes.Buffer)
+	outappend := func(part string) {
+		if len(part) > 0 {
+			outline.WriteString(part)
+			outline.WriteString(" ")
+		}
+	}
+	for stat := range statuschan {
+		ncomplt++
+		outline.Reset()
+		outappend(stat.State)
+		outappend(stat.FileName)
+		if stat.Err == nil {
+			if stat.Progress == "100%" {
+				outappend(green("OK"))
+				filesuccess[stat.FileName] = true
+			}
+		} else {
+			outappend(stat.Err.Error())
+			filesuccess[stat.FileName] = false
+		}
+		newprint := outline.String()
+		fmt.Printf("\r%s\r", strings.Repeat(" ", linewidth)) // clear the line
+		fmt.Fprint(color.Output, newprint)
+		complsigns := int(math.Floor(float64(ncomplt) * barratio))
+		blocks := strings.Repeat("=", complsigns)
+		blanks := strings.Repeat(" ", barwidth-complsigns)
+		dprg := fmt.Sprintf(dfmt, ncomplt, nitems)
+		fmt.Printf("\n [%s%s] %s\r", blocks, blanks, dprg)
+	}
+	return
+}
+
 func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
 	var fname, state string
@@ -140,10 +190,12 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	return
 }
 
-func formatOutput(statuschan <-chan git.RepoFileStatus, jsonout bool) {
+func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool) {
 	var filesuccess map[string]bool
 	if jsonout {
 		filesuccess = printJSON(statuschan)
+	} else if nitems > 0 {
+		filesuccess = printProgressWithBar(statuschan, nitems)
 	} else {
 		filesuccess = printProgressOutput(statuschan)
 	}

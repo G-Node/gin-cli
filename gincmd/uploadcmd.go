@@ -27,7 +27,7 @@ func upload(cmd *cobra.Command, args []string) {
 		// Don't add + commit files if nothing was specified
 		addchan := make(chan git.RepoFileStatus)
 		go ginclient.Add(paths, addchan)
-		formatOutput(addchan, jsonout)
+		formatOutput(addchan, 0, jsonout)
 
 		fmt.Print("Recording changes ")
 		// ignore error for now :: call commit() instead
@@ -37,7 +37,7 @@ func upload(cmd *cobra.Command, args []string) {
 
 	uploadchan := make(chan git.RepoFileStatus)
 	go gincl.Upload(paths, uploadchan)
-	formatOutput(uploadchan, jsonout)
+	formatOutput(uploadchan, 0, jsonout)
 }
 
 // UploadCmd sets up the 'upload' subcommand

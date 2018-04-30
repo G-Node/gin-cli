@@ -29,7 +29,7 @@ func getRepo(cmd *cobra.Command, args []string) {
 	gincl.GitUser = conf.GitUser
 	clonechan := make(chan git.RepoFileStatus)
 	go gincl.CloneRepo(repostr, clonechan)
-	formatOutput(clonechan, jsonout)
+	formatOutput(clonechan, 0, jsonout)
 	_, err := git.CommitIfNew("origin")
 	CheckError(err)
 }

@@ -19,7 +19,7 @@ func commit(cmd *cobra.Command, args []string) {
 	paths := args
 	addchan := make(chan git.RepoFileStatus)
 	go ginclient.Add(paths, addchan)
-	formatOutput(addchan, jsonout)
+	formatOutput(addchan, 0, jsonout)
 
 	fmt.Print("Recording changes ")
 	err := git.Commit(makeCommitMessage("commit", paths))
