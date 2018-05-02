@@ -139,7 +139,9 @@ func printProgressWithBar(statuschan <-chan git.RepoFileStatus, nitems int) (fil
 		dprg := fmt.Sprintf(dfmt, ncomplt, nitems)
 		fmt.Printf("\n [%s%s] %s\r", blocks, blanks, dprg)
 	}
-	fmt.Println()
+	if outline.Len() > 0 {
+		fmt.Println()
+	}
 	return
 }
 
