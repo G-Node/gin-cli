@@ -341,9 +341,9 @@ func Commit(commitmsg string) error {
 
 	if err != nil {
 		if strings.Contains(string(stdout), "nothing to commit") {
-			// eat the error
+			// Return special error
 			log.Write("Nothing to commit")
-			return nil
+			return fmt.Errorf("Nothing to commit")
 		}
 		log.Write("Error during GitCommit")
 		logstd(stdout, stderr)
