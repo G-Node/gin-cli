@@ -1,14 +1,26 @@
 package gincmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
+
+func countItemsAdd(paths []string) int {
+	args := append([]string{"add", "--dry-run"}, paths...)
+	cmd := git.Command(args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	return len(bytes.Split(bytes.TrimSpace(output), []byte("\n")))
+}
 
 func commit(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
@@ -18,8 +30,9 @@ func commit(cmd *cobra.Command, args []string) {
 
 	paths := args
 	addchan := make(chan git.RepoFileStatus)
+	nitems := countItemsAdd(paths)
 	go ginclient.Add(paths, addchan)
-	formatOutput(addchan, 0, jsonout)
+	formatOutput(addchan, nitems, jsonout)
 
 	if !jsonout {
 		fmt.Print(":: Recording changes ")
