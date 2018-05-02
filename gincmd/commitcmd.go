@@ -21,12 +21,16 @@ func commit(cmd *cobra.Command, args []string) {
 	go ginclient.Add(paths, addchan)
 	formatOutput(addchan, 0, jsonout)
 
-	fmt.Print("Recording changes ")
+	if !jsonout {
+		fmt.Print(":: Recording changes ")
+	}
 	err := git.Commit(makeCommitMessage("commit", paths))
 	if err != nil {
 		Die(err)
 	}
-	fmt.Println(green("OK"))
+	if !jsonout {
+		fmt.Println(green("OK"))
+	}
 }
 
 func makeCommitMessage(action string, paths []string) (commitmsg string) {
