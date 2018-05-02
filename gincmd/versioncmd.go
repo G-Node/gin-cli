@@ -21,7 +21,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 	copyto, _ := cmd.Flags().GetString("copy-to")
 	paths := args
 
-	var commit git.GinCommit
+	var gcommit git.GinCommit
 	if commithash == "" {
 		commits, err := git.Log(count, "", paths, false)
 		CheckError(err)
@@ -33,32 +33,21 @@ func repoversion(cmd *cobra.Command, args []string) {
 		if len(commits) == 0 {
 			Die("No revisions matched request")
 		}
-		commit = verprompt(commits)
+		gcommit = verprompt(commits)
 	} else {
 		commits, err := git.Log(1, commithash, paths, false)
 		CheckError(err)
-		commit = commits[0]
+		gcommit = commits[0]
 	}
 
 	if copyto == "" {
 		// TODO: Print some sort of output (similar to copy-to variant)
 		// e.g., File 'fname' restored to version <revision> (date)
-		err := ginclient.CheckoutVersion(commit.AbbreviatedHash, paths)
+		err := ginclient.CheckoutVersion(gcommit.AbbreviatedHash, paths)
 		CheckError(err)
-
-		addchan := make(chan git.RepoFileStatus)
-		go ginclient.Add(paths, addchan)
-		formatOutput(addchan, 0, jsonout)
-
-		fmt.Print("Recording changes ")
-		err = git.Commit(makeCommitMessage("commit", paths))
-		if err != nil {
-			Die(err)
-		}
-		fmt.Println(green("OK"))
-
+		commit(cmd, paths)
 	} else {
-		checkoutcopies(commit, paths, copyto)
+		checkoutcopies(gcommit, paths, copyto)
 	}
 }
 
