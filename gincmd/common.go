@@ -118,6 +118,7 @@ func printProgressWithBar(statuschan <-chan git.RepoFileStatus, nitems int) (fil
 	for stat := range statuschan {
 		ncomplt++
 		outline.Reset()
+		outline.WriteString(" ")
 		outappend(stat.State)
 		outappend(stat.FileName)
 		if stat.Err == nil {
@@ -154,6 +155,7 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	}
 	for stat := range statuschan {
 		outline.Reset()
+		outline.WriteString(" ")
 		if stat.FileName != fname || stat.State != state {
 			// New line if new file or new state
 			if len(lastprint) > 0 {
@@ -181,6 +183,7 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 		if newprint != lastprint {
 			fmt.Printf("\r%s\r", strings.Repeat(" ", len(lastprint))) // clear the line
 			fmt.Fprint(color.Output, newprint)
+			fmt.Print("\r")
 			lastprint = newprint
 		}
 	}
