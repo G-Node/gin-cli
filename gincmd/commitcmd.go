@@ -38,11 +38,18 @@ func commit(cmd *cobra.Command, args []string) {
 		fmt.Print(":: Recording changes ")
 	}
 	err := git.Commit(makeCommitMessage("commit", paths))
+	var stat string
 	if err != nil {
-		Die(err)
+		if err.Error() == "Nothing to commit" {
+			stat = "N/A\n:: No changes recorded"
+		} else {
+			Die(err)
+		}
+	} else {
+		stat = green("OK")
 	}
 	if !jsonout {
-		fmt.Println(green("OK"))
+		fmt.Fprintln(color.Output, stat)
 	}
 }
 
