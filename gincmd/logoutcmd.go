@@ -20,7 +20,7 @@ func logout(cmd *cobra.Command, args []string) {
 	}
 
 	gincl.Logout()
-	fmt.Println("You have been logged out.")
+	fmt.Println(":: You have been logged out.")
 }
 
 // LogoutCmd sets up the 'logout' subcommand
