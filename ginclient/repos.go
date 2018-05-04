@@ -668,36 +668,38 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		}
 	}
 
-	// Run whereis on cached files
-	wichan := make(chan git.AnnexWhereisRes)
-	go git.AnnexWhereis(cachedfiles, wichan)
-	for wiInfo := range wichan {
-		if wiInfo.Err != nil {
-			continue
-		}
-		fname := wiInfo.File
-		for _, remote := range wiInfo.Whereis {
-			// if no remotes are "here", the file is NoContent
-			statuses[fname] = NoContent
-			if remote.Here {
-				if len(wiInfo.Whereis) > 1 {
-					statuses[fname] = Synced
-				} else {
-					statuses[fname] = LocalChanges
+	if len(cachedfiles) > 0 {
+		// Run whereis on cached files (if any)
+		wichan := make(chan git.AnnexWhereisRes)
+		go git.AnnexWhereis(cachedfiles, wichan)
+		for wiInfo := range wichan {
+			if wiInfo.Err != nil {
+				continue
+			}
+			fname := wiInfo.File
+			for _, remote := range wiInfo.Whereis {
+				// if no remotes are "here", the file is NoContent
+				statuses[fname] = NoContent
+				if remote.Here {
+					if len(wiInfo.Whereis) > 1 {
+						statuses[fname] = Synced
+					} else {
+						statuses[fname] = LocalChanges
+					}
+					break
 				}
-				break
 			}
 		}
-	}
 
-	diffchan := make(chan string)
-	go git.DiffUpstream(cachedfiles, diffchan)
-	for fname := range diffchan {
-		// Two notes:
-		//		1. There will definitely be overlap here with the same status in annex (not a problem)
-		//		2. The diff might be due to remote or local changes, but for now we're going to assume local
-		if strings.TrimSpace(fname) != "" {
-			statuses[fname] = LocalChanges
+		diffchan := make(chan string)
+		go git.DiffUpstream(cachedfiles, diffchan)
+		for fname := range diffchan {
+			// Two notes:
+			//		1. There will definitely be overlap here with the same status in annex (not a problem)
+			//		2. The diff might be due to remote or local changes, but for now we're going to assume local
+			if strings.TrimSpace(fname) != "" {
+				statuses[fname] = LocalChanges
+			}
 		}
 	}
 
