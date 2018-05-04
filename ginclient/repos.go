@@ -599,15 +599,27 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	}
 
 	// Unmodified files that are checked into git (not annex) do not show up
-	// Need to run git ls-files and add only files that haven't been added yet
+	// Need to run git ls-files, with bare temporarily disabled, and add only files that haven't been added yet
+	git.SetBare(false)
+	defer git.SetBare(true)
 	lschan := make(chan string)
 	go git.LsFiles(paths, lschan)
+	var gitfiles []string
 	for fname := range lschan {
 		if _, ok := statuses[fname]; !ok {
 			statuses[fname] = Synced
+			gitfiles = append(gitfiles, fname)
 		}
 	}
 
+	// git files should be checked against upstream for local commits
+	if len(gitfiles) > 0 {
+		diffchan := make(chan string)
+		go git.DiffUpstream(gitfiles, diffchan)
+		for fname := range diffchan {
+			statuses[fname] = LocalChanges
+		}
+	}
 	return statuses, nil
 }
 
