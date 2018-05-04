@@ -21,6 +21,10 @@ func unlock(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die("This command must be run from inside a gin repository.")
 	}
+	// unlock should do nothing in direct mode
+	if git.IsDirect() {
+		return
+	}
 	conf := config.Read()
 	gincl := ginclient.New(conf.GinHost)
 	nitems := countItemsUnlock(args)
