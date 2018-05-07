@@ -709,9 +709,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 			// Two notes:
 			//		1. There will definitely be overlap here with the same status in annex (not a problem)
 			//		2. The diff might be due to remote or local changes, but for now we're going to assume local
-			if strings.TrimSpace(fname) != "" {
-				statuses[fname] = LocalChanges
-			}
+			statuses[fname] = LocalChanges
 		}
 	}
 
