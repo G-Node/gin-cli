@@ -7,16 +7,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func countItemsUnlock(paths []string) (count int) {
+	wichan := make(chan git.AnnexWhereisRes)
+	go git.AnnexWhereis(paths, wichan)
+	for _ = range wichan {
+		count++
+	}
+	return
+}
+
 func unlock(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	if !git.IsRepo() {
 		Die("This command must be run from inside a gin repository.")
 	}
+	// unlock should do nothing in direct mode
+	if git.IsDirect() {
+		return
+	}
 	conf := config.Read()
 	gincl := ginclient.New(conf.GinHost)
+	nitems := countItemsUnlock(args)
 	unlockchan := make(chan git.RepoFileStatus)
 	go gincl.UnlockContent(args, unlockchan)
-	formatOutput(unlockchan, jsonout)
+	formatOutput(unlockchan, nitems, jsonout)
 }
 
 // UnlockCmd sets up the file 'unlock' subcommand

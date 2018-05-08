@@ -20,7 +20,7 @@ func getContent(cmd *cobra.Command, args []string) {
 	gincl.GitUser = conf.GitUser
 	getcchan := make(chan git.RepoFileStatus)
 	go gincl.GetContent(args, getcchan)
-	formatOutput(getcchan, jsonout)
+	formatOutput(getcchan, 0, jsonout)
 }
 
 // GetContentCmd sets up the 'get-content' subcommand

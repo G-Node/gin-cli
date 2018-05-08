@@ -37,7 +37,7 @@ func createRepo(cmd *cobra.Command, args []string) {
 	gincl.GitHost = conf.GitHost
 	gincl.GitUser = conf.GitUser
 	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
-	fmt.Printf("Creating repository '%s' ", repoPath)
+	fmt.Printf(":: Creating repository '%s' ", repoPath)
 	err := gincl.CreateRepo(repoName, repoDesc)
 	CheckError(err)
 	fmt.Fprintln(color.Output, green("OK"))

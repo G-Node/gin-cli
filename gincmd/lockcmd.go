@@ -7,16 +7,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func countItemsLock(paths []string) (count int) {
+	statchan := make(chan git.AnnexStatusRes)
+	go git.AnnexStatus(paths, statchan)
+	for _ = range statchan {
+		count++
+	}
+	return
+}
+
 func lock(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	if !git.IsRepo() {
 		Die("This command must be run from inside a gin repository.")
 	}
+	// lock should do nothing in direct mode
+	if git.IsDirect() {
+		return
+	}
 	conf := config.Read()
 	gincl := ginclient.New(conf.GinHost)
+	nitems := countItemsLock(args)
 	lockchan := make(chan git.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
-	formatOutput(lockchan, jsonout)
+	formatOutput(lockchan, nitems, jsonout)
 }
 
 // LockCmd sets up the file 'lock' subcommand

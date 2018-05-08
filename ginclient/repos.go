@@ -224,7 +224,7 @@ func (gincl *Client) DelRepo(name string) error {
 // The status channel 'addchan' is closed when this function returns.
 func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 	defer close(addchan)
-	paths, err := expandglobs(paths)
+	paths, err := expandglobs(paths, false)
 	if err != nil {
 		addchan <- git.RepoFileStatus{Err: err}
 		return
@@ -252,7 +252,7 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus
 	defer close(uploadchan)
 	log.Write("Upload")
 
-	paths, err := expandglobs(paths)
+	paths, err := expandglobs(paths, false)
 	if err != nil {
 		uploadchan <- git.RepoFileStatus{Err: err}
 		return
@@ -272,7 +272,7 @@ func (gincl *Client) GetContent(paths []string, getcontchan chan<- git.RepoFileS
 	defer close(getcontchan)
 	log.Write("GetContent")
 
-	paths, err := expandglobs(paths)
+	paths, err := expandglobs(paths, true)
 
 	if err != nil {
 		getcontchan <- git.RepoFileStatus{Err: err}
@@ -293,7 +293,7 @@ func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- git.RepoFileSt
 	defer close(rmcchan)
 	log.Write("RemoveContent")
 
-	paths, err := expandglobs(paths)
+	paths, err := expandglobs(paths, true)
 	if err != nil {
 		rmcchan <- git.RepoFileStatus{Err: err}
 		return
@@ -313,7 +313,7 @@ func (gincl *Client) LockContent(paths []string, lcchan chan<- git.RepoFileStatu
 	defer close(lcchan)
 	log.Write("LockContent")
 
-	paths, err := expandglobs(paths)
+	paths, err := expandglobs(paths, true)
 	if err != nil {
 		lcchan <- git.RepoFileStatus{Err: err}
 		return
@@ -333,7 +333,7 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileSt
 	defer close(ulcchan)
 	log.Write("UnlockContent")
 
-	paths, err := expandglobs(paths)
+	paths, err := expandglobs(paths, true)
 	if err != nil {
 		ulcchan <- git.RepoFileStatus{Err: err}
 		return
@@ -668,36 +668,38 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		}
 	}
 
-	// Run whereis on cached files
-	wichan := make(chan git.AnnexWhereisRes)
-	go git.AnnexWhereis(cachedfiles, wichan)
-	for wiInfo := range wichan {
-		if wiInfo.Err != nil {
-			continue
-		}
-		fname := wiInfo.File
-		for _, remote := range wiInfo.Whereis {
-			// if no remotes are "here", the file is NoContent
-			statuses[fname] = NoContent
-			if remote.Here {
-				if len(wiInfo.Whereis) > 1 {
-					statuses[fname] = Synced
-				} else {
-					statuses[fname] = LocalChanges
+	if len(cachedfiles) > 0 {
+		// Run whereis on cached files (if any)
+		wichan := make(chan git.AnnexWhereisRes)
+		go git.AnnexWhereis(cachedfiles, wichan)
+		for wiInfo := range wichan {
+			if wiInfo.Err != nil {
+				continue
+			}
+			fname := wiInfo.File
+			for _, remote := range wiInfo.Whereis {
+				// if no remotes are "here", the file is NoContent
+				statuses[fname] = NoContent
+				if remote.Here {
+					if len(wiInfo.Whereis) > 1 {
+						statuses[fname] = Synced
+					} else {
+						statuses[fname] = LocalChanges
+					}
+					break
 				}
-				break
 			}
 		}
-	}
 
-	diffchan := make(chan string)
-	go git.DiffUpstream(cachedfiles, diffchan)
-	for fname := range diffchan {
-		// Two notes:
-		//		1. There will definitely be overlap here with the same status in annex (not a problem)
-		//		2. The diff might be due to remote or local changes, but for now we're going to assume local
-		if strings.TrimSpace(fname) != "" {
-			statuses[fname] = LocalChanges
+		diffchan := make(chan string)
+		go git.DiffUpstream(cachedfiles, diffchan)
+		for fname := range diffchan {
+			// Two notes:
+			//		1. There will definitely be overlap here with the same status in annex (not a problem)
+			//		2. The diff might be due to remote or local changes, but for now we're going to assume local
+			if strings.TrimSpace(fname) != "" {
+				statuses[fname] = LocalChanges
+			}
 		}
 	}
 
@@ -743,7 +745,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 
 // ListFiles lists the files and directories specified by paths and their sync status.
 func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
-	paths, err := expandglobs(paths)
+	paths, err := expandglobs(paths, false)
 	if err != nil {
 		return nil, err
 	}
@@ -754,8 +756,9 @@ func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
 }
 
 // expandglobs expands a list of globs into paths (files and directories).
-// An error is returned if at least one element of the input slice does not match a real path.
-func expandglobs(paths []string) (globexppaths []string, err error) {
+// If strictmatch is true, an error is returned if at least one element of the input slice does not match a real path,
+// otherwise the pattern itself is returned when it matches no existing path.
+func expandglobs(paths []string, strictmatch bool) (globexppaths []string, err error) {
 	if len(paths) == 0 {
 		// Nothing to do
 		globexppaths = paths
@@ -772,14 +775,12 @@ func expandglobs(paths []string) (globexppaths []string, err error) {
 		}
 		if exp == nil {
 			log.Write("ExpandGlobs: No files matched")
-			return nil, fmt.Errorf("No files matched %v", p)
+			if strictmatch {
+				return nil, fmt.Errorf("No files matched %v", p)
+			}
+			exp = []string{p}
 		}
 		globexppaths = append(globexppaths, exp...)
-	}
-	if len(globexppaths) == 0 {
-		// Invalid paths
-		log.Write("ExpandGlobs: No files matched")
-		err = fmt.Errorf("No files matched %v", paths)
 	}
 	return
 }

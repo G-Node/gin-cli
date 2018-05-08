@@ -12,7 +12,7 @@ import (
 func initRepo(cmd *cobra.Command, args []string) {
 	conf := config.Read()
 	gincl := ginclient.New(conf.GinHost)
-	fmt.Print("Initialising local storage ")
+	fmt.Print(":: Initialising local storage ")
 	err := gincl.InitDir()
 	CheckError(err)
 	_, err = git.CommitIfNew("")

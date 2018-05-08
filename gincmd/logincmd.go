@@ -51,7 +51,7 @@ func login(cmd *cobra.Command, args []string) {
 	CheckError(err)
 	info, err := gincl.RequestAccount(username)
 	CheckError(err)
-	fmt.Printf("Hello %s. You are now logged in.\n", info.UserName)
+	fmt.Printf(":: Hello %s. You are now logged in.\n", info.UserName)
 }
 
 // LoginCmd sets up the 'login' subcommand

@@ -7,6 +7,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func countItemsRemove(paths []string) int {
+	avail, err := git.AnnexFind(paths)
+	if err != nil {
+		return 0
+	}
+	return len(avail)
+}
+
 func remove(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	conf := config.Read()
@@ -17,12 +25,11 @@ func remove(cmd *cobra.Command, args []string) {
 	}
 	gincl.GitHost = conf.GitHost
 	gincl.GitUser = conf.GitUser
-	lockchan := make(chan git.RepoFileStatus)
-	go gincl.LockContent(args, lockchan)
-	formatOutput(lockchan, jsonout)
+	lock(cmd, args)
+	nitems := countItemsRemove(args)
 	rmchan := make(chan git.RepoFileStatus)
 	go gincl.RemoveContent(args, rmchan)
-	formatOutput(rmchan, jsonout)
+	formatOutput(rmchan, nitems, jsonout)
 }
 
 // RemoveContentCmd sets up the 'remove-content' subcommand

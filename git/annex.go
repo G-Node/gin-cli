@@ -622,7 +622,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 			status.Err = nil
 		} else {
 			log.Write("Error unlocking %s", unlockres.File)
-			status.Err = fmt.Errorf("Content not available locally\nUse 'gin get-content' to download")
+			status.Err = fmt.Errorf("Content not available locally. Use 'gin get-content' to download")
 		}
 		status.Progress = progcomplete
 		unlockchan <- status
@@ -658,6 +658,11 @@ func AnnexFind(paths []string) (map[string]AnnexFindRes, error) {
 	outlines := bytes.Split(stdout, []byte("\n"))
 	items := make(map[string]AnnexFindRes, len(outlines))
 	for _, line := range outlines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			// Empty line output. Ignore
+			continue
+		}
 		var afr AnnexFindRes
 		json.Unmarshal(line, &afr)
 		items[afr.Key] = afr

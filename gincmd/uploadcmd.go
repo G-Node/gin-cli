@@ -1,8 +1,6 @@
 package gincmd
 
 import (
-	"fmt"
-
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/git"
@@ -24,20 +22,12 @@ func upload(cmd *cobra.Command, args []string) {
 	paths := args
 
 	if len(paths) > 0 {
-		// Don't add + commit files if nothing was specified
-		addchan := make(chan git.RepoFileStatus)
-		go ginclient.Add(paths, addchan)
-		formatOutput(addchan, jsonout)
-
-		fmt.Print("Recording changes ")
-		// ignore error for now :: call commit() instead
-		git.Commit(makeCommitMessage("upload", paths))
-		fmt.Println(green("OK"))
+		commit(cmd, paths)
 	}
 
 	uploadchan := make(chan git.RepoFileStatus)
 	go gincl.Upload(paths, uploadchan)
-	formatOutput(uploadchan, jsonout)
+	formatOutput(uploadchan, 0, jsonout)
 }
 
 // UploadCmd sets up the 'upload' subcommand
