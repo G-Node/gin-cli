@@ -1,11 +1,22 @@
 package gincmd
 
 import (
+	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/spf13/cobra"
 )
 
 func addRemote(cmd *cobra.Command, args []string) {
-	Die("Not implemented")
+	rname := args[0]
+	rurl := args[1]
+
+	// TODO: Validate remote URL
+	conf := config.Read()
+	gincl := ginclient.New(conf.GinHost)
+	requirelogin(cmd, gincl, true)
+	gincl.GitHost = conf.GitHost
+	gincl.GitUser = conf.GitUser
+	gincl.AddRemote(rname, rurl)
 }
 
 // AddRemoteCmd sets up the 'add-remote' repository subcommand
