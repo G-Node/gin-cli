@@ -90,6 +90,7 @@ func pathExists(path string) bool {
 }
 
 func stringInSlice(element string, strlist []string) bool {
+	// TODO: Replace this function with a map where possible
 	for _, str := range strlist {
 		if element == str {
 			return true

@@ -357,7 +357,9 @@ func Commit(commitmsg string) error {
 // (git diff --name-only --relative @{upstream})
 func DiffUpstream(paths []string, diffchan chan<- string) {
 	defer close(diffchan)
-	diffargs := []string{"diff", "-z", "--name-only", "--relative", "@{upstream}"}
+	// FIXME: Direct mode gets weird with the branches, so we explicitly state origin/master
+	// Should be fixed when we add configurable remotes
+	diffargs := []string{"diff", "-z", "--name-only", "--relative", "origin/master"} // "@{upstream}"}
 	diffargs = append(diffargs, paths...)
 	cmd := Command(diffargs...)
 	err := cmd.Start()
@@ -756,6 +758,10 @@ func IsVersion6() bool {
 	ver := strings.TrimSpace(string(stdout))
 	log.Write("Annex version is %s", ver)
 	return ver == "6"
+}
+
+func SetBare(state bool) {
+	setBare(state)
 }
 
 func setBare(state bool) error {
