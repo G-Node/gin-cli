@@ -46,7 +46,8 @@ func createRepo(cmd *cobra.Command, args []string) {
 		// Init cwd
 		err = gincl.InitDir()
 		CheckError(err)
-		err = gincl.AddRemote("origin", repoPath)
+		url := fmt.Sprintf("ssh://%s@%s/%s", conf.GitUser, conf.GitHost, repoPath)
+		err = git.AddRemote("origin", url)
 		CheckError(err)
 		_, err := git.CommitIfNew("origin")
 		CheckError(err)

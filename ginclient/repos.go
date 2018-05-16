@@ -446,12 +446,6 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 	}
 }
 
-// AddRemote constructs the proper remote URL given a repository path (user/reponame) and adds it as a named remote to the repository configuration.
-func (gincl *Client) AddRemote(name, repopath string) error {
-	remotepath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repopath)
-	return git.AddRemote(name, remotepath)
-}
-
 // InitDir initialises the local directory with the default remote and annex configuration.
 // The status channel 'initchan' is closed when this function returns.
 func (gincl *Client) InitDir() error {

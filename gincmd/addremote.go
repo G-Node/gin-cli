@@ -1,22 +1,39 @@
 package gincmd
 
 import (
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"fmt"
+	"strings"
+
 	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
 )
 
-func addRemote(cmd *cobra.Command, args []string) {
-	rname := args[0]
-	rurl := args[1]
+func parseRemote(remote string) string {
+	// split on first colon and check if it's a known alias
+	parts := strings.SplitN(remote, ":", 2)
+	alias, repopath := parts[0], parts[1]
+	if alias == "gin" {
+		// Built-in alias 'gin'; use default remote address
+		conf := config.Read()
+		url := fmt.Sprintf("ssh://%s@%s/%s", conf.GitUser, conf.GitHost, repopath)
+		return url
+	}
+	// Unknown alias, return as is
+	return remote
+}
 
-	// TODO: Validate remote URL
-	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
-	requirelogin(cmd, gincl, true)
-	gincl.GitHost = conf.GitHost
-	gincl.GitUser = conf.GitUser
-	gincl.AddRemote(rname, rurl)
+func addRemote(cmd *cobra.Command, args []string) {
+	if !git.IsRepo() {
+		Die("This command must be run from inside a gin repository.")
+	}
+	name, remote := args[0], args[1]
+	url := parseRemote(remote)
+	git.AddRemote(name, url)
+
+	// TODO: Check if remote exists (and is accessible)
+
+	// TODO: If it doesn't exist, offer to create it
 }
 
 // AddRemoteCmd sets up the 'add-remote' repository subcommand
