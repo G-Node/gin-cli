@@ -272,6 +272,7 @@ func AddRemote(name, url string) error {
 }
 
 // LsRemote performs a git ls-remote of a specific remote. If no remote is specified (empty string), it's run against all the default remote.
+// The argument can be a name or a URL.
 // (git ls-remote)
 func LsRemote(remote string) (string, error) {
 	fn := fmt.Sprintf("LsRemote(%s)", remote)
@@ -284,8 +285,8 @@ func LsRemote(remote string) (string, error) {
 	if err != nil {
 		sstderr := string(stderr)
 		gerr := giterror{UError: sstderr, Origin: fn}
-		if strings.Contains(sstderr, "Permission denied") {
-			gerr.Description = "permission denied or remote does not exist"
+		if strings.Contains(sstderr, "does not exist") || strings.Contains(sstderr, "Permission denied") {
+			gerr.Description = fmt.Sprintf("remote %s does not exist", remote)
 		}
 		log.Write("Error during ls-remote command")
 		logstd(stdout, stderr)
