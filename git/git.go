@@ -259,13 +259,14 @@ func AddRemote(name, url string) error {
 	cmd := Command("remote", "add", name, url)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		gerr := giterror{UError: err.Error(), Origin: fn}
+		sstderr := string(stderr)
+		gerr := giterror{UError: sstderr, Origin: fn}
 		log.Write("Error during remote add command")
 		logstd(stdout, stderr)
-		if strings.Contains(string(stderr), "already exists") {
+		if strings.Contains(sstderr, "already exists") {
 			gerr.Description = fmt.Sprintf("remote with name '%s' already exists", name)
-			return gerr
 		}
+		return gerr
 	}
 	return err
 }
