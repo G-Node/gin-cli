@@ -41,25 +41,22 @@ func checkRemote(cmd *cobra.Command, url string) (err error) {
 	}
 	fmt.Fprintln(color.Output, red("FAILED"))
 	return err
-
-	// TODO: Check if it's a gin URL before offering to create
-	// conf := config.Read()
-	// gincl := ginclient.New(conf.GinHost)
-	// requirelogin(cmd, gincl, true)
-	// Check again
 }
 
-func createRemote(cmd *cobra.Command, remote string) error {
+func createRemote(cmd *cobra.Command, remote string) {
 	conf := config.Read()
 	gincl := ginclient.New(conf.GinHost)
 	requirelogin(cmd, gincl, true)
 	_, repopath := splitAliasRemote(remote)
 	repopathParts := strings.SplitN(repopath, "/", 2)
 	reponame := repopathParts[1]
-	return gincl.CreateRepo(reponame, "")
+	fmt.Printf(":: Creating repository '%s' ", repopath)
+	err := gincl.CreateRepo(reponame, "")
+	CheckError(err)
+	fmt.Fprintln(color.Output, green("OK"))
 }
 
-func promptCreate(cmd *cobra.Command, remote string) error {
+func promptCreate(cmd *cobra.Command, remote string) {
 	var response string
 	fmt.Printf("Remote %s does not exist. Would you like to create it?\n", remote)
 	for {
@@ -68,11 +65,12 @@ func promptCreate(cmd *cobra.Command, remote string) error {
 
 		switch strings.ToLower(response) {
 		case "c", "create":
-			return createRemote(cmd, remote)
+			createRemote(cmd, remote)
+			return
 		case "a", "add", "add anyway":
-			return nil
+			return
 		case "b", "abort":
-			return fmt.Errorf("aborted")
+			Die("aborted")
 		}
 	}
 }
@@ -86,18 +84,17 @@ func addRemote(cmd *cobra.Command, args []string) {
 	name, remote := args[0], args[1]
 	url := parseRemote(remote)
 	err := checkRemote(cmd, url)
+	// TODO: Check if it's a gin URL before offering to create
 	if err != nil {
 		if create {
-			err = createRemote(cmd, remote)
+			createRemote(cmd, remote)
 		} else {
-			err = promptCreate(cmd, remote)
+			promptCreate(cmd, remote)
 		}
-		CheckError(err)
 	}
 	err = git.AddRemote(name, url)
 	CheckError(err)
 	fmt.Printf(":: Added new remote: %s [%s]\n", name, url)
-	// CheckError(err)
 }
 
 // AddRemoteCmd sets up the 'add-remote' repository subcommand
