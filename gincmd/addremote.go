@@ -6,12 +6,16 @@ import (
 
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/git"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
 func parseRemote(remote string) string {
 	// split on first colon and check if it's a known alias
 	parts := strings.SplitN(remote, ":", 2)
+	if len(parts) < 2 {
+		Die("remote location must be of the form <server>:<repositoryname>, or <alias>:<repositoryname> (see \"gin help add-remote\")")
+	}
 	alias, repopath := parts[0], parts[1]
 	if alias == "gin" {
 		// Built-in alias 'gin'; use default remote address
