@@ -49,17 +49,17 @@ func checkRemote(cmd *cobra.Command, url string) (err error) {
 	// Check again
 }
 
-func promptCreate(cmd *cobra.Command, remote string) error {
-	create := func() error {
-		conf := config.Read()
-		gincl := ginclient.New(conf.GinHost)
-		requirelogin(cmd, gincl, true)
-		_, repopath := splitAliasRemote(remote)
-		repopathParts := strings.SplitN(repopath, "/", 2)
-		reponame := repopathParts[1]
-		return gincl.CreateRepo(reponame, "")
-	}
+func createRemote(cmd *cobra.Command, remote string) error {
+	conf := config.Read()
+	gincl := ginclient.New(conf.GinHost)
+	requirelogin(cmd, gincl, true)
+	_, repopath := splitAliasRemote(remote)
+	repopathParts := strings.SplitN(repopath, "/", 2)
+	reponame := repopathParts[1]
+	return gincl.CreateRepo(reponame, "")
+}
 
+func promptCreate(cmd *cobra.Command, remote string) error {
 	var response string
 	fmt.Printf("Remote %s does not exist. Would you like to create it?\n", remote)
 	for {
@@ -68,7 +68,7 @@ func promptCreate(cmd *cobra.Command, remote string) error {
 
 		switch strings.ToLower(response) {
 		case "c", "create":
-			return create()
+			return createRemote(cmd, remote)
 		case "a", "add", "add anyway":
 			return nil
 		case "b", "abort":
@@ -81,11 +81,17 @@ func addRemote(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die("This command must be run from inside a gin repository.")
 	}
+	flags := cmd.Flags()
+	create, _ := flags.GetBool("create")
 	name, remote := args[0], args[1]
 	url := parseRemote(remote)
 	err := checkRemote(cmd, url)
 	if err != nil {
-		err = promptCreate(cmd, remote)
+		if create {
+			err = createRemote(cmd, remote)
+		} else {
+			err = promptCreate(cmd, remote)
+		}
 		CheckError(err)
 	}
 	err = git.AddRemote(name, url)
