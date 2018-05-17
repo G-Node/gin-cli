@@ -270,6 +270,30 @@ func AddRemote(name, url string) error {
 	return err
 }
 
+// LsRemote performs a git ls-remote of a specific remote. If no remote is specified (empty string), it's run against all the default remote.
+// (git ls-remote)
+func LsRemote(remote string) (string, error) {
+	fn := fmt.Sprintf("LsRemote(%s)", remote)
+	args := []string{"ls-remote"}
+	if len(remote) > 0 {
+		args = append(args, remote)
+	}
+	cmd := Command(args...)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		sstderr := string(stderr)
+		gerr := giterror{UError: sstderr, Origin: fn}
+		if strings.Contains(sstderr, "Permission denied") {
+			gerr.Description = "permission denied or remote does not exist"
+		}
+		log.Write("Error during ls-remote command")
+		logstd(stdout, stderr)
+		return "", gerr
+	}
+
+	return string(stdout), nil
+}
+
 // CommitIfNew creates an empty initial git commit if the current repository is completely new.
 // If 'upstream' is not an empty string, and an initial commit was created, it sets the current branch to track the same-named branch at the specified remote.
 // Returns 'true' if (and only if) a commit was created.

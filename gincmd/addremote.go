@@ -27,17 +27,39 @@ func parseRemote(remote string) string {
 	return remote
 }
 
+func checkRemote(cmd *cobra.Command, url string) (err error) {
+	// Check if the remote is accessible
+	fmt.Print(":: Checking remote ")
+	if _, err = git.LsRemote(url); err == nil {
+		fmt.Fprintln(color.Output, green("OK"))
+		return nil
+	}
+	fmt.Fprintln(color.Output, red("FAILED"))
+	return err
+
+	// TODO: Check if it's a gin URL before offering to create
+	// conf := config.Read()
+	// gincl := ginclient.New(conf.GinHost)
+	// requirelogin(cmd, gincl, true)
+	// Check again
+}
+
 func addRemote(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die("This command must be run from inside a gin repository.")
 	}
 	name, remote := args[0], args[1]
 	url := parseRemote(remote)
-	git.AddRemote(name, url)
-
-	// TODO: Check if remote exists (and is accessible)
-
-	// TODO: If it doesn't exist, offer to create it
+	err := git.AddRemote(name, url)
+	CheckError(err)
+	fmt.Printf(":: Added new remote: %s [%s]\n", name, url)
+	err = checkRemote(cmd, url)
+	if err != nil {
+		// Prompt for cleanup
+		git.Command("remote", "rm", name).Run()
+		Die(err)
+	}
+	// CheckError(err)
 }
 
 // AddRemoteCmd sets up the 'add-remote' repository subcommand

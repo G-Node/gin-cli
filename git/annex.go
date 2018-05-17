@@ -200,6 +200,7 @@ func AnnexPull() error {
 		logstd(stdout, stderr)
 		errmsg := "failed"
 		sstderr := string(stderr)
+		// TODO: Use giterror
 		if strings.Contains(sstderr, "Permission denied") {
 			errmsg = "download failed: permission denied"
 		} else if strings.Contains(sstderr, "Host key verification failed") {
