@@ -4,19 +4,24 @@ import (
 	"fmt"
 	"strings"
 
+	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
-func parseRemote(remote string) string {
+func splitAliasRemote(remote string) (string, string) {
 	// split on first colon and check if it's a known alias
 	parts := strings.SplitN(remote, ":", 2)
 	if len(parts) < 2 {
 		Die("remote location must be of the form <server>:<repositoryname>, or <alias>:<repositoryname> (see \"gin help add-remote\")")
 	}
-	alias, repopath := parts[0], parts[1]
+	return parts[0], parts[1]
+}
+
+func parseRemote(remote string) string {
+	alias, repopath := splitAliasRemote(remote)
 	if alias == "gin" {
 		// Built-in alias 'gin'; use default remote address
 		conf := config.Read()
@@ -44,21 +49,48 @@ func checkRemote(cmd *cobra.Command, url string) (err error) {
 	// Check again
 }
 
+func promptCreate(cmd *cobra.Command, remote string) error {
+	create := func() error {
+		conf := config.Read()
+		gincl := ginclient.New(conf.GinHost)
+		requirelogin(cmd, gincl, true)
+		_, repopath := splitAliasRemote(remote)
+		repopathParts := strings.SplitN(repopath, "/", 2)
+		reponame := repopathParts[1]
+		return gincl.CreateRepo(reponame, "")
+	}
+
+	var response string
+	fmt.Printf("Remote %s does not exist. Would you like to create it?\n", remote)
+	for {
+		fmt.Printf("[c]reate / [a]dd anyway / a[b]ort: ")
+		fmt.Scanln(&response)
+
+		switch strings.ToLower(response) {
+		case "c", "create":
+			return create()
+		case "a", "add", "add anyway":
+			return nil
+		case "b", "abort":
+			return fmt.Errorf("aborted")
+		}
+	}
+}
+
 func addRemote(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die("This command must be run from inside a gin repository.")
 	}
 	name, remote := args[0], args[1]
 	url := parseRemote(remote)
-	err := git.AddRemote(name, url)
+	err := checkRemote(cmd, url)
+	if err != nil {
+		err = promptCreate(cmd, remote)
+		CheckError(err)
+	}
+	err = git.AddRemote(name, url)
 	CheckError(err)
 	fmt.Printf(":: Added new remote: %s [%s]\n", name, url)
-	err = checkRemote(cmd, url)
-	if err != nil {
-		// Prompt for cleanup
-		git.Command("remote", "rm", name).Run()
-		Die(err)
-	}
 	// CheckError(err)
 }
 
@@ -82,5 +114,6 @@ func AddRemoteCmd() *cobra.Command {
 		Run:     addRemote,
 		DisableFlagsInUseLine: true,
 	}
+	addRemoteCmd.Flags().Bool("create", false, "Create the remote on the server if it does not already exist.")
 	return addRemoteCmd
 }
