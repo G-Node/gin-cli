@@ -1,6 +1,8 @@
 package gincmd
 
 import (
+	"strings"
+
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/git"
@@ -14,6 +16,14 @@ func upload(cmd *cobra.Command, args []string) {
 	requirelogin(cmd, gincl, !jsonout)
 	if !git.IsRepo() {
 		Die("This command must be run from inside a gin repository.")
+	}
+
+	// Abort if there are no remotes configured
+	if _, err := git.LsRemote(""); err != nil {
+		if strings.Contains(err.Error(), "No remote configured") {
+			Die("upload failed: no remote configured")
+		}
+		// Ignore any other type of error and try to upload
 	}
 
 	gincl.GitHost = conf.GitHost
