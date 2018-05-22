@@ -269,6 +269,15 @@ func ConfigGet(key string) (string, error) {
 	return string(stdout), nil
 }
 
+// DefaultRemote returns the name of the configured default remote.
+func DefaultRemote() (string, error) {
+	defremote, err := ConfigGet("branch.master.remote")
+	if err != nil {
+		err = fmt.Errorf("could not determine default remote")
+	}
+	return defremote, err
+}
+
 // RemoteShow returns the configured remotes and their URL.
 // (git remote -v show -n)
 func RemoteShow() (map[string]string, error) {

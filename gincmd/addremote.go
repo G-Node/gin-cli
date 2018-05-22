@@ -109,8 +109,8 @@ func addRemote(cmd *cobra.Command, args []string) {
 	CheckError(err)
 	fmt.Printf(":: Added new remote: %s [%s]\n", name, url)
 	defaultIfOne(name)
-	defremote, err := git.ConfigGet("branch.master.remote")
-	CheckErrorMsg(err, "could not determine default remote")
+	defremote, err := git.DefaultRemote()
+	CheckError(err)
 	fmt.Printf(":: Default remote: %s\n", defremote)
 }
 
