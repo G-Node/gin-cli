@@ -266,7 +266,9 @@ func ConfigGet(key string) (string, error) {
 		logstd(stdout, stderr)
 		return "", gerr
 	}
-	return string(stdout), nil
+	value := string(stdout)
+	value = strings.TrimSpace(value)
+	return value, nil
 }
 
 // DefaultRemote returns the name of the configured default remote.
