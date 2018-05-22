@@ -105,7 +105,7 @@ func addRemote(cmd *cobra.Command, args []string) {
 			promptCreate(cmd, remote)
 		}
 	}
-	err = git.AddRemote(name, url)
+	err = git.RemoteAdd(name, url)
 	CheckError(err)
 	fmt.Printf(":: Added new remote: %s [%s]\n", name, url)
 	defaultIfOne(name)

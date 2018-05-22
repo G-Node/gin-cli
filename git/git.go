@@ -305,9 +305,9 @@ func RemoteShow() (map[string]string, error) {
 	return remotes, nil
 }
 
-// AddRemote adds a remote named name for the repository at url.
-func AddRemote(name, url string) error {
-	fn := fmt.Sprintf("AddRemote(%s, %s)", name, url)
+// RemoteAdd adds a remote named name for the repository at url.
+func RemoteAdd(name, url string) error {
+	fn := fmt.Sprintf("RemoteAdd(%s, %s)", name, url)
 	cmd := Command("remote", "add", name, url)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
