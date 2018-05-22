@@ -22,17 +22,29 @@ const unknownhostname = "(unknown)"
 var green = color.New(color.FgGreen).SprintFunc()
 var red = color.New(color.FgRed).SprintFunc()
 
-//Die prints an error message to stderr and exits the program with status 1.
+// Die prints an error message to stderr and exits the program with status 1.
 func Die(msg interface{}) {
-	msgstring := fmt.Sprintf("%s %s\n", red("[error]"), msg)
+	msgstring := fmt.Sprintf("%s", msg)
 	if len(msgstring) > 0 {
 		log.Write("Exiting with ERROR message: %s", msgstring)
-		fmt.Fprintf(color.Error, msgstring)
+		fmt.Fprintf(color.Error, "%s %s\n", red("[error]"), msgstring)
 	} else {
 		log.Write("Exiting with ERROR (no message)")
 	}
 	log.Close()
 	os.Exit(1)
+}
+
+// Exit prints a message to stdout and exits the program with status 0.
+func Exit(msg string) {
+	if len(msg) > 0 {
+		log.Write("Exiting with message: %s", msg)
+		fmt.Println(msg)
+	} else {
+		log.Write("Exiting")
+	}
+	log.Close()
+	os.Exit(0)
 }
 
 // CheckError exits the program if an error is passed to the function.

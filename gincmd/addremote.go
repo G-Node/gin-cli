@@ -70,7 +70,7 @@ func promptCreate(cmd *cobra.Command, remote string) {
 		case "a", "add", "add anyway":
 			return
 		case "b", "abort":
-			Die("aborted")
+			Exit("aborted")
 		}
 	}
 }
