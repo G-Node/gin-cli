@@ -253,6 +253,40 @@ func SetGitUser(name, email string) error {
 	return cmd.Run()
 }
 
+// ConfigGet returns the value of a given git configuration key.
+// The returned key is always a string.
+// (git config --get)
+func ConfigGet(key string) (string, error) {
+	return "", nil
+}
+
+// RemoteShow returns the configured remotes and their URL.
+// (git remote -v show -n)
+func RemoteShow() (map[string]string, error) {
+	fn := "RemoteShow()"
+	cmd := Command("remote", "-v", "show", "-n")
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		sstderr := string(stderr)
+		gerr := giterror{UError: sstderr, Origin: fn}
+		log.Write("Error during remote show command")
+		logstd(stdout, stderr)
+		return nil, gerr
+	}
+	remotes := make(map[string]string)
+	sstdout := string(stdout)
+	for _, line := range strings.Split(sstdout, "\n") {
+		parts := strings.Fields(line)
+		if len(parts) != 3 {
+			log.Write("Unexpected output: %s", line)
+			continue
+		}
+		remotes[parts[0]] = parts[1]
+	}
+
+	return remotes, nil
+}
+
 // AddRemote adds a remote named name for the repository at url.
 func AddRemote(name, url string) error {
 	fn := fmt.Sprintf("AddRemote(%s, %s)", name, url)
@@ -269,6 +303,21 @@ func AddRemote(name, url string) error {
 		return gerr
 	}
 	return err
+}
+
+// BranchSetUpstream sets the default upstream remote for the current branch.
+// (git branch --set-upstream-to=)
+func BranchSetUpstream(name string) error {
+	fn := fmt.Sprintf("BranchSetUpstream(%s)", name)
+	cmd := Command("branch", fmt.Sprintf("--set-upstream-to=%s", name))
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		log.Write("Error during branch set-upstream-to")
+		logstd(stdout, stderr)
+		return gerr
+	}
+	return nil
 }
 
 // LsRemote performs a git ls-remote of a specific remote. If no remote is specified (empty string), it's run against all the default remote.
