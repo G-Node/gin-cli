@@ -446,16 +446,19 @@ func Commit(commitmsg string) error {
 }
 
 // DiffUpstream returns, through the provided channel, the names of all files that differ from the default remote branch.
-// The output channel 'diffchan' is closed when this function returns
+// The output channel 'diffchan' is closed when this function returns.
 // (git diff --name-only --relative @{upstream})
 func DiffUpstream(paths []string, diffchan chan<- string) {
 	defer close(diffchan)
-	// FIXME: Direct mode gets weird with the branches, so we explicitly state origin/master
-	// Should be fixed when we add configurable remotes
-	diffargs := []string{"diff", "-z", "--name-only", "--relative", "origin/master"} // "@{upstream}"}
+	defremote, err := DefaultRemote()
+	if err != nil {
+		log.Write(err.Error())
+		return
+	}
+	diffargs := []string{"diff", "-z", "--name-only", "--relative", fmt.Sprintf("%s/master", defremote)}
 	diffargs = append(diffargs, paths...)
 	cmd := Command(diffargs...)
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		log.Write("ls-files command set up failed: %s", err)
 		return
