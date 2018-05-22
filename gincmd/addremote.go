@@ -6,6 +6,7 @@ import (
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -77,7 +78,7 @@ func promptCreate(cmd *cobra.Command, remote string) {
 
 func addRemote(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
-		Die("This command must be run from inside a gin repository.")
+		Die(ginerrors.NotInRepo)
 	}
 	flags := cmd.Flags()
 	create, _ := flags.GetBool("create")

@@ -3,6 +3,7 @@ package gincmd
 import (
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +20,7 @@ func countItemsUnlock(paths []string) (count int) {
 func unlock(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	if !git.IsRepo() {
-		Die("This command must be run from inside a gin repository.")
+		Die(ginerrors.NotInRepo)
 	}
 	// unlock should do nothing in direct mode
 	if git.IsDirect() {

@@ -3,6 +3,7 @@ package gincmd
 import (
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +22,7 @@ func remove(cmd *cobra.Command, args []string) {
 	gincl := ginclient.New(conf.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 	if !git.IsRepo() {
-		Die("This command must be run from inside a gin repository.")
+		Die(ginerrors.NotInRepo)
 	}
 	gincl.GitHost = conf.GitHost
 	gincl.GitUser = conf.GitUser

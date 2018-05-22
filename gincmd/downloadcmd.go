@@ -6,6 +6,7 @@ import (
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -17,7 +18,7 @@ func download(cmd *cobra.Command, args []string) {
 	gincl := ginclient.New(conf.GinHost)
 	requirelogin(cmd, gincl, !jsonout)
 	if !git.IsRepo() {
-		Die("This command must be run from inside a gin repository.")
+		Die(ginerrors.NotInRepo)
 	}
 
 	content, _ := cmd.Flags().GetBool("content")
