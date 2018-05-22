@@ -257,7 +257,16 @@ func SetGitUser(name, email string) error {
 // The returned key is always a string.
 // (git config --get)
 func ConfigGet(key string) (string, error) {
-	return "", nil
+	fn := fmt.Sprintf("ConfigGet(%s)", key)
+	cmd := Command("config", "--get", key)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		log.Write("Error during config get")
+		logstd(stdout, stderr)
+		return "", gerr
+	}
+	return string(stdout), nil
 }
 
 // RemoteShow returns the configured remotes and their URL.

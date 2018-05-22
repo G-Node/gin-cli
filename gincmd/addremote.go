@@ -76,6 +76,18 @@ func promptCreate(cmd *cobra.Command, remote string) {
 	}
 }
 
+func defaultIfOne(name string) {
+	remotes, err := git.RemoteShow()
+	CheckError(err)
+	if len(remotes) == 1 {
+		// Set default upstream
+		for k := range remotes {
+			git.BranchSetUpstream(k)
+			break
+		}
+	}
+}
+
 func addRemote(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
@@ -96,6 +108,10 @@ func addRemote(cmd *cobra.Command, args []string) {
 	err = git.AddRemote(name, url)
 	CheckError(err)
 	fmt.Printf(":: Added new remote: %s [%s]\n", name, url)
+	defaultIfOne(name)
+	defremote, err := git.ConfigGet("branch.master.remote")
+	CheckErrorMsg(err, "could not determine default remote")
+	fmt.Printf(":: Default remote: %s\n", defremote)
 }
 
 // AddRemoteCmd sets up the 'add-remote' repository subcommand
