@@ -258,8 +258,14 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus
 		return
 	}
 
+	remote, err := DefaultRemote()
+	if err != nil {
+		uploadchan <- git.RepoFileStatus{Err: err}
+		return
+	}
+
 	annexpushchan := make(chan git.RepoFileStatus)
-	go git.AnnexPush(paths, annexpushchan)
+	go git.AnnexPush(paths, remote, annexpushchan)
 	for stat := range annexpushchan {
 		uploadchan <- stat
 	}
@@ -383,6 +389,24 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 	status.Progress = "100%"
 	clonechan <- status
 	return
+}
+
+// DefaultRemote returns the name of the configured default gin remote.
+func DefaultRemote() (string, error) {
+	defremote, err := git.ConfigGet("gin.remote")
+	if err != nil {
+		err = fmt.Errorf("could not determine default remote")
+	}
+	return defremote, err
+}
+
+// SetDefaultRemote sets the name of the default gin remote.
+func SetDefaultRemote(remote string) error {
+	err := git.ConfigSet("gin.remote", remote)
+	if err != nil {
+		err = fmt.Errorf("Failed to set default remote: %s", err)
+	}
+	return err
 }
 
 // CheckoutVersion checks out all files specified by paths from the revision with the specified commithash.
@@ -606,12 +630,16 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		}
 	}
 
-	// git files should be checked against upstream for local commits
+	// git files should be checked against upstream (if it exists) for local commits
 	if len(gitfiles) > 0 {
 		diffchan := make(chan string)
-		go git.DiffUpstream(gitfiles, diffchan)
-		for fname := range diffchan {
-			statuses[fname] = LocalChanges
+		remote, err := DefaultRemote()
+		if err == nil {
+			upstream := fmt.Sprintf("%s/master", remote)
+			go git.DiffUpstream(gitfiles, upstream, diffchan)
+			for fname := range diffchan {
+				statuses[fname] = LocalChanges
+			}
 		}
 	}
 	return statuses, nil
@@ -698,12 +726,16 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		}
 
 		diffchan := make(chan string)
-		go git.DiffUpstream(cachedfiles, diffchan)
-		for fname := range diffchan {
-			// Two notes:
-			//		1. There will definitely be overlap here with the same status in annex (not a problem)
-			//		2. The diff might be due to remote or local changes, but for now we're going to assume local
-			statuses[fname] = LocalChanges
+		remote, err := DefaultRemote()
+		if err == nil {
+			upstream := fmt.Sprintf("%s/master", remote)
+			go git.DiffUpstream(cachedfiles, upstream, diffchan)
+			for fname := range diffchan {
+				// Two notes:
+				//		1. There will definitely be overlap here with the same status in annex (not a problem)
+				//		2. The diff might be due to remote or local changes, but for now we're going to assume local
+				statuses[fname] = LocalChanges
+			}
 		}
 	}
 

@@ -271,13 +271,19 @@ func ConfigGet(key string) (string, error) {
 	return value, nil
 }
 
-// DefaultRemote returns the name of the configured default remote.
-func DefaultRemote() (string, error) {
-	defremote, err := ConfigGet("branch.master.remote")
+// ConfigSet sets a configuration value in the local git config.
+// (git config --local)
+func ConfigSet(key, value string) error {
+	fn := fmt.Sprintf("ConfigSet(%s, %s)", key, value)
+	cmd := Command("config", "--local", key, value)
+	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		err = fmt.Errorf("could not determine default remote")
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		log.Write("Error during config set")
+		logstd(stdout, stderr)
+		return gerr
 	}
-	return defremote, err
+	return nil
 }
 
 // RemoteShow returns the configured remotes and their URL.
@@ -296,6 +302,10 @@ func RemoteShow() (map[string]string, error) {
 	remotes := make(map[string]string)
 	sstdout := string(stdout)
 	for _, line := range strings.Split(sstdout, "\n") {
+		line = strings.TrimSuffix(line, "\n")
+		if len(strings.TrimSpace(line)) == 0 {
+			continue
+		}
 		parts := strings.Fields(line)
 		if len(parts) != 3 {
 			log.Write("Unexpected output: %s", line)
@@ -322,14 +332,21 @@ func RemoteAdd(name, url string) error {
 		}
 		return gerr
 	}
-	return err
+	// Performing fetch after adding remote to retrieve references
+	// Any errors are logged and ignored
+	cmd = Command("fetch", name)
+	stdout, stderr, err = cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+	}
+	return nil
 }
 
 // BranchSetUpstream sets the default upstream remote for the current branch.
 // (git branch --set-upstream-to=)
 func BranchSetUpstream(name string) error {
 	fn := fmt.Sprintf("BranchSetUpstream(%s)", name)
-	cmd := Command("branch", fmt.Sprintf("--set-upstream-to=%s", name))
+	cmd := Command("branch", fmt.Sprintf("--set-upstream-to=%s/master", name))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := giterror{UError: string(stderr), Origin: fn}
@@ -450,17 +467,12 @@ func Commit(commitmsg string) error {
 // DiffUpstream returns, through the provided channel, the names of all files that differ from the default remote branch.
 // The output channel 'diffchan' is closed when this function returns.
 // (git diff --name-only --relative @{upstream})
-func DiffUpstream(paths []string, diffchan chan<- string) {
+func DiffUpstream(paths []string, upstream string, diffchan chan<- string) {
 	defer close(diffchan)
-	defremote, err := DefaultRemote()
-	if err != nil {
-		log.Write(err.Error())
-		return
-	}
-	diffargs := []string{"diff", "-z", "--name-only", "--relative", fmt.Sprintf("%s/master", defremote)}
+	diffargs := []string{"diff", "-z", "--name-only", "--relative", upstream}
 	diffargs = append(diffargs, paths...)
 	cmd := Command(diffargs...)
-	err = cmd.Start()
+	err := cmd.Start()
 	if err != nil {
 		log.Write("ls-files command set up failed: %s", err)
 		return

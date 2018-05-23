@@ -76,15 +76,10 @@ func promptCreate(cmd *cobra.Command, remote string) {
 	}
 }
 
-func defaultIfOne(name string) {
-	remotes, err := git.RemoteShow()
-	CheckError(err)
-	if len(remotes) == 1 {
-		// Set default upstream
-		for k := range remotes {
-			git.BranchSetUpstream(k)
-			break
-		}
+func defaultIfUnset(name string) {
+	_, err := ginclient.DefaultRemote()
+	if err != nil {
+		ginclient.SetDefaultRemote(name)
 	}
 }
 
@@ -108,8 +103,8 @@ func addRemote(cmd *cobra.Command, args []string) {
 	err = git.RemoteAdd(name, url)
 	CheckError(err)
 	fmt.Printf(":: Added new remote: %s [%s]\n", name, url)
-	defaultIfOne(name)
-	defremote, err := git.DefaultRemote()
+	defaultIfUnset(name)
+	defremote, err := ginclient.DefaultRemote()
 	CheckError(err)
 	fmt.Printf(":: Default remote: %s\n", defremote)
 }

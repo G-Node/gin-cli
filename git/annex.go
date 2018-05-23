@@ -217,14 +217,8 @@ func AnnexPull() error {
 // AnnexPush uploads all changes and new content to the default remote.
 // The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull; git annex copy --to=<defaultremote>)
-func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
+func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
-	defremote, err := DefaultRemote()
-	if err != nil {
-		log.Write(err.Error())
-		pushchan <- RepoFileStatus{Err: err}
-		return
-	}
 	cmd := AnnexCommand("sync", "--no-pull", "--no-commit") // NEVER commit changes when doing annex-sync
 	stdout, stderr, err := cmd.OutputError()
 	// TODO: Parse git push output for progress
@@ -245,7 +239,7 @@ func AnnexPush(paths []string, pushchan chan<- RepoFileStatus) {
 		return
 	}
 
-	cmd = AnnexCommand("copy", "--all", "--json-progress", fmt.Sprintf("--to=%s", defremote))
+	cmd = AnnexCommand("copy", "--all", "--json-progress", fmt.Sprintf("--to=%s", remote))
 	err = cmd.Start()
 	if err != nil {
 		pushchan <- RepoFileStatus{Err: err}
