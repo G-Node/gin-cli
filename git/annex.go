@@ -556,12 +556,26 @@ func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
 	return
 }
 
+// AnnexDescribe changes the description of a repository.
+// (git annex describe)
+func AnnexDescribe(repository, description string) error {
+	fn := fmt.Sprintf("AnnexDescribe(%s, %s)", repository, description)
+	cmd := AnnexCommand("describe", repository, description)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		log.Write("Error during Describe")
+		logstd(stdout, stderr)
+		return giterror{Origin: fn, UError: string(stderr)}
+	}
+	return nil
+}
+
 // AnnexInfo returns the annex information for a given repository
 // (git annex info)
 func AnnexInfo() (AnnexInfoRes, error) {
 	cmd := AnnexCommand("info", "--json")
 	stdout, stderr, err := cmd.OutputError()
-	if err != nil || cmd.Wait() != nil {
+	if err != nil {
 		log.Write("Error during AnnexInfo")
 		logstd(stdout, stderr)
 		return AnnexInfoRes{}, fmt.Errorf("Error retrieving annex info")
