@@ -85,6 +85,26 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 
 // Git commands
 
+// Init initialises the current directory as a git repository.
+// The repository is optionally initialised as bare.
+// (git init [--bare])
+func Init(bare bool) error {
+	fn := fmt.Sprintf("Init(%v)", bare)
+	args := []string{"init"}
+	if bare {
+		args = append(args, "--bare")
+	}
+	cmd := Command(args...)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		log.Write("Error during init command")
+		logstd(stdout, stderr)
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		return gerr
+	}
+	return nil
+}
+
 // Clone downloads a repository and sets the remote fetch and push urls.
 // The status channel 'clonechan' is closed when this function returns.
 // (git clone ...)

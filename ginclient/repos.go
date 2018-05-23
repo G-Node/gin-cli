@@ -475,11 +475,8 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 func (gincl *Client) InitDir() error {
 	initerr := ginerror{Origin: "InitDir", Description: "Error initialising local directory"}
 	if !git.IsRepo() {
-		cmd := git.Command("init")
-		stdout, stderr, err := cmd.OutputError()
+		err := git.Init(false)
 		if err != nil {
-			log.Write("Error during Init command: %s", string(stderr))
-			log.Write("[stdout]\n%s\n[stderr]\n%s", string(stdout), string(stderr))
 			initerr.UError = err.Error()
 			return initerr
 		}
