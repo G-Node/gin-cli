@@ -12,7 +12,7 @@ func upload(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	conf := config.Read()
 	gincl := ginclient.New(conf.GinHost)
-	requirelogin(cmd, gincl, !jsonout)
+	// requirelogin(cmd, gincl, !jsonout) // re-enable only for gin remotes
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
