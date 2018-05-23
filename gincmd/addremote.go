@@ -2,6 +2,7 @@ package gincmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
@@ -10,6 +11,14 @@ import (
 	"github.com/G-Node/gin-cli/git"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+)
+
+type rtype int8
+
+const (
+	ginrt rtype = iota
+	dirrt
+	unknownrt
 )
 
 func splitAliasRemote(remote string) (string, string) {
@@ -21,16 +30,20 @@ func splitAliasRemote(remote string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func parseRemote(remote string) string {
+func parseRemote(remote string) (rtype, string) {
 	alias, repopath := splitAliasRemote(remote)
-	if alias == "gin" {
+	switch alias {
+	case "gin":
 		// Built-in alias 'gin'; use default remote address
 		conf := config.Read()
 		url := fmt.Sprintf("ssh://%s@%s/%s", conf.GitUser, conf.GitHost, repopath)
-		return url
+		return ginrt, url
+	case "dir":
+		// Built-in alias 'dir'; set up filesystem directory as bare remote
+		return dirrt, repopath
 	}
 	// Unknown alias, return as is
-	return remote
+	return unknownrt, remote
 }
 
 func checkRemote(cmd *cobra.Command, url string) (err error) {
@@ -44,7 +57,7 @@ func checkRemote(cmd *cobra.Command, url string) (err error) {
 	return err
 }
 
-func createRemote(cmd *cobra.Command, remote string) {
+func createGinRemote(cmd *cobra.Command, remote string) {
 	conf := config.Read()
 	gincl := ginclient.New(conf.GinHost)
 	requirelogin(cmd, gincl, true)
@@ -57,7 +70,30 @@ func createRemote(cmd *cobra.Command, remote string) {
 	fmt.Fprintln(color.Output, green("OK"))
 }
 
-func promptCreate(cmd *cobra.Command, remote string) {
+func createDirRemote(remote string) {
+	origdir, err := os.Getwd()
+	CheckError(err)
+	defer os.Chdir(origdir)
+	_, repopath := splitAliasRemote(remote)
+	os.MkdirAll(repopath, 0755)
+	os.Chdir(repopath)
+	gincl := ginclient.New("")
+	err = gincl.InitDir()
+	CheckError(err)
+	git.SetBare(true)
+	git.AnnexDescribe("here", "GIN Storage")
+}
+
+func createRemote(cmd *cobra.Command, rt rtype, remote string) {
+	switch rt {
+	case ginrt:
+		createGinRemote(cmd, remote)
+	case dirrt:
+		createDirRemote(remote)
+	}
+}
+
+func promptCreate(cmd *cobra.Command, rt rtype, remote string) {
 	var response string
 	fmt.Printf("Remote %s does not exist. Would you like to create it?\n", remote)
 	for {
@@ -66,7 +102,7 @@ func promptCreate(cmd *cobra.Command, remote string) {
 
 		switch strings.ToLower(response) {
 		case "c", "create":
-			createRemote(cmd, remote)
+			createRemote(cmd, rt, remote)
 			return
 		case "a", "add", "add anyway":
 			return
@@ -90,14 +126,14 @@ func addRemote(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags()
 	create, _ := flags.GetBool("create")
 	name, remote := args[0], args[1]
-	url := parseRemote(remote)
+	rt, url := parseRemote(remote)
 	err := checkRemote(cmd, url)
 	// TODO: Check if it's a gin URL before offering to create
 	if err != nil {
 		if create {
-			createRemote(cmd, remote)
+			createRemote(cmd, rt, remote)
 		} else {
-			promptCreate(cmd, remote)
+			promptCreate(cmd, rt, remote)
 		}
 	}
 	err = git.RemoteAdd(name, url)
