@@ -49,6 +49,7 @@ func createRepo(cmd *cobra.Command, args []string) {
 		url := fmt.Sprintf("ssh://%s@%s/%s", conf.GitUser, conf.GitHost, repoPath)
 		err = git.RemoteAdd("origin", url)
 		CheckError(err)
+		defaultIfUnset("origin")
 		_, err := git.CommitIfNew("origin")
 		CheckError(err)
 	} else if !noclone {
