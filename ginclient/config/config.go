@@ -124,7 +124,7 @@ func Read() GinConfiguration {
 	configuration.Annex.Exclude = viper.GetStringSlice("annex.exclude")
 	configuration.Annex.MinSize = viper.GetString("annex.minsize")
 
-	log.Write("configurationuration values")
+	log.Write("values")
 	log.Write("%+v", configuration)
 
 	// TODO: Validate URLs on config read
