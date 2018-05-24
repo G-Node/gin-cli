@@ -10,6 +10,7 @@ import (
 
 func upload(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
+	remotes, _ := cmd.Flags().GetStringSlice("to")
 	conf := config.Read()
 	gincl := ginclient.New(conf.GinHost)
 	// requirelogin(cmd, gincl, !jsonout) // re-enable only for gin remotes
@@ -32,7 +33,7 @@ func upload(cmd *cobra.Command, args []string) {
 	}
 
 	uploadchan := make(chan git.RepoFileStatus)
-	go gincl.Upload(paths, uploadchan)
+	go gincl.Upload(paths, remotes, uploadchan)
 	formatOutput(uploadchan, 0, jsonout)
 }
 

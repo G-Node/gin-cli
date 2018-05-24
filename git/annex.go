@@ -239,7 +239,13 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 		return
 	}
 
-	cmd = AnnexCommand("copy", "--all", "--json-progress", fmt.Sprintf("--to=%s", remote))
+	args := []string{"copy", "--json-progress", fmt.Sprintf("--to=%s", remote)}
+	if len(paths) == 0 {
+		paths = []string{"--all"}
+	}
+	args = append(args, paths...)
+
+	cmd = AnnexCommand(args...)
 	err = cmd.Start()
 	if err != nil {
 		pushchan <- RepoFileStatus{Err: err}

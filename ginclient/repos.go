@@ -248,7 +248,7 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 
 // Upload transfers locally recorded changes to a remote.
 // The status channel 'uploadchan' is closed when this function returns.
-func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus) {
+func (gincl *Client) Upload(paths []string, remotes []string, uploadchan chan<- git.RepoFileStatus) {
 	defer close(uploadchan)
 	log.Write("Upload")
 
@@ -258,16 +258,22 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus
 		return
 	}
 
-	remote, err := DefaultRemote()
-	if err != nil {
-		uploadchan <- git.RepoFileStatus{Err: err}
-		return
+	if len(remotes) == 0 {
+		remote, err := DefaultRemote()
+		if err != nil {
+			uploadchan <- git.RepoFileStatus{Err: err}
+			return
+		}
+		remotes = []string{remote}
 	}
 
-	annexpushchan := make(chan git.RepoFileStatus)
-	go git.AnnexPush(paths, remote, annexpushchan)
-	for stat := range annexpushchan {
-		uploadchan <- stat
+	for _, remote := range remotes {
+		// TODO: Add remote destination to RepoFileStatus
+		annexpushchan := make(chan git.RepoFileStatus)
+		go git.AnnexPush(paths, remote, annexpushchan)
+		for stat := range annexpushchan {
+			uploadchan <- stat
+		}
 	}
 	return
 }
