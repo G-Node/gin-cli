@@ -375,16 +375,12 @@ func BranchSetUpstream(name string) error {
 	return nil
 }
 
-// LsRemote performs a git ls-remote of a specific remote. If no remote is specified (empty string), it's run against all the default remote.
+// LsRemote performs a git ls-remote of a specific remote.
 // The argument can be a name or a URL.
 // (git ls-remote)
 func LsRemote(remote string) (string, error) {
 	fn := fmt.Sprintf("LsRemote(%s)", remote)
-	args := []string{"ls-remote"}
-	if len(remote) > 0 {
-		args = append(args, remote)
-	}
-	cmd := Command(args...)
+	cmd := Command("ls-remote", remote)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		sstderr := string(stderr)
