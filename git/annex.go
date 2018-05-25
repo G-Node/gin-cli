@@ -131,60 +131,6 @@ func AnnexInit(description string) error {
 	return nil
 }
 
-// AnnexSync synchronises the local repository with the remote.
-// Optionally synchronises content if content=True.
-// The status channel 'syncchan' is closed when this function returns.
-// (git annex sync [--content])
-func AnnexSync(content bool, syncchan chan<- RepoFileStatus) {
-	defer close(syncchan)
-	args := []string{"sync"}
-	if content {
-		args = append(args, "--content")
-	}
-	cmd := AnnexCommand(args...)
-	cmd.Start()
-	var status RepoFileStatus
-	status.State = "Synchronising repository"
-	syncchan <- status
-	var line string
-	var rerr error
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		}
-		words := strings.Fields(line)
-		if words[0] == "copy" || words[0] == "get" {
-			status.FileName = strings.TrimSpace(words[1])
-			// new file - reset Progress and Rate
-			status.Progress = ""
-			status.Rate = ""
-			if words[len(words)-1] != "ok" {
-				// if the copy line ends with ok, the file is already done (no upload needed)
-				// so we shouldn't send the status to the caller
-				syncchan <- status
-			}
-		} else if strings.Contains(line, "%") {
-			status.Progress = words[1]
-			status.Rate = words[2]
-			syncchan <- status
-		}
-	}
-
-	var stderr string
-	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\000') {
-		stderr += line
-	}
-	if err := cmd.Wait(); err != nil {
-		log.Write("Error during AnnexSync")
-		log.Write("[stderr]\n%s", stderr)
-		log.Write("[Error]: %v", err)
-	}
-	status.Progress = progcomplete
-	syncchan <- status
-	return
-}
-
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // (git annex sync --no-push [--content])
 func AnnexPull() error {
@@ -658,7 +604,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 // AnnexFind lists available annexed files in the current directory.
 // Specifying 'paths' limits the search to files matching a given path.
 // Returned items are indexed by their annex key.
-// git annex find)
+// (git annex find)
 func AnnexFind(paths []string) (map[string]AnnexFindRes, error) {
 	cmdargs := []string{"find", "--json"}
 	if len(paths) > 0 {
