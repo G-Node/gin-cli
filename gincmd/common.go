@@ -207,6 +207,7 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 }
 
 func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool) {
+	// TODO: instead of a true/false success, add an error for every file and then group the errors by type and print a report
 	var filesuccess map[string]bool
 	if jsonout {
 		filesuccess = printJSON(statuschan)

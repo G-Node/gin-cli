@@ -267,7 +267,16 @@ func (gincl *Client) Upload(paths []string, remotes []string, uploadchan chan<- 
 		remotes = []string{remote}
 	}
 
+	confremotes, err := git.RemoteShow()
+	if err != nil || len(confremotes) == 0 {
+		uploadchan <- git.RepoFileStatus{Err: fmt.Errorf("failed to validate remote configuration (no configured remotes?)")}
+	}
+
 	for _, remote := range remotes {
+		if _, ok := confremotes[remote]; !ok {
+			uploadchan <- git.RepoFileStatus{FileName: remote, Err: fmt.Errorf("unknown remote name '%s': skipping", remote)}
+			continue
+		}
 		annexpushchan := make(chan git.RepoFileStatus)
 		go git.AnnexPush(paths, remote, annexpushchan)
 		for stat := range annexpushchan {

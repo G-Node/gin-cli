@@ -19,7 +19,7 @@ func upload(cmd *cobra.Command, args []string) {
 	}
 
 	// Fail early if no default remote
-	if _, err := ginclient.DefaultRemote(); err != nil {
+	if _, err := ginclient.DefaultRemote(); err != nil && len(remotes) == 0 {
 		Die("upload failed: no remote configured")
 	}
 
