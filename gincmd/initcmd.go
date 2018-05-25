@@ -5,7 +5,6 @@ import (
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
-	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +14,7 @@ func initRepo(cmd *cobra.Command, args []string) {
 	fmt.Print(":: Initialising local storage ")
 	err := gincl.InitDir(false)
 	CheckError(err)
-	_, err = git.CommitIfNew()
+	_, err = ginclient.CommitIfNew()
 	CheckError(err)
 	fmt.Println(green("OK"))
 }

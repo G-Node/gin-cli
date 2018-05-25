@@ -397,12 +397,48 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 	return
 }
 
+// CommitIfNew creates an empty initial git commit if the current repository is completely new.
+// If a new commit is created and a default remote exists, the new commit is pushed to initialise the remote as well.
+// Returns 'true' if (and only if) a commit was created.
+func CommitIfNew() (bool, error) {
+	if !git.IsRepo() {
+		return false, fmt.Errorf("not a repository")
+	}
+	_, err := git.RevParse("HEAD")
+	if err == nil {
+		// All good. No need to do anything
+		return false, nil
+	}
+
+	// Create an empty initial commit
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = unknownhostname
+	}
+	initmsg := fmt.Sprintf("Initial commit: Repository initialised on %s", hostname)
+	if err = git.CommitEmpty(initmsg); err != nil {
+		log.Write("Error while creating initial commit")
+		return false, err
+	}
+
+	return true, nil
+}
+
 // DefaultRemote returns the name of the configured default gin remote.
+// If a remote is not set in the config, the remote of the default git upstream is set and returned.
 func DefaultRemote() (string, error) {
 	defremote, err := git.ConfigGet("gin.remote")
-	if err != nil {
-		err = fmt.Errorf("could not determine default remote")
+	if err == nil {
+		return defremote, nil
 	}
+	log.Write("Default remote not set. Checking master remote.")
+	defremote, err = git.ConfigGet("branch.master.remote")
+	if err == nil {
+		SetDefaultRemote(defremote)
+		log.Write("Set default remote to %s", defremote)
+		return defremote, nil
+	}
+	err = fmt.Errorf("could not determine default remote")
 	return defremote, err
 }
 

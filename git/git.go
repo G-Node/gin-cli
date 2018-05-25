@@ -396,33 +396,19 @@ func LsRemote(remote string) (string, error) {
 	return string(stdout), nil
 }
 
-// CommitIfNew creates an empty initial git commit if the current repository is completely new.
-// Returns 'true' if (and only if) a commit was created.
-func CommitIfNew() (bool, error) {
-	if !IsRepo() {
-		return false, fmt.Errorf("not a repository")
-	}
-	cmd := Command("rev-parse", "HEAD")
-	err := cmd.Run()
-	if err == nil {
-		// All good. No need to do anything
-		return false, nil
-	}
-
-	// Create an empty initial commit
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = unknownhostname
-	}
-	cmd = Command("commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
+// RevParse parses an argument and returns the unambiguous, SHA1 representation.
+// (git rev-parse)
+func RevParse(rev string) (string, error) {
+	fn := fmt.Sprintf("RevParse(%s)", rev)
+	cmd := Command("rev-parse", rev)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error while creating initial commit")
+		log.Write("Error during rev-parse command")
 		logstd(stdout, stderr)
-		return false, fmt.Errorf(string(stderr))
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		return "", gerr
 	}
-
-	return true, nil
+	return string(stdout), nil
 }
 
 // IsRepo checks whether the current working directory is in a git repository.
@@ -460,6 +446,20 @@ func Commit(commitmsg string) error {
 			return fmt.Errorf("Nothing to commit")
 		}
 		log.Write("Error during GitCommit")
+		logstd(stdout, stderr)
+		return fmt.Errorf(string(stderr))
+	}
+	return nil
+}
+
+// CommitEmpty performs a commit even when there are no new changes added to the index.
+// This is useful for initialising new repositories with a usable HEAD.
+// (git commit --allow-empty)
+func CommitEmpty(commitmsg string) error {
+	cmd := Command("commit", "--allow-empty", fmt.Sprintf("--message=%s", commitmsg))
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		log.Write("Error during CommitEmpty")
 		logstd(stdout, stderr)
 		return fmt.Errorf(string(stderr))
 	}
