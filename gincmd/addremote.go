@@ -33,6 +33,7 @@ func splitAliasRemote(remote string) (string, string) {
 func parseRemote(remote string) (rtype, string) {
 	alias, repopath := splitAliasRemote(remote)
 	switch alias {
+	// TODO: Support configurable aliases for alternative GIN servers (self hosted), which should return 'ginrt'
 	case "gin":
 		// Built-in alias 'gin'; use default remote address
 		conf := config.Read()
@@ -57,11 +58,10 @@ func checkRemote(cmd *cobra.Command, url string) (err error) {
 	return err
 }
 
-func createGinRemote(cmd *cobra.Command, remote string) {
+func createGinRemote(cmd *cobra.Command, repopath string) {
 	conf := config.Read()
 	gincl := ginclient.New(conf.GinHost)
 	requirelogin(cmd, gincl, true)
-	_, repopath := splitAliasRemote(remote)
 	repopathParts := strings.SplitN(repopath, "/", 2)
 	reponame := repopathParts[1]
 	fmt.Printf(":: Creating repository '%s' ", repopath)
@@ -70,11 +70,10 @@ func createGinRemote(cmd *cobra.Command, remote string) {
 	fmt.Fprintln(color.Output, green("OK"))
 }
 
-func createDirRemote(remote string) {
+func createDirRemote(repopath string) {
 	origdir, err := os.Getwd()
 	CheckError(err)
 	defer os.Chdir(origdir)
-	_, repopath := splitAliasRemote(remote)
 	os.MkdirAll(repopath, 0755)
 	os.Chdir(repopath)
 	gincl := ginclient.New("")
@@ -84,11 +83,14 @@ func createDirRemote(remote string) {
 }
 
 func createRemote(cmd *cobra.Command, rt rtype, remote string) {
+	alias, repopath := splitAliasRemote(remote)
 	switch rt {
 	case ginrt:
-		createGinRemote(cmd, remote)
+		createGinRemote(cmd, repopath)
 	case dirrt:
-		createDirRemote(remote)
+		createDirRemote(repopath)
+	default:
+		Die(fmt.Sprintf("type or server '%s' unknown: cannot create remote", alias))
 	}
 }
 
