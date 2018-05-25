@@ -386,7 +386,7 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 	status := git.RepoFileStatus{State: "Initialising local storage"}
 	clonechan <- status
 	os.Chdir(repoName)
-	err := gincl.InitDir()
+	err := gincl.InitDir(false)
 	if err != nil {
 		status.Err = err
 		clonechan <- status
@@ -477,11 +477,12 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 }
 
 // InitDir initialises the local directory with the default remote and annex configuration.
+// Optionally initialised as a bare repository (for annex directory remotes).
 // The status channel 'initchan' is closed when this function returns.
-func (gincl *Client) InitDir() error {
+func (gincl *Client) InitDir(bare bool) error {
 	initerr := ginerror{Origin: "InitDir", Description: "Error initialising local directory"}
 	if !git.IsRepo() {
-		err := git.Init(false)
+		err := git.Init(bare)
 		if err != nil {
 			initerr.UError = err.Error()
 			return initerr

@@ -78,9 +78,8 @@ func createDirRemote(remote string) {
 	os.MkdirAll(repopath, 0755)
 	os.Chdir(repopath)
 	gincl := ginclient.New("")
-	err = gincl.InitDir()
+	err = gincl.InitDir(true)
 	CheckError(err)
-	git.SetBare(true)
 	git.AnnexDescribe("here", "GIN Storage")
 }
 
