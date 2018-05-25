@@ -148,18 +148,26 @@ func addRemote(cmd *cobra.Command, args []string) {
 
 // AddRemoteCmd sets up the 'add-remote' repository subcommand
 func AddRemoteCmd() *cobra.Command {
-	description := "Adds a server or location for data storage."
+	description := `Add a remote to the current repository for uploading and downloading. The name of the remote can be any word except the reserved keyword 'all'.
+
+The location must be of the form alias:path or server:path. Currently supported aliases are 'gin' for the default configured gin server, and 'dir' for directories. If neither is specified, it is assumed to be the address of a git server. For gin remotes, the path is the location of the repository on the server, in the form user/repositoryname. For directories, it is the path to the storage directory.
+
+When a remote is added, if it does not exist on the server or in the specified directory, the client will offer to create it. This is only possible for 'gin' and 'dir' remotes.
+
+A new remote is set as the default for uploading if no other remotes are configured. To set any new remote as the default, use the --default option. Use the 'set-remote' command to change the default remote at any time.`
+
+	// When a remote is added, if it does not exist, the client will offer to create it. This is only possible for 'gin' and 'dir' remotes and any other GIN servers the user has configured.`
 	args := map[string]string{
 		"<name>":     "The name of the new remote",
-		"<location>": "The server address or location for the data store.",
+		"<location>": "The location of the data store, in the form alias:path or server:path",
 	}
 	examples := map[string]string{
-		"Add a GIN server repository as a remote": "$ …",
-		"Add a storage drive":                     "$ …",
+		"Add a GIN server repository as a remote named 'primary'":          "$ gin add-remote primary gin:alice/example",
+		"Add a directory on a storage drive as a remote named 'datastore'": "$ gin add-remote datastore dir:/mnt/gindatastore",
 	}
 	var addRemoteCmd = &cobra.Command{
 		Use:     "add-remote <name> <location>",
-		Short:   description,
+		Short:   "Add a remote to the current repository for uploading and downloading.",
 		Long:    formatdesc(description, args),
 		Example: formatexamples(examples),
 		Args:    cobra.ExactArgs(2),
@@ -167,5 +175,6 @@ func AddRemoteCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	addRemoteCmd.Flags().Bool("create", false, "Create the remote on the server if it does not already exist.")
+	addRemoteCmd.Flags().Bool("default", false, "Sets the new remote as the default (if the command succeeds).")
 	return addRemoteCmd
 }
