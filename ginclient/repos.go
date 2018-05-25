@@ -444,11 +444,18 @@ func DefaultRemote() (string, error) {
 
 // SetDefaultRemote sets the name of the default gin remote.
 func SetDefaultRemote(remote string) error {
-	err := git.ConfigSet("gin.remote", remote)
+	remotes, err := git.RemoteShow()
 	if err != nil {
-		err = fmt.Errorf("Failed to set default remote: %s", err)
+		return fmt.Errorf("failed to determine configured remotes")
 	}
-	return err
+	if _, ok := remotes[remote]; !ok {
+		return fmt.Errorf("no such remote: %s", remote)
+	}
+	err = git.ConfigSet("gin.remote", remote)
+	if err != nil {
+		return fmt.Errorf("failed to set default remote: %s", err)
+	}
+	return nil
 }
 
 // CheckoutVersion checks out all files specified by paths from the revision with the specified commithash.
