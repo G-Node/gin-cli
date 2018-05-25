@@ -159,7 +159,7 @@ The location must be of the form alias:path or server:path. Currently supported 
 
 When a remote is added, if it does not exist on the server or in the specified directory, the client will offer to create it. This is only possible for 'gin' and 'dir' remotes.
 
-A new remote is set as the default for uploading if no other remotes are configured. To set any new remote as the default, use the --default option. Use the 'set-remote' command to change the default remote at any time.`
+A new remote is set as the default for uploading if no other remotes are configured. To set any new remote as the default, use the --default option. Use the 'use-remote' command to change the default remote at any time.`
 
 	// When a remote is added, if it does not exist, the client will offer to create it. This is only possible for 'gin' and 'dir' remotes and any other GIN servers the user has configured.`
 	args := map[string]string{
@@ -172,7 +172,7 @@ A new remote is set as the default for uploading if no other remotes are configu
 	}
 	var addRemoteCmd = &cobra.Command{
 		Use:     "add-remote <name> <location>",
-		Short:   "Add a remote to the current repository for uploading and downloading.",
+		Short:   "Add a remote to the current repository for uploading and downloading",
 		Long:    formatdesc(description, args),
 		Example: formatexamples(examples),
 		Args:    cobra.ExactArgs(2),
