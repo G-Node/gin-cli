@@ -397,9 +397,8 @@ func LsRemote(remote string) (string, error) {
 }
 
 // CommitIfNew creates an empty initial git commit if the current repository is completely new.
-// If 'upstream' is not an empty string, and an initial commit was created, it sets the current branch to track the same-named branch at the specified remote.
 // Returns 'true' if (and only if) a commit was created.
-func CommitIfNew(upstream string) (bool, error) {
+func CommitIfNew() (bool, error) {
 	if !IsRepo() {
 		return false, fmt.Errorf("not a repository")
 	}
@@ -410,7 +409,7 @@ func CommitIfNew(upstream string) (bool, error) {
 		return false, nil
 	}
 
-	// Create an empty initial commit and run annex sync to synchronise everything
+	// Create an empty initial commit
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = unknownhostname
@@ -423,17 +422,6 @@ func CommitIfNew(upstream string) (bool, error) {
 		return false, fmt.Errorf(string(stderr))
 	}
 
-	if upstream == "" {
-		return true, nil
-	}
-
-	cmd = Command("push", "--set-upstream", upstream, "HEAD")
-	stdout, stderr, err = cmd.OutputError()
-	if err != nil {
-		log.Write("Error while creating initial commit")
-		logstd(stdout, stderr)
-		return false, fmt.Errorf(string(stderr))
-	}
 	return true, nil
 }
 

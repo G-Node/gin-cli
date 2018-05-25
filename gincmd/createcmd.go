@@ -50,7 +50,7 @@ func createRepo(cmd *cobra.Command, args []string) {
 		err = git.RemoteAdd("origin", url)
 		CheckError(err)
 		defaultIfUnset("origin")
-		_, err := git.CommitIfNew("origin")
+		_, err := git.CommitIfNew()
 		CheckError(err)
 	} else if !noclone {
 		// Clone repository after creation

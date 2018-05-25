@@ -15,7 +15,7 @@ func initRepo(cmd *cobra.Command, args []string) {
 	fmt.Print(":: Initialising local storage ")
 	err := gincl.InitDir()
 	CheckError(err)
-	_, err = git.CommitIfNew("")
+	_, err = git.CommitIfNew()
 	CheckError(err)
 	fmt.Println(green("OK"))
 }

@@ -31,7 +31,7 @@ func getRepo(cmd *cobra.Command, args []string) {
 	go gincl.CloneRepo(repostr, clonechan)
 	formatOutput(clonechan, 0, jsonout)
 	defaultIfUnset("origin")
-	_, err := git.CommitIfNew("origin")
+	_, err := git.CommitIfNew()
 	CheckError(err)
 }
 
