@@ -41,6 +41,8 @@ type RepoFileStatus struct {
 	Err error `json:"err"`
 }
 
+// TODO: Create structs to accommodate extra information for other operations
+
 // GinCommit describes a commit, retrieved from the git log.
 type GinCommit struct {
 	Hash            string    `json:"hash"`

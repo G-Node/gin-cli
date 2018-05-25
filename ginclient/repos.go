@@ -268,7 +268,6 @@ func (gincl *Client) Upload(paths []string, remotes []string, uploadchan chan<- 
 	}
 
 	for _, remote := range remotes {
-		// TODO: Add remote destination to RepoFileStatus
 		annexpushchan := make(chan git.RepoFileStatus)
 		go git.AnnexPush(paths, remote, annexpushchan)
 		for stat := range annexpushchan {

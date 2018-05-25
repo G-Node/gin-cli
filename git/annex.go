@@ -272,8 +272,9 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.Write("Error during AnnexGet")
+		log.Write("Error during AnnexPush")
 		log.Write(string(stderr))
+		pushchan <- RepoFileStatus{Err: fmt.Errorf(string(stderr))}
 	}
 	return
 }
