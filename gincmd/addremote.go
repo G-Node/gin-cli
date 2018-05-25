@@ -126,6 +126,7 @@ func addRemote(cmd *cobra.Command, args []string) {
 	}
 	flags := cmd.Flags()
 	create, _ := flags.GetBool("create")
+	setdefault, _ := flags.GetBool("default")
 	name, remote := args[0], args[1]
 	rt, url := parseRemote(remote)
 	err := checkRemote(cmd, url)
@@ -140,7 +141,11 @@ func addRemote(cmd *cobra.Command, args []string) {
 	err = git.RemoteAdd(name, url)
 	CheckError(err)
 	fmt.Printf(":: Added new remote: %s [%s]\n", name, url)
-	defaultIfUnset(name)
+	if setdefault {
+		ginclient.SetDefaultRemote(name)
+	} else {
+		defaultRemoteIfUnset(name)
+	}
 	defremote, err := ginclient.DefaultRemote()
 	CheckError(err)
 	fmt.Printf(":: Default remote: %s\n", defremote)
