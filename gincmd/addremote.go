@@ -113,7 +113,7 @@ func promptCreate(cmd *cobra.Command, rt rtype, remote string) {
 	}
 }
 
-func defaultIfUnset(name string) {
+func defaultRemoteIfUnset(name string) {
 	_, err := ginclient.DefaultRemote()
 	if err != nil {
 		ginclient.SetDefaultRemote(name)
