@@ -196,7 +196,7 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 	}
 
 	var status RepoFileStatus
-	status.State = "Uploading"
+	status.State = fmt.Sprintf("Uploading (to: %s)", remote)
 
 	var outline []byte
 	var rerr error
