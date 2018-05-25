@@ -21,6 +21,8 @@ const (
 	unknownrt
 )
 
+const allremotes = "all"
+
 func splitAliasRemote(remote string) (string, string) {
 	// split on first colon and check if it's a known alias
 	parts := strings.SplitN(remote, ":", 2)
@@ -128,6 +130,9 @@ func addRemote(cmd *cobra.Command, args []string) {
 	create, _ := flags.GetBool("create")
 	setdefault, _ := flags.GetBool("default")
 	name, remote := args[0], args[1]
+	if name == allremotes {
+		Die("cannot set a remote with name 'all': see 'gin help add-remote' and 'gin help upload'")
+	}
 	rt, url := parseRemote(remote)
 	err := checkRemote(cmd, url)
 	// TODO: Check if it's a gin URL before offering to create
@@ -153,7 +158,7 @@ func addRemote(cmd *cobra.Command, args []string) {
 
 // AddRemoteCmd sets up the 'add-remote' repository subcommand
 func AddRemoteCmd() *cobra.Command {
-	description := `Add a remote to the current repository for uploading and downloading. The name of the remote can be any word except the reserved keyword 'all'.
+	description := `Add a remote to the current repository for uploading and downloading. The name of the remote can be any word except the reserved keyword 'all' (reserved for performing uploads to all configured remotes).
 
 The location must be of the form alias:path or server:path. Currently supported aliases are 'gin' for the default configured gin server, and 'dir' for directories. If neither is specified, it is assumed to be the address of a git server. For gin remotes, the path is the location of the repository on the server, in the form user/repositoryname. For directories, it is the path to the storage directory.
 
