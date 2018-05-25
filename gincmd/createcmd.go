@@ -50,8 +50,14 @@ func createRepo(cmd *cobra.Command, args []string) {
 		err = git.RemoteAdd("origin", url)
 		CheckError(err)
 		defaultIfUnset("origin")
-		_, err := ginclient.CommitIfNew()
+		new, err := ginclient.CommitIfNew()
 		CheckError(err)
+		if new {
+			// Push the new commit to initialise origin
+			uploadchan := make(chan git.RepoFileStatus)
+			go gincl.Upload(nil, []string{"origin"}, uploadchan)
+			<-uploadchan
+		}
 	} else if !noclone {
 		// Clone repository after creation
 		getRepo(cmd, []string{repoPath})
