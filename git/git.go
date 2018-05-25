@@ -264,13 +264,11 @@ func SetGitUser(name, email string) error {
 	if !IsRepo() {
 		return fmt.Errorf("not a repository")
 	}
-	cmd := Command("config", "--local", "user.name", name)
-	err := cmd.Run()
+	err := ConfigSet("user.name", name)
 	if err != nil {
 		return err
 	}
-	cmd = Command("config", "--local", "user.email", email)
-	return cmd.Run()
+	return ConfigSet("user.email", email)
 }
 
 // ConfigGet returns the value of a given git configuration key.
