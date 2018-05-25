@@ -124,12 +124,9 @@ func AnnexInit(description string) error {
 		logstd(stdout, stderr)
 		return initError
 	}
-	cmd = Command("config", "annex.backends", "MD5")
-	stdout, stderr, err = cmd.OutputError()
+	err = ConfigSet("annex.backends", "MD5")
 	if err != nil {
 		log.Write("Failed to set default annex backend MD5")
-		log.Write("[Error]: %v", string(stderr))
-		logstd(stdout, stderr)
 	}
 	return nil
 }
