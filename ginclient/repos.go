@@ -466,6 +466,19 @@ func SetDefaultRemote(remote string) error {
 	return nil
 }
 
+// RemoveRemote removes a remote from the repository configuration.
+func RemoveRemote(remote string) error {
+	remotes, err := git.RemoteShow()
+	if err != nil {
+		return fmt.Errorf("failed to determine configured remotes")
+	}
+	if _, ok := remotes[remote]; !ok {
+		return fmt.Errorf("no such remote: %s", remote)
+	}
+	err = git.RemoteRemove(remote)
+	return err
+}
+
 // CheckoutVersion checks out all files specified by paths from the revision with the specified commithash.
 func CheckoutVersion(commithash string, paths []string) error {
 	return git.Checkout(commithash, paths)

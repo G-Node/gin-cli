@@ -133,6 +133,7 @@ func addRemote(cmd *cobra.Command, args []string) {
 	if name == allremotes {
 		Die("cannot set a remote with name 'all': see 'gin help add-remote' and 'gin help upload'")
 	}
+	// TODO: Check if remote with same name already exists; fail early
 	rt, url := parseRemote(remote)
 	err := checkRemote(cmd, url)
 	// TODO: Check if it's a gin URL before offering to create

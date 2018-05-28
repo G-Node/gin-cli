@@ -337,7 +337,7 @@ func RemoteShow() (map[string]string, error) {
 	return remotes, nil
 }
 
-// RemoteAdd adds a remote named name for the repository at url.
+// RemoteAdd adds a remote named name for the repository at URL.
 func RemoteAdd(name, url string) error {
 	fn := fmt.Sprintf("RemoteAdd(%s, %s)", name, url)
 	cmd := Command("remote", "add", name, url)
@@ -358,6 +358,24 @@ func RemoteAdd(name, url string) error {
 	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
 		logstd(stdout, stderr)
+	}
+	return nil
+}
+
+// RemoteRemove removes the remote named name from the repository configuration.
+func RemoteRemove(name string) error {
+	fn := fmt.Sprintf("RemoteRm(%s)", name)
+	cmd := Command("remote", "remove", name)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		sstderr := string(stderr)
+		gerr := giterror{UError: sstderr, Origin: fn}
+		log.Write("Error during remote remove command")
+		logstd(stdout, stderr)
+		if strings.Contains(sstderr, "No such remote") {
+			gerr.Description = fmt.Sprintf("remote with name '%s' does not exist", name)
+		}
+		return gerr
 	}
 	return nil
 }
