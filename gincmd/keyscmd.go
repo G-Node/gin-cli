@@ -19,7 +19,8 @@ func keys(cmd *cobra.Command, args []string) {
 	}
 
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	requirelogin(cmd, gincl, true)
 
 	keyfilename, _ := flags.GetString("add")

@@ -12,7 +12,8 @@ import (
 
 func createRepo(cmd *cobra.Command, args []string) {
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	requirelogin(cmd, gincl, true)
 
 	var repoName, repoDesc string
@@ -34,10 +35,9 @@ func createRepo(cmd *cobra.Command, args []string) {
 			repoDesc = args[1]
 		}
 	}
-	gincl.GitHost = conf.GitHost
-	gincl.GitUser = conf.GitUser
-	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
-	fmt.Printf(":: Creating repository '%s' ", repoPath)
+	gincl.GitAddress = srvcfg.Git.AddressStr()
+	repopath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
+	fmt.Printf(":: Creating repository '%s' ", repopath)
 	err := gincl.CreateRepo(repoName, repoDesc)
 	CheckError(err)
 	fmt.Fprintln(color.Output, green("OK"))
@@ -46,7 +46,7 @@ func createRepo(cmd *cobra.Command, args []string) {
 		// Init cwd
 		err = gincl.InitDir(false)
 		CheckError(err)
-		url := fmt.Sprintf("ssh://%s@%s/%s", conf.GitUser, conf.GitHost, repoPath)
+		url := fmt.Sprintf("%s/%s", srvcfg.Git.AddressStr(), repopath)
 		err = git.RemoteAdd("origin", url)
 		CheckError(err)
 		defaultRemoteIfUnset("origin")
@@ -60,7 +60,7 @@ func createRepo(cmd *cobra.Command, args []string) {
 		}
 	} else if !noclone {
 		// Clone repository after creation
-		getRepo(cmd, []string{repoPath})
+		getRepo(cmd, []string{repopath})
 	}
 }
 

@@ -25,7 +25,8 @@ func repos(cmd *cobra.Command, args []string) {
 		usageDie(cmd)
 	}
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	requirelogin(cmd, gincl, true)
 	username := gincl.Username
 	if len(args) == 1 && args[0] != username {

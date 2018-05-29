@@ -14,8 +14,8 @@ func upload(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	remotes, _ := cmd.Flags().GetStringSlice("to")
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
-	// requirelogin(cmd, gincl, !jsonout) // re-enable only for gin remotes
+	srvcfg := conf.Servers["gin"] // TODO: Is this necessary? What about other servers
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -38,11 +38,7 @@ func upload(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	gincl.GitHost = conf.GitHost
-	gincl.GitUser = conf.GitUser
-
 	paths := args
-
 	if len(paths) > 0 {
 		commit(cmd, paths)
 	}

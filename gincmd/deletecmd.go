@@ -11,7 +11,8 @@ import (
 
 func deleteRepo(cmd *cobra.Command, args []string) {
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	requirelogin(cmd, gincl, true)
 	var repostr, confirmation string
 

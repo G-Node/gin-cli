@@ -11,7 +11,7 @@ import (
 func countItemsLock(paths []string) (count int) {
 	statchan := make(chan git.AnnexStatusRes)
 	go git.AnnexStatus(paths, statchan)
-	for _ = range statchan {
+	for range statchan {
 		count++
 	}
 	return
@@ -27,7 +27,8 @@ func lock(cmd *cobra.Command, args []string) {
 		return
 	}
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	nitems := countItemsLock(args)
 	lockchan := make(chan git.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)

@@ -27,7 +27,8 @@ func unlock(cmd *cobra.Command, args []string) {
 		return
 	}
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	nitems := countItemsUnlock(args)
 	unlockchan := make(chan git.RepoFileStatus)
 	go gincl.UnlockContent(args, unlockchan)

@@ -249,6 +249,7 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 // Upload transfers locally recorded changes to a remote.
 // The status channel 'uploadchan' is closed when this function returns.
 func (gincl *Client) Upload(paths []string, remotes []string, uploadchan chan<- git.RepoFileStatus) {
+	// TODO: Does this need to be a Client method?
 	defer close(uploadchan)
 	log.Write("Upload")
 
@@ -375,12 +376,12 @@ func (gincl *Client) Download() error {
 
 // CloneRepo clones a remote repository and initialises annex.
 // The status channel 'clonechan' is closed when this function returns.
-func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileStatus) {
+func (gincl *Client) CloneRepo(repopath string, clonechan chan<- git.RepoFileStatus) {
 	defer close(clonechan)
 	log.Write("CloneRepo")
 	clonestatus := make(chan git.RepoFileStatus)
-	remotepath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
-	go git.Clone(remotepath, repoPath, clonestatus)
+	remotepath := fmt.Sprintf("%s/%s", gincl.GitAddress, repopath)
+	go git.Clone(remotepath, repopath, clonestatus)
 	for stat := range clonestatus {
 		clonechan <- stat
 		if stat.Err != nil {
@@ -388,7 +389,7 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 		}
 	}
 
-	repoPathParts := strings.SplitN(repoPath, "/", 2)
+	repoPathParts := strings.SplitN(repopath, "/", 2)
 	repoName := repoPathParts[1]
 
 	status := git.RepoFileStatus{State: "Initialising local storage"}

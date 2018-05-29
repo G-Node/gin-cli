@@ -26,9 +26,9 @@ func lsRepo(cmd *cobra.Command, args []string) {
 	short, _ := flags.GetBool("short")
 
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
-	gincl.GitHost = conf.GitHost
-	gincl.GitUser = conf.GitUser
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl.GitAddress = srvcfg.Git.AddressStr()
 
 	filesStatus, err := gincl.ListFiles(args...)
 	CheckError(err)
