@@ -31,10 +31,34 @@ func promptForGit() (gitconf config.GitConfiguration) {
 }
 
 func parseWebstring(webstring string) (webconf config.WebConfiguration) {
+	errmsg := fmt.Sprintf("invalid web configuration line %s", webstring)
+	split := strings.SplitN(webstring, "://", 2)
+	if len(split) != 2 {
+		Die(errmsg)
+	}
+	webconf.Protocol = split[0]
+
+	split = strings.SplitN(split[1], ":", 2)
+	if len(split) != 2 {
+		Die(errmsg)
+	}
+	webconf.Host, webconf.Port = split[0], split[1]
 	return
 }
 
 func parseGitstring(gitstring string) (gitconf config.GitConfiguration) {
+	errmsg := fmt.Sprintf("invalid git configuration line %s", gitstring)
+	split := strings.SplitN(gitstring, "@", 2)
+	if len(split) != 2 {
+		Die(errmsg)
+	}
+	gitconf.User = split[0]
+
+	split = strings.SplitN(split[1], ":", 2)
+	if len(split) != 2 {
+		Die(errmsg)
+	}
+	gitconf.Host, gitconf.Port = split[0], split[1]
 	return
 }
 
