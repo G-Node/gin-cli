@@ -1,15 +1,32 @@
 package gincmd
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/spf13/cobra"
 )
 
 func promptForWeb() (webconf config.WebConfiguration) {
+	fmt.Println(":: Web server configuration")
+	fmt.Print("  Protocol (e.g., http, https): ")
+	fmt.Scanln(&webconf.Protocol)
+	fmt.Print("  Host or address: ")
+	fmt.Scanln(&webconf.Host)
+	fmt.Print("  Port (e.g., 80, 443): ")
+	fmt.Scanln(&webconf.Port)
 	return
 }
 
 func promptForGit() (gitconf config.GitConfiguration) {
+	fmt.Println(":: Git server configuration")
+	fmt.Print("  Username: ")
+	fmt.Scanln(&gitconf.User)
+	fmt.Print("  Host or address: ")
+	fmt.Scanln(&gitconf.Host)
+	fmt.Print("  Port (e.g., 22, 2222): ")
+	fmt.Scanln(&gitconf.Port)
 	return
 }
 
