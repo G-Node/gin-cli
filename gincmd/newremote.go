@@ -2,9 +2,11 @@ package gincmd
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/spf13/cobra"
 )
 
@@ -14,8 +16,13 @@ func promptForWeb() (webconf config.WebCfg) {
 	fmt.Scanln(&webconf.Protocol)
 	fmt.Print("  Host or address: ")
 	fmt.Scanln(&webconf.Host)
+
+	var port uint16
 	fmt.Print("  Port (e.g., 80, 443): ")
-	fmt.Scanln(&webconf.Port)
+	_, err := fmt.Scanln(&port)
+	if err != nil {
+		Die(ginerrors.BadPort)
+	}
 	return
 }
 
@@ -25,8 +32,12 @@ func promptForGit() (gitconf config.GitCfg) {
 	fmt.Scanln(&gitconf.User)
 	fmt.Print("  Host or address: ")
 	fmt.Scanln(&gitconf.Host)
+	var port uint16
 	fmt.Print("  Port (e.g., 22, 2222): ")
-	fmt.Scanln(&gitconf.Port)
+	_, err := fmt.Scanln(&port)
+	if err != nil {
+		Die(ginerrors.BadPort)
+	}
 	return
 }
 
@@ -42,7 +53,11 @@ func parseWebstring(webstring string) (webconf config.WebCfg) {
 	if len(split) != 2 {
 		Die(errmsg)
 	}
-	webconf.Host, webconf.Port = split[0], split[1]
+	port, err := strconv.ParseUint(split[1], 10, 16)
+	if err != nil {
+		Die(fmt.Sprintf("%s: %s", errmsg, ginerrors.BadPort))
+	}
+	webconf.Host, webconf.Port = split[0], uint16(port)
 	return
 }
 
@@ -58,7 +73,11 @@ func parseGitstring(gitstring string) (gitconf config.GitCfg) {
 	if len(split) != 2 {
 		Die(errmsg)
 	}
-	gitconf.Host, gitconf.Port = split[0], split[1]
+	port, err := strconv.ParseUint(split[1], 10, 16)
+	if err != nil {
+		Die(fmt.Sprintf("%s: %s", errmsg, ginerrors.BadPort))
+	}
+	gitconf.Host, gitconf.Port = split[0], uint16(port)
 	return
 }
 
