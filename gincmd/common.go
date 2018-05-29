@@ -295,6 +295,9 @@ func SetUpCommands(verstr string) *cobra.Command {
 	// Init repo
 	rootCmd.AddCommand(InitCmd())
 
+	// New remote
+	rootCmd.AddCommand(NewRemoteCmd())
+
 	// Add remote
 	rootCmd.AddCommand(AddRemoteCmd())
 
