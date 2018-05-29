@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func promptForWeb() (webconf config.WebConfiguration) {
+func promptForWeb() (webconf config.WebCfg) {
 	fmt.Println(":: Web server configuration")
 	fmt.Print("  Protocol (e.g., http, https): ")
 	fmt.Scanln(&webconf.Protocol)
@@ -19,7 +19,7 @@ func promptForWeb() (webconf config.WebConfiguration) {
 	return
 }
 
-func promptForGit() (gitconf config.GitConfiguration) {
+func promptForGit() (gitconf config.GitCfg) {
 	fmt.Println(":: Git server configuration")
 	fmt.Print("  Username: ")
 	fmt.Scanln(&gitconf.User)
@@ -30,7 +30,7 @@ func promptForGit() (gitconf config.GitConfiguration) {
 	return
 }
 
-func parseWebstring(webstring string) (webconf config.WebConfiguration) {
+func parseWebstring(webstring string) (webconf config.WebCfg) {
 	errmsg := fmt.Sprintf("invalid web configuration line %s", webstring)
 	split := strings.SplitN(webstring, "://", 2)
 	if len(split) != 2 {
@@ -46,7 +46,7 @@ func parseWebstring(webstring string) (webconf config.WebConfiguration) {
 	return
 }
 
-func parseGitstring(gitstring string) (gitconf config.GitConfiguration) {
+func parseGitstring(gitstring string) (gitconf config.GitCfg) {
 	errmsg := fmt.Sprintf("invalid git configuration line %s", gitstring)
 	split := strings.SplitN(gitstring, "@", 2)
 	if len(split) != 2 {
@@ -67,7 +67,7 @@ func newRemote(cmd *cobra.Command, args []string) {
 	webstring, _ := cmd.Flags().GetString("web")
 	gitstring, _ := cmd.Flags().GetString("git")
 
-	serverConf := config.ServerConfiguration{}
+	serverConf := config.ServerCfg{}
 
 	if webstring == "" {
 		serverConf.Web = promptForWeb()

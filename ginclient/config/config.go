@@ -13,28 +13,28 @@ import (
 
 var configDirs = configdir.New("g-node", "gin")
 
-// WebConfiguration is the configuration for the web server.
-type WebConfiguration struct {
+// WebCfg is the configuration for the web server.
+type WebCfg struct {
 	Protocol string
 	Host     string
 	Port     string
 }
 
-// GitConfiguration is the configuration for the git server.
-type GitConfiguration struct {
+// GitCfg is the configuration for the git server.
+type GitCfg struct {
 	User string
 	Host string
 	Port string
 }
 
-// ServerConfiguration holds the information required for GIN servers (web and git).
-type ServerConfiguration struct {
-	Web WebConfiguration
-	Git GitConfiguration
+// ServerCfg holds the information required for GIN servers (web and git).
+type ServerCfg struct {
+	Web WebCfg
+	Git GitCfg
 }
 
-// GinConfiguration holds the client configuration values.
-type GinConfiguration struct {
+// GinCliCfg holds the client configuration values.
+type GinCliCfg struct {
 	GinHost    string
 	GitHost    string
 	GitUser    string
@@ -78,12 +78,12 @@ func findreporoot(path string) (string, error) {
 }
 
 // local configuration cache
-var configuration GinConfiguration
+var configuration GinCliCfg
 var set = false
 
 // Read loads in the configuration from the config file(s) and returns a populated GinConfiguration struct.
 // The configuration is cached. Subsequent reads reuse the already loaded configuration.
-func Read() GinConfiguration {
+func Read() GinCliCfg {
 	if set {
 		return configuration
 	}
@@ -152,7 +152,8 @@ func Read() GinConfiguration {
 	return configuration
 }
 
-func WriteServerConf(alias string, conf ServerConfiguration) error {
+func WriteServerConf(alias string, conf ServerCfg) error {
+	fmt.Printf("Saving to %s: %+v", alias, conf)
 	return nil
 }
 
