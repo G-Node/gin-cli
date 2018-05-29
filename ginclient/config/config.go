@@ -13,7 +13,27 @@ import (
 
 var configDirs = configdir.New("g-node", "gin")
 
-// GinConfiguration holds the client configuration values
+// WebConfiguration is the configuration for the web server.
+type WebConfiguration struct {
+	Protocol string
+	Host     string
+	Port     string
+}
+
+// GitConfiguration is the configuration for the git server.
+type GitConfiguration struct {
+	User string
+	Host string
+	Port string
+}
+
+// ServerConfiguration holds the information required for GIN servers (web and git).
+type ServerConfiguration struct {
+	Web WebConfiguration
+	Git GitConfiguration
+}
+
+// GinConfiguration holds the client configuration values.
 type GinConfiguration struct {
 	GinHost    string
 	GitHost    string
@@ -130,6 +150,10 @@ func Read() GinConfiguration {
 	// TODO: Validate URLs on config read
 	set = true
 	return configuration
+}
+
+func WriteServerConf(alias string, conf ServerConfiguration) error {
+	return nil
 }
 
 // Path returns the configuration path where configuration files should be stored.

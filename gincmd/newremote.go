@@ -1,10 +1,47 @@
 package gincmd
 
 import (
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/spf13/cobra"
 )
 
+func promptForWeb() (webconf config.WebConfiguration) {
+	return
+}
+
+func promptForGit() (gitconf config.GitConfiguration) {
+	return
+}
+
+func parseWebstring(webstring string) (webconf config.WebConfiguration) {
+	return
+}
+
+func parseGitstring(gitstring string) (gitconf config.GitConfiguration) {
+	return
+}
+
 func newRemote(cmd *cobra.Command, args []string) {
+	alias := args[0]
+	webstring, _ := cmd.Flags().GetString("web")
+	gitstring, _ := cmd.Flags().GetString("git")
+
+	serverConf := config.ServerConfiguration{}
+
+	if webstring == "" {
+		serverConf.Web = promptForWeb()
+	} else {
+		serverConf.Web = parseWebstring(webstring)
+	}
+
+	if gitstring == "" {
+		serverConf.Git = promptForGit()
+	} else {
+		serverConf.Git = parseGitstring(gitstring)
+	}
+
+	// Save to config
+	config.WriteServerConf(alias, serverConf)
 }
 
 // NewRemoteCmd sets up the 'use-remote' repository subcommand
@@ -41,7 +78,7 @@ See the Examples section for a full example.
 		Use:     "new-remote [--web http[s]://<hostname>[:<port>]] [--git [<gituser>@]<hostname>[:<port>]] <alias>",
 		Short:   "Set the repository's default upload remote",
 		Long:    formatdesc(description, args),
-		Args:    cobra.MaximumNArgs(1),
+		Args:    cobra.ExactArgs(1),
 		Example: formatexamples(examples),
 		Run:     newRemote,
 		DisableFlagsInUseLine: true,
