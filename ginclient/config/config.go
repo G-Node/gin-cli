@@ -144,7 +144,7 @@ func Read() GinCliCfg {
 func removeInvalidServerConfs() {
 	// Check server configurations for invalid names and port numbers
 	for alias := range viper.GetStringMap("servers") {
-		if alias == "dir" || alias == "all" {
+		if alias == "dir" {
 			fmt.Fprintf(color.Error, "%s server alias '%s' is not allowed (reserved word): server configuration ignored\n", yellow("[warning]"), alias)
 			delete(configuration.Servers, alias)
 			continue

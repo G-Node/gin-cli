@@ -163,7 +163,7 @@ func AddRemoteCmd() *cobra.Command {
 
 The location must be of the form alias:path or server:path. Currently supported aliases are 'gin' for the default configured gin server, and 'dir' for directories. If neither is specified, it is assumed to be the address of a git server. For gin remotes, the path is the location of the repository on the server, in the form user/repositoryname. For directories, it is the path to the storage directory.
 
-When a remote is added, if it does not exist on the server or in the specified directory, the client will offer to create it. This is only possible for 'gin' and 'dir' remotes.
+When a remote is added, if it does not exist, the client will offer to create it. This is only possible for 'gin' and 'dir' type remotes and any other GIN servers the user has configured.
 
 A new remote is set as the default for uploading if no other remotes are configured. To set any new remote as the default, use the --default option. Use the 'use-remote' command to change the default remote at any time.`
 

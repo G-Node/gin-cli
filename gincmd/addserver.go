@@ -83,6 +83,11 @@ func parseGitstring(gitstring string) (gitconf config.GitCfg) {
 
 func addServer(cmd *cobra.Command, args []string) {
 	alias := args[0]
+
+	if alias == "dir" {
+		Die(fmt.Sprintf("invalid server alias '%s': this word is reserved", alias))
+	}
+
 	webstring, _ := cmd.Flags().GetString("web")
 	gitstring, _ := cmd.Flags().GetString("git")
 
@@ -110,7 +115,7 @@ func AddServerCmd() *cobra.Command {
 
 The command requires only one argument, the alias for the server. All other information can be provided on the command line using the flags described below. You will be prompted for any required information that is not provided.
 
-When configuring a server, you must specify an alias (name) for it, which will be used to refer to the configured server. This alias is then used when adding a remote to a repository. See 'gin help add-remote'.
+When configuring a server, you must specify an alias (name) for it, which will be used to refer to the configured server. This alias is then used when adding a remote to a repository. The default G-Node GIN server is available under the name 'gin', but this may be overridden. The word 'dir' cannot be used as is has special meaning when adding a remote to a repository. See 'gin help add-remote'.
 
 The following information is required to configure a new server:
 
