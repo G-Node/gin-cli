@@ -2,12 +2,14 @@ package gincmd
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh"
 )
 
 func promptForWeb() (webconf config.WebCfg) {
@@ -81,6 +83,22 @@ func parseGitstring(gitstring string) (gitconf config.GitCfg) {
 	return
 }
 
+func fetchHostKey(gitconf *config.GitCfg) {
+	keycb := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		hostkeystr := fmt.Sprintf("%s,%s %s", hostname, remote.String(), string(ssh.MarshalAuthorizedKey(key)))
+		gitconf.HostKey = hostkeystr
+		return nil
+	}
+	sshcon := ssh.ClientConfig{
+		User:            gitconf.User,
+		HostKeyCallback: keycb,
+	}
+	ssh.Dial("tcp", fmt.Sprintf("%s:%d", gitconf.Host, gitconf.Port), &sshcon)
+	// TODO: Print and confirm?
+	// TODO: Print error if connection fails
+	return
+}
+
 func addServer(cmd *cobra.Command, args []string) {
 	alias := args[0]
 
@@ -104,6 +122,8 @@ func addServer(cmd *cobra.Command, args []string) {
 	} else {
 		serverConf.Git = parseGitstring(gitstring)
 	}
+
+	fetchHostKey(&serverConf.Git)
 
 	// Save to config
 	config.WriteServerConf(alias, serverConf)

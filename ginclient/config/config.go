@@ -180,6 +180,7 @@ func WriteServerConf(alias string, newcfg ServerCfg) error {
 	v.Set(fmt.Sprintf("servers.%s.git.user", alias), newcfg.Git.User)
 	v.Set(fmt.Sprintf("servers.%s.git.host", alias), newcfg.Git.Host)
 	v.Set(fmt.Sprintf("servers.%s.git.port", alias), newcfg.Git.Port)
+	v.Set(fmt.Sprintf("servers.%s.git.hostkey", alias), newcfg.Git.HostKey)
 
 	v.WriteConfig()
 
