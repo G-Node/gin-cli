@@ -2,7 +2,6 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,10 +12,44 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	defaultFileName = "config.yml"
+)
+
 var (
 	configDirs = configdir.New("g-node", "gin")
 	yellow     = color.New(color.FgYellow).SprintFunc()
+
+	ginDefaultServer = ServerCfg{
+		WebCfg{
+			Protocol: "https",
+			Host:     "web.gin.g-node.org",
+			Port:     443,
+		},
+		GitCfg{
+			Host:    "gin.g-node.org",
+			Port:    22,
+			User:    "git",
+			HostKey: "gin.g-node.org,141.84.41.216 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBE5IBgKP3nUryEFaACwY4N3jlqDx8Qw1xAxU2Xpt5V0p9RNefNnedVmnIBV6lA3n+9kT1OSbyqA/+SgsQ57nHo0=",
+		},
+	}
+
+	defaultConf = map[string]interface{}{
+		// Binaries
+		"bin.git":      "git",
+		"bin.gitannex": "git-annex",
+		"bin.ssh":      "ssh",
+		// Annex filters
+		"annex.minsize": "10M",
+		"servers.gin":   ginDefaultServer,
+	}
+
+	// configuration cache: used to avoid rereading during a single command invocation
+	configuration GinCliCfg
+	set           = false
 )
+
+// Types
 
 // WebCfg is the configuration for the web server.
 type WebCfg struct {
@@ -65,6 +98,105 @@ type GinCliCfg struct {
 	}
 }
 
+// Read loads in the configuration from the config file(s), merges any defined values into the default configuration, and returns a populated GinConfiguration struct.
+// The configuration is cached. Subsequent reads reuse the already loaded configuration.
+func Read() GinCliCfg {
+	if set {
+		return configuration
+	}
+	viper.Reset()
+	viper.SetTypeByDefaultValue(true)
+
+	for k, v := range defaultConf {
+		viper.SetDefault(k, v)
+	}
+
+	// Merge in user config file
+	confpath, _ := Path(false)
+	confpath = filepath.Join(confpath, defaultFileName)
+	viper.SetConfigFile(confpath)
+	cerr := viper.MergeInConfig()
+	if cerr == nil {
+		log.Write("Found config file %s", confpath)
+	}
+
+	viper.Unmarshal(&configuration)
+
+	removeInvalidServerConfs()
+
+	// configuration file in the repository root (annex excludes and size threshold only)
+	reporoot, err := findreporoot(".")
+	if err == nil {
+		confpath := filepath.Join(reporoot, defaultFileName)
+		viper.SetConfigFile(confpath)
+		cerr = viper.MergeInConfig()
+		if cerr == nil {
+			log.Write("Found config file %s", confpath)
+		}
+	}
+	configuration.Annex.Exclude = viper.GetStringSlice("annex.exclude")
+	configuration.Annex.MinSize = viper.GetString("annex.minsize")
+
+	set = true
+	return configuration
+}
+
+func removeInvalidServerConfs() {
+	// Check server configurations for invalid names and port numbers
+	for alias := range viper.GetStringMap("servers") {
+		if alias == "dir" || alias == "all" {
+			fmt.Fprintf(color.Error, "%s server alias '%s' is not allowed (reserved word): server configuration ignored\n", yellow("[warning]"), alias)
+			delete(configuration.Servers, alias)
+			continue
+		}
+		webport := viper.GetInt(fmt.Sprintf("servers.%s.web.port", alias))
+		gitport := viper.GetInt(fmt.Sprintf("servers.%s.git.port", alias))
+		if webport < 0 || webport > 65535 || gitport < 0 || gitport > 65535 {
+			if alias == "gin" {
+				fmt.Fprintf(color.Error, "%s invalid value found in configuration for '%s': using default\n", yellow("[warning]"), alias)
+				configuration.Servers["gin"] = ginDefaultServer
+			} else {
+				fmt.Fprintf(color.Error, "%s invalid value found in configuration for '%s': server configuration ignored\n", yellow("[warning]"), alias)
+				delete(configuration.Servers, alias)
+			}
+		}
+	}
+}
+
+func WriteServerConf(alias string, newcfg ServerCfg) error {
+	configuration := Read()
+	configuration.Servers[alias] = newcfg
+
+	confpath, _ := Path(false)
+	configFileName := "config.yml"
+	confpath = filepath.Join(confpath, configFileName)
+	viper.SetConfigFile(confpath)
+
+	// viper.
+	// 	viper.WriteConfigAs
+	return nil
+}
+
+// Path returns the configuration path where configuration files should be stored.
+// If the GIN_CONFIG_DIR environment variable is set, its value is returned, otherwise the platform default is used.
+// If create is true and the directory does not exist, the full path is created.
+func Path(create bool) (string, error) {
+	confpath := os.Getenv("GIN_CONFIG_DIR")
+	if confpath == "" {
+		confpath = configDirs.QueryFolders(configdir.Global)[0].Path
+	}
+	var err error
+	if create {
+		err = os.MkdirAll(confpath, 0755)
+		if err != nil {
+			return "", fmt.Errorf("could not create config directory %s", confpath)
+		}
+	}
+	return confpath, err
+}
+
+// Util functions
+
 // pathExists returns true if the path exists
 func pathExists(path string) bool {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -90,117 +222,4 @@ func findreporoot(path string) (string, error) {
 	}
 
 	return findreporoot(updir)
-}
-
-// local configuration cache
-var configuration GinCliCfg
-var set = false
-
-// Read loads in the configuration from the config file(s) and returns a populated GinConfiguration struct.
-// The configuration is cached. Subsequent reads reuse the already loaded configuration.
-func Read() GinCliCfg {
-	if set {
-		return configuration
-	}
-	viper.Reset()
-	viper.SetTypeByDefaultValue(true)
-	// Binaries
-	viper.SetDefault("bin.git", "git")
-	viper.SetDefault("bin.gitannex", "git-annex")
-	viper.SetDefault("bin.ssh", "ssh")
-
-	// annex filters
-	viper.SetDefault("annex.minsize", "10M")
-
-	// Merge in user config file
-	confpath, _ := Path(false)
-	configFileName := "config.yml"
-	confpath = filepath.Join(confpath, configFileName)
-
-	viper.SetConfigFile(confpath)
-	cerr := viper.MergeInConfig()
-	if cerr == nil {
-		log.Write("Found config file %s", confpath)
-	}
-
-	// Servers
-	servers := make(map[string]ServerCfg)
-
-	// append default gin configuration
-	servers["gin"] = ServerCfg{
-		WebCfg{
-			Protocol: "https",
-			Host:     "web.gin.g-node.org",
-			Port:     443,
-		},
-		GitCfg{
-			Host:    "gin.g-node.org",
-			Port:    22,
-			User:    "git",
-			HostKey: "gin.g-node.org,141.84.41.216 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBE5IBgKP3nUryEFaACwY4N3jlqDx8Qw1xAxU2Xpt5V0p9RNefNnedVmnIBV6lA3n+9kT1OSbyqA/+SgsQ57nHo0=",
-		},
-	}
-
-	// Read the config, overwriting the "gin" configuration if it exists
-	srvcfgMap := viper.GetStringMap("servers")
-	for alias, cfg := range srvcfgMap {
-		// Marshal map then unmarshal into ServerCfg struct
-		marshaled, _ := json.Marshal(cfg)
-		s := ServerCfg{}
-		err := json.Unmarshal(marshaled, &s)
-		if err != nil {
-			fmt.Fprintf(color.Output, "%s invalid value found in configuration for '%s': server configuration ignored\n", yellow("[warning]"), alias)
-			continue
-		}
-		servers[alias] = s
-	}
-	configuration.Servers = servers
-
-	// Binaries
-	configuration.Bin.Git = viper.GetString("bin.git")
-	configuration.Bin.GitAnnex = viper.GetString("bin.gitannex")
-	configuration.Bin.SSH = viper.GetString("bin.ssh")
-
-	// configuration file in the repository root (annex excludes and size threshold only)
-	reporoot, err := findreporoot(".")
-	if err == nil {
-		confpath := filepath.Join(reporoot, configFileName)
-		viper.SetConfigFile(confpath)
-		cerr = viper.MergeInConfig()
-		if cerr == nil {
-			log.Write("Found config file %s", confpath)
-		}
-	}
-	configuration.Annex.Exclude = viper.GetStringSlice("annex.exclude")
-	configuration.Annex.MinSize = viper.GetString("annex.minsize")
-
-	log.Write("values")
-	log.Write("%+v", configuration)
-
-	// TODO: Validate URLs on config read
-	set = true
-	return configuration
-}
-
-func WriteServerConf(alias string, conf ServerCfg) error {
-	fmt.Printf("Saving to %s: %+v", alias, conf)
-	return nil
-}
-
-// Path returns the configuration path where configuration files should be stored.
-// If the GIN_CONFIG_DIR environment variable is set, its value is returned, otherwise the platform default is used.
-// If create is true and the directory does not exist, the full path is created.
-func Path(create bool) (string, error) {
-	confpath := os.Getenv("GIN_CONFIG_DIR")
-	if confpath == "" {
-		confpath = configDirs.QueryFolders(configdir.Global)[0].Path
-	}
-	var err error
-	if create {
-		err = os.MkdirAll(confpath, 0755)
-		if err != nil {
-			return "", fmt.Errorf("could not create config directory %s", confpath)
-		}
-	}
-	return confpath, err
 }
