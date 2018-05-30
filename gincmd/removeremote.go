@@ -33,7 +33,7 @@ func RemoveRemoteCmd() *cobra.Command {
 	}
 	var removeRemoteCmd = &cobra.Command{
 		Use:                   "remove-remote <name>",
-		Short:                 description,
+		Short:                 "Remove a remote from the current repository",
 		Long:                  formatdesc(description, args),
 		Args:                  cobra.ExactArgs(1),
 		Run:                   rmRemote,
