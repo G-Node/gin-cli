@@ -163,17 +163,26 @@ func removeInvalidServerConfs() {
 	}
 }
 
+// WriteServerConf writes a new server configuration into the user config file.
 func WriteServerConf(alias string, newcfg ServerCfg) error {
-	configuration := Read()
-	configuration.Servers[alias] = newcfg
+	// Read in the file configuration ONLY
+	confpath, _ := Path(true) // create config path if necessary
+	confpath = filepath.Join(confpath, defaultFileName)
+	v := viper.New()
+	v.SetConfigFile(confpath)
 
-	confpath, _ := Path(false)
-	configFileName := "config.yml"
-	confpath = filepath.Join(confpath, configFileName)
-	viper.SetConfigFile(confpath)
+	v.ReadInConfig()
 
-	// viper.
-	// 	viper.WriteConfigAs
+	v.Set(fmt.Sprintf("servers.%s.web.protocol", alias), newcfg.Web.Protocol)
+	v.Set(fmt.Sprintf("servers.%s.web.host", alias), newcfg.Web.Host)
+	v.Set(fmt.Sprintf("servers.%s.web.port", alias), newcfg.Web.Port)
+
+	v.Set(fmt.Sprintf("servers.%s.git.user", alias), newcfg.Git.User)
+	v.Set(fmt.Sprintf("servers.%s.git.host", alias), newcfg.Git.Host)
+	v.Set(fmt.Sprintf("servers.%s.git.port", alias), newcfg.Git.Port)
+
+	v.WriteConfig()
+
 	return nil
 }
 
