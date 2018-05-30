@@ -81,7 +81,7 @@ func parseGitstring(gitstring string) (gitconf config.GitCfg) {
 	return
 }
 
-func newRemote(cmd *cobra.Command, args []string) {
+func addServer(cmd *cobra.Command, args []string) {
 	alias := args[0]
 	webstring, _ := cmd.Flags().GetString("web")
 	gitstring, _ := cmd.Flags().GetString("git")
@@ -104,9 +104,9 @@ func newRemote(cmd *cobra.Command, args []string) {
 	config.WriteServerConf(alias, serverConf)
 }
 
-// NewRemoteCmd sets up the 'use-remote' repository subcommand
-func NewRemoteCmd() *cobra.Command {
-	description := `Configure a new GIN server that can be added as a remote to repositories.
+// AddServerCmd sets up the 'add-server' command for adding new server configurations
+func AddServerCmd() *cobra.Command {
+	description := `Configure a new GIN server that can be used to add remotes to repositories.
 
 The command requires only one argument, the alias for the server. All other information can be provided on the command line using the flags described below. You will be prompted for any required information that is not provided.
 
@@ -132,18 +132,18 @@ See the Examples section for a full example.
 		"<alias>": "The alias (name) for the server.",
 	}
 	examples := map[string]string{
-		"This is what configuring the built-in GIN remote would look like (note: this is already configured)": "$ gin new-remote --web https://web.gin.g-node.org:443 --git git@git.g-node.org:22 gin",
+		"This is what configuring the built-in G-Node GIN server would look like (note: this is already configured)": "$ gin add-server --web https://web.gin.g-node.org:443 --git git@git.g-node.org:22 gin",
 	}
-	var newRemoteCmd = &cobra.Command{
-		Use:     "new-remote [--web http[s]://<hostname>[:<port>]] [--git [<gituser>@]<hostname>[:<port>]] <alias>",
-		Short:   "Set the repository's default upload remote",
+	var addServerCmd = &cobra.Command{
+		Use:     "add-server [--web http[s]://<hostname>[:<port>]] [--git [<gituser>@]<hostname>[:<port>]] <alias>",
+		Short:   "Add a new GIN server configuration",
 		Long:    formatdesc(description, args),
 		Args:    cobra.ExactArgs(1),
 		Example: formatexamples(examples),
-		Run:     newRemote,
+		Run:     addServer,
 		DisableFlagsInUseLine: true,
 	}
-	newRemoteCmd.Flags().String("web", "", "Set the address and port for the web server.")
-	newRemoteCmd.Flags().String("git", "", "Set the user, address and port for the git server.")
-	return newRemoteCmd
+	addServerCmd.Flags().String("web", "", "Set the address and port for the web server.")
+	addServerCmd.Flags().String("git", "", "Set the user, address and port for the git server.")
+	return addServerCmd
 }
