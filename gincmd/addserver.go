@@ -98,7 +98,7 @@ func fetchHostKey(gitconf *config.GitCfg) {
 	if err != nil && !strings.Contains(err.Error(), "unable to authenticate") {
 		Die(fmt.Sprintf("connection test failed: %s", err))
 	}
-	fmt.Printf(":: Host key fingerprint: %s\n", fingerprint)
+	fmt.Printf(":: Host key fingerprint for [%s]: %s\n", gitconf.AddressStr(), fingerprint)
 	fmt.Print("Accept [yes/no]: ")
 	var response string
 	fmt.Scanln(&response)
