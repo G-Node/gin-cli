@@ -95,7 +95,7 @@ func fetchHostKey(gitconf *config.GitCfg) {
 		HostKeyCallback: keycb,
 	}
 	_, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", gitconf.Host, gitconf.Port), &sshcon)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "unable to authenticate") {
 		Die(fmt.Sprintf("connection test failed: %s", err))
 	}
 	fmt.Printf(":: Host key fingerprint: %s\n", fingerprint)
