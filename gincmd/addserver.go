@@ -84,18 +84,37 @@ func parseGitstring(gitstring string) (gitconf config.GitCfg) {
 }
 
 func fetchHostKey(gitconf *config.GitCfg) {
+	var hostkeystr, fingerprint string
 	keycb := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-		hostkeystr := fmt.Sprintf("%s,%s %s", hostname, remote.String(), string(ssh.MarshalAuthorizedKey(key)))
-		gitconf.HostKey = hostkeystr
+		hostkeystr = fmt.Sprintf("%s,%s %s", hostname, remote.String(), string(ssh.MarshalAuthorizedKey(key)))
+		fingerprint = ssh.FingerprintSHA256(key)
 		return nil
 	}
 	sshcon := ssh.ClientConfig{
 		User:            gitconf.User,
 		HostKeyCallback: keycb,
 	}
-	ssh.Dial("tcp", fmt.Sprintf("%s:%d", gitconf.Host, gitconf.Port), &sshcon)
-	// TODO: Print and confirm?
-	// TODO: Print error if connection fails
+	_, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", gitconf.Host, gitconf.Port), &sshcon)
+	if err != nil {
+		Die(fmt.Sprintf("connection test failed: %s", err))
+	}
+	fmt.Printf(":: Host key fingerprint: %s\n", fingerprint)
+	fmt.Print("Accept [yes/no]: ")
+	var response string
+	fmt.Scanln(&response)
+	for cont := false; !cont; {
+		switch strings.ToLower(response) {
+		case "no":
+			Exit("Aborted")
+		case "yes":
+			cont = true
+		default:
+			fmt.Print("Please type 'yes' or 'no': ")
+			fmt.Scanln(&response)
+		}
+	}
+
+	gitconf.HostKey = hostkeystr
 	return
 }
 
