@@ -172,7 +172,9 @@ func (ut *UserToken) LoadToken() error {
 		return nil
 	}
 	path, _ := config.Path(false) // Error can only occur when create=True
-	filepath := filepath.Join(path, "token")
+	defserver := config.Read().DefaultServer
+	filename := fmt.Sprintf("%s@%s.token", ut.Username, defserver)
+	filepath := filepath.Join(path, filename)
 	file, err := os.Open(filepath)
 	if err != nil {
 		return weberror{UError: err.Error(), Origin: fn, Description: "failed to load user token"}
@@ -195,7 +197,9 @@ func (ut *UserToken) StoreToken() error {
 	if err != nil {
 		return weberror{UError: err.Error(), Origin: fn}
 	}
-	filepath := filepath.Join(path, "token")
+	defserver := config.Read().DefaultServer
+	filename := fmt.Sprintf("%s@%s.token", ut.Username, defserver)
+	filepath := filepath.Join(path, filename)
 	file, err := os.Create(filepath)
 	if err != nil {
 		log.Write("Failed to create token file %s", filepath)

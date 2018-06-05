@@ -62,7 +62,8 @@ func PrivKeyPath(user string) string {
 		log.Write(err.Error())
 		return ""
 	}
-	return filepath.Join(configpath, fmt.Sprintf("%s.key", user))
+	defserver := config.Read().DefaultServer
+	return filepath.Join(configpath, fmt.Sprintf("%s@%s.key", user, defserver))
 }
 
 // HostKeyPath returns the full path for the location of the gin host key file.
@@ -73,7 +74,9 @@ func HostKeyPath() string {
 		log.Write(err.Error())
 		return ""
 	}
-	return filepath.Join(configpath, "ginhostkey")
+	defserver := config.Read().DefaultServer
+	filename := fmt.Sprintf("%s.hostkey", defserver)
+	return filepath.Join(configpath, filename)
 }
 
 // sshEnv returns the value that should be set for the GIT_SSH_COMMAND environment variable
@@ -88,7 +91,6 @@ func sshEnv(user string) string {
 	config := config.Read()
 	sshbin := fixpathsep(config.Bin.SSH)
 	keyfile := fixpathsep(PrivKeyPath(user))
-	// hostkeyfile := fixpathsep(HostKeyPath())
 	hostkeyfile := HostKeyPath()
 	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=\"%s\"'", sshbin, keyfile, hostkeyfile)
 	log.Write("env %s", gitSSHCmd)
