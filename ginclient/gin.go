@@ -292,5 +292,10 @@ func DefaultServer() string {
 
 // SetDefaultServer sets the name of the default gin server.
 func SetDefaultServer(alias string) error {
-	return config.SetDefaultServer(alias)
+	conf := config.Read()
+	if _, ok := conf.Servers[alias]; !ok {
+		return fmt.Errorf("server with alias '%s' does not exist", alias)
+	}
+	config.SetDefaultServer(alias)
+	return nil
 }
