@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func setRemote(cmd *cobra.Command, args []string) {
+func useRemote(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -36,7 +36,7 @@ With no arguments, this command simply prints the currently configured default r
 		Short: "Set the repository's default upload remote",
 		Long:  formatdesc(description, args),
 		Args:  cobra.MaximumNArgs(1),
-		Run:   setRemote,
+		Run:   useRemote,
 		DisableFlagsInUseLine: true,
 	}
 	return addRemoteCmd
