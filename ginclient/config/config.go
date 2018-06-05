@@ -188,6 +188,22 @@ func AddServerConf(alias string, newcfg ServerCfg) {
 	appendToFile(key, newcfg)
 }
 
+// RmServerConf removes a server configuration from the user config file.
+func RmServerConf(alias string) {
+	var c GinCliCfg
+	v := viper.New()
+	// Merge in user config file
+	confpath, _ := Path(false)
+	confpath = filepath.Join(confpath, defaultFileName)
+	v.SetConfigFile(confpath)
+	v.ReadInConfig()
+	v.Unmarshal(&c)
+	delete(c.Servers, alias)
+	v.Set("servers", c.Servers)
+	v.WriteConfig()
+	set = false
+}
+
 // SetDefaultServer writes the given name to the config file to server as the default server for web calls.
 // An error is returned if the name doesn't exist in the current configuration.
 func SetDefaultServer(alias string) {

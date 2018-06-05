@@ -284,18 +284,30 @@ func MakeHostsFile() {
 	return
 }
 
-// DefaultServer returns the name of the configured default gin server.
+// DefaultServer returns the alias of the configured default gin server.
 func DefaultServer() string {
 	conf := config.Read()
 	return conf.DefaultServer
 }
 
-// SetDefaultServer sets the name of the default gin server.
+// SetDefaultServer sets the alias of the default gin server.
+// Returns with error if no server with the given alias exists.
 func SetDefaultServer(alias string) error {
 	conf := config.Read()
 	if _, ok := conf.Servers[alias]; !ok {
 		return fmt.Errorf("server with alias '%s' does not exist", alias)
 	}
 	config.SetDefaultServer(alias)
+	return nil
+}
+
+// RemoveServer removes a server from the user configuration.
+// Returns with error if no server with the given alias exists.
+func RemoveServer(alias string) error {
+	conf := config.Read()
+	if _, ok := conf.Servers[alias]; !ok {
+		return fmt.Errorf("server with alias '%s' does not exist", alias)
+	}
+	config.RmServerConf(alias)
 	return nil
 }

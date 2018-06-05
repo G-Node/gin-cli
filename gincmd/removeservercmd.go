@@ -3,21 +3,22 @@ package gincmd
 import (
 	"fmt"
 
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/spf13/cobra"
 )
 
 func rmServer(cmd *cobra.Command, args []string) {
-	name := args[0]
+	alias := args[0]
 	defserver := config.Read().DefaultServer
-	// err := ginclient.RemoveServer(name)
-	// CheckError(err)
-	fmt.Printf(":: Server removed: %s\n", name)
-	if name == "gin" {
+	err := ginclient.RemoveServer(alias)
+	CheckError(err)
+	fmt.Printf(":: Server removed: %s\n", alias)
+	if alias == "gin" {
 		fmt.Println(":: 'gin' alias now refers to the built-in G-Node GIN server.")
-	} else if defserver == name {
+	} else if defserver == alias {
 		config.SetDefaultServer("gin")
-		fmt.Printf(":: %s was the default sever. Reverting to default server 'gin'.\n:: Use 'gin use-server' to set a new default.\n", name)
+		fmt.Printf(":: %s was the default sever. Reverting to default server 'gin'.\n:: Use 'gin use-server' to set a new default.\n", alias)
 	}
 }
 
