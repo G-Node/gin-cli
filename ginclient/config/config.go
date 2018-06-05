@@ -182,8 +182,8 @@ func appendToFile(key string, value interface{}) {
 	set = false
 }
 
-// WriteServerConf writes a new server configuration into the user config file.
-func WriteServerConf(alias string, newcfg ServerCfg) {
+// AddServerConf writes a new server configuration into the user config file.
+func AddServerConf(alias string, newcfg ServerCfg) {
 	key := fmt.Sprintf("servers.%s", alias)
 	appendToFile(key, newcfg)
 }
