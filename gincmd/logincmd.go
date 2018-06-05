@@ -11,15 +11,17 @@ import (
 
 // login requests credentials, performs login with auth server, and stores the token.
 func login(cmd *cobra.Command, args []string) {
-	var username string
-	var password string
+	var username, password string
 
-	if args == nil || len(args) == 0 {
+	conf := config.Read()
+	srvalias := conf.DefaultServer
+
+	fmt.Printf("Logging into %s\n", srvalias)
+
+	if len(args) == 0 {
 		// prompt for login
 		fmt.Print("Login: ")
 		fmt.Scanln(&username)
-	} else if len(args) > 1 {
-		usageDie(cmd)
 	} else {
 		username = args[0]
 	}
@@ -40,14 +42,11 @@ func login(cmd *cobra.Command, args []string) {
 	}
 
 	password = string(pwbytes)
-
 	if password == "" {
 		Die("No password provided. Aborting.")
 	}
 
-	conf := config.Read()
-	srvalias := "gin"
-	srvcfg := conf.Servers[srvalias] // TODO: Support aliases
+	srvcfg := conf.Servers[srvalias]
 	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	err = gincl.Login(username, password, "gin-cli")
 	CheckError(err)
@@ -57,8 +56,8 @@ func login(cmd *cobra.Command, args []string) {
 	if name == "" {
 		name = info.UserName
 	}
-	fmt.Printf(":: Successfully logged into server %s [%s]\n", srvalias, srvcfg.Web.AddressStr())
 	fmt.Printf(":: Welcome %s\n", name)
+	fmt.Printf(":: Successfully logged into %s [%s]\n", srvalias, srvcfg.Web.AddressStr())
 }
 
 // LoginCmd sets up the 'login' subcommand
