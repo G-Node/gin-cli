@@ -42,6 +42,7 @@ var (
 		// Annex filters
 		"annex.minsize": "10M",
 		"servers.gin":   ginDefaultServer,
+		"defaultserver": "gin",
 	}
 
 	// configuration cache: used to avoid rereading during a single command invocation
@@ -86,8 +87,9 @@ type ServerCfg struct {
 
 // GinCliCfg holds the client configuration values.
 type GinCliCfg struct {
-	Servers map[string]ServerCfg
-	Bin     struct {
+	Servers       map[string]ServerCfg
+	DefaultServer string
+	Bin           struct {
 		Git      string
 		GitAnnex string
 		SSH      string

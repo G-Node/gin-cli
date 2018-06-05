@@ -285,8 +285,9 @@ func MakeHostsFile() {
 }
 
 // DefaultServer returns the name of the configured default gin server.
-func DefaultServer() (string, error) {
-	return "", nil
+func DefaultServer() string {
+	conf := config.Read()
+	return conf.DefaultServer
 }
 
 // SetDefaultServer sets the name of the default gin server.

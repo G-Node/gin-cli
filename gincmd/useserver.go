@@ -13,8 +13,7 @@ func useServer(cmd *cobra.Command, args []string) {
 		err := ginclient.SetDefaultServer(name)
 		CheckError(err)
 	}
-	name, err := ginclient.DefaultServer()
-	CheckError(err)
+	name := ginclient.DefaultServer()
 	fmt.Printf(":: Default server: %s\n", name)
 }
 
