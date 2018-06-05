@@ -780,6 +780,7 @@ func GetAnnexVersion() (string, error) {
 		return "", err
 
 	}
+	log.Write(string(stdout))
 	return string(stdout), nil
 }
 

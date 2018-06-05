@@ -46,8 +46,8 @@ func login(cmd *cobra.Command, args []string) {
 		Die("No password provided. Aborting.")
 	}
 
-	srvcfg := conf.Servers[srvalias]
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	// TODO: add server flag
+	gincl := ginclient.New(srvalias)
 	err = gincl.Login(username, password, "gin-cli")
 	CheckError(err)
 	info, err := gincl.RequestAccount(username)
@@ -57,7 +57,7 @@ func login(cmd *cobra.Command, args []string) {
 		name = info.UserName
 	}
 	fmt.Printf(":: Welcome %s\n", name)
-	fmt.Printf(":: Successfully logged into %s [%s]\n", srvalias, srvcfg.Web.AddressStr())
+	fmt.Printf(":: Successfully logged into %s [%s]\n", srvalias, gincl.WebAddress())
 }
 
 // LoginCmd sets up the 'login' subcommand

@@ -63,7 +63,7 @@ func PrivKeyPath(user string) string {
 		return ""
 	}
 	defserver := config.Read().DefaultServer
-	return filepath.Join(configpath, fmt.Sprintf("%s@%s.key", user, defserver))
+	return filepath.Join(configpath, fmt.Sprintf("%s.key", defserver))
 }
 
 // HostKeyPath returns the full path for the location of the gin host key file.

@@ -12,8 +12,8 @@ import (
 
 func createRepo(cmd *cobra.Command, args []string) {
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	// TODO: add server flag
+	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, true)
 
 	var repoName, repoDesc string
@@ -35,7 +35,6 @@ func createRepo(cmd *cobra.Command, args []string) {
 			repoDesc = args[1]
 		}
 	}
-	gincl.GitAddress = srvcfg.Git.AddressStr()
 	repopath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
 	fmt.Printf(":: Creating repository '%s' ", repopath)
 	err := gincl.CreateRepo(repoName, repoDesc)
@@ -46,7 +45,7 @@ func createRepo(cmd *cobra.Command, args []string) {
 		// Init cwd
 		err = gincl.InitDir(false)
 		CheckError(err)
-		url := fmt.Sprintf("%s/%s", srvcfg.Git.AddressStr(), repopath)
+		url := fmt.Sprintf("%s/%s", gincl.GitAddress(), repopath)
 		err = git.RemoteAdd("origin", url)
 		CheckError(err)
 		defaultRemoteIfUnset("origin")

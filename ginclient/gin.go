@@ -31,9 +31,15 @@ type GINUser struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-// New returns a new client for the GIN server.
-func New(host string) *Client {
-	return &Client{Client: web.New(host)}
+// New returns a new client for the GIN server, configured with the server referred to by the alias in the argument.
+func New(alias string) *Client {
+	// TODO: keep alias and use it to read config values when required
+	// This will be useful for finalising multiple remote functionality and for future on-demand reading of config file values.
+	if alias == "" {
+		return &Client{Client: web.New(""), srvalias: ""}
+	}
+	srvcfg := config.Read().Servers[alias]
+	return &Client{Client: web.New(srvcfg.Web.AddressStr()), srvalias: alias}
 }
 
 // AccessToken represents a API access token.
@@ -45,7 +51,20 @@ type AccessToken struct {
 // Client is a client interface to the GIN server. Embeds web.Client.
 type Client struct {
 	*web.Client
-	GitAddress string
+	srvalias string
+}
+
+// GitAddress returns the full address string for the configured git server
+func (gincl *Client) GitAddress() string {
+	if gincl.srvalias == "" {
+		return ""
+	}
+	return config.Read().Servers[gincl.srvalias].Git.AddressStr()
+}
+
+// WebAddress returns the full address string for the configured web server
+func (gincl *Client) WebAddress() string {
+	return config.Read().Servers[gincl.srvalias].Web.AddressStr()
 }
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
@@ -277,6 +296,7 @@ func (gincl *Client) Logout() {
 
 // MakeHostsFile creates a known_hosts file in the config directory based on the server configuration for host key checking.
 func MakeHostsFile() {
+	// TODO: private client method
 	conf := config.Read()
 	hostkeyfile := git.HostKeyPath()
 	ginhostkey := fmt.Sprintln(conf.Servers["gin"].Git.HostKey)

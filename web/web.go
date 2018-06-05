@@ -173,10 +173,12 @@ func (ut *UserToken) LoadToken() error {
 	}
 	path, _ := config.Path(false) // Error can only occur when create=True
 	defserver := config.Read().DefaultServer
-	filename := fmt.Sprintf("%s@%s.token", ut.Username, defserver)
+	filename := fmt.Sprintf("%s.token", defserver)
 	filepath := filepath.Join(path, filename)
+	log.Write("Loading token %s", filepath)
 	file, err := os.Open(filepath)
 	if err != nil {
+		log.Write("Failed to load")
 		return weberror{UError: err.Error(), Origin: fn, Description: "failed to load user token"}
 	}
 	defer closeFile(file)
@@ -184,6 +186,7 @@ func (ut *UserToken) LoadToken() error {
 	decoder := gob.NewDecoder(file)
 	err = decoder.Decode(ut)
 	if err != nil {
+		log.Write("Failed to parse")
 		return weberror{UError: err.Error(), Origin: fn, Description: "failed to parse user token"}
 	}
 	return nil
@@ -191,6 +194,7 @@ func (ut *UserToken) LoadToken() error {
 
 // StoreToken saves the username and auth token to the token file.
 func (ut *UserToken) StoreToken() error {
+	// TODO: server alias argument
 	fn := "StoreToken()"
 	log.Write("Saving token")
 	path, err := config.Path(true)
@@ -198,7 +202,7 @@ func (ut *UserToken) StoreToken() error {
 		return weberror{UError: err.Error(), Origin: fn}
 	}
 	defserver := config.Read().DefaultServer
-	filename := fmt.Sprintf("%s@%s.token", ut.Username, defserver)
+	filename := fmt.Sprintf("%s.token", defserver)
 	filepath := filepath.Join(path, filename)
 	file, err := os.Create(filepath)
 	if err != nil {
@@ -219,9 +223,13 @@ func (ut *UserToken) StoreToken() error {
 
 // DeleteToken deletes the token file if it exists (for finalising a logout).
 func DeleteToken() error {
+	// TODO: server alias argument
 	path, _ := config.Path(false) // Error can only occur when create=True
-	tokenpath := filepath.Join(path, "token")
+	defserver := config.Read().DefaultServer
+	filename := fmt.Sprintf("%s.token", defserver)
+	tokenpath := filepath.Join(path, filename)
 	err := os.Remove(tokenpath)
+	// TODO: Remove hostkey too?
 	if err != nil {
 		return weberror{UError: err.Error(), Origin: "DeleteToken()", Description: "could not delete token"}
 	}

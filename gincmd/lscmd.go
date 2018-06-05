@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
@@ -25,10 +24,8 @@ func lsRepo(cmd *cobra.Command, args []string) {
 	jsonout, _ := flags.GetBool("json")
 	short, _ := flags.GetBool("short")
 
-	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
-	gincl.GitAddress = srvcfg.Git.AddressStr()
+	// TODO: Use repo remotes; no server configuration
+	gincl := ginclient.New("gin")
 
 	filesStatus, err := gincl.ListFiles(args...)
 	CheckError(err)

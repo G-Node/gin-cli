@@ -260,9 +260,9 @@ func (gincl *Client) Upload(paths []string, remotes []string, uploadchan chan<- 
 	}
 
 	if len(remotes) == 0 {
-		remote, err := DefaultRemote()
-		if err != nil {
-			uploadchan <- git.RepoFileStatus{Err: err}
+		remote, ierr := DefaultRemote()
+		if ierr != nil {
+			uploadchan <- git.RepoFileStatus{Err: ierr}
 			return
 		}
 		remotes = []string{remote}
@@ -380,7 +380,7 @@ func (gincl *Client) CloneRepo(repopath string, clonechan chan<- git.RepoFileSta
 	defer close(clonechan)
 	log.Write("CloneRepo")
 	clonestatus := make(chan git.RepoFileStatus)
-	remotepath := fmt.Sprintf("%s/%s", gincl.GitAddress, repopath)
+	remotepath := fmt.Sprintf("%s/%s", gincl.GitAddress(), repopath)
 	go git.Clone(remotepath, repopath, clonestatus)
 	for stat := range clonestatus {
 		clonechan <- stat

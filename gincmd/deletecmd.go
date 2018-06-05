@@ -10,9 +10,9 @@ import (
 )
 
 func deleteRepo(cmd *cobra.Command, args []string) {
+	// TODO: add server flag
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, true)
 	var repostr, confirmation string
 
@@ -29,6 +29,8 @@ func deleteRepo(cmd *cobra.Command, args []string) {
 		log.Write("ERROR: Mismatch in repository names: %s != %s", repoinfo.FullName, repostr)
 		Die("An unexpected error occurred while communicating with the server.")
 	}
+
+	// TODO: Display server information (repo web URL)
 
 	fmt.Println("--- WARNING ---")
 	fmt.Println("You are about to delete a remote repository, all its files, and history.")

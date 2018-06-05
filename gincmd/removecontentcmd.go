@@ -18,14 +18,13 @@ func countItemsRemove(paths []string) int {
 
 func remove(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
+	// TODO: Need server config? just use remotes (and all keys)
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, !jsonout)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
-	gincl.GitAddress = srvcfg.Git.AddressStr()
 	lock(cmd, args)
 	nitems := countItemsRemove(args)
 	rmchan := make(chan git.RepoFileStatus)

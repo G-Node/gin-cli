@@ -14,16 +14,15 @@ import (
 
 func download(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
+	// TODO: no client necessary? Just use remotes
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, !jsonout)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
 
 	content, _ := cmd.Flags().GetBool("content")
-	gincl.GitAddress = srvcfg.Git.AddressStr()
 	lockchan := make(chan git.RepoFileStatus)
 	go gincl.LockContent([]string{}, lockchan)
 	formatOutput(lockchan, 0, jsonout)

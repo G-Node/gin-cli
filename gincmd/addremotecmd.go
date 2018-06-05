@@ -60,9 +60,7 @@ func checkRemote(cmd *cobra.Command, url string) (err error) {
 }
 
 func createGinRemote(cmd *cobra.Command, alias, repopath string) {
-	conf := config.Read()
-	srvcfg := conf.Servers[alias]
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(alias)
 	requirelogin(cmd, gincl, true)
 	repopathParts := strings.SplitN(repopath, "/", 2)
 	reponame := repopathParts[1]

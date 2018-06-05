@@ -26,9 +26,9 @@ func lock(cmd *cobra.Command, args []string) {
 	if git.IsDirect() {
 		return
 	}
+	// TODO: need server config? Just use remotes
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(conf.DefaultServer)
 	nitems := countItemsLock(args)
 	lockchan := make(chan git.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
@@ -13,9 +12,7 @@ import (
 func upload(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	remotes, _ := cmd.Flags().GetStringSlice("to")
-	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Is this necessary? What about other servers
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}

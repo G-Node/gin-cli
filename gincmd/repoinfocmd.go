@@ -28,11 +28,11 @@ func printRepoInfo(repo gogs.Repository) {
 }
 
 func repoinfo(cmd *cobra.Command, args []string) {
+	// TODO: add server flag
 	flags := cmd.Flags()
 	jsonout, _ := flags.GetBool("json")
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, true)
 	repoinfo, err := gincl.GetRepo(args[0])
 	CheckError(err)

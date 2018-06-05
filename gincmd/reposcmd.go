@@ -24,9 +24,10 @@ func repos(cmd *cobra.Command, args []string) {
 	if (allrepos && sharedrepos) || ((allrepos || sharedrepos) && len(args) > 0) {
 		usageDie(cmd)
 	}
+
+	// TODO: Add server flag
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, true)
 	username := gincl.Username
 	if len(args) == 1 && args[0] != username {

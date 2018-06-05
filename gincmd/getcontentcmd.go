@@ -11,14 +11,13 @@ import (
 func getContent(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	// TODO: no need for client; use remotes (and all keys?)
+	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, !jsonout)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
 
-	gincl.GitAddress = srvcfg.Git.AddressStr()
 	getcchan := make(chan git.RepoFileStatus)
 	go gincl.GetContent(args, getcchan)
 	formatOutput(getcchan, 0, jsonout)

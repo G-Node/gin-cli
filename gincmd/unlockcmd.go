@@ -11,7 +11,7 @@ import (
 func countItemsUnlock(paths []string) (count int) {
 	wichan := make(chan git.AnnexWhereisRes)
 	go git.AnnexWhereis(paths, wichan)
-	for _ = range wichan {
+	for range wichan {
 		count++
 	}
 	return
@@ -26,9 +26,11 @@ func unlock(cmd *cobra.Command, args []string) {
 	if git.IsDirect() {
 		return
 	}
+
+	// TODO: Probably doesn't need a server config
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	defserver := conf.DefaultServer
+	gincl := ginclient.New(defserver)
 	nitems := countItemsUnlock(args)
 	unlockchan := make(chan git.RepoFileStatus)
 	go gincl.UnlockContent(args, unlockchan)

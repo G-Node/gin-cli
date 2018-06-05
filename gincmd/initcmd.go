@@ -9,9 +9,9 @@ import (
 )
 
 func initRepo(cmd *cobra.Command, args []string) {
+	// TODO: add server flag (?)
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(conf.DefaultServer)
 	fmt.Print(":: Initialising local storage ")
 	err := gincl.InitDir(false)
 	CheckError(err)
