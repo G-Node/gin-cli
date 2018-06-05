@@ -46,13 +46,19 @@ func login(cmd *cobra.Command, args []string) {
 	}
 
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	srvalias := "gin"
+	srvcfg := conf.Servers[srvalias] // TODO: Support aliases
 	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	err = gincl.Login(username, password, "gin-cli")
 	CheckError(err)
 	info, err := gincl.RequestAccount(username)
 	CheckError(err)
-	fmt.Printf(":: Hello %s. You are now logged in.\n", info.UserName)
+	name := info.FullName
+	if name == "" {
+		name = info.UserName
+	}
+	fmt.Printf(":: Successfully logged into server %s [%s]\n", srvalias, srvcfg.Web.AddressStr())
+	fmt.Printf(":: Welcome %s\n", name)
 }
 
 // LoginCmd sets up the 'login' subcommand
