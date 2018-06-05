@@ -32,7 +32,7 @@ func remotes(cmd *cobra.Command, args []string) {
 // RemotesCmd sets up the 'remotes' subcommand
 func RemotesCmd() *cobra.Command {
 	description := `List configured remotes and their information.`
-	var addRemoteCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "remotes",
 		Short: "List the repository's configured remotes",
 		Long:  formatdesc(description, nil),
@@ -40,5 +40,5 @@ func RemotesCmd() *cobra.Command {
 		Run:   remotes,
 		DisableFlagsInUseLine: true,
 	}
-	return addRemoteCmd
+	return cmd
 }

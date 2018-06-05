@@ -30,7 +30,7 @@ func GetContentCmd() *cobra.Command {
 	args := map[string]string{
 		"<filenames>": "One or more directories or files to lock.",
 	}
-	var getContentCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:                   "get-content [--json] [<filenames>]...",
 		Short:                 "Download the content of files from a remote repository",
 		Long:                  formatdesc(description, args),
@@ -39,6 +39,6 @@ func GetContentCmd() *cobra.Command {
 		Aliases:               []string{"getc"},
 		DisableFlagsInUseLine: true,
 	}
-	getContentCmd.Flags().Bool("json", false, "Print output in JSON format.")
-	return getContentCmd
+	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	return cmd
 }

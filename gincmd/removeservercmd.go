@@ -29,7 +29,7 @@ func RemoveServerCmd() *cobra.Command {
 	args := map[string]string{
 		"<alias>": "The alias (name) of the server in the configuration",
 	}
-	var removeServerCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:                   "remove-server <alias>",
 		Short:                 "Remove a server from the global configuration",
 		Long:                  formatdesc(description, args),
@@ -38,5 +38,5 @@ func RemoveServerCmd() *cobra.Command {
 		Aliases:               []string{"rm-server"},
 		DisableFlagsInUseLine: true,
 	}
-	return removeServerCmd
+	return cmd
 }

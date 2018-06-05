@@ -178,7 +178,7 @@ See the Examples section for a full example.
 	examples := map[string]string{
 		"This is what configuring the built-in G-Node GIN server would look like (note: this is already configured)": "$ gin add-server --web https://web.gin.g-node.org:443 --git git@git.g-node.org:22 gin",
 	}
-	var addServerCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:     "add-server [--web http[s]://<hostname>[:<port>]] [--git [<gituser>@]<hostname>[:<port>]] <alias>",
 		Short:   "Add a new GIN server configuration",
 		Long:    formatdesc(description, args),
@@ -187,7 +187,7 @@ See the Examples section for a full example.
 		Run:     addServer,
 		DisableFlagsInUseLine: true,
 	}
-	addServerCmd.Flags().String("web", "", "Set the address and port for the web server.")
-	addServerCmd.Flags().String("git", "", "Set the user, address and port for the git server.")
-	return addServerCmd
+	cmd.Flags().String("web", "", "Set the address and port for the web server.")
+	cmd.Flags().String("git", "", "Set the user, address and port for the git server.")
+	return cmd
 }

@@ -39,7 +39,7 @@ func RemoveContentCmd() *cobra.Command {
 	args := map[string]string{
 		"<filenames>": "One or more directories or files to remove.",
 	}
-	var rmContentCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:                   "remove-content [--json] [<filenames>]...",
 		Short:                 "Remove the content of local files that have already been uploaded",
 		Long:                  formatdesc(description, args),
@@ -48,6 +48,6 @@ func RemoveContentCmd() *cobra.Command {
 		Aliases:               []string{"rmc"},
 		DisableFlagsInUseLine: true,
 	}
-	rmContentCmd.Flags().Bool("json", false, "Print output in JSON format.")
-	return rmContentCmd
+	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	return cmd
 }

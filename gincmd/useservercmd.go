@@ -30,7 +30,7 @@ With no arguments, this command simply prints the currently configured default s
 	args := map[string]string{
 		"<name>": "The name of the server to use by default",
 	}
-	var addRemoteCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "use-server [<name>]",
 		Short: "Set the default server for the client",
 		Long:  formatdesc(description, args),
@@ -38,5 +38,5 @@ With no arguments, this command simply prints the currently configured default s
 		Run:   useServer,
 		DisableFlagsInUseLine: true,
 	}
-	return addRemoteCmd
+	return cmd
 }

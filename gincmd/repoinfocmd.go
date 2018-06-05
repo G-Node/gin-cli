@@ -52,7 +52,7 @@ func RepoInfoCmd() *cobra.Command {
 	args := map[string]string{
 		"<repopath>": "The repository path must be specified on the command line. A repository path is the owner's username, followed by a \"/\" and the repository name.",
 	}
-	var reposCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "repoinfo --json <repopath>",
 		Short: "Show the information for a specific repository",
 		Long:  formatdesc(description, args),
@@ -60,6 +60,6 @@ func RepoInfoCmd() *cobra.Command {
 		Run:   repoinfo,
 		DisableFlagsInUseLine: true,
 	}
-	reposCmd.Flags().Bool("json", false, "Print information in JSON format.")
-	return reposCmd
+	cmd.Flags().Bool("json", false, "Print information in JSON format.")
+	return cmd
 }

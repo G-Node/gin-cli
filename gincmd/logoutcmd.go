@@ -26,7 +26,7 @@ func logout(cmd *cobra.Command, args []string) {
 
 // LogoutCmd sets up the 'logout' subcommand
 func LogoutCmd() *cobra.Command {
-	var logoutCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "logout",
 		Short: "Logout of the GIN services",
 		Long:  "Logout of the GIN services.\n\nThis command takes no arguments.",
@@ -34,5 +34,5 @@ func LogoutCmd() *cobra.Command {
 		Run:   logout,
 		DisableFlagsInUseLine: true,
 	}
-	return logoutCmd
+	return cmd
 }

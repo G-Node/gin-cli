@@ -86,7 +86,7 @@ func ReposCmd() *cobra.Command {
 	args := map[string]string{
 		"<username>": "The name of the user whose repositories should be listed. The list consists of public repositories and repositories shared with the logged in user.",
 	}
-	var reposCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "repos [--shared | --all | <username>]",
 		Short: "List available remote repositories",
 		Long:  formatdesc(description, args),
@@ -94,8 +94,8 @@ func ReposCmd() *cobra.Command {
 		Run:   repos,
 		DisableFlagsInUseLine: true,
 	}
-	reposCmd.Flags().Bool("all", false, "List all repositories accessible to the logged in user.")
-	reposCmd.Flags().Bool("shared", false, "List all repositories that the user is a member of (excluding own repositories).")
-	reposCmd.Flags().Bool("json", false, "Print listing in JSON format.")
-	return reposCmd
+	cmd.Flags().Bool("all", false, "List all repositories accessible to the logged in user.")
+	cmd.Flags().Bool("shared", false, "List all repositories that the user is a member of (excluding own repositories).")
+	cmd.Flags().Bool("json", false, "Print listing in JSON format.")
+	return cmd
 }

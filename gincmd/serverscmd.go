@@ -28,7 +28,7 @@ func servers(cmd *cobra.Command, args []string) {
 // ServersCmd sets up the 'servers' subcommand
 func ServersCmd() *cobra.Command {
 	description := `List globally configured servers and their information.`
-	var serversCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "servers",
 		Short: "List the globally configured servers",
 		Long:  formatdesc(description, nil),
@@ -36,5 +36,5 @@ func ServersCmd() *cobra.Command {
 		Run:   servers,
 		DisableFlagsInUseLine: true,
 	}
-	return serversCmd
+	return cmd
 }

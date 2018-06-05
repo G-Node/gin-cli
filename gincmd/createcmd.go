@@ -80,7 +80,7 @@ func CreateCmd() *cobra.Command {
 		"Create a repository named 'eegdata' with a description":                                             "$ gin create eegdata \"My repository for storing EEG data\"",
 	}
 
-	var createCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:     "create [--here | --no-clone] [<repository>] [<description>]",
 		Short:   "Create a new repository on the GIN server",
 		Long:    formatdesc(description, args),
@@ -89,7 +89,7 @@ func CreateCmd() *cobra.Command {
 		Run:     createRepo,
 		DisableFlagsInUseLine: true,
 	}
-	createCmd.Flags().Bool("here", false, "Create the local repository clone in the current working directory. Cannot be used with --no-clone.")
-	createCmd.Flags().Bool("no-clone", false, "Create repository on the server but do not clone it locally. Cannot be used with --here.")
-	return createCmd
+	cmd.Flags().Bool("here", false, "Create the local repository clone in the current working directory. Cannot be used with --no-clone.")
+	cmd.Flags().Bool("no-clone", false, "Create repository on the server but do not clone it locally. Cannot be used with --here.")
+	return cmd
 }

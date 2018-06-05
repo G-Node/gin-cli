@@ -23,7 +23,7 @@ func initRepo(cmd *cobra.Command, args []string) {
 // InitCmd sets up the 'init' repository subcommand
 func InitCmd() *cobra.Command {
 	description := "Initialise a local repository in the current directory with the default options."
-	var initRepoCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "init",
 		Short: "Initialise the current directory as a gin repository",
 		Long:  formatdesc(description, nil),
@@ -31,5 +31,5 @@ func InitCmd() *cobra.Command {
 		Run:   initRepo,
 		DisableFlagsInUseLine: true,
 	}
-	return initRepoCmd
+	return cmd
 }

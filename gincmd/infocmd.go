@@ -48,7 +48,7 @@ func InfoCmd() *cobra.Command {
 	args := map[string]string{
 		"<username>": "The name of the user whose information should be printed. This can be the username of the currently logged in user (default), in which case the command will print all the profile information with indicators for which data is publicly visible. If it is the username of a different user, only the publicly visible information is printed.",
 	}
-	var infoCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "info [username]",
 		Short: "Print a user's information",
 		Long:  formatdesc(description, args),
@@ -56,5 +56,5 @@ func InfoCmd() *cobra.Command {
 		Run:   printAccountInfo,
 		DisableFlagsInUseLine: true,
 	}
-	return infoCmd
+	return cmd
 }

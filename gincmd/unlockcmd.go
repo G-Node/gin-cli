@@ -41,7 +41,7 @@ func UnlockCmd() *cobra.Command {
 	args := map[string]string{
 		"<filenames>": "One or more directories or files to unllock.",
 	}
-	var unlockCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "unlock [--json] [<filenames>]...",
 		Short: "Unlock files for editing",
 		Long:  formatdesc(description, args),
@@ -49,6 +49,6 @@ func UnlockCmd() *cobra.Command {
 		Run:   unlock,
 		DisableFlagsInUseLine: true,
 	}
-	unlockCmd.Flags().Bool("json", false, "Print output in JSON format.")
-	return unlockCmd
+	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	return cmd
 }

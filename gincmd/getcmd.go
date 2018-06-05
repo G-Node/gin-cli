@@ -51,7 +51,7 @@ func GetCmd() *cobra.Command {
 		"Get and initialise the repository named 'example' owned by user 'alice'": "$ gin get alice/example",
 		"Get and initialise the repository named 'eegdata' owned by user 'peter'": "$ gin get peter/eegdata",
 	}
-	var getRepoCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:     "get [--json] <repopath>",
 		Short:   "Retrieve (clone) a repository from the remote server",
 		Long:    formatdesc(description, args),
@@ -60,6 +60,6 @@ func GetCmd() *cobra.Command {
 		Run:     getRepo,
 		DisableFlagsInUseLine: true,
 	}
-	getRepoCmd.Flags().Bool("json", false, "Print output in JSON format.")
-	return getRepoCmd
+	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	return cmd
 }

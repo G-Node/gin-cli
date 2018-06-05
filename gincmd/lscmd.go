@@ -94,7 +94,7 @@ RM: The file has been removed from the repository.
 		"<filenames>": "One or more directories or files to list.",
 	}
 
-	var lsRepoCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "ls [--json | --short | -s] [<filenames>]...",
 		Short: "List the sync status of files in the local repository",
 		Long:  formatdesc(description, args),
@@ -102,7 +102,7 @@ RM: The file has been removed from the repository.
 		Run:   lsRepo,
 		DisableFlagsInUseLine: true,
 	}
-	lsRepoCmd.Flags().Bool("json", false, "Print listing in JSON format (uses short form abbreviations).")
-	lsRepoCmd.Flags().BoolP("short", "s", false, "Print listing in short form.")
-	return lsRepoCmd
+	cmd.Flags().Bool("json", false, "Print listing in JSON format (uses short form abbreviations).")
+	cmd.Flags().BoolP("short", "s", false, "Print listing in short form.")
+	return cmd
 }

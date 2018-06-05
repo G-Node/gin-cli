@@ -41,7 +41,7 @@ func LockCmd() *cobra.Command {
 	args := map[string]string{
 		"<filenames>": "One or more directories or files to lock.",
 	}
-	var lockCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "lock [--json] [<filenames>]...",
 		Short: "Lock files",
 		Long:  formatdesc(description, args),
@@ -49,6 +49,6 @@ func LockCmd() *cobra.Command {
 		Run:   lock,
 		DisableFlagsInUseLine: true,
 	}
-	lockCmd.Flags().Bool("json", false, "Print output in JSON format.")
-	return lockCmd
+	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	return cmd
 }

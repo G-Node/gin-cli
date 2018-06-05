@@ -31,7 +31,7 @@ With no arguments, this command simply prints the currently configured default r
 	args := map[string]string{
 		"<name>": "The name of the remote to use by default",
 	}
-	var addRemoteCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "use-remote [<name>]",
 		Short: "Set the repository's default upload remote",
 		Long:  formatdesc(description, args),
@@ -39,5 +39,5 @@ With no arguments, this command simply prints the currently configured default r
 		Run:   useRemote,
 		DisableFlagsInUseLine: true,
 	}
-	return addRemoteCmd
+	return cmd
 }
