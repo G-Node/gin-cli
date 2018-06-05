@@ -283,3 +283,13 @@ func MakeHostsFile() {
 	_ = ioutil.WriteFile(hostkeyfile, []byte(ginhostkey), 0600)
 	return
 }
+
+// DefaultServer returns the name of the configured default gin server.
+func DefaultServer() (string, error) {
+	return "", nil
+}
+
+// SetDefaultServer sets the name of the default gin server.
+func SetDefaultServer(remote string) error {
+	return nil
+}
