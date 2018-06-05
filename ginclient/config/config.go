@@ -186,6 +186,43 @@ func WriteServerConf(alias string, newcfg ServerCfg) error {
 
 	v.WriteConfig()
 
+	// invalidate the read cache
+	set = false
+
+	return nil
+}
+
+// SetDefaultServer writes the given name to the config file to server as the default server for web calls.
+// An error is returned if the name doesn't exist in the current configuration.
+func SetDefaultServer(alias string) error {
+	// Read in the file configuration ONLY (no defaults)
+	confpath, _ := Path(true) // create config path if necessary
+	confpath = filepath.Join(confpath, defaultFileName)
+	v := viper.New()
+	v.SetConfigFile(confpath)
+
+	v.ReadInConfig()
+
+	// if the default alias is set to 'gin', don't validate it (there must always be gin)
+	if alias == "gin" {
+		v.Set("defaultserver", alias)
+		v.WriteConfig()
+		// invalidate the read cache
+		set = false
+		return nil
+	}
+
+	srv := v.Get(fmt.Sprintf("servers.%s", alias))
+	if srv == nil {
+		return fmt.Errorf("server with alias '%s' does not exist", alias)
+	}
+
+	v.Set("defaultserver", alias)
+	v.WriteConfig()
+
+	// invalidate the read cache
+	set = false
+
 	return nil
 }
 
@@ -207,7 +244,7 @@ func Path(create bool) (string, error) {
 	return confpath, err
 }
 
-// Util functions
+// Util functions //
 
 // pathExists returns true if the path exists
 func pathExists(path string) bool {

@@ -291,6 +291,6 @@ func DefaultServer() string {
 }
 
 // SetDefaultServer sets the name of the default gin server.
-func SetDefaultServer(remote string) error {
-	return nil
+func SetDefaultServer(alias string) error {
+	return config.SetDefaultServer(alias)
 }
