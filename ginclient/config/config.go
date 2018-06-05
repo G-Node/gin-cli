@@ -165,8 +165,10 @@ func removeInvalidServerConfs() {
 	}
 }
 
-// WriteServerConf writes a new server configuration into the user config file.
-func WriteServerConf(alias string, newcfg ServerCfg) error {
+// appendToFile appends a key-value to the configuration file.
+// A useful utility function that loads the configuration only from the file, adds the new key-value pair, and saves it back, without loading the built-in defaults.
+// On successful write, the read cache is invalidated.
+func appendToFile(key string, value interface{}) {
 	// Read in the file configuration ONLY
 	confpath, _ := Path(true) // create config path if necessary
 	confpath = filepath.Join(confpath, defaultFileName)
@@ -174,56 +176,22 @@ func WriteServerConf(alias string, newcfg ServerCfg) error {
 	v.SetConfigFile(confpath)
 
 	v.ReadInConfig()
-
-	v.Set(fmt.Sprintf("servers.%s.web.protocol", alias), newcfg.Web.Protocol)
-	v.Set(fmt.Sprintf("servers.%s.web.host", alias), newcfg.Web.Host)
-	v.Set(fmt.Sprintf("servers.%s.web.port", alias), newcfg.Web.Port)
-
-	v.Set(fmt.Sprintf("servers.%s.git.user", alias), newcfg.Git.User)
-	v.Set(fmt.Sprintf("servers.%s.git.host", alias), newcfg.Git.Host)
-	v.Set(fmt.Sprintf("servers.%s.git.port", alias), newcfg.Git.Port)
-	v.Set(fmt.Sprintf("servers.%s.git.hostkey", alias), newcfg.Git.HostKey)
-
+	v.Set(key, value)
 	v.WriteConfig()
-
 	// invalidate the read cache
 	set = false
+}
 
-	return nil
+// WriteServerConf writes a new server configuration into the user config file.
+func WriteServerConf(alias string, newcfg ServerCfg) {
+	key := fmt.Sprintf("servers.%s", alias)
+	appendToFile(key, newcfg)
 }
 
 // SetDefaultServer writes the given name to the config file to server as the default server for web calls.
 // An error is returned if the name doesn't exist in the current configuration.
-func SetDefaultServer(alias string) error {
-	// Read in the file configuration ONLY (no defaults)
-	confpath, _ := Path(true) // create config path if necessary
-	confpath = filepath.Join(confpath, defaultFileName)
-	v := viper.New()
-	v.SetConfigFile(confpath)
-
-	v.ReadInConfig()
-
-	// if the default alias is set to 'gin', don't validate it (there must always be gin)
-	if alias == "gin" {
-		v.Set("defaultserver", alias)
-		v.WriteConfig()
-		// invalidate the read cache
-		set = false
-		return nil
-	}
-
-	srv := v.Get(fmt.Sprintf("servers.%s", alias))
-	if srv == nil {
-		return fmt.Errorf("server with alias '%s' does not exist", alias)
-	}
-
-	v.Set("defaultserver", alias)
-	v.WriteConfig()
-
-	// invalidate the read cache
-	set = false
-
-	return nil
+func SetDefaultServer(alias string) {
+	appendToFile("defaultserver", alias)
 }
 
 // Path returns the configuration path where configuration files should be stored.
