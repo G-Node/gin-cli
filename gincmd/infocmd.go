@@ -13,7 +13,8 @@ func printAccountInfo(cmd *cobra.Command, args []string) {
 	var username string
 
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	_ = gincl.LoadToken() // does not REQUIRE login
 
 	if len(args) == 0 {

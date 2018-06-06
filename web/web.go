@@ -159,8 +159,8 @@ func (cl *Client) Delete(address string) (*http.Response, error) {
 	return resp, err
 }
 
-// NewClient creates a new client for a given host.
-func NewClient(host string) *Client {
+// New creates a new client for a given host.
+func New(host string) *Client {
 	return &Client{Host: host, web: &http.Client{}}
 }
 

@@ -12,7 +12,8 @@ import (
 
 func createRepo(cmd *cobra.Command, args []string) {
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	requirelogin(cmd, gincl, true)
 
 	var repoName, repoDesc string
@@ -34,25 +35,32 @@ func createRepo(cmd *cobra.Command, args []string) {
 			repoDesc = args[1]
 		}
 	}
-	gincl.GitHost = conf.GitHost
-	gincl.GitUser = conf.GitUser
-	repoPath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
-	fmt.Printf(":: Creating repository '%s' ", repoPath)
+	gincl.GitAddress = srvcfg.Git.AddressStr()
+	repopath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
+	fmt.Printf(":: Creating repository '%s' ", repopath)
 	err := gincl.CreateRepo(repoName, repoDesc)
 	CheckError(err)
 	fmt.Fprintln(color.Output, green("OK"))
 
 	if here {
 		// Init cwd
-		err = gincl.InitDir()
+		err = gincl.InitDir(false)
 		CheckError(err)
-		err = gincl.AddRemote("origin", repoPath)
+		url := fmt.Sprintf("%s/%s", srvcfg.Git.AddressStr(), repopath)
+		err = git.RemoteAdd("origin", url)
 		CheckError(err)
-		_, err := git.CommitIfNew("origin")
+		defaultRemoteIfUnset("origin")
+		new, err := ginclient.CommitIfNew()
 		CheckError(err)
+		if new {
+			// Push the new commit to initialise origin
+			uploadchan := make(chan git.RepoFileStatus)
+			go gincl.Upload(nil, []string{"origin"}, uploadchan)
+			<-uploadchan
+		}
 	} else if !noclone {
 		// Clone repository after creation
-		getRepo(cmd, []string{repoPath})
+		getRepo(cmd, []string{repopath})
 	}
 }
 

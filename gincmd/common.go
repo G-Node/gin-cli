@@ -22,19 +22,29 @@ const unknownhostname = "(unknown)"
 var green = color.New(color.FgGreen).SprintFunc()
 var red = color.New(color.FgRed).SprintFunc()
 
-//Die prints an error message to stderr and exits the program with status 1.
+// Die prints an error message to stderr and exits the program with status 1.
 func Die(msg interface{}) {
-	// fmt.Fprintf(color.Error, "%s %s\n", red("ERROR"), msg)
-	// Swap the line above for the line below when (if) https://github.com/fatih/color/pull/87 gets merged
-	msgstring := fmt.Sprintf("E: %s", msg)
+	msgstring := fmt.Sprintf("%s", msg)
 	if len(msgstring) > 0 {
 		log.Write("Exiting with ERROR message: %s", msgstring)
-		fmt.Fprintln(os.Stderr, msgstring)
+		fmt.Fprintf(color.Error, "%s %s\n", red("[error]"), msgstring)
 	} else {
 		log.Write("Exiting with ERROR (no message)")
 	}
 	log.Close()
 	os.Exit(1)
+}
+
+// Exit prints a message to stdout and exits the program with status 0.
+func Exit(msg string) {
+	if len(msg) > 0 {
+		log.Write("Exiting with message: %s", msg)
+		fmt.Println(msg)
+	} else {
+		log.Write("Exiting")
+	}
+	log.Close()
+	os.Exit(0)
 }
 
 // CheckError exits the program if an error is passed to the function.
@@ -197,6 +207,7 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 }
 
 func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool) {
+	// TODO: instead of a true/false success, add an error for every file and then group the errors by type and print a report
 	var filesuccess map[string]bool
 	if jsonout {
 		filesuccess = printJSON(statuschan)
@@ -283,6 +294,21 @@ func SetUpCommands(verstr string) *cobra.Command {
 
 	// Init repo
 	rootCmd.AddCommand(InitCmd())
+
+	// New remote
+	rootCmd.AddCommand(AddServerCmd())
+
+	// Add remote
+	rootCmd.AddCommand(AddRemoteCmd())
+
+	// Remove remote
+	rootCmd.AddCommand(RemoveRemoteCmd())
+
+	// Use remote
+	rootCmd.AddCommand(UseRemoteCmd())
+
+	// Remotes
+	rootCmd.AddCommand(RemotesCmd())
 
 	// Create repo
 	rootCmd.AddCommand(CreateCmd())

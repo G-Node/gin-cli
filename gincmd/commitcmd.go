@@ -7,6 +7,7 @@ import (
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/log"
+	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -25,7 +26,7 @@ func countItemsAdd(paths []string) int {
 func commit(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	if !git.IsRepo() {
-		Die("This command must be run from inside a gin repository.")
+		Die(ginerrors.NotInRepo)
 	}
 
 	paths := args

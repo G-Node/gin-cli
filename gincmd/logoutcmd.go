@@ -13,7 +13,8 @@ func logout(cmd *cobra.Command, args []string) {
 		usageDie(cmd)
 	}
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	err := gincl.LoadToken()
 	if err != nil {
 		Die("You are not logged in.")

@@ -248,7 +248,8 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 
 // Upload transfers locally recorded changes to a remote.
 // The status channel 'uploadchan' is closed when this function returns.
-func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus) {
+func (gincl *Client) Upload(paths []string, remotes []string, uploadchan chan<- git.RepoFileStatus) {
+	// TODO: Does this need to be a Client method?
 	defer close(uploadchan)
 	log.Write("Upload")
 
@@ -258,10 +259,30 @@ func (gincl *Client) Upload(paths []string, uploadchan chan<- git.RepoFileStatus
 		return
 	}
 
-	annexpushchan := make(chan git.RepoFileStatus)
-	go git.AnnexPush(paths, annexpushchan)
-	for stat := range annexpushchan {
-		uploadchan <- stat
+	if len(remotes) == 0 {
+		remote, err := DefaultRemote()
+		if err != nil {
+			uploadchan <- git.RepoFileStatus{Err: err}
+			return
+		}
+		remotes = []string{remote}
+	}
+
+	confremotes, err := git.RemoteShow()
+	if err != nil || len(confremotes) == 0 {
+		uploadchan <- git.RepoFileStatus{Err: fmt.Errorf("failed to validate remote configuration (no configured remotes?)")}
+	}
+
+	for _, remote := range remotes {
+		if _, ok := confremotes[remote]; !ok {
+			uploadchan <- git.RepoFileStatus{FileName: remote, Err: fmt.Errorf("unknown remote name '%s': skipping", remote)}
+			continue
+		}
+		annexpushchan := make(chan git.RepoFileStatus)
+		go git.AnnexPush(paths, remote, annexpushchan)
+		for stat := range annexpushchan {
+			uploadchan <- stat
+		}
 	}
 	return
 }
@@ -355,12 +376,12 @@ func (gincl *Client) Download() error {
 
 // CloneRepo clones a remote repository and initialises annex.
 // The status channel 'clonechan' is closed when this function returns.
-func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileStatus) {
+func (gincl *Client) CloneRepo(repopath string, clonechan chan<- git.RepoFileStatus) {
 	defer close(clonechan)
 	log.Write("CloneRepo")
 	clonestatus := make(chan git.RepoFileStatus)
-	remotepath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repoPath)
-	go git.Clone(remotepath, repoPath, clonestatus)
+	remotepath := fmt.Sprintf("%s/%s", gincl.GitAddress, repopath)
+	go git.Clone(remotepath, repopath, clonestatus)
 	for stat := range clonestatus {
 		clonechan <- stat
 		if stat.Err != nil {
@@ -368,13 +389,13 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 		}
 	}
 
-	repoPathParts := strings.SplitN(repoPath, "/", 2)
+	repoPathParts := strings.SplitN(repopath, "/", 2)
 	repoName := repoPathParts[1]
 
 	status := git.RepoFileStatus{State: "Initialising local storage"}
 	clonechan <- status
 	os.Chdir(repoName)
-	err := gincl.InitDir()
+	err := gincl.InitDir(false)
 	if err != nil {
 		status.Err = err
 		clonechan <- status
@@ -383,6 +404,80 @@ func (gincl *Client) CloneRepo(repoPath string, clonechan chan<- git.RepoFileSta
 	status.Progress = "100%"
 	clonechan <- status
 	return
+}
+
+// CommitIfNew creates an empty initial git commit if the current repository is completely new.
+// If a new commit is created and a default remote exists, the new commit is pushed to initialise the remote as well.
+// Returns 'true' if (and only if) a commit was created.
+func CommitIfNew() (bool, error) {
+	if !git.IsRepo() {
+		return false, fmt.Errorf("not a repository")
+	}
+	_, err := git.RevParse("HEAD")
+	if err == nil {
+		// All good. No need to do anything
+		return false, nil
+	}
+
+	// Create an empty initial commit
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = unknownhostname
+	}
+	initmsg := fmt.Sprintf("Initial commit: Repository initialised on %s", hostname)
+	if err = git.CommitEmpty(initmsg); err != nil {
+		log.Write("Error while creating initial commit")
+		return false, err
+	}
+
+	return true, nil
+}
+
+// DefaultRemote returns the name of the configured default gin remote.
+// If a remote is not set in the config, the remote of the default git upstream is set and returned.
+func DefaultRemote() (string, error) {
+	defremote, err := git.ConfigGet("gin.remote")
+	if err == nil {
+		return defremote, nil
+	}
+	log.Write("Default remote not set. Checking master remote.")
+	defremote, err = git.ConfigGet("branch.master.remote")
+	if err == nil {
+		SetDefaultRemote(defremote)
+		log.Write("Set default remote to %s", defremote)
+		return defremote, nil
+	}
+	err = fmt.Errorf("could not determine default remote")
+	return defremote, err
+}
+
+// SetDefaultRemote sets the name of the default gin remote.
+func SetDefaultRemote(remote string) error {
+	remotes, err := git.RemoteShow()
+	if err != nil {
+		return fmt.Errorf("failed to determine configured remotes")
+	}
+	if _, ok := remotes[remote]; !ok {
+		return fmt.Errorf("no such remote: %s", remote)
+	}
+	err = git.ConfigSet("gin.remote", remote)
+	if err != nil {
+		return fmt.Errorf("failed to set default remote: %s", err)
+	}
+	return nil
+}
+
+// RemoveRemote removes a remote from the repository configuration.
+func RemoveRemote(remote string) error {
+	remotes, err := git.RemoteShow()
+	if err != nil {
+		return fmt.Errorf("failed to determine configured remotes")
+	}
+	if _, ok := remotes[remote]; !ok {
+		return fmt.Errorf("no such remote: %s", remote)
+	}
+	err = git.RemoteRemove(remote)
+	return err
 }
 
 // CheckoutVersion checks out all files specified by paths from the revision with the specified commithash.
@@ -446,22 +541,14 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 	}
 }
 
-// AddRemote constructs the proper remote URL given a repository path (user/reponame) and adds it as a named remote to the repository configuration.
-func (gincl *Client) AddRemote(name, repopath string) error {
-	remotepath := fmt.Sprintf("ssh://%s@%s/%s", gincl.GitUser, gincl.GitHost, repopath)
-	return git.AddRemote(name, remotepath)
-}
-
 // InitDir initialises the local directory with the default remote and annex configuration.
+// Optionally initialised as a bare repository (for annex directory remotes).
 // The status channel 'initchan' is closed when this function returns.
-func (gincl *Client) InitDir() error {
+func (gincl *Client) InitDir(bare bool) error {
 	initerr := ginerror{Origin: "InitDir", Description: "Error initialising local directory"}
 	if !git.IsRepo() {
-		cmd := git.Command("init")
-		stdout, stderr, err := cmd.OutputError()
+		err := git.Init(bare)
 		if err != nil {
-			log.Write("Error during Init command: %s", string(stderr))
-			log.Write("[stdout]\n%s\n[stderr]\n%s", string(stdout), string(stderr))
 			initerr.UError = err.Error()
 			return initerr
 		}
@@ -612,12 +699,16 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		}
 	}
 
-	// git files should be checked against upstream for local commits
+	// git files should be checked against upstream (if it exists) for local commits
 	if len(gitfiles) > 0 {
 		diffchan := make(chan string)
-		go git.DiffUpstream(gitfiles, diffchan)
-		for fname := range diffchan {
-			statuses[fname] = LocalChanges
+		remote, err := DefaultRemote()
+		if err == nil {
+			upstream := fmt.Sprintf("%s/master", remote)
+			go git.DiffUpstream(gitfiles, upstream, diffchan)
+			for fname := range diffchan {
+				statuses[fname] = LocalChanges
+			}
 		}
 	}
 	return statuses, nil
@@ -704,12 +795,16 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		}
 
 		diffchan := make(chan string)
-		go git.DiffUpstream(cachedfiles, diffchan)
-		for fname := range diffchan {
-			// Two notes:
-			//		1. There will definitely be overlap here with the same status in annex (not a problem)
-			//		2. The diff might be due to remote or local changes, but for now we're going to assume local
-			statuses[fname] = LocalChanges
+		remote, err := DefaultRemote()
+		if err == nil {
+			upstream := fmt.Sprintf("%s/master", remote)
+			go git.DiffUpstream(cachedfiles, upstream, diffchan)
+			for fname := range diffchan {
+				// Two notes:
+				//		1. There will definitely be overlap here with the same status in annex (not a problem)
+				//		2. The diff might be due to remote or local changes, but for now we're going to assume local
+				statuses[fname] = LocalChanges
+			}
 		}
 	}
 

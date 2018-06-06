@@ -33,7 +33,7 @@ type GINUser struct {
 
 // New returns a new client for the GIN server.
 func New(host string) *Client {
-	return &Client{Client: web.NewClient(host)}
+	return &Client{Client: web.New(host)}
 }
 
 // AccessToken represents a API access token.
@@ -45,8 +45,7 @@ type AccessToken struct {
 // Client is a client interface to the GIN server. Embeds web.Client.
 type Client struct {
 	*web.Client
-	GitHost string
-	GitUser string
+	GitAddress string
 }
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
@@ -280,7 +279,7 @@ func (gincl *Client) Logout() {
 func MakeHostsFile() {
 	conf := config.Read()
 	hostkeyfile := git.HostKeyPath()
-	ginhostkey := fmt.Sprintln(conf.GitHostKey)
+	ginhostkey := fmt.Sprintln(conf.Servers["gin"].Git.HostKey)
 	_ = ioutil.WriteFile(hostkeyfile, []byte(ginhostkey), 0600)
 	return
 }

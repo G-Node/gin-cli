@@ -46,7 +46,8 @@ func login(cmd *cobra.Command, args []string) {
 	}
 
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	err = gincl.Login(username, password, "gin-cli")
 	CheckError(err)
 	info, err := gincl.RequestAccount(username)

@@ -41,6 +41,8 @@ type RepoFileStatus struct {
 	Err error `json:"err"`
 }
 
+// TODO: Create structs to accommodate extra information for other operations
+
 // GinCommit describes a commit, retrieved from the git log.
 type GinCommit struct {
 	Hash            string    `json:"hash"`
@@ -84,6 +86,26 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 }
 
 // Git commands
+
+// Init initialises the current directory as a git repository.
+// The repository is optionally initialised as bare.
+// (git init [--bare])
+func Init(bare bool) error {
+	fn := fmt.Sprintf("Init(%v)", bare)
+	args := []string{"init"}
+	if bare {
+		args = append(args, "--bare")
+	}
+	cmd := Command(args...)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		log.Write("Error during init command")
+		logstd(stdout, stderr)
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		return gerr
+	}
+	return nil
+}
 
 // Clone downloads a repository and sets the remote fetch and push urls.
 // The status channel 'clonechan' is closed when this function returns.
@@ -244,71 +266,169 @@ func SetGitUser(name, email string) error {
 	if !IsRepo() {
 		return fmt.Errorf("not a repository")
 	}
-	cmd := Command("config", "--local", "user.name", name)
-	err := cmd.Run()
+	err := ConfigSet("user.name", name)
 	if err != nil {
 		return err
 	}
-	cmd = Command("config", "--local", "user.email", email)
-	return cmd.Run()
+	return ConfigSet("user.email", email)
 }
 
-// AddRemote adds a remote named name for the repository at url.
-func AddRemote(name, url string) error {
-	fn := fmt.Sprintf("AddRemote(%s, %s)", name, url)
+// ConfigGet returns the value of a given git configuration key.
+// The returned key is always a string.
+// (git config --get)
+func ConfigGet(key string) (string, error) {
+	fn := fmt.Sprintf("ConfigGet(%s)", key)
+	cmd := Command("config", "--get", key)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		log.Write("Error during config get")
+		logstd(stdout, stderr)
+		return "", gerr
+	}
+	value := string(stdout)
+	value = strings.TrimSpace(value)
+	return value, nil
+}
+
+// ConfigSet sets a configuration value in the local git config.
+// (git config --local)
+func ConfigSet(key, value string) error {
+	fn := fmt.Sprintf("ConfigSet(%s, %s)", key, value)
+	cmd := Command("config", "--local", key, value)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		log.Write("Error during config set")
+		logstd(stdout, stderr)
+		return gerr
+	}
+	return nil
+}
+
+// RemoteShow returns the configured remotes and their URL.
+// (git remote -v show -n)
+func RemoteShow() (map[string]string, error) {
+	fn := "RemoteShow()"
+	cmd := Command("remote", "-v", "show", "-n")
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		sstderr := string(stderr)
+		gerr := giterror{UError: sstderr, Origin: fn}
+		log.Write("Error during remote show command")
+		logstd(stdout, stderr)
+		return nil, gerr
+	}
+	remotes := make(map[string]string)
+	sstdout := string(stdout)
+	for _, line := range strings.Split(sstdout, "\n") {
+		line = strings.TrimSuffix(line, "\n")
+		if len(strings.TrimSpace(line)) == 0 {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) != 3 {
+			log.Write("Unexpected output: %s", line)
+			continue
+		}
+		remotes[parts[0]] = parts[1]
+	}
+
+	return remotes, nil
+}
+
+// RemoteAdd adds a remote named name for the repository at URL.
+func RemoteAdd(name, url string) error {
+	fn := fmt.Sprintf("RemoteAdd(%s, %s)", name, url)
 	cmd := Command("remote", "add", name, url)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		gerr := giterror{UError: err.Error(), Origin: fn}
+		sstderr := string(stderr)
+		gerr := giterror{UError: sstderr, Origin: fn}
 		log.Write("Error during remote add command")
 		logstd(stdout, stderr)
-		if strings.Contains(string(stderr), "already exists") {
+		if strings.Contains(sstderr, "already exists") {
 			gerr.Description = fmt.Sprintf("remote with name '%s' already exists", name)
-			return gerr
 		}
+		return gerr
 	}
-	return err
-}
-
-// CommitIfNew creates an empty initial git commit if the current repository is completely new.
-// If 'upstream' is not an empty string, and an initial commit was created, it sets the current branch to track the same-named branch at the specified remote.
-// Returns 'true' if (and only if) a commit was created.
-func CommitIfNew(upstream string) (bool, error) {
-	if !IsRepo() {
-		return false, fmt.Errorf("not a repository")
-	}
-	cmd := Command("rev-parse", "HEAD")
-	err := cmd.Run()
-	if err == nil {
-		// All good. No need to do anything
-		return false, nil
-	}
-
-	// Create an empty initial commit and run annex sync to synchronise everything
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = unknownhostname
-	}
-	cmd = Command("commit", "--allow-empty", "-m", fmt.Sprintf("Initial commit: Repository initialised on %s", hostname))
-	stdout, stderr, err := cmd.OutputError()
-	if err != nil {
-		log.Write("Error while creating initial commit")
-		logstd(stdout, stderr)
-		return false, fmt.Errorf(string(stderr))
-	}
-
-	if upstream == "" {
-		return true, nil
-	}
-
-	cmd = Command("push", "--set-upstream", upstream, "HEAD")
+	// Performing fetch after adding remote to retrieve references
+	// Any errors are logged and ignored
+	cmd = Command("fetch", name)
 	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
-		log.Write("Error while creating initial commit")
 		logstd(stdout, stderr)
-		return false, fmt.Errorf(string(stderr))
 	}
-	return true, nil
+	return nil
+}
+
+// RemoteRemove removes the remote named name from the repository configuration.
+func RemoteRemove(name string) error {
+	fn := fmt.Sprintf("RemoteRm(%s)", name)
+	cmd := Command("remote", "remove", name)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		sstderr := string(stderr)
+		gerr := giterror{UError: sstderr, Origin: fn}
+		log.Write("Error during remote remove command")
+		logstd(stdout, stderr)
+		if strings.Contains(sstderr, "No such remote") {
+			gerr.Description = fmt.Sprintf("remote with name '%s' does not exist", name)
+		}
+		return gerr
+	}
+	return nil
+}
+
+// BranchSetUpstream sets the default upstream remote for the current branch.
+// (git branch --set-upstream-to=)
+func BranchSetUpstream(name string) error {
+	fn := fmt.Sprintf("BranchSetUpstream(%s)", name)
+	cmd := Command("branch", fmt.Sprintf("--set-upstream-to=%s/master", name))
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		log.Write("Error during branch set-upstream-to")
+		logstd(stdout, stderr)
+		return gerr
+	}
+	return nil
+}
+
+// LsRemote performs a git ls-remote of a specific remote.
+// The argument can be a name or a URL.
+// (git ls-remote)
+func LsRemote(remote string) (string, error) {
+	fn := fmt.Sprintf("LsRemote(%s)", remote)
+	cmd := Command("ls-remote", remote)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		sstderr := string(stderr)
+		gerr := giterror{UError: sstderr, Origin: fn}
+		if strings.Contains(sstderr, "does not exist") || strings.Contains(sstderr, "Permission denied") {
+			gerr.Description = fmt.Sprintf("remote %s does not exist", remote)
+		}
+		log.Write("Error during ls-remote command")
+		logstd(stdout, stderr)
+		return "", gerr
+	}
+
+	return string(stdout), nil
+}
+
+// RevParse parses an argument and returns the unambiguous, SHA1 representation.
+// (git rev-parse)
+func RevParse(rev string) (string, error) {
+	fn := fmt.Sprintf("RevParse(%s)", rev)
+	cmd := Command("rev-parse", rev)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		log.Write("Error during rev-parse command")
+		logstd(stdout, stderr)
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		return "", gerr
+	}
+	return string(stdout), nil
 }
 
 // IsRepo checks whether the current working directory is in a git repository.
@@ -352,14 +472,26 @@ func Commit(commitmsg string) error {
 	return nil
 }
 
+// CommitEmpty performs a commit even when there are no new changes added to the index.
+// This is useful for initialising new repositories with a usable HEAD.
+// (git commit --allow-empty)
+func CommitEmpty(commitmsg string) error {
+	cmd := Command("commit", "--allow-empty", fmt.Sprintf("--message=%s", commitmsg))
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		log.Write("Error during CommitEmpty")
+		logstd(stdout, stderr)
+		return fmt.Errorf(string(stderr))
+	}
+	return nil
+}
+
 // DiffUpstream returns, through the provided channel, the names of all files that differ from the default remote branch.
-// The output channel 'diffchan' is closed when this function returns
+// The output channel 'diffchan' is closed when this function returns.
 // (git diff --name-only --relative @{upstream})
-func DiffUpstream(paths []string, diffchan chan<- string) {
+func DiffUpstream(paths []string, upstream string, diffchan chan<- string) {
 	defer close(diffchan)
-	// FIXME: Direct mode gets weird with the branches, so we explicitly state origin/master
-	// Should be fixed when we add configurable remotes
-	diffargs := []string{"diff", "-z", "--name-only", "--relative", "origin/master"} // "@{upstream}"}
+	diffargs := []string{"diff", "-z", "--name-only", "--relative", upstream}
 	diffargs = append(diffargs, paths...)
 	cmd := Command(diffargs...)
 	err := cmd.Start()

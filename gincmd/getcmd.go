@@ -18,19 +18,26 @@ func getRepo(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	repostr := args[0]
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	requirelogin(cmd, gincl, !jsonout)
 
 	if !isValidRepoPath(repostr) {
 		Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
 	}
 
-	gincl.GitHost = conf.GitHost
-	gincl.GitUser = conf.GitUser
+	gincl.GitAddress = srvcfg.Git.AddressStr()
 	clonechan := make(chan git.RepoFileStatus)
 	go gincl.CloneRepo(repostr, clonechan)
 	formatOutput(clonechan, 0, jsonout)
-	_, err := git.CommitIfNew("origin")
+	defaultRemoteIfUnset("origin")
+	new, err := ginclient.CommitIfNew()
+	if new {
+		// Push the new commit to initialise origin
+		uploadchan := make(chan git.RepoFileStatus)
+		go gincl.Upload(nil, []string{"origin"}, uploadchan)
+		<-uploadchan
+	}
 	CheckError(err)
 }
 

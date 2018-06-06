@@ -3,6 +3,7 @@ package gincmd
 import (
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
+	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
 )
@@ -18,13 +19,13 @@ func countItemsRemove(paths []string) int {
 func remove(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	conf := config.Read()
-	gincl := ginclient.New(conf.GinHost)
+	srvcfg := conf.Servers["gin"] // TODO: Support aliases
+	gincl := ginclient.New(srvcfg.Web.AddressStr())
 	requirelogin(cmd, gincl, !jsonout)
 	if !git.IsRepo() {
-		Die("This command must be run from inside a gin repository.")
+		Die(ginerrors.NotInRepo)
 	}
-	gincl.GitHost = conf.GitHost
-	gincl.GitUser = conf.GitUser
+	gincl.GitAddress = srvcfg.Git.AddressStr()
 	lock(cmd, args)
 	nitems := countItemsRemove(args)
 	rmchan := make(chan git.RepoFileStatus)
