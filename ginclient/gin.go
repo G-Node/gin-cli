@@ -299,7 +299,7 @@ func MakeHostsFile() {
 	// TODO: private client method
 	conf := config.Read()
 	hostkeyfile := git.HostKeyPath()
-	ginhostkey := fmt.Sprintln(conf.Servers["gin"].Git.HostKey)
+	ginhostkey := fmt.Sprintln(conf.Servers[conf.DefaultServer].Git.HostKey)
 	_ = ioutil.WriteFile(hostkeyfile, []byte(ginhostkey), 0600)
 	return
 }
