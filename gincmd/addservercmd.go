@@ -86,7 +86,7 @@ func parseGitstring(gitstring string) (gitconf config.GitCfg) {
 func fetchHostKey(gitconf *config.GitCfg) {
 	var hostkeystr, fingerprint string
 	keycb := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-		hostkeystr = fmt.Sprintf("%s,%s %s", hostname, remote.String(), string(ssh.MarshalAuthorizedKey(key)))
+		hostkeystr = fmt.Sprintf("[%s]:%d,%s %s", gitconf.Host, gitconf.Port, remote.String(), string(ssh.MarshalAuthorizedKey(key)))
 		fingerprint = ssh.FingerprintSHA256(key)
 		return nil
 	}
