@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/web"
@@ -99,8 +100,13 @@ func (gincl *Client) MakeSessionKey() error {
 		return err
 	}
 
-	privKeyFile := git.PrivKeyPath(gincl.Username)
-	_ = ioutil.WriteFile(privKeyFile, []byte(keyPair.Private), 0600)
+	configpath, err := config.Path(true)
+	if err != nil {
+		log.Write("Could not create config directory for private key")
+		return err
+	}
+	keyfilepath := filepath.Join(configpath, fmt.Sprintf("%s.key", gincl.srvalias))
+	ioutil.WriteFile(keyfilepath, []byte(keyPair.Private), 0600)
 
 	return nil
 }

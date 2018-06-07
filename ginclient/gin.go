@@ -251,7 +251,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	gincl.Token = token.Sha1
 	log.Write("Login successful. Username: %s", username)
 
-	err = gincl.StoreToken()
+	err = gincl.StoreToken(gincl.srvalias)
 	if err != nil {
 		return fmt.Errorf("Error while storing token: %s", err.Error())
 	}
@@ -259,6 +259,11 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	MakeHostsFile()
 
 	return gincl.MakeSessionKey()
+}
+
+// LoadToken calls the embedded UserToken.LoadToken function with the configured server alias.
+func (gincl *Client) LoadToken() error {
+	return gincl.UserToken.LoadToken(gincl.srvalias)
 }
 
 // Logout logs out the currently logged in user in 3 steps:
@@ -280,8 +285,8 @@ func (gincl *Client) Logout() {
 	}
 
 	// 2. Delete private key
-	privKeyFile := git.PrivKeyPath(gincl.UserToken.Username)
-	err = os.Remove(privKeyFile)
+	privKeyFiles := git.PrivKeyPath()
+	err = os.Remove(privKeyFiles[gincl.srvalias])
 	if err != nil {
 		log.Write("Error deleting key file")
 	} else {

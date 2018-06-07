@@ -10,9 +10,14 @@ import (
 )
 
 func deleteRepo(cmd *cobra.Command, args []string) {
-	// TODO: add server flag
+	flags := cmd.Flags()
+	srvalias, _ := flags.GetString("server")
+
 	conf := config.Read()
-	gincl := ginclient.New(conf.DefaultServer)
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, true)
 	var repostr, confirmation string
 
@@ -61,5 +66,6 @@ func DeleteCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 		Hidden:                true,
 	}
+	cmd.Flags().String("server", "", "Specify server `alias` on which the repository to be deleted resides. See also 'gin servers'.")
 	return cmd
 }

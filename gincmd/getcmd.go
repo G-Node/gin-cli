@@ -15,11 +15,15 @@ func isValidRepoPath(path string) bool {
 }
 
 func getRepo(cmd *cobra.Command, args []string) {
-	jsonout, _ := cmd.Flags().GetBool("json")
-	repostr := args[0]
-	// TODO: add server flag
+	flags := cmd.Flags()
+	jsonout, _ := flags.GetBool("json")
+	srvalias, _ := flags.GetString("server")
 	conf := config.Read()
-	gincl := ginclient.New(conf.DefaultServer)
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	repostr := args[0]
+	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, !jsonout)
 
 	if !isValidRepoPath(repostr) {
@@ -60,5 +64,6 @@ func GetCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	cmd.Flags().String("server", "", "Specify server `alias` for the repository. See also 'gin servers'.")
 	return cmd
 }

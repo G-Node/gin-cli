@@ -4,15 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
 )
 
 func annexrun(cmd *cobra.Command, args []string) {
-	// TODO: Use all available keys?
-	gincl := ginclient.New("")
-	_ = gincl.LoadToken() // OK to run without token
 	annexcmd := git.AnnexCommand(args...)
 	err := annexcmd.Start()
 	CheckError(err)

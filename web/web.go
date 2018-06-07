@@ -166,16 +166,15 @@ func New(host string) *Client {
 
 // LoadToken reads the username and auth token from the token file and sets the
 // values in the struct.
-func (ut *UserToken) LoadToken() error {
-	fn := "LoadToken()"
+func (ut *UserToken) LoadToken(srvalias string) error {
+	fn := fmt.Sprintf("LoadToken(%s)", srvalias)
 	if ut.Username != "" && ut.Token != "" {
 		return nil
 	}
 	path, _ := config.Path(false) // Error can only occur when create=True
-	defserver := config.Read().DefaultServer
-	filename := fmt.Sprintf("%s.token", defserver)
+	filename := fmt.Sprintf("%s.token", srvalias)
 	filepath := filepath.Join(path, filename)
-	log.Write("Loading token %s", filepath)
+	log.Write("Loading token [server %s] %s", srvalias, filepath)
 	file, err := os.Open(filepath)
 	if err != nil {
 		log.Write("Failed to load")
@@ -193,17 +192,15 @@ func (ut *UserToken) LoadToken() error {
 }
 
 // StoreToken saves the username and auth token to the token file.
-func (ut *UserToken) StoreToken() error {
-	// TODO: server alias argument
-	fn := "StoreToken()"
-	log.Write("Saving token")
+func (ut *UserToken) StoreToken(srvalias string) error {
+	fn := fmt.Sprintf("StoreToken(%s)", srvalias)
 	path, err := config.Path(true)
 	if err != nil {
 		return weberror{UError: err.Error(), Origin: fn}
 	}
-	defserver := config.Read().DefaultServer
-	filename := fmt.Sprintf("%s.token", defserver)
+	filename := fmt.Sprintf("%s.token", srvalias)
 	filepath := filepath.Join(path, filename)
+	log.Write("Saving token [server %s] %s", srvalias, filepath)
 	file, err := os.Create(filepath)
 	if err != nil {
 		log.Write("Failed to create token file %s", filepath)

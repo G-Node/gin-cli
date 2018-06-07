@@ -14,18 +14,22 @@ import (
 
 func keys(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags()
-	if flags.NFlag() > 1 {
-		usageDie(cmd)
-	}
+	srvalias, _ := flags.GetString("server")
 
-	// TODO: add server flag
 	conf := config.Read()
-	gincl := ginclient.New(conf.DefaultServer)
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, true)
 
 	keyfilename, _ := flags.GetString("add")
 	keyidx, _ := flags.GetInt("delete")
 	verbose, _ := flags.GetBool("verbose")
+
+	if keyfilename != "" && keyidx > 0 {
+		Die("can't add and delete key at the same time")
+	}
 
 	if keyfilename != "" {
 		addKey(gincl, keyfilename)
@@ -106,5 +110,6 @@ func KeysCmd() *cobra.Command {
 	cmd.Flags().String("add", "", "Specify a `filename` which contains a public key to be added to the GIN server.")
 	cmd.Flags().Int("delete", 0, "Specify a `number` to delete the corresponding key from the server. Use 'gin keys' to get the numbered listing of keys.")
 	cmd.Flags().BoolP("verbose", "v", false, "Verbose printing. Prints the entire public key.")
+	cmd.Flags().String("server", "", "Specify server `alias` to query, add, or remove keys. See also 'gin servers'.")
 	return cmd
 }

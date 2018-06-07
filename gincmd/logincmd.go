@@ -13,9 +13,13 @@ import (
 func login(cmd *cobra.Command, args []string) {
 	var username, password string
 
-	conf := config.Read()
-	srvalias := conf.DefaultServer
+	flags := cmd.Flags()
+	srvalias, _ := flags.GetString("server")
 
+	conf := config.Read()
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
 	fmt.Printf("Logging into %s\n", srvalias)
 
 	if len(args) == 0 {
@@ -46,7 +50,6 @@ func login(cmd *cobra.Command, args []string) {
 		Die("No password provided. Aborting.")
 	}
 
-	// TODO: add server flag
 	gincl := ginclient.New(srvalias)
 	err = gincl.Login(username, password, "gin-cli")
 	CheckError(err)
@@ -71,5 +74,6 @@ func LoginCmd() *cobra.Command {
 		Run:   login,
 		DisableFlagsInUseLine: true,
 	}
+	cmd.Flags().String("server", "", "Specify server `alias` to log into. See also 'gin servers'.")
 	return cmd
 }

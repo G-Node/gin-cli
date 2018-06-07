@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -55,16 +56,23 @@ func MakeKeyPair() (*KeyPair, error) {
 	return &KeyPair{privStr, pubStr}, nil
 }
 
-// PrivKeyPath returns the full path for the location of the user's private key file.
-func PrivKeyPath(user string) string {
+// PrivKeyPath returns a map with the full path for all the currently available private key files indexed by the server alias for each key.
+func PrivKeyPath() map[string]string {
 	configpath, err := config.Path(false)
 	if err != nil {
 		log.Write("Error getting user's config path. Can't load key file.")
 		log.Write(err.Error())
-		return ""
+		return nil
 	}
-	defserver := config.Read().DefaultServer
-	return filepath.Join(configpath, fmt.Sprintf("%s.key", defserver))
+	servers := config.Read().Servers
+	keys := make(map[string]string)
+	for srvalias := range servers {
+		keyfilepath := filepath.Join(configpath, fmt.Sprintf("%s.key", srvalias))
+		if pathExists(keyfilepath) {
+			keys[srvalias] = keyfilepath
+		}
+	}
+	return keys
 }
 
 // GetHostKey takes a git server configuration, queries the server via SSH, and returns the public key of the host (in the format required for the known_hosts file) and the key fingerprint.
@@ -112,8 +120,9 @@ func HostKeyPath() string {
 }
 
 // sshEnv returns the value that should be set for the GIT_SSH_COMMAND environment variable
-// in order to use the user's private key.
-func sshEnv(user string) string {
+// in order to use the user's private keys.
+// The returned string contains all available private keys.
+func sshEnv() string {
 	// Windows git seems to require Unix paths for the SSH command -- this is dirty but works
 	fixpathsep := func(p string) string {
 		p = filepath.ToSlash(p)
@@ -122,9 +131,16 @@ func sshEnv(user string) string {
 	}
 	config := config.Read()
 	sshbin := fixpathsep(config.Bin.SSH)
-	keyfile := fixpathsep(PrivKeyPath(user))
+	keys := PrivKeyPath()
+	keyargs := make([]string, len(keys))
+	idx := 0
+	for _, k := range keys {
+		keyargs[idx] = fmt.Sprintf("-i %s", fixpathsep(k))
+		idx++
+	}
+	keystr := strings.Join(keyargs, " ")
 	hostkeyfile := HostKeyPath()
-	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=\"%s\"'", sshbin, keyfile, hostkeyfile)
+	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=\"%s\"'", sshbin, keystr, hostkeyfile)
 	log.Write("env %s", gitSSHCmd)
 	return gitSSHCmd
 }

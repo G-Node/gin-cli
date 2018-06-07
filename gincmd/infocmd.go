@@ -12,10 +12,15 @@ import (
 func printAccountInfo(cmd *cobra.Command, args []string) {
 	var username string
 
-	// TODO: add server flag
+	flags := cmd.Flags()
+	srvalias, _ := flags.GetString("server")
+
 	conf := config.Read()
-	gincl := ginclient.New(conf.DefaultServer)
-	_ = gincl.LoadToken() // does not REQUIRE login
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
+	gincl.LoadToken() // does not REQUIRE login
 
 	if len(args) == 0 {
 		username = gincl.Username
@@ -56,5 +61,6 @@ func InfoCmd() *cobra.Command {
 		Run:   printAccountInfo,
 		DisableFlagsInUseLine: true,
 	}
+	cmd.Flags().String("server", "", "Specify server `alias` for info lookup. See also 'gin servers'.")
 	return cmd
 }

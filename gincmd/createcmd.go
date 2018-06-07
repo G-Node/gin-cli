@@ -11,20 +11,24 @@ import (
 )
 
 func createRepo(cmd *cobra.Command, args []string) {
-	conf := config.Read()
-	// TODO: add server flag
-	gincl := ginclient.New(conf.DefaultServer)
-	requirelogin(cmd, gincl, true)
-
 	var repoName, repoDesc string
 
 	flags := cmd.Flags()
 	here, _ := flags.GetBool("here")
 	noclone, _ := flags.GetBool("no-clone")
+	srvalias, _ := flags.GetString("server")
 
 	if noclone && here {
 		usageDie(cmd)
 	}
+
+	conf := config.Read()
+
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
+	requirelogin(cmd, gincl, true)
 
 	if len(args) == 0 {
 		fmt.Print("Repository name: ")
@@ -90,5 +94,6 @@ func CreateCmd() *cobra.Command {
 	}
 	cmd.Flags().Bool("here", false, "Create the local repository clone in the current working directory. Cannot be used with --no-clone.")
 	cmd.Flags().Bool("no-clone", false, "Create repository on the server but do not clone it locally. Cannot be used with --here.")
+	cmd.Flags().String("server", "", "Specify server `alias` where the repository will be created. See also 'gin servers'.")
 	return cmd
 }
