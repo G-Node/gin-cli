@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"path/filepath"
 	"strings"
 
@@ -64,6 +65,37 @@ func PrivKeyPath(user string) string {
 	}
 	defserver := config.Read().DefaultServer
 	return filepath.Join(configpath, fmt.Sprintf("%s.key", defserver))
+}
+
+// GetHostKey takes a git server configuration, queries the server via SSH, and returns the public key of the host (in the format required for the known_hosts file) and the key fingerprint.
+func GetHostKey(gitconf config.GitCfg) (hostkeystr, fingerprint string, err error) {
+	// HostKeyCallback constructs the keystring
+	keycb := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		hostkeystr = fmt.Sprintf("%s", gitconf.Host)
+		if gitconf.Port != 22 {
+			// Only specify if non-standard port
+			hostkeystr = fmt.Sprintf("%s:%d", hostkeystr, gitconf.Port)
+		}
+		ip := remote.String()
+		if strings.HasSuffix(ip, ":22") {
+			// Only specify if non-standard port
+			ip = strings.TrimSuffix(ip, ":22")
+		}
+		hostkeystr = fmt.Sprintf("%s,%s %s", hostkeystr, ip, string(ssh.MarshalAuthorizedKey(key)))
+		fingerprint = ssh.FingerprintSHA256(key)
+		return nil
+	}
+
+	sshcon := ssh.ClientConfig{
+		User:            gitconf.User,
+		HostKeyCallback: keycb,
+	}
+	_, derr := ssh.Dial("tcp", fmt.Sprintf("%s:%d", gitconf.Host, gitconf.Port), &sshcon)
+	if derr != nil && !strings.Contains(derr.Error(), "unable to authenticate") {
+		// Other errors (auth error in particular) should be ignored
+		err = fmt.Errorf("connection test failed: %s", derr)
+	}
+	return
 }
 
 // HostKeyPath returns the full path for the location of the gin host key file.

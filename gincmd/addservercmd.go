@@ -2,14 +2,13 @@ package gincmd
 
 import (
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh"
 )
 
 func promptForWeb() (webconf config.WebCfg) {
@@ -83,32 +82,9 @@ func parseGitstring(gitstring string) (gitconf config.GitCfg) {
 	return
 }
 
-func fetchHostKey(gitconf *config.GitCfg) {
-	// TODO: Move to SSH package
-	var hostkeystr, fingerprint string
-	keycb := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-		hostkeystr = fmt.Sprintf("%s", gitconf.Host)
-		if gitconf.Port != 22 {
-			// Only specify if non-standard port
-			hostkeystr = fmt.Sprintf("%s:%d", hostkeystr, gitconf.Port)
-		}
-		ip := remote.String()
-		if strings.HasSuffix(ip, ":22") {
-			// Only specify if non-standard port
-			ip = strings.TrimSuffix(ip, ":22")
-		}
-		hostkeystr = fmt.Sprintf("%s,%s %s", hostkeystr, ip, string(ssh.MarshalAuthorizedKey(key)))
-		fingerprint = ssh.FingerprintSHA256(key)
-		return nil
-	}
-	sshcon := ssh.ClientConfig{
-		User:            gitconf.User,
-		HostKeyCallback: keycb,
-	}
-	_, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", gitconf.Host, gitconf.Port), &sshcon)
-	if err != nil && !strings.Contains(err.Error(), "unable to authenticate") {
-		Die(fmt.Sprintf("connection test failed: %s", err))
-	}
+func addHostKey(gitconf *config.GitCfg) {
+	hostkeystr, fingerprint, err := git.GetHostKey(*gitconf)
+	CheckError(err)
 	fmt.Printf(":: Host key fingerprint for [%s]: %s\n", gitconf.AddressStr(), fingerprint)
 	fmt.Print("Accept [yes/no]: ")
 	var response string
@@ -153,7 +129,7 @@ func addServer(cmd *cobra.Command, args []string) {
 		serverConf.Git = parseGitstring(gitstring)
 	}
 
-	fetchHostKey(&serverConf.Git)
+	addHostKey(&serverConf.Git)
 
 	// Save to config
 	config.AddServerConf(alias, serverConf)
