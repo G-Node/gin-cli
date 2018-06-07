@@ -84,9 +84,20 @@ func parseGitstring(gitstring string) (gitconf config.GitCfg) {
 }
 
 func fetchHostKey(gitconf *config.GitCfg) {
+	// TODO: Move to SSH package
 	var hostkeystr, fingerprint string
 	keycb := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-		hostkeystr = fmt.Sprintf("[%s]:%d,%s %s", gitconf.Host, gitconf.Port, remote.String(), string(ssh.MarshalAuthorizedKey(key)))
+		hostkeystr = fmt.Sprintf("%s", gitconf.Host)
+		if gitconf.Port != 22 {
+			// Only specify if non-standard port
+			hostkeystr = fmt.Sprintf("%s:%d", hostkeystr, gitconf.Port)
+		}
+		ip := remote.String()
+		if strings.HasSuffix(ip, ":22") {
+			// Only specify if non-standard port
+			ip = strings.TrimSuffix(ip, ":22")
+		}
+		hostkeystr = fmt.Sprintf("%s,%s %s", hostkeystr, ip, string(ssh.MarshalAuthorizedKey(key)))
 		fingerprint = ssh.FingerprintSHA256(key)
 		return nil
 	}
