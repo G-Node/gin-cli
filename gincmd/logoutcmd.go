@@ -12,9 +12,14 @@ func logout(cmd *cobra.Command, args []string) {
 	if len(args) > 0 {
 		usageDie(cmd)
 	}
-	// TODO: Add server flag
+	flags := cmd.Flags()
+	srvalias, _ := flags.GetString("server")
+
 	conf := config.Read()
-	gincl := ginclient.New(conf.DefaultServer)
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
 	err := gincl.LoadToken()
 	if err != nil {
 		Die("You are not logged in.")
@@ -34,5 +39,6 @@ func LogoutCmd() *cobra.Command {
 		Run:   logout,
 		DisableFlagsInUseLine: true,
 	}
+	cmd.Flags().String("server", "", "Specify server `alias` where the repository will be created. See also 'gin servers'.")
 	return cmd
 }

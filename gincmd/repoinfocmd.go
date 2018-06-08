@@ -28,11 +28,15 @@ func printRepoInfo(repo gogs.Repository) {
 }
 
 func repoinfo(cmd *cobra.Command, args []string) {
-	// TODO: add server flag
 	flags := cmd.Flags()
+	srvalias, _ := flags.GetString("server")
 	jsonout, _ := flags.GetBool("json")
+
 	conf := config.Read()
-	gincl := ginclient.New(conf.DefaultServer)
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, true)
 	repoinfo, err := gincl.GetRepo(args[0])
 	CheckError(err)
@@ -61,5 +65,6 @@ func RepoInfoCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print information in JSON format.")
+	cmd.Flags().String("server", "", "Specify server `alias` where the repository will be created. See also 'gin servers'.")
 	return cmd
 }

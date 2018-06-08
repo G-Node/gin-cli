@@ -21,13 +21,17 @@ func repos(cmd *cobra.Command, args []string) {
 	jsonout, _ := flags.GetBool("json")
 	allrepos, _ := flags.GetBool("all")
 	sharedrepos, _ := flags.GetBool("shared")
+	srvalias, _ := flags.GetString("server")
+
+	conf := config.Read()
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
 	if (allrepos && sharedrepos) || ((allrepos || sharedrepos) && len(args) > 0) {
 		usageDie(cmd)
 	}
 
-	// TODO: Add server flag
-	conf := config.Read()
-	gincl := ginclient.New(conf.DefaultServer)
+	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, true)
 	username := gincl.Username
 	if len(args) == 1 && args[0] != username {
@@ -98,5 +102,6 @@ func ReposCmd() *cobra.Command {
 	cmd.Flags().Bool("all", false, "List all repositories accessible to the logged in user.")
 	cmd.Flags().Bool("shared", false, "List all repositories that the user is a member of (excluding own repositories).")
 	cmd.Flags().Bool("json", false, "Print listing in JSON format.")
+	cmd.Flags().String("server", "", "Specify server `alias` where the repository will be created. See also 'gin servers'.")
 	return cmd
 }
