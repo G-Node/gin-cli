@@ -35,11 +35,10 @@ func deleteRepo(cmd *cobra.Command, args []string) {
 		Die("An unexpected error occurred while communicating with the server.")
 	}
 
-	// TODO: Display server information (repo web URL)
-
 	fmt.Println("--- WARNING ---")
 	fmt.Println("You are about to delete a remote repository, all its files, and history.")
 	fmt.Println("This action is irreversible.")
+	fmt.Printf("You are about to delete the repository at: %s\n", repoinfo.HTMLURL)
 
 	fmt.Println("If you are sure you want to delete this repository, type its full name (owner/name) below")
 	fmt.Print("> ")
