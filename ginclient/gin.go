@@ -291,7 +291,7 @@ func (gincl *Client) Logout() {
 		log.Write("Private key file deleted")
 	}
 
-	err = web.DeleteToken()
+	err = web.DeleteToken(gincl.srvalias)
 	if err != nil {
 		log.Write("Error deleting token file")
 	}

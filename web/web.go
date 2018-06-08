@@ -219,14 +219,11 @@ func (ut *UserToken) StoreToken(srvalias string) error {
 }
 
 // DeleteToken deletes the token file if it exists (for finalising a logout).
-func DeleteToken() error {
-	// TODO: server alias argument
+func DeleteToken(srvalias string) error {
 	path, _ := config.Path(false) // Error can only occur when create=True
-	defserver := config.Read().DefaultServer
-	filename := fmt.Sprintf("%s.token", defserver)
+	filename := fmt.Sprintf("%s.token", srvalias)
 	tokenpath := filepath.Join(path, filename)
 	err := os.Remove(tokenpath)
-	// TODO: Remove hostkey too?
 	if err != nil {
 		return weberror{UError: err.Error(), Origin: "DeleteToken()", Description: "could not delete token"}
 	}
