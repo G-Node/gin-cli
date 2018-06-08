@@ -4,14 +4,11 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/spf13/cobra"
 )
 
 func initRepo(cmd *cobra.Command, args []string) {
-	// TODO: add server flag (?)
-	conf := config.Read()
-	gincl := ginclient.New(conf.DefaultServer)
+	gincl := ginclient.New("")
 	fmt.Print(":: Initialising local storage ")
 	err := gincl.InitDir(false)
 	CheckError(err)
