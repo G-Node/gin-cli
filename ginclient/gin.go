@@ -33,12 +33,13 @@ type GINUser struct {
 
 // New returns a new client for the GIN server, configured with the server referred to by the alias in the argument.
 func New(alias string) *Client {
-	// TODO: keep alias and use it to read config values when required
-	// This will be useful for finalising multiple remote functionality and for future on-demand reading of config file values.
 	if alias == "" {
 		return &Client{Client: web.New(""), srvalias: ""}
 	}
-	srvcfg := config.Read().Servers[alias]
+	srvcfg, ok := config.Read().Servers[alias]
+	if !ok {
+		return &Client{Client: web.New(""), srvalias: ""}
+	}
 	return &Client{Client: web.New(srvcfg.Web.AddressStr()), srvalias: alias}
 }
 
