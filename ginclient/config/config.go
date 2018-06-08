@@ -168,9 +168,12 @@ func removeInvalidServerConfs() {
 // appendToFile appends a key-value to the configuration file.
 // A useful utility function that loads the configuration only from the file, adds the new key-value pair, and saves it back, without loading the built-in defaults.
 // On successful write, the read cache is invalidated.
-func appendToFile(key string, value interface{}) {
+func appendToFile(key string, value interface{}) error {
 	// Read in the file configuration ONLY
-	confpath, _ := Path(true) // create config path if necessary
+	confpath, err := Path(true) // create config path if necessary
+	if err != nil {
+		return err
+	}
 	confpath = filepath.Join(confpath, defaultFileName)
 	v := viper.New()
 	v.SetConfigFile(confpath)
@@ -180,12 +183,13 @@ func appendToFile(key string, value interface{}) {
 	v.WriteConfig()
 	// invalidate the read cache
 	set = false
+	return nil
 }
 
 // AddServerConf writes a new server configuration into the user config file.
-func AddServerConf(alias string, newcfg ServerCfg) {
+func AddServerConf(alias string, newcfg ServerCfg) error {
 	key := fmt.Sprintf("servers.%s", alias)
-	appendToFile(key, newcfg)
+	return appendToFile(key, newcfg)
 }
 
 // RmServerConf removes a server configuration from the user config file.

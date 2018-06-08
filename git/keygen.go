@@ -109,22 +109,23 @@ func GetHostKey(gitconf config.GitCfg) (hostkeystr, fingerprint string, err erro
 
 // hostkeypath returns the full path for the location of the gin host key file.
 func hostkeypath() string {
-	configpath, err := config.Path(false)
-	if err != nil {
-		log.Write("Error getting user's config path. Can't create host key file.")
-		log.Write(err.Error())
-		return ""
-	}
+	configpath, _ := config.Path(false) // Error can only occur when attempting to create directory
 	filename := "known_hosts"
 	return filepath.Join(configpath, filename)
 }
 
 // WriteKnownHosts creates a known_hosts file in the config directory with all configured host keys.
 func WriteKnownHosts() error {
+	_, err := config.Path(true)
+	if err != nil {
+		log.Write("Failed to create config directory for known_hosts")
+		return err
+	}
 	conf := config.Read()
 	hostkeyfile := hostkeypath()
 	f, err := os.OpenFile(hostkeyfile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
+		log.Write("Failed to create known_hosts")
 		return err
 	}
 	defer f.Close()
@@ -139,12 +140,13 @@ func WriteKnownHosts() error {
 
 // GetKnownHosts returns the path to the known_hosts file.
 // If the file does not exist it is created by calling WriteKnownHosts.
-func GetKnownHosts() string {
+func GetKnownHosts() (string, error) {
 	hkpath := hostkeypath()
+	var err error
 	if !pathExists(hkpath) {
-		WriteKnownHosts()
+		err = WriteKnownHosts()
 	}
-	return hkpath
+	return hkpath, err
 }
 
 // sshEnv returns the value that should be set for the GIT_SSH_COMMAND environment variable
@@ -167,8 +169,12 @@ func sshEnv() string {
 		idx++
 	}
 	keystr := strings.Join(keyargs, " ")
-	hostkeyfile := GetKnownHosts()
-	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=\"%s\"'", sshbin, keystr, hostkeyfile)
+	hostkeyfile, err := GetKnownHosts()
+	var hfoptstr string
+	if err != nil {
+		hfoptstr = fmt.Sprintf("-o 'UserKnownHostsFile=\"%s\"'", hostkeyfile)
+	}
+	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes %s", sshbin, keystr, hfoptstr)
 	log.Write("env %s", gitSSHCmd)
 	return gitSSHCmd
 }

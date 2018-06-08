@@ -132,10 +132,16 @@ func addServer(cmd *cobra.Command, args []string) {
 	addHostKey(&serverConf.Git)
 
 	// Save to config
-	config.AddServerConf(alias, serverConf)
+	err := config.AddServerConf(alias, serverConf)
+	if err != nil {
+		Die("failed to update configuration file")
+	}
 
 	// Recreate known hosts file
-	git.WriteKnownHosts()
+	err = git.WriteKnownHosts()
+	if err != nil {
+		Die("failed to write known_hosts file")
+	}
 }
 
 // AddServerCmd sets up the 'add-server' command for adding new server configurations
