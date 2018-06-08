@@ -256,8 +256,6 @@ func (gincl *Client) Login(username, password, clientID string) error {
 		return fmt.Errorf("Error while storing token: %s", err.Error())
 	}
 
-	MakeHostsFile()
-
 	return gincl.MakeSessionKey()
 }
 
@@ -297,16 +295,6 @@ func (gincl *Client) Logout() {
 	if err != nil {
 		log.Write("Error deleting token file")
 	}
-}
-
-// MakeHostsFile creates a known_hosts file in the config directory based on the server configuration for host key checking.
-func MakeHostsFile() {
-	// TODO: private client method
-	conf := config.Read()
-	hostkeyfile := git.HostKeyPath()
-	ginhostkey := fmt.Sprintln(conf.Servers[conf.DefaultServer].Git.HostKey)
-	_ = ioutil.WriteFile(hostkeyfile, []byte(ginhostkey), 0600)
-	return
 }
 
 // DefaultServer returns the alias of the configured default gin server.
