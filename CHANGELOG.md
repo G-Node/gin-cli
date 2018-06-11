@@ -2,6 +2,46 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Unreleased
+
+### Changes
+- New commands
+    - Local workflows:
+        - `gin init`: Initialises a directory as a gin repository without creating a repository on a server.
+        - `gin commit`: Records changes in the local repository without performing an upload and without requiring a remote or an internet connection.
+    - Versioning
+        - `gin version`: Rolls back files or directories to older versions. With the `--copy-to` flag, retrieves older files without overwriting the current version and copies them to a specific location.
+    - Remotes
+        - `gin add-remote`: Adds a remote to the current repository for uploading and downloading. This also brings support for using directory paths on the local filesystem as "remotes" (e.g., external hard drives, network attached storage), without the need to have a GIN server.
+        - `gin remove-remote`: Removes a remote from the current repository.
+        - `gin remotes`: Lists remotes configured for a repository and shows the default remote used for `gin upload`.
+        - `gin use-remote`: Switches the repository's default upload remote.
+        - The `gin upload` command now accepts a `--to` argument for uploading annexed content to a specific, non-default remote.
+    - Servers
+        - `gin add-server`: Adds a new GIN server to the global client configuration.
+        - `gin remove-server`: Removes a GIN server from the global client configuration.
+        - `gin servers`: Lists the configured servers and shows the default server used for web queries.
+        - `gin use-server`: Switches the default server.
+        - The `login`, `logout`, `create`, `info`, `keys`, `repos`, `repoinfo`, and `get` commands now accept a `--server` argument for querying or operating on a specific, non-default server.
+- Progress bars for file operations: Some operations don't have a per-file progress (add, lock, unlock). There is no partial unlock state for a file, for instance. For these commands, the output shows the overall progress along with the number of total files that are being affected.
+- Smaller logfiles: The log file is now limited to 1 MB. No more ever-growing logs.
+
+### Bug fixes
+- Fixed a bug where file tracking would register a type change in git when working with direct mode repositories (e.g., on Windows).
+- Fixed a bug where the file status (from `gin ls`) was being incorrectly reported when working in direct mode (e.g., on Windows). Direct mode repositories should now show the exact same output as indirect mode ones.
+
+### Relevant PRs
+- #191: New command: gin version
+- #192: Versioning "copy to"
+- #197: Transfer rates
+- #199: gin commit: Working without remotes
+- #201: Fix file adding in direct mode
+- #202: Log trimming
+- #203: Progress bars for file operations
+- #204: Fix for ls file status in direct mode
+- #205: New command: add-remote
+- #206: Handle multiple server configurations
+
 ## Version 0.16
 
 ### Changes
@@ -10,7 +50,7 @@
 - Fix for stuttering/flashing of text during progress printing on Windows.
 - Completely redone command line argument handling and better help formatting.
 - New command: `gin repoinfo`
-  - Prints the information for a single repository on the server
+  - Prints the information for a single repository on the server.
 
 ### Relevant PRs
 - #172: Logging changes
