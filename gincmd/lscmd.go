@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
@@ -25,10 +24,8 @@ func lsRepo(cmd *cobra.Command, args []string) {
 	jsonout, _ := flags.GetBool("json")
 	short, _ := flags.GetBool("short")
 
-	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
-	gincl.GitAddress = srvcfg.Git.AddressStr()
+	// TODO: Use repo remotes; no server configuration
+	gincl := ginclient.New("gin")
 
 	filesStatus, err := gincl.ListFiles(args...)
 	CheckError(err)
@@ -94,7 +91,7 @@ RM: The file has been removed from the repository.
 		"<filenames>": "One or more directories or files to list.",
 	}
 
-	var lsRepoCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "ls [--json | --short | -s] [<filenames>]...",
 		Short: "List the sync status of files in the local repository",
 		Long:  formatdesc(description, args),
@@ -102,7 +99,7 @@ RM: The file has been removed from the repository.
 		Run:   lsRepo,
 		DisableFlagsInUseLine: true,
 	}
-	lsRepoCmd.Flags().Bool("json", false, "Print listing in JSON format (uses short form abbreviations).")
-	lsRepoCmd.Flags().BoolP("short", "s", false, "Print listing in short form.")
-	return lsRepoCmd
+	cmd.Flags().Bool("json", false, "Print listing in JSON format (uses short form abbreviations).")
+	cmd.Flags().BoolP("short", "s", false, "Print listing in short form.")
+	return cmd
 }

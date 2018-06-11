@@ -11,20 +11,24 @@ import (
 )
 
 func createRepo(cmd *cobra.Command, args []string) {
-	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
-	requirelogin(cmd, gincl, true)
-
 	var repoName, repoDesc string
 
 	flags := cmd.Flags()
 	here, _ := flags.GetBool("here")
 	noclone, _ := flags.GetBool("no-clone")
+	srvalias, _ := flags.GetString("server")
 
 	if noclone && here {
 		usageDie(cmd)
 	}
+
+	conf := config.Read()
+
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
+	requirelogin(cmd, gincl, true)
 
 	if len(args) == 0 {
 		fmt.Print("Repository name: ")
@@ -35,7 +39,6 @@ func createRepo(cmd *cobra.Command, args []string) {
 			repoDesc = args[1]
 		}
 	}
-	gincl.GitAddress = srvcfg.Git.AddressStr()
 	repopath := fmt.Sprintf("%s/%s", gincl.Username, repoName)
 	fmt.Printf(":: Creating repository '%s' ", repopath)
 	err := gincl.CreateRepo(repoName, repoDesc)
@@ -46,7 +49,7 @@ func createRepo(cmd *cobra.Command, args []string) {
 		// Init cwd
 		err = gincl.InitDir(false)
 		CheckError(err)
-		url := fmt.Sprintf("%s/%s", srvcfg.Git.AddressStr(), repopath)
+		url := fmt.Sprintf("%s/%s", gincl.GitAddress(), repopath)
 		err = git.RemoteAdd("origin", url)
 		CheckError(err)
 		defaultRemoteIfUnset("origin")
@@ -80,7 +83,7 @@ func CreateCmd() *cobra.Command {
 		"Create a repository named 'eegdata' with a description":                                             "$ gin create eegdata \"My repository for storing EEG data\"",
 	}
 
-	var createCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:     "create [--here | --no-clone] [<repository>] [<description>]",
 		Short:   "Create a new repository on the GIN server",
 		Long:    formatdesc(description, args),
@@ -89,7 +92,8 @@ func CreateCmd() *cobra.Command {
 		Run:     createRepo,
 		DisableFlagsInUseLine: true,
 	}
-	createCmd.Flags().Bool("here", false, "Create the local repository clone in the current working directory. Cannot be used with --no-clone.")
-	createCmd.Flags().Bool("no-clone", false, "Create repository on the server but do not clone it locally. Cannot be used with --here.")
-	return createCmd
+	cmd.Flags().Bool("here", false, "Create the local repository clone in the current working directory. Cannot be used with --no-clone.")
+	cmd.Flags().Bool("no-clone", false, "Create repository on the server but do not clone it locally. Cannot be used with --here.")
+	cmd.Flags().String("server", "", "Specify server `alias` where the repository will be created. See also 'gin servers'.")
+	return cmd
 }

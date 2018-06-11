@@ -14,7 +14,6 @@ import (
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git/shell"
-	"github.com/G-Node/gin-cli/web"
 )
 
 const progcomplete = "100%"
@@ -948,10 +947,8 @@ func Command(args ...string) shell.Cmd {
 	gitbin := config.Bin.Git
 	cmd := shell.Command(gitbin)
 	cmd.Args = append(cmd.Args, args...)
-	token := web.UserToken{}
-	_ = token.LoadToken()
 	env := os.Environ()
-	cmd.Env = append(env, sshEnv(token.Username))
+	cmd.Env = append(env, sshEnv())
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
 	return cmd

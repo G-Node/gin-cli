@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/web"
@@ -99,8 +100,13 @@ func (gincl *Client) MakeSessionKey() error {
 		return err
 	}
 
-	privKeyFile := git.PrivKeyPath(gincl.Username)
-	_ = ioutil.WriteFile(privKeyFile, []byte(keyPair.Private), 0600)
+	configpath, err := config.Path(true)
+	if err != nil {
+		log.Write("Could not create config directory for private key")
+		return err
+	}
+	keyfilepath := filepath.Join(configpath, fmt.Sprintf("%s.key", gincl.srvalias))
+	ioutil.WriteFile(keyfilepath, []byte(keyPair.Private), 0600)
 
 	return nil
 }
@@ -260,9 +266,9 @@ func (gincl *Client) Upload(paths []string, remotes []string, uploadchan chan<- 
 	}
 
 	if len(remotes) == 0 {
-		remote, err := DefaultRemote()
-		if err != nil {
-			uploadchan <- git.RepoFileStatus{Err: err}
+		remote, ierr := DefaultRemote()
+		if ierr != nil {
+			uploadchan <- git.RepoFileStatus{Err: ierr}
 			return
 		}
 		remotes = []string{remote}
@@ -380,7 +386,7 @@ func (gincl *Client) CloneRepo(repopath string, clonechan chan<- git.RepoFileSta
 	defer close(clonechan)
 	log.Write("CloneRepo")
 	clonestatus := make(chan git.RepoFileStatus)
-	remotepath := fmt.Sprintf("%s/%s", gincl.GitAddress, repopath)
+	remotepath := fmt.Sprintf("%s/%s", gincl.GitAddress(), repopath)
 	go git.Clone(remotepath, repopath, clonestatus)
 	for stat := range clonestatus {
 		clonechan <- stat

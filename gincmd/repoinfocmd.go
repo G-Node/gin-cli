@@ -29,10 +29,14 @@ func printRepoInfo(repo gogs.Repository) {
 
 func repoinfo(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags()
+	srvalias, _ := flags.GetString("server")
 	jsonout, _ := flags.GetBool("json")
+
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, true)
 	repoinfo, err := gincl.GetRepo(args[0])
 	CheckError(err)
@@ -52,7 +56,7 @@ func RepoInfoCmd() *cobra.Command {
 	args := map[string]string{
 		"<repopath>": "The repository path must be specified on the command line. A repository path is the owner's username, followed by a \"/\" and the repository name.",
 	}
-	var reposCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "repoinfo --json <repopath>",
 		Short: "Show the information for a specific repository",
 		Long:  formatdesc(description, args),
@@ -60,6 +64,7 @@ func RepoInfoCmd() *cobra.Command {
 		Run:   repoinfo,
 		DisableFlagsInUseLine: true,
 	}
-	reposCmd.Flags().Bool("json", false, "Print information in JSON format.")
-	return reposCmd
+	cmd.Flags().Bool("json", false, "Print information in JSON format.")
+	cmd.Flags().String("server", "", "Specify server `alias` where the repository will be created. See also 'gin servers'.")
+	return cmd
 }

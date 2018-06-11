@@ -166,15 +166,18 @@ func New(host string) *Client {
 
 // LoadToken reads the username and auth token from the token file and sets the
 // values in the struct.
-func (ut *UserToken) LoadToken() error {
-	fn := "LoadToken()"
+func (ut *UserToken) LoadToken(srvalias string) error {
+	fn := fmt.Sprintf("LoadToken(%s)", srvalias)
 	if ut.Username != "" && ut.Token != "" {
 		return nil
 	}
 	path, _ := config.Path(false) // Error can only occur when create=True
-	filepath := filepath.Join(path, "token")
+	filename := fmt.Sprintf("%s.token", srvalias)
+	filepath := filepath.Join(path, filename)
+	log.Write("Loading token [server %s] %s", srvalias, filepath)
 	file, err := os.Open(filepath)
 	if err != nil {
+		log.Write("Failed to load")
 		return weberror{UError: err.Error(), Origin: fn, Description: "failed to load user token"}
 	}
 	defer closeFile(file)
@@ -182,20 +185,22 @@ func (ut *UserToken) LoadToken() error {
 	decoder := gob.NewDecoder(file)
 	err = decoder.Decode(ut)
 	if err != nil {
+		log.Write("Failed to parse")
 		return weberror{UError: err.Error(), Origin: fn, Description: "failed to parse user token"}
 	}
 	return nil
 }
 
 // StoreToken saves the username and auth token to the token file.
-func (ut *UserToken) StoreToken() error {
-	fn := "StoreToken()"
-	log.Write("Saving token")
+func (ut *UserToken) StoreToken(srvalias string) error {
+	fn := fmt.Sprintf("StoreToken(%s)", srvalias)
 	path, err := config.Path(true)
 	if err != nil {
 		return weberror{UError: err.Error(), Origin: fn}
 	}
-	filepath := filepath.Join(path, "token")
+	filename := fmt.Sprintf("%s.token", srvalias)
+	filepath := filepath.Join(path, filename)
+	log.Write("Saving token [server %s] %s", srvalias, filepath)
 	file, err := os.Create(filepath)
 	if err != nil {
 		log.Write("Failed to create token file %s", filepath)
@@ -214,9 +219,10 @@ func (ut *UserToken) StoreToken() error {
 }
 
 // DeleteToken deletes the token file if it exists (for finalising a logout).
-func DeleteToken() error {
+func DeleteToken(srvalias string) error {
 	path, _ := config.Path(false) // Error can only occur when create=True
-	tokenpath := filepath.Join(path, "token")
+	filename := fmt.Sprintf("%s.token", srvalias)
+	tokenpath := filepath.Join(path, filename)
 	err := os.Remove(tokenpath)
 	if err != nil {
 		return weberror{UError: err.Error(), Origin: "DeleteToken()", Description: "could not delete token"}

@@ -26,9 +26,9 @@ func lock(cmd *cobra.Command, args []string) {
 	if git.IsDirect() {
 		return
 	}
+	// TODO: need server config? Just use remotes
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(conf.DefaultServer)
 	nitems := countItemsLock(args)
 	lockchan := make(chan git.RepoFileStatus)
 	go gincl.LockContent(args, lockchan)
@@ -41,7 +41,7 @@ func LockCmd() *cobra.Command {
 	args := map[string]string{
 		"<filenames>": "One or more directories or files to lock.",
 	}
-	var lockCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "lock [--json] [<filenames>]...",
 		Short: "Lock files",
 		Long:  formatdesc(description, args),
@@ -49,6 +49,6 @@ func LockCmd() *cobra.Command {
 		Run:   lock,
 		DisableFlagsInUseLine: true,
 	}
-	lockCmd.Flags().Bool("json", false, "Print output in JSON format.")
-	return lockCmd
+	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	return cmd
 }

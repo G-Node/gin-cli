@@ -295,8 +295,17 @@ func SetUpCommands(verstr string) *cobra.Command {
 	// Init repo
 	rootCmd.AddCommand(InitCmd())
 
-	// New remote
+	// Add server
 	rootCmd.AddCommand(AddServerCmd())
+
+	// Remove server
+	rootCmd.AddCommand(RemoveServerCmd())
+
+	// Use server
+	rootCmd.AddCommand(UseServerCmd())
+
+	// Servers
+	rootCmd.AddCommand(ServersCmd())
 
 	// Add remote
 	rootCmd.AddCommand(AddRemoteCmd())

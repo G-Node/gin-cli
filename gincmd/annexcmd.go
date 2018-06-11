@@ -4,14 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
 )
 
 func annexrun(cmd *cobra.Command, args []string) {
-	gincl := ginclient.New("")
-	_ = gincl.LoadToken() // OK to run without token
 	annexcmd := git.AnnexCommand(args...)
 	err := annexcmd.Start()
 	CheckError(err)
@@ -30,7 +27,7 @@ func annexrun(cmd *cobra.Command, args []string) {
 
 // AnnexCmd sets up the 'annex' passthrough subcommand
 func AnnexCmd() *cobra.Command {
-	var annexCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "annex <cmd> [<args>]...",
 		Short: "Run a 'git annex' command through the gin client",
 		Long:  "",
@@ -40,5 +37,5 @@ func AnnexCmd() *cobra.Command {
 		Hidden:                true,
 		DisableFlagParsing:    true,
 	}
-	return annexCmd
+	return cmd
 }

@@ -12,9 +12,14 @@ func logout(cmd *cobra.Command, args []string) {
 	if len(args) > 0 {
 		usageDie(cmd)
 	}
+	flags := cmd.Flags()
+	srvalias, _ := flags.GetString("server")
+
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
 	err := gincl.LoadToken()
 	if err != nil {
 		Die("You are not logged in.")
@@ -26,7 +31,7 @@ func logout(cmd *cobra.Command, args []string) {
 
 // LogoutCmd sets up the 'logout' subcommand
 func LogoutCmd() *cobra.Command {
-	var logoutCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "logout",
 		Short: "Logout of the GIN services",
 		Long:  "Logout of the GIN services.\n\nThis command takes no arguments.",
@@ -34,5 +39,6 @@ func LogoutCmd() *cobra.Command {
 		Run:   logout,
 		DisableFlagsInUseLine: true,
 	}
-	return logoutCmd
+	cmd.Flags().String("server", "", "Specify server `alias` where the repository will be created. See also 'gin servers'.")
+	return cmd
 }

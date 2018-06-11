@@ -18,14 +18,13 @@ func countItemsRemove(paths []string) int {
 
 func remove(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
+	// TODO: Need server config? just use remotes (and all keys)
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, !jsonout)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
-	gincl.GitAddress = srvcfg.Git.AddressStr()
 	lock(cmd, args)
 	nitems := countItemsRemove(args)
 	rmchan := make(chan git.RepoFileStatus)
@@ -39,7 +38,7 @@ func RemoveContentCmd() *cobra.Command {
 	args := map[string]string{
 		"<filenames>": "One or more directories or files to remove.",
 	}
-	var rmContentCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:                   "remove-content [--json] [<filenames>]...",
 		Short:                 "Remove the content of local files that have already been uploaded",
 		Long:                  formatdesc(description, args),
@@ -48,6 +47,6 @@ func RemoveContentCmd() *cobra.Command {
 		Aliases:               []string{"rmc"},
 		DisableFlagsInUseLine: true,
 	}
-	rmContentCmd.Flags().Bool("json", false, "Print output in JSON format.")
-	return rmContentCmd
+	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	return cmd
 }

@@ -31,7 +31,7 @@ func RemoveRemoteCmd() *cobra.Command {
 	args := map[string]string{
 		"<name>": "The name of the remote",
 	}
-	var removeRemoteCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:                   "remove-remote <name>",
 		Short:                 "Remove a remote from the current repository",
 		Long:                  formatdesc(description, args),
@@ -40,5 +40,5 @@ func RemoveRemoteCmd() *cobra.Command {
 		Aliases:               []string{"rm-remote"},
 		DisableFlagsInUseLine: true,
 	}
-	return removeRemoteCmd
+	return cmd
 }

@@ -2,14 +2,13 @@ package gincmd
 
 import (
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
+	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh"
 )
 
 func promptForWeb() (webconf config.WebCfg) {
@@ -83,21 +82,9 @@ func parseGitstring(gitstring string) (gitconf config.GitCfg) {
 	return
 }
 
-func fetchHostKey(gitconf *config.GitCfg) {
-	var hostkeystr, fingerprint string
-	keycb := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-		hostkeystr = fmt.Sprintf("%s,%s %s", hostname, remote.String(), string(ssh.MarshalAuthorizedKey(key)))
-		fingerprint = ssh.FingerprintSHA256(key)
-		return nil
-	}
-	sshcon := ssh.ClientConfig{
-		User:            gitconf.User,
-		HostKeyCallback: keycb,
-	}
-	_, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", gitconf.Host, gitconf.Port), &sshcon)
-	if err != nil && !strings.Contains(err.Error(), "unable to authenticate") {
-		Die(fmt.Sprintf("connection test failed: %s", err))
-	}
+func addHostKey(gitconf *config.GitCfg) {
+	hostkeystr, fingerprint, err := git.GetHostKey(*gitconf)
+	CheckError(err)
 	fmt.Printf(":: Host key fingerprint for [%s]: %s\n", gitconf.AddressStr(), fingerprint)
 	fmt.Print("Accept [yes/no]: ")
 	var response string
@@ -142,10 +129,19 @@ func addServer(cmd *cobra.Command, args []string) {
 		serverConf.Git = parseGitstring(gitstring)
 	}
 
-	fetchHostKey(&serverConf.Git)
+	addHostKey(&serverConf.Git)
 
 	// Save to config
-	config.WriteServerConf(alias, serverConf)
+	err := config.AddServerConf(alias, serverConf)
+	if err != nil {
+		Die("failed to update configuration file")
+	}
+
+	// Recreate known hosts file
+	err = git.WriteKnownHosts()
+	if err != nil {
+		Die("failed to write known_hosts file")
+	}
 }
 
 // AddServerCmd sets up the 'add-server' command for adding new server configurations
@@ -178,7 +174,7 @@ See the Examples section for a full example.
 	examples := map[string]string{
 		"This is what configuring the built-in G-Node GIN server would look like (note: this is already configured)": "$ gin add-server --web https://web.gin.g-node.org:443 --git git@git.g-node.org:22 gin",
 	}
-	var addServerCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:     "add-server [--web http[s]://<hostname>[:<port>]] [--git [<gituser>@]<hostname>[:<port>]] <alias>",
 		Short:   "Add a new GIN server configuration",
 		Long:    formatdesc(description, args),
@@ -187,7 +183,7 @@ See the Examples section for a full example.
 		Run:     addServer,
 		DisableFlagsInUseLine: true,
 	}
-	addServerCmd.Flags().String("web", "", "Set the address and port for the web server.")
-	addServerCmd.Flags().String("git", "", "Set the user, address and port for the git server.")
-	return addServerCmd
+	cmd.Flags().String("web", "", "Set the address and port for the web server.")
+	cmd.Flags().String("git", "", "Set the user, address and port for the git server.")
+	return cmd
 }

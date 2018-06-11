@@ -10,9 +10,14 @@ import (
 )
 
 func deleteRepo(cmd *cobra.Command, args []string) {
+	flags := cmd.Flags()
+	srvalias, _ := flags.GetString("server")
+
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, true)
 	var repostr, confirmation string
 
@@ -33,6 +38,7 @@ func deleteRepo(cmd *cobra.Command, args []string) {
 	fmt.Println("--- WARNING ---")
 	fmt.Println("You are about to delete a remote repository, all its files, and history.")
 	fmt.Println("This action is irreversible.")
+	fmt.Printf("You are about to delete the repository at: %s\n", repoinfo.HTMLURL)
 
 	fmt.Println("If you are sure you want to delete this repository, type its full name (owner/name) below")
 	fmt.Print("> ")
@@ -50,7 +56,7 @@ func deleteRepo(cmd *cobra.Command, args []string) {
 
 // DeleteCmd sets up the 'delete' repository subcommand
 func DeleteCmd() *cobra.Command {
-	var deleteCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "delete <repository>",
 		Short: "Delete a repository from the GIN server",
 		Long:  "Delete a repository from the GIN server.",
@@ -59,5 +65,6 @@ func DeleteCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 		Hidden:                true,
 	}
-	return deleteCmd
+	cmd.Flags().String("server", "", "Specify server `alias` on which the repository to be deleted resides. See also 'gin servers'.")
+	return cmd
 }

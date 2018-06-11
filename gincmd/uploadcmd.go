@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
-	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
@@ -13,9 +12,7 @@ import (
 func upload(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	remotes, _ := cmd.Flags().GetStringSlice("to")
-	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Is this necessary? What about other servers
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -63,7 +60,7 @@ If no arguments are specified, only changes to files already being tracked are u
 		"Upload all previously committed changes to remote named 'labdata'": "$ gin upload --to labdata",
 		"Upload all '.zip' files to remotes named 'gin' and 'labdata'":      "$ gin upload --to gin --to labdata *.zip\n    or\n$ gin upload --to gin,labdata *.zip",
 	}
-	var uploadCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:     "upload [--json] [--to <remote>] [<filenames>]...",
 		Short:   "Upload local changes to a remote repository",
 		Long:    formatdesc(description, args),
@@ -72,7 +69,7 @@ If no arguments are specified, only changes to files already being tracked are u
 		Run:     upload,
 		DisableFlagsInUseLine: true,
 	}
-	uploadCmd.Flags().Bool("json", false, "Print output in JSON format.")
-	uploadCmd.Flags().StringSliceP("to", "t", nil, "Upload to specific `remote`. Supports multiple remotes, either by specifying multiple times or as a comma separated list (see Examples). If the keyword 'all' is specified, the data is uploaded to all configured remotes.")
-	return uploadCmd
+	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	cmd.Flags().StringSliceP("to", "t", nil, "Upload to specific `remote`. Supports multiple remotes, either by specifying multiple times or as a comma separated list (see Examples). If the keyword 'all' is specified, the data is uploaded to all configured remotes.")
+	return cmd
 }

@@ -21,12 +21,17 @@ func repos(cmd *cobra.Command, args []string) {
 	jsonout, _ := flags.GetBool("json")
 	allrepos, _ := flags.GetBool("all")
 	sharedrepos, _ := flags.GetBool("shared")
+	srvalias, _ := flags.GetString("server")
+
+	conf := config.Read()
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
 	if (allrepos && sharedrepos) || ((allrepos || sharedrepos) && len(args) > 0) {
 		usageDie(cmd)
 	}
-	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+
+	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, true)
 	username := gincl.Username
 	if len(args) == 1 && args[0] != username {
@@ -86,7 +91,7 @@ func ReposCmd() *cobra.Command {
 	args := map[string]string{
 		"<username>": "The name of the user whose repositories should be listed. The list consists of public repositories and repositories shared with the logged in user.",
 	}
-	var reposCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "repos [--shared | --all | <username>]",
 		Short: "List available remote repositories",
 		Long:  formatdesc(description, args),
@@ -94,8 +99,9 @@ func ReposCmd() *cobra.Command {
 		Run:   repos,
 		DisableFlagsInUseLine: true,
 	}
-	reposCmd.Flags().Bool("all", false, "List all repositories accessible to the logged in user.")
-	reposCmd.Flags().Bool("shared", false, "List all repositories that the user is a member of (excluding own repositories).")
-	reposCmd.Flags().Bool("json", false, "Print listing in JSON format.")
-	return reposCmd
+	cmd.Flags().Bool("all", false, "List all repositories accessible to the logged in user.")
+	cmd.Flags().Bool("shared", false, "List all repositories that the user is a member of (excluding own repositories).")
+	cmd.Flags().Bool("json", false, "Print listing in JSON format.")
+	cmd.Flags().String("server", "", "Specify server `alias` where the repository will be created. See also 'gin servers'.")
+	return cmd
 }

@@ -14,18 +14,22 @@ import (
 
 func keys(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags()
-	if flags.NFlag() > 1 {
-		usageDie(cmd)
-	}
+	srvalias, _ := flags.GetString("server")
 
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, true)
 
 	keyfilename, _ := flags.GetString("add")
 	keyidx, _ := flags.GetInt("delete")
 	verbose, _ := flags.GetBool("verbose")
+
+	if keyfilename != "" && keyidx > 0 {
+		Die("can't add and delete key at the same time")
+	}
 
 	if keyfilename != "" {
 		addKey(gincl, keyfilename)
@@ -94,7 +98,7 @@ func KeysCmd() *cobra.Command {
 	examples := map[string]string{
 		"Add a public key to your account, as generated from the default ssh-keygen command": "$ gin keys --add ~/.ssh/id_rsa.pub",
 	}
-	var keysCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:     "keys [--add <filename> | --delete <keynum> | --verbose | -v]",
 		Short:   "List, add, or delete public keys on the GIN services",
 		Long:    formatdesc(description, nil),
@@ -103,8 +107,9 @@ func KeysCmd() *cobra.Command {
 		Run:     keys,
 		DisableFlagsInUseLine: true,
 	}
-	keysCmd.Flags().String("add", "", "Specify a `filename` which contains a public key to be added to the GIN server.")
-	keysCmd.Flags().Int("delete", 0, "Specify a `number` to delete the corresponding key from the server. Use 'gin keys' to get the numbered listing of keys.")
-	keysCmd.Flags().BoolP("verbose", "v", false, "Verbose printing. Prints the entire public key.")
-	return keysCmd
+	cmd.Flags().String("add", "", "Specify a `filename` which contains a public key to be added to the GIN server.")
+	cmd.Flags().Int("delete", 0, "Specify a `number` to delete the corresponding key from the server. Use 'gin keys' to get the numbered listing of keys.")
+	cmd.Flags().BoolP("verbose", "v", false, "Verbose printing. Prints the entire public key.")
+	cmd.Flags().String("server", "", "Specify server `alias` to query, add, or remove keys. See also 'gin servers'.")
+	return cmd
 }

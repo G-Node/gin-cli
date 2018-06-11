@@ -11,15 +11,21 @@ import (
 
 // login requests credentials, performs login with auth server, and stores the token.
 func login(cmd *cobra.Command, args []string) {
-	var username string
-	var password string
+	var username, password string
 
-	if args == nil || len(args) == 0 {
+	flags := cmd.Flags()
+	srvalias, _ := flags.GetString("server")
+
+	conf := config.Read()
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	fmt.Printf("Logging into %s\n", srvalias)
+
+	if len(args) == 0 {
 		// prompt for login
 		fmt.Print("Login: ")
 		fmt.Scanln(&username)
-	} else if len(args) > 1 {
-		usageDie(cmd)
 	} else {
 		username = args[0]
 	}
@@ -40,25 +46,27 @@ func login(cmd *cobra.Command, args []string) {
 	}
 
 	password = string(pwbytes)
-
 	if password == "" {
 		Die("No password provided. Aborting.")
 	}
 
-	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(srvalias)
 	err = gincl.Login(username, password, "gin-cli")
 	CheckError(err)
 	info, err := gincl.RequestAccount(username)
 	CheckError(err)
-	fmt.Printf(":: Hello %s. You are now logged in.\n", info.UserName)
+	name := info.FullName
+	if name == "" {
+		name = info.UserName
+	}
+	fmt.Printf(":: Welcome %s\n", name)
+	fmt.Printf(":: Successfully logged into %s [%s]\n", srvalias, gincl.WebAddress())
 }
 
 // LoginCmd sets up the 'login' subcommand
 func LoginCmd() *cobra.Command {
 	description := "Login to the GIN services.\n\nIf no username is specified on the command line, you will be prompted for it. The login command always prompts for a password."
-	var loginCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:   "login [<username>]",
 		Short: "Login to the GIN services",
 		Long:  formatdesc(description, nil),
@@ -66,5 +74,6 @@ func LoginCmd() *cobra.Command {
 		Run:   login,
 		DisableFlagsInUseLine: true,
 	}
-	return loginCmd
+	cmd.Flags().String("server", "", "Specify server `alias` to log into. See also 'gin servers'.")
+	return cmd
 }

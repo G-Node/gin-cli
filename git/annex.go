@@ -12,7 +12,6 @@ import (
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git/shell"
-	"github.com/G-Node/gin-cli/web"
 )
 
 // Git annex commands
@@ -780,6 +779,7 @@ func GetAnnexVersion() (string, error) {
 		return "", err
 
 	}
+	log.Write(string(stdout))
 	return string(stdout), nil
 }
 
@@ -788,10 +788,8 @@ func AnnexCommand(args ...string) shell.Cmd {
 	config := config.Read()
 	gitannexbin := config.Bin.GitAnnex
 	cmd := shell.Command(gitannexbin, args...)
-	token := web.UserToken{}
-	_ = token.LoadToken()
 	env := os.Environ()
-	cmd.Env = append(env, sshEnv(token.Username))
+	cmd.Env = append(env, sshEnv())
 	cmd.Env = append(cmd.Env, "GIT_ANNEX_USE_GIT_SSH=1")
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))

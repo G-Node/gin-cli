@@ -31,9 +31,16 @@ type GINUser struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-// New returns a new client for the GIN server.
-func New(host string) *Client {
-	return &Client{Client: web.New(host)}
+// New returns a new client for the GIN server, configured with the server referred to by the alias in the argument.
+func New(alias string) *Client {
+	if alias == "" {
+		return &Client{Client: web.New(""), srvalias: ""}
+	}
+	srvcfg, ok := config.Read().Servers[alias]
+	if !ok {
+		return &Client{Client: web.New(""), srvalias: ""}
+	}
+	return &Client{Client: web.New(srvcfg.Web.AddressStr()), srvalias: alias}
 }
 
 // AccessToken represents a API access token.
@@ -45,7 +52,20 @@ type AccessToken struct {
 // Client is a client interface to the GIN server. Embeds web.Client.
 type Client struct {
 	*web.Client
-	GitAddress string
+	srvalias string
+}
+
+// GitAddress returns the full address string for the configured git server
+func (gincl *Client) GitAddress() string {
+	if gincl.srvalias == "" {
+		return ""
+	}
+	return config.Read().Servers[gincl.srvalias].Git.AddressStr()
+}
+
+// WebAddress returns the full address string for the configured web server
+func (gincl *Client) WebAddress() string {
+	return config.Read().Servers[gincl.srvalias].Web.AddressStr()
 }
 
 // GetUserKeys fetches the public keys that the user has added to the auth server.
@@ -232,14 +252,17 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	gincl.Token = token.Sha1
 	log.Write("Login successful. Username: %s", username)
 
-	err = gincl.StoreToken()
+	err = gincl.StoreToken(gincl.srvalias)
 	if err != nil {
 		return fmt.Errorf("Error while storing token: %s", err.Error())
 	}
 
-	MakeHostsFile()
-
 	return gincl.MakeSessionKey()
+}
+
+// LoadToken calls the embedded UserToken.LoadToken function with the configured server alias.
+func (gincl *Client) LoadToken() error {
+	return gincl.UserToken.LoadToken(gincl.srvalias)
 }
 
 // Logout logs out the currently logged in user in 3 steps:
@@ -261,25 +284,44 @@ func (gincl *Client) Logout() {
 	}
 
 	// 2. Delete private key
-	privKeyFile := git.PrivKeyPath(gincl.UserToken.Username)
-	err = os.Remove(privKeyFile)
+	privKeyFiles := git.PrivKeyPath()
+	err = os.Remove(privKeyFiles[gincl.srvalias])
 	if err != nil {
 		log.Write("Error deleting key file")
 	} else {
 		log.Write("Private key file deleted")
 	}
 
-	err = web.DeleteToken()
+	err = web.DeleteToken(gincl.srvalias)
 	if err != nil {
 		log.Write("Error deleting token file")
 	}
 }
 
-// MakeHostsFile creates a known_hosts file in the config directory based on the server configuration for host key checking.
-func MakeHostsFile() {
+// DefaultServer returns the alias of the configured default gin server.
+func DefaultServer() string {
 	conf := config.Read()
-	hostkeyfile := git.HostKeyPath()
-	ginhostkey := fmt.Sprintln(conf.Servers["gin"].Git.HostKey)
-	_ = ioutil.WriteFile(hostkeyfile, []byte(ginhostkey), 0600)
-	return
+	return conf.DefaultServer
+}
+
+// SetDefaultServer sets the alias of the default gin server.
+// Returns with error if no server with the given alias exists.
+func SetDefaultServer(alias string) error {
+	conf := config.Read()
+	if _, ok := conf.Servers[alias]; !ok {
+		return fmt.Errorf("server with alias '%s' does not exist", alias)
+	}
+	config.SetDefaultServer(alias)
+	return nil
+}
+
+// RemoveServer removes a server from the user configuration.
+// Returns with error if no server with the given alias exists.
+func RemoveServer(alias string) error {
+	conf := config.Read()
+	if _, ok := conf.Servers[alias]; !ok {
+		return fmt.Errorf("server with alias '%s' does not exist", alias)
+	}
+	config.RmServerConf(alias)
+	return nil
 }

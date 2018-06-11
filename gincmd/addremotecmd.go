@@ -60,9 +60,7 @@ func checkRemote(cmd *cobra.Command, url string) (err error) {
 }
 
 func createGinRemote(cmd *cobra.Command, alias, repopath string) {
-	conf := config.Read()
-	srvcfg := conf.Servers[alias]
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	gincl := ginclient.New(alias)
 	requirelogin(cmd, gincl, true)
 	repopathParts := strings.SplitN(repopath, "/", 2)
 	reponame := repopathParts[1]
@@ -176,7 +174,7 @@ A new remote is set as the default for uploading if no other remotes are configu
 		"Add a GIN server repository as a remote named 'primary'":          "$ gin add-remote primary gin:alice/example",
 		"Add a directory on a storage drive as a remote named 'datastore'": "$ gin add-remote datastore dir:/mnt/gindatastore",
 	}
-	var addRemoteCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:     "add-remote <name> <location>",
 		Short:   "Add a remote to the current repository for uploading and downloading",
 		Long:    formatdesc(description, args),
@@ -185,7 +183,7 @@ A new remote is set as the default for uploading if no other remotes are configu
 		Run:     addRemote,
 		DisableFlagsInUseLine: true,
 	}
-	addRemoteCmd.Flags().Bool("create", false, "Create the remote on the server if it does not already exist.")
-	addRemoteCmd.Flags().Bool("default", false, "Sets the new remote as the default (if the command succeeds).")
-	return addRemoteCmd
+	cmd.Flags().Bool("create", false, "Create the remote on the server if it does not already exist.")
+	cmd.Flags().Bool("default", false, "Sets the new remote as the default (if the command succeeds).")
+	return cmd
 }

@@ -15,18 +15,21 @@ func isValidRepoPath(path string) bool {
 }
 
 func getRepo(cmd *cobra.Command, args []string) {
-	jsonout, _ := cmd.Flags().GetBool("json")
-	repostr := args[0]
+	flags := cmd.Flags()
+	jsonout, _ := flags.GetBool("json")
+	srvalias, _ := flags.GetString("server")
 	conf := config.Read()
-	srvcfg := conf.Servers["gin"] // TODO: Support aliases
-	gincl := ginclient.New(srvcfg.Web.AddressStr())
+	if srvalias == "" {
+		srvalias = conf.DefaultServer
+	}
+	repostr := args[0]
+	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, !jsonout)
 
 	if !isValidRepoPath(repostr) {
 		Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
 	}
 
-	gincl.GitAddress = srvcfg.Git.AddressStr()
 	clonechan := make(chan git.RepoFileStatus)
 	go gincl.CloneRepo(repostr, clonechan)
 	formatOutput(clonechan, 0, jsonout)
@@ -51,7 +54,7 @@ func GetCmd() *cobra.Command {
 		"Get and initialise the repository named 'example' owned by user 'alice'": "$ gin get alice/example",
 		"Get and initialise the repository named 'eegdata' owned by user 'peter'": "$ gin get peter/eegdata",
 	}
-	var getRepoCmd = &cobra.Command{
+	var cmd = &cobra.Command{
 		Use:     "get [--json] <repopath>",
 		Short:   "Retrieve (clone) a repository from the remote server",
 		Long:    formatdesc(description, args),
@@ -60,6 +63,7 @@ func GetCmd() *cobra.Command {
 		Run:     getRepo,
 		DisableFlagsInUseLine: true,
 	}
-	getRepoCmd.Flags().Bool("json", false, "Print output in JSON format.")
-	return getRepoCmd
+	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	cmd.Flags().String("server", "", "Specify server `alias` for the repository. See also 'gin servers'.")
+	return cmd
 }
