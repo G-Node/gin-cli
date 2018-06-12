@@ -45,6 +45,8 @@ var mdTemplate = `## {{ .Short }}
 
 {{ . | fmtflags }}
 
+{{ . | fmtexamples }}
+
 `
 
 var wrapper = wrap.NewWrapper()
@@ -77,6 +79,16 @@ func fmtflags(cmd *cobra.Command) (fflags string) {
 	return
 }
 
+func fmtexamples(cmd *cobra.Command) (fexamples string) {
+	fexamples = cmd.Example
+	if fexamples == "" {
+		return
+	}
+	fexamples = strings.Replace(fexamples, "$", "\n    $", -1)
+	fexamples = fmt.Sprintf("**Examples**\n\n%s", fexamples)
+	return
+}
+
 func checkError(err error) {
 	if err != nil {
 		log.Fatal(err)
@@ -87,8 +99,9 @@ func gendoc(cmd *cobra.Command) string {
 	fmt.Printf("Generating help text for command %s\n", cmd.Name())
 
 	funcMap := template.FuncMap{
-		"fmtargs":  fmtargs,
-		"fmtflags": fmtflags,
+		"fmtargs":     fmtargs,
+		"fmtflags":    fmtflags,
+		"fmtexamples": fmtexamples,
 	}
 	t, err := template.New("command").Funcs(funcMap).Parse(mdTemplate)
 	checkError(err)

@@ -1,3 +1,24 @@
+gin-cli (1.0b); urgency=low
+
+  * Beta 1.0
+  * New command `gin init`: Initialises a directory as a gin repository without creating a repository on a server.
+  * New command `gin commit`: Records changes in the local repository without performing an upload and without requiring a remote or an internet connection.
+  * New command `gin version`: Rolls back files or directories to older versions. With the `--copy-to` flag, retrieves older files without overwriting the current version and copies them to a specific location.
+  * New command `gin add-remote`: Adds a remote to the current repository for uploading and downloading. This also brings support for using directory paths on the local filesystem as "remotes" (e.g., external hard drives, network attached storage), without the need to have a GIN server.
+  * New command `gin remove-remote`: Removes a remote from the current repository.
+  * New command `gin remotes`: Lists remotes configured for a repository and shows the default remote used for `gin upload`.
+  * New command `gin use-remote`: Switches the repository's default upload remote.
+  * The `gin upload` command now accepts a `--to` argument for uploading annexed content to a specific, non-default remote.
+  * New command `gin add-server`: Adds a new GIN server to the global client configuration.
+  * New command `gin remove-server`: Removes a GIN server from the global client configuration.
+  * New command `gin servers`: Lists the configured servers and shows the default server used for web queries.
+  * New command `gin use-server`: Switches the default server.
+  * The `login`, `logout`, `create`, `info`, `keys`, `repos`, `repoinfo`, and `get` commands now accept a `--server` argument for querying or operating on a specific, non-default server.
+  * Progress bars for file operations: Some operations don't have a per-file progress (add, lock, unlock). There is no partial unlock state for a file, for instance. For these commands, the output shows the overall progress along with the number of total files that are being affected.
+  * Smaller logfiles: The log file is now limited to 1 MB. No more ever-growing logs.
+  * Fixed a bug where file tracking would register a type change in git when working with direct mode repositories (e.g., on Windows).
+  * Fixed a bug where the file status (from `gin ls`) was being incorrectly reported when working in direct mode (e.g., on Windows). Direct mode repositories should now show the exact same output as indirect mode ones.
+
 gin-cli (0.16); urgency=low
 
   * Release 0.16
