@@ -941,6 +941,31 @@ func gitAddDirect(paths []string) (filtered []string) {
 	return
 }
 
+// GetGitVersion returns the version string of the system's git binary.
+func GetGitVersion() (string, error) {
+	cmd := Command("version")
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		errmsg := string(stderr)
+		log.Write("Error while preparing git version command")
+		if strings.Contains(err.Error(), "executable file not found") {
+			return "", fmt.Errorf("git executable not found: %s", err.Error())
+		}
+		if strings.Contains(errmsg, "no such file or directory") {
+			return "", fmt.Errorf("git executable not found: %s", errmsg)
+		}
+		if errmsg != "" {
+			return "", fmt.Errorf(errmsg)
+		}
+		return "", err
+
+	}
+	verstr := string(stdout)
+	verstr = strings.TrimSpace(verstr)
+	verstr = strings.TrimPrefix(verstr, "git version ")
+	return verstr, nil
+}
+
 // Command sets up an external git command with the provided arguments and returns a GinCmd struct.
 func Command(args ...string) shell.Cmd {
 	config := config.Read()

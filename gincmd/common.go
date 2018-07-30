@@ -275,7 +275,8 @@ func formatexamples(examples map[string]string) (exdesc string) {
 }
 
 // SetUpCommands sets up all the subcommands for the client and returns the root command, ready to execute.
-func SetUpCommands(verstr string) *cobra.Command {
+func SetUpCommands(verinfo VersionInfo) *cobra.Command {
+	verstr := verinfo.String()
 	var rootCmd = &cobra.Command{
 		Use:                   "gin",
 		Long:                  "GIN Command Line Interface and client for the GIN services", // TODO: Add license and web info
