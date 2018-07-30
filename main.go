@@ -27,11 +27,15 @@ func init() {
 	verinfo.Commit = commit
 
 	gitVer, err := git.GetGitVersion()
-	gincmd.CheckError(err)
+	if err != nil {
+		gitVer = err.Error()
+	}
 	verinfo.Git = gitVer
 
 	annexVer, err := git.GetAnnexVersion()
-	gincmd.CheckError(err)
+	if err != nil {
+		annexVer = err.Error()
+	}
 	verinfo.Annex = annexVer
 }
 

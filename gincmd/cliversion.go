@@ -23,14 +23,31 @@ func (v *VersionInfo) String() string {
 	if v.Version == "" {
 		return "GIN command line client [dev build]"
 	}
-	return fmt.Sprintf("GIN command line client %s Build %s (%s)\n  git: %s\n  git-annex: %s", v.Version, v.Build, v.Commit, v.Git, v.Annex)
+
+	gitver := v.Git
+	if ok, err := v.GitOK(); !ok {
+		if strings.Contains(err.Error(), "not found") {
+			gitver = "not found"
+		}
+	}
+
+	annexver := v.Annex
+	if ok, err := v.AnnexOK(); !ok {
+		annexver = err.Error()
+		if strings.Contains(err.Error(), "not found") {
+			annexver = "not found"
+		}
+	}
+
+	return fmt.Sprintf("GIN command line client %s Build %s (%s)\n  git: %s\n  git-annex: %s", v.Version, v.Build, v.Commit, gitver, annexver)
 }
 
 // GitOK checks if the system git version is higher than the required one.
 // If it is not, or the git binary is not found, an appropriate error message is returned.
 func (v *VersionInfo) GitOK() (bool, error) {
-	if v.Git == "" {
-		return false, fmt.Errorf("The GIN Client requires git to be installed and accessible")
+	_, err := version.NewVersion(v.Git)
+	if err != nil {
+		return false, fmt.Errorf(v.Git)
 	}
 	return true, nil
 }
@@ -38,7 +55,6 @@ func (v *VersionInfo) GitOK() (bool, error) {
 // AnnexOK checks if the system annex version is higher than the required one.
 // If it is not, or the git-annex binary is not found, an appropriate error message is returned.
 func (v *VersionInfo) AnnexOK() (bool, error) {
-	errmsg := fmt.Sprintf("The GIN Client requires git-annex %s or newer", minAnnexVersion)
 	systemver, err := version.NewVersion(v.Annex)
 	if err != nil {
 		// Special case for neurodebian git-annex version
@@ -47,13 +63,14 @@ func (v *VersionInfo) AnnexOK() (bool, error) {
 		verstring := strings.Split(v.Annex, "~")[0]
 		systemver, err = version.NewVersion(verstring)
 		if err != nil {
-			// Can't figure out the version. Giving up.
-			return false, fmt.Errorf("%s\ngit-annex version %s not understood", errmsg, v.Annex)
+			// Can't figure out the version: print error from AnnexVersion
+			// return false, fmt.Errorf("%s\ngit-annex version %s not understood", errmsg, v.Annex)
+			return false, fmt.Errorf(v.Annex)
 		}
 	}
 	minver, _ := version.NewVersion(minAnnexVersion)
 	if systemver.LessThan(minver) {
-		return false, fmt.Errorf("%s\nFound version %s", errmsg, v.Annex)
+		return false, fmt.Errorf("git-annex version %s found, but %s or newer is required", v.Annex, minAnnexVersion)
 	}
 	return true, nil
 }

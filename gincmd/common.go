@@ -19,8 +19,30 @@ import (
 
 const unknownhostname = "(unknown)"
 
-var green = color.New(color.FgGreen).SprintFunc()
-var red = color.New(color.FgRed).SprintFunc()
+var (
+	green  = color.New(color.FgGreen).SprintFunc()
+	red    = color.New(color.FgRed).SprintFunc()
+	yellow = color.New(color.FgYellow).SprintFunc()
+
+	reqgitannex = []string{
+		"add-remote",
+		"commit",
+		"create",
+		"download",
+		"get",
+		"get-content",
+		"init",
+		"lock",
+		"ls",
+		"remotes",
+		"remove-content",
+		"remove-remote",
+		"unlock",
+		"upload",
+		"use-remote",
+		"version",
+	}
+)
 
 // Die prints an error message to stderr and exits the program with status 1.
 func Die(msg interface{}) {
@@ -274,6 +296,23 @@ func formatexamples(examples map[string]string) (exdesc string) {
 	return
 }
 
+func disableCommand(cmd *cobra.Command, giterr, annexerr error) {
+	// marks a given command as disabled and redirects the execution to an error message
+	errmsg := fmt.Sprintf("The '%s' command is not available because it requires git and git-annex:", cmd.Name())
+
+	if giterr != nil {
+		errmsg = fmt.Sprintf("%s\n  %s", errmsg, giterr)
+	}
+	if annexerr != nil {
+		errmsg = fmt.Sprintf("%s\n  %s", errmsg, annexerr)
+	}
+	cmd.Short = fmt.Sprintf("[%s] %s", red("not available"), cmd.Short)
+
+	cmd.Run = func(c *cobra.Command, args []string) {
+		Die(errmsg)
+	}
+}
+
 // SetUpCommands sets up all the subcommands for the client and returns the root command, ready to execute.
 func SetUpCommands(verinfo VersionInfo) *cobra.Command {
 	verstr := verinfo.String()
@@ -283,94 +322,119 @@ func SetUpCommands(verinfo VersionInfo) *cobra.Command {
 		Version:               fmt.Sprintln(verstr),
 		DisableFlagsInUseLine: true,
 	}
+	gitok, giterr := verinfo.GitOK()
+	annexok, annexerr := verinfo.AnnexOK()
+
+	cmds := make(map[string]*cobra.Command)
+
+	// Login
+	cmds["login"] = LoginCmd()
+
+	// Logout
+	cmds["logout"] = LogoutCmd()
+
+	// Add server
+	cmds["add-server"] = AddServerCmd()
+
+	// Remove server
+	cmds["remove-server"] = RemoveServerCmd()
+
+	// Use server
+	cmds["use-server"] = UseServerCmd()
+
+	// Servers
+	cmds["servers"] = ServersCmd()
+
+	// Account info
+	cmds["info"] = InfoCmd()
+
+	// List repos
+	cmds["repos"] = ReposCmd()
+
+	// Repo info
+	cmds["repoinfo"] = RepoInfoCmd()
+
+	// Keys
+	cmds["keys"] = KeysCmd()
+
+	// Init repo
+	cmds["init"] = InitCmd()
+
+	// Add remote
+	cmds["add-remote"] = AddRemoteCmd()
+
+	// Remove remote
+	cmds["remove-remote"] = RemoveRemoteCmd()
+
+	// Use remote
+	cmds["use-remote"] = UseRemoteCmd()
+
+	// Remotes
+	cmds["remotes"] = RemotesCmd()
+
+	// Create repo
+	cmds["create"] = CreateCmd()
+
+	// Delete repo (unlisted)
+	cmds["delete"] = DeleteCmd()
+
+	// Get repo
+	cmds["get"] = GetCmd()
+
+	// List files
+	cmds["ls"] = LsRepoCmd()
+
+	// Unlock content
+	cmds["unlock"] = UnlockCmd()
+
+	// Lock content
+	cmds["lock"] = LockCmd()
+
+	// Commit changes
+	cmds["commit"] = CommitCmd()
+
+	// Upload
+	cmds["upload"] = UploadCmd()
+
+	// Download
+	cmds["download"] = DownloadCmd()
+
+	// Get content
+	cmds["get-content"] = GetContentCmd()
+
+	// Remove content
+	cmds["remove-content"] = RemoveContentCmd()
+
+	// Version
+	cmds["version"] = VersionCmd()
+
+	cmds["git"] = GitCmd()
+
+	cmds["annex"] = AnnexCmd()
+
+	// Currently treating git and git-annex dependency together: if one is broken, we assume both are
+	// This might change in the future (a command might work with git even if annex isn't found)
+	if !(gitok && annexok) {
+		for _, name := range reqgitannex {
+			disableCommand(cmds[name], giterr, annexerr)
+		}
+		warnmsg := yellow("Some commands are not available:")
+		if giterr != nil {
+			warnmsg = fmt.Sprintf("%s\n  %s", warnmsg, giterr)
+		}
+		if annexerr != nil {
+			warnmsg = fmt.Sprintf("%s\n  %s", warnmsg, annexerr)
+		}
+		helpTemplate = fmt.Sprintf("%s\n%s", helpTemplate, warnmsg)
+	}
+
 	cobra.AddTemplateFunc("wrappedFlagUsages", wrappedFlagUsages)
 	rootCmd.SetHelpTemplate(helpTemplate)
 	rootCmd.SetUsageTemplate(usageTemplate)
 
-	// Login
-	rootCmd.AddCommand(LoginCmd())
-
-	// Logout
-	rootCmd.AddCommand(LogoutCmd())
-
-	// Init repo
-	rootCmd.AddCommand(InitCmd())
-
-	// Add server
-	rootCmd.AddCommand(AddServerCmd())
-
-	// Remove server
-	rootCmd.AddCommand(RemoveServerCmd())
-
-	// Use server
-	rootCmd.AddCommand(UseServerCmd())
-
-	// Servers
-	rootCmd.AddCommand(ServersCmd())
-
-	// Add remote
-	rootCmd.AddCommand(AddRemoteCmd())
-
-	// Remove remote
-	rootCmd.AddCommand(RemoveRemoteCmd())
-
-	// Use remote
-	rootCmd.AddCommand(UseRemoteCmd())
-
-	// Remotes
-	rootCmd.AddCommand(RemotesCmd())
-
-	// Create repo
-	rootCmd.AddCommand(CreateCmd())
-
-	// Delete repo (unlisted)
-	rootCmd.AddCommand(DeleteCmd())
-
-	// Get repo
-	rootCmd.AddCommand(GetCmd())
-
-	// List files
-	rootCmd.AddCommand(LsRepoCmd())
-
-	// Unlock content
-	rootCmd.AddCommand(UnlockCmd())
-
-	// Lock content
-	rootCmd.AddCommand(LockCmd())
-
-	// Commit changes
-	rootCmd.AddCommand(CommitCmd())
-
-	// Upload
-	rootCmd.AddCommand(UploadCmd())
-
-	// Download
-	rootCmd.AddCommand(DownloadCmd())
-
-	// Get content
-	rootCmd.AddCommand(GetContentCmd())
-
-	// Remove content
-	rootCmd.AddCommand(RemoveContentCmd())
-
-	// Account info
-	rootCmd.AddCommand(InfoCmd())
-
-	// List repos
-	rootCmd.AddCommand(ReposCmd())
-
-	// Repo info
-	rootCmd.AddCommand(RepoInfoCmd())
-
-	// Keys
-	rootCmd.AddCommand(KeysCmd())
-
-	// Version
-	rootCmd.AddCommand(VersionCmd())
-
-	// git and annex passthrough (unlisted)
-	rootCmd.AddCommand(GitCmd())
-	rootCmd.AddCommand(AnnexCmd())
+	for _, cmd := range cmds {
+		rootCmd.AddCommand(cmd)
+	}
 
 	return rootCmd
 }
