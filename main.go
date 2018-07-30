@@ -16,7 +16,7 @@ var gincliversion string
 var build string
 var commit string
 var verstr string
-var minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
+const minAnnexVersion = "6.20160126" // Introduction of git-annex add --json
 
 func checkAnnexVersion() {
 	errmsg := fmt.Sprintf("The GIN Client requires git-annex %s or newer", minAnnexVersion)
