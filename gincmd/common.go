@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"runtime"
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
@@ -296,21 +297,48 @@ func formatexamples(examples map[string]string) (exdesc string) {
 	return
 }
 
-func disableCommand(cmd *cobra.Command, giterr, annexerr error) {
-	// marks a given command as disabled and redirects the execution to an error message
-	errmsg := fmt.Sprintf("The '%s' command is not available because it requires git and git-annex:", cmd.Name())
+var depinfo string
 
+func dependencyInfo(giterr, annexerr error) string {
+	if len(depinfo) > 0 {
+		return depinfo
+	}
+	var errmsg string
 	if giterr != nil {
-		errmsg = fmt.Sprintf("%s\n  %s", errmsg, giterr)
+		errmsg = fmt.Sprintf("  %s\n", giterr)
 	}
 	if annexerr != nil {
-		errmsg = fmt.Sprintf("%s\n  %s", errmsg, annexerr)
+		errmsg = fmt.Sprintf("%s  %s\n", errmsg, annexerr)
 	}
-	cmd.Short = fmt.Sprintf("[%s] %s", red("not available"), cmd.Short)
 
-	cmd.Run = func(c *cobra.Command, args []string) {
-		Die(errmsg)
+	helppage := "https://web.gin.g-node.org/G-Node/Info/wiki/GinCli"
+	var anchor string
+	switch runtime.GOOS {
+	case "windows":
+		anchor = "#windows"
+	case "darwin":
+		anchor = "#macos"
+	case "linux":
+		anchor = "#linux"
 	}
+	helpurl := fmt.Sprintf("%s%s", helppage, anchor)
+	depinfo = fmt.Sprintf("%s  Visit %s for information on installing all the required software\n", errmsg, helpurl)
+	return depinfo
+}
+
+func disableCommands(cmds map[string]*cobra.Command, giterr, annexerr error) {
+	errmsg := "The '%s' command is not available because it requires git and git-annex:"
+
+	errmsg = fmt.Sprintf("%s\n%s", errmsg, dependencyInfo(giterr, annexerr))
+
+	for _, cname := range reqgitannex {
+		cmds[cname].Short = fmt.Sprintf("[%s] %s", red("not available"), cmds[cname].Short)
+		diemsg := fmt.Sprintf(errmsg, cname)
+		cmds[cname].Run = func(c *cobra.Command, args []string) {
+			Die(diemsg)
+		}
+	}
+
 }
 
 // SetUpCommands sets up all the subcommands for the client and returns the root command, ready to execute.
@@ -322,9 +350,6 @@ func SetUpCommands(verinfo VersionInfo) *cobra.Command {
 		Version:               fmt.Sprintln(verstr),
 		DisableFlagsInUseLine: true,
 	}
-	gitok, giterr := verinfo.GitOK()
-	annexok, annexerr := verinfo.AnnexOK()
-
 	cmds := make(map[string]*cobra.Command)
 
 	// Login
@@ -414,18 +439,13 @@ func SetUpCommands(verinfo VersionInfo) *cobra.Command {
 
 	// Currently treating git and git-annex dependency together: if one is broken, we assume both are
 	// This might change in the future (a command might work with git even if annex isn't found)
+	gitok, giterr := verinfo.GitOK()
+	annexok, annexerr := verinfo.AnnexOK()
+
 	if !(gitok && annexok) {
-		for _, name := range reqgitannex {
-			disableCommand(cmds[name], giterr, annexerr)
-		}
+		disableCommands(cmds, giterr, annexerr)
 		warnmsg := yellow("Some commands are not available:")
-		if giterr != nil {
-			warnmsg = fmt.Sprintf("%s\n  %s", warnmsg, giterr)
-		}
-		if annexerr != nil {
-			warnmsg = fmt.Sprintf("%s\n  %s", warnmsg, annexerr)
-		}
-		helpTemplate = fmt.Sprintf("%s\n%s", helpTemplate, warnmsg)
+		helpTemplate = fmt.Sprintf("%s\n%s\n%s", helpTemplate, warnmsg, dependencyInfo(giterr, annexerr))
 	}
 
 	cobra.AddTemplateFunc("wrappedFlagUsages", wrappedFlagUsages)
