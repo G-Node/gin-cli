@@ -27,7 +27,7 @@ func getContent(cmd *cobra.Command, args []string) {
 func GetContentCmd() *cobra.Command {
 	description := "Download the content of the listed files. The get-content command is intended to be used to retrieve the content of placeholder files in a local repository. This command must be called from within the local repository clone. With no arguments, downloads the content for all files under the working directory, recursively."
 	args := map[string]string{
-		"<filenames>": "One or more directories or files to lock.",
+		"<filenames>": "One or more directories or files to download.",
 	}
 	var cmd = &cobra.Command{
 		Use:                   "get-content [--json] [<filenames>]...",
