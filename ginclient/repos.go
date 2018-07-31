@@ -284,6 +284,13 @@ func (gincl *Client) Upload(paths []string, remotes []string, uploadchan chan<- 
 			uploadchan <- git.RepoFileStatus{FileName: remote, Err: fmt.Errorf("unknown remote name '%s': skipping", remote)}
 			continue
 		}
+
+		gitpushchan := make(chan git.RepoFileStatus)
+		go git.Push(remote, gitpushchan)
+		for stat := range gitpushchan {
+			uploadchan <- stat
+		}
+
 		annexpushchan := make(chan git.RepoFileStatus)
 		go git.AnnexPush(paths, remote, annexpushchan)
 		for stat := range annexpushchan {
