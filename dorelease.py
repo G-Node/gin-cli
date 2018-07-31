@@ -11,7 +11,6 @@ Build gin-cli binaries and package them for distribution.
 import pickle
 import sys
 import os
-import stat
 import shutil
 import json
 import re
@@ -115,8 +114,7 @@ def build():
     with open(verfilename) as verfile:
         verinfo = verfile.read()
 
-    VERSION["version"] = re.search(r"version=([0-9\.]+(dev|beta){0,1})",
-                                   verinfo).group(1)
+    VERSION["version"] = re.search(r"version=(.*)", verinfo).group(1)
     cmd = ["git", "rev-list", "--count", "HEAD"]
     VERSION["build"] = int(check_output(cmd).strip().decode())
     cmd = ["git", "rev-parse", "HEAD"]
