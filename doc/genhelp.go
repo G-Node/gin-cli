@@ -114,7 +114,7 @@ func gendoc(cmd *cobra.Command) string {
 }
 
 func main() {
-	rootcmd := gincmd.SetUpCommands("")
+	rootcmd := gincmd.SetUpCommands(gincmd.VersionInfo{})
 	fmt.Println("Generating help file")
 
 	buf := new(bytes.Buffer)

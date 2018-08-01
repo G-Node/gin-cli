@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"runtime"
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
@@ -19,8 +20,30 @@ import (
 
 const unknownhostname = "(unknown)"
 
-var green = color.New(color.FgGreen).SprintFunc()
-var red = color.New(color.FgRed).SprintFunc()
+var (
+	green  = color.New(color.FgGreen).SprintFunc()
+	red    = color.New(color.FgRed).SprintFunc()
+	yellow = color.New(color.FgYellow).SprintFunc()
+
+	reqgitannex = []string{
+		"add-remote",
+		"commit",
+		"create",
+		"download",
+		"get",
+		"get-content",
+		"init",
+		"lock",
+		"ls",
+		"remotes",
+		"remove-content",
+		"remove-remote",
+		"unlock",
+		"upload",
+		"use-remote",
+		"version",
+	}
+)
 
 // Die prints an error message to stderr and exits the program with status 1.
 func Die(msg interface{}) {
@@ -274,102 +297,164 @@ func formatexamples(examples map[string]string) (exdesc string) {
 	return
 }
 
+var depinfo string
+
+func dependencyInfo(giterr, annexerr error) string {
+	if len(depinfo) > 0 {
+		return depinfo
+	}
+	var errmsg string
+	if giterr != nil {
+		errmsg = fmt.Sprintf("  %s\n", giterr)
+	}
+	if annexerr != nil {
+		errmsg = fmt.Sprintf("%s  %s\n", errmsg, annexerr)
+	}
+
+	helppage := "https://web.gin.g-node.org/G-Node/Info/wiki/GinCli"
+	var anchor string
+	switch runtime.GOOS {
+	case "windows":
+		anchor = "#windows"
+	case "darwin":
+		anchor = "#macos"
+	case "linux":
+		anchor = "#linux"
+	}
+	helpurl := fmt.Sprintf("%s%s", helppage, anchor)
+	depinfo = fmt.Sprintf("%s  Visit %s for information on installing all the required software\n", errmsg, helpurl)
+	return depinfo
+}
+
+func disableCommands(cmds map[string]*cobra.Command, giterr, annexerr error) {
+	errmsg := "The '%s' command is not available because it requires git and git-annex:"
+
+	errmsg = fmt.Sprintf("%s\n%s", errmsg, dependencyInfo(giterr, annexerr))
+
+	for _, cname := range reqgitannex {
+		cmds[cname].Short = fmt.Sprintf("[%s] %s", red("not available"), cmds[cname].Short)
+		diemsg := fmt.Sprintf(errmsg, cname)
+		cmds[cname].Run = func(c *cobra.Command, args []string) {
+			Die(diemsg)
+		}
+	}
+
+}
+
 // SetUpCommands sets up all the subcommands for the client and returns the root command, ready to execute.
-func SetUpCommands(verstr string) *cobra.Command {
+func SetUpCommands(verinfo VersionInfo) *cobra.Command {
+	verstr := verinfo.String()
 	var rootCmd = &cobra.Command{
 		Use:                   "gin",
 		Long:                  "GIN Command Line Interface and client for the GIN services", // TODO: Add license and web info
 		Version:               fmt.Sprintln(verstr),
 		DisableFlagsInUseLine: true,
 	}
+	cmds := make(map[string]*cobra.Command)
+
+	// Login
+	cmds["login"] = LoginCmd()
+
+	// Logout
+	cmds["logout"] = LogoutCmd()
+
+	// Add server
+	cmds["add-server"] = AddServerCmd()
+
+	// Remove server
+	cmds["remove-server"] = RemoveServerCmd()
+
+	// Use server
+	cmds["use-server"] = UseServerCmd()
+
+	// Servers
+	cmds["servers"] = ServersCmd()
+
+	// Account info
+	cmds["info"] = InfoCmd()
+
+	// List repos
+	cmds["repos"] = ReposCmd()
+
+	// Repo info
+	cmds["repoinfo"] = RepoInfoCmd()
+
+	// Keys
+	cmds["keys"] = KeysCmd()
+
+	// Init repo
+	cmds["init"] = InitCmd()
+
+	// Add remote
+	cmds["add-remote"] = AddRemoteCmd()
+
+	// Remove remote
+	cmds["remove-remote"] = RemoveRemoteCmd()
+
+	// Use remote
+	cmds["use-remote"] = UseRemoteCmd()
+
+	// Remotes
+	cmds["remotes"] = RemotesCmd()
+
+	// Create repo
+	cmds["create"] = CreateCmd()
+
+	// Delete repo (unlisted)
+	cmds["delete"] = DeleteCmd()
+
+	// Get repo
+	cmds["get"] = GetCmd()
+
+	// List files
+	cmds["ls"] = LsRepoCmd()
+
+	// Unlock content
+	cmds["unlock"] = UnlockCmd()
+
+	// Lock content
+	cmds["lock"] = LockCmd()
+
+	// Commit changes
+	cmds["commit"] = CommitCmd()
+
+	// Upload
+	cmds["upload"] = UploadCmd()
+
+	// Download
+	cmds["download"] = DownloadCmd()
+
+	// Get content
+	cmds["get-content"] = GetContentCmd()
+
+	// Remove content
+	cmds["remove-content"] = RemoveContentCmd()
+
+	// Version
+	cmds["version"] = VersionCmd()
+
+	cmds["git"] = GitCmd()
+
+	cmds["annex"] = AnnexCmd()
+
+	// Currently treating git and git-annex dependency together: if one is broken, we assume both are
+	// This might change in the future (a command might work with git even if annex isn't found)
+	gitok, giterr := verinfo.GitOK()
+	annexok, annexerr := verinfo.AnnexOK()
+
+	if !(gitok && annexok) {
+		disableCommands(cmds, giterr, annexerr)
+		warnmsg := yellow("Some commands are not available:")
+		helpTemplate = fmt.Sprintf("%s\n%s\n%s", helpTemplate, warnmsg, dependencyInfo(giterr, annexerr))
+	}
+
 	cobra.AddTemplateFunc("wrappedFlagUsages", wrappedFlagUsages)
 	rootCmd.SetHelpTemplate(helpTemplate)
 	rootCmd.SetUsageTemplate(usageTemplate)
 
-	// Login
-	rootCmd.AddCommand(LoginCmd())
-
-	// Logout
-	rootCmd.AddCommand(LogoutCmd())
-
-	// Init repo
-	rootCmd.AddCommand(InitCmd())
-
-	// Add server
-	rootCmd.AddCommand(AddServerCmd())
-
-	// Remove server
-	rootCmd.AddCommand(RemoveServerCmd())
-
-	// Use server
-	rootCmd.AddCommand(UseServerCmd())
-
-	// Servers
-	rootCmd.AddCommand(ServersCmd())
-
-	// Add remote
-	rootCmd.AddCommand(AddRemoteCmd())
-
-	// Remove remote
-	rootCmd.AddCommand(RemoveRemoteCmd())
-
-	// Use remote
-	rootCmd.AddCommand(UseRemoteCmd())
-
-	// Remotes
-	rootCmd.AddCommand(RemotesCmd())
-
-	// Create repo
-	rootCmd.AddCommand(CreateCmd())
-
-	// Delete repo (unlisted)
-	rootCmd.AddCommand(DeleteCmd())
-
-	// Get repo
-	rootCmd.AddCommand(GetCmd())
-
-	// List files
-	rootCmd.AddCommand(LsRepoCmd())
-
-	// Unlock content
-	rootCmd.AddCommand(UnlockCmd())
-
-	// Lock content
-	rootCmd.AddCommand(LockCmd())
-
-	// Commit changes
-	rootCmd.AddCommand(CommitCmd())
-
-	// Upload
-	rootCmd.AddCommand(UploadCmd())
-
-	// Download
-	rootCmd.AddCommand(DownloadCmd())
-
-	// Get content
-	rootCmd.AddCommand(GetContentCmd())
-
-	// Remove content
-	rootCmd.AddCommand(RemoveContentCmd())
-
-	// Account info
-	rootCmd.AddCommand(InfoCmd())
-
-	// List repos
-	rootCmd.AddCommand(ReposCmd())
-
-	// Repo info
-	rootCmd.AddCommand(RepoInfoCmd())
-
-	// Keys
-	rootCmd.AddCommand(KeysCmd())
-
-	// Version
-	rootCmd.AddCommand(VersionCmd())
-
-	// git and annex passthrough (unlisted)
-	rootCmd.AddCommand(GitCmd())
-	rootCmd.AddCommand(AnnexCmd())
+	for _, cmd := range cmds {
+		rootCmd.AddCommand(cmd)
+	}
 
 	return rootCmd
 }
