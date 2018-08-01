@@ -58,13 +58,12 @@ func (v *VersionInfo) AnnexOK() (bool, error) {
 	systemver, err := version.NewVersion(v.Annex)
 	if err != nil {
 		// Special case for neurodebian git-annex version
-		// The versionn string contains a tilde as a separator for the arch suffix
+		// The version string contains a tilde as a separator for the arch suffix
 		// Cutting off the suffix and checking again
 		verstring := strings.Split(v.Annex, "~")[0]
 		systemver, err = version.NewVersion(verstring)
 		if err != nil {
 			// Can't figure out the version: print error from AnnexVersion
-			// return false, fmt.Errorf("%s\ngit-annex version %s not understood", errmsg, v.Annex)
 			return false, fmt.Errorf(v.Annex)
 		}
 	}
