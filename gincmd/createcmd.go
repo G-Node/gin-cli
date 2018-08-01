@@ -59,7 +59,9 @@ func createRepo(cmd *cobra.Command, args []string) {
 			// Push the new commit to initialise origin
 			uploadchan := make(chan git.RepoFileStatus)
 			go gincl.Upload(nil, []string{"origin"}, uploadchan)
-			<-uploadchan
+			for range uploadchan {
+				// Wait for channel to close
+			}
 		}
 	} else if !noclone {
 		// Clone repository after creation

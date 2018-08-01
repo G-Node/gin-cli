@@ -79,7 +79,9 @@ func checkoutcopies(commit git.GinCommit, paths []string, destination string) {
 	// Add new files to index but do not upload
 	addchan := make(chan git.RepoFileStatus)
 	go git.Add(newfiles, addchan)
-	<-addchan
+	for range addchan {
+		// Wait for channel to close
+	}
 	// TODO: Instead of adding git files, would it be better if we did get-content on annex files and then removed them from the index?
 }
 

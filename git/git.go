@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -110,6 +111,7 @@ func Init(bare bool) error {
 // The status channel 'clonechan' is closed when this function returns.
 // (git clone ...)
 func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) {
+	// TODO: This function is crazy huge - simplify
 	fn := fmt.Sprintf("Clone(%s)", remotepath)
 	defer close(clonechan)
 	args := []string{"clone", "--progress", remotepath}
@@ -192,6 +194,46 @@ func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) 
 	// Progress doesn't show 100% if cloning an empty repository, so let's force it
 	status.Progress = progcomplete
 	clonechan <- status
+	return
+}
+
+// Push uploads all small (git) files to the server.
+// (git push)
+func Push(remote string, pushchan chan<- RepoFileStatus) {
+	defer close(pushchan)
+
+	if IsDirect() {
+		// Set bare false and revert at the end of the function
+		err := setBare(false)
+		if err != nil {
+			pushchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
+			return
+		}
+		defer setBare(true)
+	}
+
+	cmd := Command("push", "--progress", remote)
+	err := cmd.Start()
+	if err != nil {
+		pushchan <- RepoFileStatus{Err: err}
+	}
+
+	var status RepoFileStatus
+	var line string
+	var rerr error
+	re := regexp.MustCompile(`(?P<state>Compressing|Writing) objects:\s+(?P<progress>[0-9]{2,3})% \((?P<n>[0-9]+)/(?P<N>[0-9]+)\)`)
+	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\r') {
+		if !re.MatchString(line) {
+			continue
+		}
+		match := re.FindStringSubmatch(line)
+		status.State = match[1]
+		if status.State == "Writing" {
+			status.State = fmt.Sprintf("Uploading git files (to: %s)", remote)
+		}
+		status.Progress = fmt.Sprintf("%s%%", match[2])
+		pushchan <- status
+	}
 	return
 }
 
