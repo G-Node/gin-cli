@@ -6,13 +6,15 @@ sudo: required
 services:
     - docker
 
-go:
-  - "1.10.x"
-  - tip
-
 matrix:
-    allow_failures:
-        - go: tip
+  include:
+    - go: "1.10.x"
+      env: testscript="run-cont-tests"
+    - go: "1.10.x"
+      env: testscript="run-cont-tests-mv"
+    - go: tip
+  allow_failures:
+    - go: tip
 
 before_install:
   - sudo apt-get update
@@ -45,18 +47,18 @@ install:
 script:
   - make
   - make installtest
-  - if [ ${TRAVIS_GO_VERSION} != "tip" ]; then
+  - if [[ "${TRAVIS_GO_VERSION}" != "tip" ]]; then
         ./tests/start-server;
         while ! curl localhost:3000 -so /dev/null; do sleep 1; done;
-        ./tests/run-cont-tests;
+        ./tests/${testscript};
     fi
 
 after_script:
   # push logs to gist
-  - if [ ${TRAVIS_GO_VERSION} != "tip" ]; then
+  - if [[ "${TRAVIS_GO_VERSION}" != "tip" ]]; then
         echo $GISTTOKEN > ./tests/testuserhome/.gist;
-        mv ./tests/testuserhome/log/gin.log ./tests/testuserhome/log/gin-${TRAVIS_BRANCH}.log;
-        mv ./tests/testuserhome/log/tests.log ./tests/testuserhome/log/tests-${TRAVIS_BRANCH}.log;
+        mv ./tests/testuserhome/log/gin.log ./tests/testuserhome/log/gin-${TRAVIS_BRANCH}-${testscript}.log;
+        mv ./tests/testuserhome/log/tests.log ./tests/testuserhome/log/tests-${TRAVIS_BRANCH}-${testscript}.log;
         ./tests/run-cont gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c ./testuserhome/log/*.log;
         rm ./tests/testuserhome/.gist;
     fi
