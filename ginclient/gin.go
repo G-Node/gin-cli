@@ -224,7 +224,7 @@ func (gincl *Client) DeletePubKeyByIdx(idx int) (string, error) {
 // It also generates a key pair for the user for use in git commands.
 func (gincl *Client) Login(username, password, clientID string) error {
 	fn := "Login()"
-	tokenCreate := &gogs.CreateAccessTokenOption{Name: "gin-cli"}
+	tokenCreate := &gogs.CreateAccessTokenOption{Name: clientID}
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
 	res, err := gincl.PostBasicAuth(address, username, password, tokenCreate)
 	if err != nil {
