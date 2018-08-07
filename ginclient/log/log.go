@@ -80,11 +80,7 @@ func Write(fmtstr string, args ...interface{}) {
 	if logger == nil {
 		return
 	}
-	if len(args) == 0 {
-		logger.Print(fmtstr)
-	} else {
-		logger.Printf(fmtstr, args...)
-	}
+	logger.Printf(fmtstr, args...)
 }
 
 // WriteError prints err to the logfile and returns, effectively ignoring the error.
