@@ -20,6 +20,7 @@ var order = []string{
 	"login",
 	"logout",
 	"create",
+	"init",
 	"get",
 	"download",
 	"upload",
@@ -28,6 +29,15 @@ var order = []string{
 	"remove-content",
 	"lock",
 	"unlock",
+	"commit",
+	"add-remote",
+	"remove-remote",
+	"use-remote",
+	"remotes",
+	"add-server",
+	"remove-server",
+	"use-server",
+	"servers",
 }
 
 var skip = []string{
@@ -114,7 +124,10 @@ func gendoc(cmd *cobra.Command) string {
 }
 
 func main() {
-	rootcmd := gincmd.SetUpCommands(gincmd.VersionInfo{})
+
+	verinfo := gincmd.VersionInfo{Git: "5", Annex: "7"}
+	rootcmd := gincmd.SetUpCommands(verinfo)
+
 	fmt.Println("Generating help file")
 
 	buf := new(bytes.Buffer)
