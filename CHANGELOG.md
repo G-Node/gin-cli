@@ -2,7 +2,7 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
-## Unreleased
+## Version 1.0
 
 ### Changes
 - New commands
@@ -25,6 +25,9 @@
         - The `login`, `logout`, `create`, `info`, `keys`, `repos`, `repoinfo`, and `get` commands now accept a `--server` argument for querying or operating on a specific, non-default server.
 - Progress bars for file operations: Some operations don't have a per-file progress (add, lock, unlock). There is no partial unlock state for a file, for instance. For these commands, the output shows the overall progress along with the number of total files that are being affected.
 - Smaller logfiles: The log file is now limited to 1 MB. No more ever-growing logs.
+- The client is now usable even without git-annex installed, but commands that require git and git-annex are disabled.
+- Progress is now also printed when uploading git files.
+- Minimum required got-annex version: 6.20171109
 
 ### Bug fixes
 - Fixed a bug where file tracking would register a type change in git when working with direct mode repositories (e.g., on Windows).
@@ -41,6 +44,8 @@
 - #204: Fix for ls file status in direct mode
 - #205: New command: add-remote
 - #206: Handle multiple server configurations
+- #210: Disable commands that rely on git/annex when either is not available
+- #211: Git transfer output
 
 ## Version 0.16
 
