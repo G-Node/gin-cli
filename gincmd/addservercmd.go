@@ -18,9 +18,8 @@ func promptForWeb() (webconf config.WebCfg) {
 	fmt.Print("  Host or address: ")
 	fmt.Scanln(&webconf.Host)
 
-	var port uint16
 	fmt.Print("  Port (e.g., 80, 443): ")
-	_, err := fmt.Scanln(&port)
+	_, err := fmt.Scanln(&webconf.Port)
 	if err != nil {
 		Die(ginerrors.BadPort)
 	}
@@ -33,9 +32,8 @@ func promptForGit() (gitconf config.GitCfg) {
 	fmt.Scanln(&gitconf.User)
 	fmt.Print("  Host or address: ")
 	fmt.Scanln(&gitconf.Host)
-	var port uint16
 	fmt.Print("  Port (e.g., 22, 2222): ")
-	_, err := fmt.Scanln(&port)
+	_, err := fmt.Scanln(&gitconf.Port)
 	if err != nil {
 		Die(ginerrors.BadPort)
 	}
