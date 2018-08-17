@@ -1,6 +1,13 @@
-gin-cli (1.0b); urgency=low
+gin-cli (1.1); urgency=low
 
-  * Beta 1.0
+  * Release 1.1
+  * Bug fix: The port was not being stored properly when using the input
+    prompts to set up a new server configuration.
+  * Bug fix: In some cases, the host key was not written to the `known_hosts` file in the format required (especially for `localhost`).
+
+gin-cli (1.0); urgency=low
+
+  * Release 1.0
   * New command `gin init`: Initialises a directory as a gin repository without creating a repository on a server.
   * New command `gin commit`: Records changes in the local repository without performing an upload and without requiring a remote or an internet connection.
   * New command `gin version`: Rolls back files or directories to older versions. With the `--copy-to` flag, retrieves older files without overwriting the current version and copies them to a specific location.

@@ -2,6 +2,16 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.1
+
+### Bug fixes
+- Fixed a couple of bugs relating to the `add-server` command.
+    - The port was not being stored properly when using the input prompts to set up a new server configuration.
+    - In some cases, the host key was not written to the `known_hosts` file in the format required (especially for `localhost`).
+
+### Relevant PRs
+- #213: Localhost key fix
+
 ## Version 1.0
 
 ### Changes
