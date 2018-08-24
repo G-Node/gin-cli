@@ -220,9 +220,30 @@ func (gincl *Client) DeletePubKeyByIdx(idx int) (string, error) {
 	return key.Title, gincl.DeletePubKey(key.ID)
 }
 
-// Login requests a token from the auth server and stores the username and token to file.
+// Login requests a token from the auth server and stores the username and
+// token to file and adds them to the Client.
 // It also generates a key pair for the user for use in git commands.
+// (See also NewToken)
 func (gincl *Client) Login(username, password, clientID string) error {
+	// Get token
+	err := gincl.NewToken(username, password, clientID)
+	if err != nil {
+		return err
+	}
+
+	// Store token (to file)
+	err = gincl.StoreToken(gincl.srvalias)
+	if err != nil {
+		return fmt.Errorf("Error while storing token: %s", err.Error())
+	}
+
+	// Make keys
+	return gincl.MakeSessionKey()
+}
+
+// NewToken requests a new user token from the GIN server and adds it to the
+// Client along with the username.
+func (gincl *Client) NewToken(username, password, clientID string) error {
 	fn := "Login()"
 	tokenCreate := &gogs.CreateAccessTokenOption{Name: clientID}
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
@@ -251,13 +272,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	gincl.Username = username
 	gincl.Token = token.Sha1
 	log.Write("Login successful. Username: %s", username)
-
-	err = gincl.StoreToken(gincl.srvalias)
-	if err != nil {
-		return fmt.Errorf("Error while storing token: %s", err.Error())
-	}
-
-	return gincl.MakeSessionKey()
+	return nil
 }
 
 // LoadToken calls the embedded UserToken.LoadToken function with the configured server alias.
