@@ -115,6 +115,25 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 	return resp, err
 }
 
+// GetBasicAuth sends a GET request to address.
+// The username and password are used to perform Basic authentication.
+func (cl *Client) GetBasicAuth(address, username, password string) (*http.Response, error) {
+	fn := fmt.Sprintf("GetBasicAuth(%s)", address)
+	requrl := urlJoin(cl.Host, address)
+	req, err := http.NewRequest("GET", requrl, nil)
+	if err != nil {
+		return nil, weberror{UError: err.Error(), Origin: fn}
+	}
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", gogs.BasicAuthEncode(username, password)))
+	log.Write("Performing GET: %s", req.URL)
+	resp, err := cl.web.Do(req)
+	if err != nil {
+		err = weberror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
+	}
+	return resp, err
+}
+
 // PostBasicAuth sends a POST request to address with the provided data.
 // The username and password are used to perform Basic authentication.
 func (cl *Client) PostBasicAuth(address, username, password string, data interface{}) (*http.Response, error) {
