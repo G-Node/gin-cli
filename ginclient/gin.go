@@ -225,12 +225,30 @@ func (gincl *Client) DeletePubKeyByIdx(idx int) (string, error) {
 // It also generates a key pair for the user for use in git commands.
 // (See also NewToken)
 func (gincl *Client) Login(username, password, clientID string) error {
-	// TODO: Check if token already exists with clientID and use that instead
-	// of creating a new one ever time
-	// Get token
-	err := gincl.NewToken(username, password, clientID)
+	// retrieve user's active tokens
+	tokens, err := gincl.GetTokens(username, password)
 	if err != nil {
 		return err
+	}
+
+	for _, token := range tokens {
+		if token.Name == clientID {
+			// found our token
+			gincl.UserToken.Username = username
+			gincl.UserToken.Token = token.Sha1
+			log.Write("Found %s access token", clientID)
+			break
+		}
+	}
+
+	if len(gincl.UserToken.Token) == 0 {
+		// no existing token; creating new one
+		log.Write("Requesting new token from server")
+		err = gincl.NewToken(username, password, clientID)
+		if err != nil {
+			return err
+		}
+		log.Write("Login successful. Username: %s", username)
 	}
 
 	// Store token (to file)
