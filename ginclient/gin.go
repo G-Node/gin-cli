@@ -320,7 +320,6 @@ func (gincl *Client) NewToken(username, password, clientID string) error {
 	}
 	gincl.Username = username
 	gincl.Token = token.Sha1
-	log.Write("Login successful. Username: %s", username)
 	return nil
 }
 
