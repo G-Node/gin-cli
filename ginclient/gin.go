@@ -225,10 +225,30 @@ func (gincl *Client) DeletePubKeyByIdx(idx int) (string, error) {
 // It also generates a key pair for the user for use in git commands.
 // (See also NewToken)
 func (gincl *Client) Login(username, password, clientID string) error {
-	// Get token
-	err := gincl.NewToken(username, password, clientID)
+	// retrieve user's active tokens
+	tokens, err := gincl.GetTokens(username, password)
 	if err != nil {
 		return err
+	}
+
+	for _, token := range tokens {
+		if token.Name == clientID {
+			// found our token
+			gincl.UserToken.Username = username
+			gincl.UserToken.Token = token.Sha1
+			log.Write("Found %s access token", clientID)
+			break
+		}
+	}
+
+	if len(gincl.UserToken.Token) == 0 {
+		// no existing token; creating new one
+		log.Write("Requesting new token from server")
+		err = gincl.NewToken(username, password, clientID)
+		if err != nil {
+			return err
+		}
+		log.Write("Login successful. Username: %s", username)
 	}
 
 	// Store token (to file)
@@ -241,10 +261,39 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	return gincl.MakeSessionKey()
 }
 
+// GetTokens returns all the user's active access tokens from the GIN server.
+func (gincl *Client) GetTokens(username, password string) ([]AccessToken, error) {
+	fn := "GetTokens()"
+	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
+	res, err := gincl.GetBasicAuth(address, username, password)
+	if err != nil {
+		return nil, err // return error from GetBasicAuth directly
+	}
+	switch code := res.StatusCode; {
+	case code == http.StatusInternalServerError:
+		return nil, ginerror{UError: res.Status, Origin: fn, Description: "server error"}
+	case code == http.StatusUnauthorized:
+		return nil, ginerror{UError: res.Status, Origin: fn, Description: "authorisation failed"}
+	case code != http.StatusOK:
+		return nil, ginerror{UError: res.Status, Origin: fn} // Unexpected error
+	}
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	log.Write("Got response: %s", res.Status)
+	tokens := []AccessToken{}
+	err = json.Unmarshal(data, &tokens)
+	if err != nil {
+		return nil, ginerror{UError: err.Error(), Origin: fn, Description: "failed to parse response body"}
+	}
+	return tokens, nil
+}
+
 // NewToken requests a new user token from the GIN server and adds it to the
 // Client along with the username.
 func (gincl *Client) NewToken(username, password, clientID string) error {
-	fn := "Login()"
+	fn := "NewToken()"
 	tokenCreate := &gogs.CreateAccessTokenOption{Name: clientID}
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
 	res, err := gincl.PostBasicAuth(address, username, password, tokenCreate)
@@ -271,7 +320,6 @@ func (gincl *Client) NewToken(username, password, clientID string) error {
 	}
 	gincl.Username = username
 	gincl.Token = token.Sha1
-	log.Write("Login successful. Username: %s", username)
 	return nil
 }
 

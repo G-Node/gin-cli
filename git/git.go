@@ -78,7 +78,7 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(struct {
 		RFSAlias
-		Err string `json:"err"`
+		Err string
 	}{
 		RFSAlias: RFSAlias(s),
 		Err:      errmsg,
