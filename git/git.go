@@ -934,6 +934,12 @@ func IsVersion6() bool {
 	return ver == "6"
 }
 
+// mergeAbort aborts an unfinished  git merge.
+func mergeAbort() {
+	cmd := Command("merge", "--abort")
+	cmd.Run()
+}
+
 func SetBare(state bool) {
 	setBare(state)
 }

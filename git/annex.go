@@ -148,14 +148,30 @@ func AnnexPull() error {
 		} else if strings.Contains(sstderr, "Host key verification failed") {
 			errmsg = "download failed: server key does not match known host key"
 		} else if strings.Contains(sstderr, "would be overwritten by merge") {
-			errmsg = fmt.Sprintf("download failed: local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseConflictFiles(sstderr), ", "))
+			errmsg = fmt.Sprintf("download failed: local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseFilesOverwrite(sstderr), ", "))
+		} else if strings.Contains(sstderr, "unresolved conflict") {
+			errmsg = fmt.Sprintf("download failed: files changed locally and remotely and cannot be automatically merged (merge conflict):\n %s", strings.Join(parseFilesConflict(string(stdout)), ", "))
+			// abort merge
+			mergeAbort()
 		}
 		err = fmt.Errorf(errmsg)
 	}
 	return err
 }
 
-func parseConflictFiles(errmsg string) []string {
+func parseFilesConflict(errmsg string) []string {
+	lines := strings.Split(errmsg, "\n")
+	var filenames []string
+	delim := "Merge conflict in "
+	for _, l := range lines {
+		if idx := strings.Index(l, delim); idx > -1 {
+			filenames = append(filenames, l[idx+len(delim):])
+		}
+	}
+	return filenames
+}
+
+func parseFilesOverwrite(errmsg string) []string {
 	lines := strings.Split(errmsg, "\n")
 	var filenames []string
 	start := false
