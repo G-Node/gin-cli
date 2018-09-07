@@ -148,12 +148,30 @@ func AnnexPull() error {
 		} else if strings.Contains(sstderr, "Host key verification failed") {
 			errmsg = "download failed: server key does not match known host key"
 		} else if strings.Contains(sstderr, "would be overwritten by merge") {
-			errmsg = "download failed: local modified or untracked file would be overwritten by download"
-			// TODO: Which file
+			errmsg = fmt.Sprintf("download failed: local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseConflictFiles(sstderr), ", "))
 		}
 		err = fmt.Errorf(errmsg)
 	}
 	return err
+}
+
+func parseConflictFiles(errmsg string) []string {
+	lines := strings.Split(errmsg, "\n")
+	var filenames []string
+	start := false
+	for _, l := range lines {
+		if strings.Contains(l, "error: The following") {
+			start = true
+			continue
+		}
+		if strings.Contains(l, "Please move or remove") {
+			break
+		}
+		if start {
+			filenames = append(filenames, strings.TrimSpace(l))
+		}
+	}
+	return filenames
 }
 
 // AnnexPush uploads all changes and new content to the default remote.
