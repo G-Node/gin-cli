@@ -501,7 +501,8 @@ func Commit(commitmsg string) error {
 	stdout, stderr, err := cmd.OutputError()
 
 	if err != nil {
-		if strings.Contains(string(stdout), "nothing to commit") {
+		sstdout := string(stdout)
+		if strings.Contains(sstdout, "nothing to commit") || strings.Contains(sstdout, "nothing added to commit") {
 			// Return special error
 			log.Write("Nothing to commit")
 			return fmt.Errorf("Nothing to commit")
