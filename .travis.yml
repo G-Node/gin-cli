@@ -59,6 +59,6 @@ after_script:
         echo $GISTTOKEN > ./tests/testuserhome/.gist;
         mv ./tests/testuserhome/log/gin.log ./tests/testuserhome/log/gin-${TRAVIS_BRANCH}-${testscript}.log;
         mv ./tests/testuserhome/log/tests.log ./tests/testuserhome/log/tests-${TRAVIS_BRANCH}-${testscript}.log;
-        ./tests/run-cont gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c ./testuserhome/log/*.log;
+        ./tests/run-cont find ./log -type f -exec gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c {} \+ ;
         rm ./tests/testuserhome/.gist;
     fi
