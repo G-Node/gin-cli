@@ -38,13 +38,13 @@ var order = []string{
 	"remove-server",
 	"use-server",
 	"servers",
+	"version",
 }
 
 var skip = []string{
 	"delete",
 	"git",
 	"annex",
-	"version",
 }
 
 var mdTemplate = `## {{ .Short }}
