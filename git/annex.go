@@ -146,15 +146,27 @@ func AnnexPull() error {
 		if strings.Contains(sstderr, "Permission denied") {
 			errmsg = "download failed: permission denied"
 		} else if strings.Contains(sstderr, "Host key verification failed") {
+			// Bad host key configured
 			errmsg = "download failed: server key does not match known host key"
 		} else if strings.Contains(sstderr, "would be overwritten by merge") {
+			// Untracked local file conflicts with file being pulled
 			errmsg = fmt.Sprintf("download failed: local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseFilesOverwrite(sstderr), ", "))
 		} else if strings.Contains(sstderr, "unresolved conflict") {
+			// Merge conflict in git files
 			errmsg = fmt.Sprintf("download failed: files changed locally and remotely and cannot be automatically merged (merge conflict):\n %s", strings.Join(parseFilesConflict(string(stdout)), ", "))
 			// abort merge
 			mergeAbort()
 		}
 		err = fmt.Errorf(errmsg)
+	}
+
+	// annex conflicts are resolved automatically and don't produce an error
+	// checking stdout for message
+	sstdout := string(stdout)
+	if strings.Contains(sstdout, "Merge conflict was automatically resolved") {
+		// Merge conflict in annex files (automatically resolved by keeping both copies)
+		err = fmt.Errorf("files changed locally and remotely. Both files have been kept:\n %s", strings.Join(parseFilesAnnexConflict(sstdout), ", "))
+		// TODO: This should probably instead become a warning or notice, instead of a full error
 	}
 	return err
 }
@@ -166,6 +178,18 @@ func parseFilesConflict(errmsg string) []string {
 	for _, l := range lines {
 		if idx := strings.Index(l, delim); idx > -1 {
 			filenames = append(filenames, l[idx+len(delim):])
+		}
+	}
+	return filenames
+}
+
+func parseFilesAnnexConflict(errmsg string) []string {
+	lines := strings.Split(errmsg, "\n")
+	var filenames []string
+	delim := ": needs merge"
+	for _, l := range lines {
+		if idx := strings.Index(l, delim); idx > -1 {
+			filenames = append(filenames, l[0:idx])
 		}
 	}
 	return filenames
