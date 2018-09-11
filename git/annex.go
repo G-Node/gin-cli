@@ -136,39 +136,46 @@ func AnnexPull() error {
 	args := []string{"sync", "--no-push", "--no-commit"}
 	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
+	sstdout := string(stdout)
+	sstderr := string(stderr)
 	if err != nil {
 		log.Write("Error during AnnexPull.")
 		log.Write("[Error]: %v", err)
 		logstd(stdout, stderr)
-		errmsg := "failed"
-		sstderr := string(stderr)
 		// TODO: Use giterror
 		if strings.Contains(sstderr, "Permission denied") {
-			errmsg = "download failed: permission denied"
+			return fmt.Errorf("download failed: permission denied")
 		} else if strings.Contains(sstderr, "Host key verification failed") {
 			// Bad host key configured
-			errmsg = "download failed: server key does not match known host key"
-		} else if strings.Contains(sstderr, "would be overwritten by merge") {
-			// Untracked local file conflicts with file being pulled
-			errmsg = fmt.Sprintf("download failed: local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseFilesOverwrite(sstderr), ", "))
-		} else if strings.Contains(sstderr, "unresolved conflict") {
-			// Merge conflict in git files
-			errmsg = fmt.Sprintf("download failed: files changed locally and remotely and cannot be automatically merged (merge conflict):\n %s", strings.Join(parseFilesConflict(string(stdout)), ", "))
-			// abort merge
-			mergeAbort()
+			return fmt.Errorf("download failed: server key does not match known host key")
+		} else {
+			err = checkMergeErrors(sstdout, sstderr)
+			if err == nil {
+				err = fmt.Errorf("failed")
+			}
+			return err
 		}
-		err = fmt.Errorf(errmsg)
 	}
 
-	// annex conflicts are resolved automatically and don't produce an error
-	// checking stdout for message
-	sstdout := string(stdout)
-	if strings.Contains(sstdout, "Merge conflict was automatically resolved") {
+	// some conflicts are resolved automatically and don't produce an error in some combinations
+	return checkMergeErrors(sstdout, sstderr)
+}
+
+func checkMergeErrors(stdout, stderr string) error {
+	if strings.Contains(stderr, "would be overwritten by merge") {
+		// Untracked local file conflicts with file being pulled
+		return fmt.Errorf("download failed: local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseFilesOverwrite(stderr), ", "))
+	} else if strings.Contains(stderr, "unresolved conflict") {
+		// Merge conflict in git files
+		mergeAbort()
+		return fmt.Errorf("download failed: files changed locally and remotely and cannot be automatically merged (merge conflict):\n %s", strings.Join(parseFilesConflict(string(stdout)), ", "))
+		// abort merge
+	} else if strings.Contains(stdout, "Merge conflict was automatically resolved") {
 		// Merge conflict in annex files (automatically resolved by keeping both copies)
-		err = fmt.Errorf("files changed locally and remotely. Both files have been kept:\n %s", strings.Join(parseFilesAnnexConflict(sstdout), ", "))
+		return fmt.Errorf("files changed locally and remotely. Both files have been kept:\n %s", strings.Join(parseFilesAnnexConflict(stdout), ", "))
 		// TODO: This should probably instead become a warning or notice, instead of a full error
 	}
-	return err
+	return nil
 }
 
 func parseFilesConflict(errmsg string) []string {
@@ -200,11 +207,11 @@ func parseFilesOverwrite(errmsg string) []string {
 	var filenames []string
 	start := false
 	for _, l := range lines {
-		if strings.Contains(l, "error: The following") {
+		if strings.Contains(l, "error: The following") || strings.Contains(l, "error: Your local") {
 			start = true
 			continue
 		}
-		if strings.Contains(l, "Please move or remove") {
+		if strings.Contains(l, "Please move or remove") || strings.Contains(l, "Please commit your changes") {
 			break
 		}
 		if start {
@@ -212,6 +219,7 @@ func parseFilesOverwrite(errmsg string) []string {
 		}
 	}
 	return filenames
+
 }
 
 // AnnexPush uploads all changes and new content to the default remote.
