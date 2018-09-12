@@ -934,10 +934,18 @@ func IsVersion6() bool {
 	return ver == "6"
 }
 
-// mergeAbort aborts an unfinished  git merge.
+// mergeAbort aborts an unfinished git merge.
 func mergeAbort() {
+	// Here, we run a git status without checking any part of the result. It
+	// seems git-annex performs some cleanup or consistency fixes to the index
+	// when git status is run and before that, the merge --abort fails.
+	Command("status").Run()
 	cmd := Command("merge", "--abort")
-	cmd.Run()
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		// log error but do nothing
+		logstd(stdout, stderr)
+	}
 }
 
 func SetBare(state bool) {

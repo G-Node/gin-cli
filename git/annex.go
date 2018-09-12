@@ -136,6 +136,7 @@ func AnnexPull() error {
 	args := []string{"sync", "--no-push", "--no-commit"}
 	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
+	cmd.Wait()
 	sstdout := string(stdout)
 	sstderr := string(stderr)
 	if err != nil {
