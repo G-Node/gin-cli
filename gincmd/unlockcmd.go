@@ -44,11 +44,11 @@ func UnlockCmd() *cobra.Command {
 		"<filenames>": "One or more directories or files to unllock.",
 	}
 	var cmd = &cobra.Command{
-		Use:   "unlock [--json] [<filenames>]...",
-		Short: "Unlock files for editing",
-		Long:  formatdesc(description, args),
-		Args:  cobra.ArbitraryArgs,
-		Run:   unlock,
+		Use:                   "unlock [--json] [<filenames>]...",
+		Short:                 "Unlock files for editing",
+		Long:                  formatdesc(description, args),
+		Args:                  cobra.ArbitraryArgs,
+		Run:                   unlock,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print output in JSON format.")

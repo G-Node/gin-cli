@@ -32,11 +32,11 @@ func logout(cmd *cobra.Command, args []string) {
 // LogoutCmd sets up the 'logout' subcommand
 func LogoutCmd() *cobra.Command {
 	var cmd = &cobra.Command{
-		Use:   "logout",
-		Short: "Logout of the GIN services",
-		Long:  "Logout of the GIN services.\n\nThis command takes no arguments.",
-		Args:  cobra.NoArgs,
-		Run:   logout,
+		Use:                   "logout",
+		Short:                 "Logout of the GIN services",
+		Long:                  "Logout of the GIN services.\n\nThis command takes no arguments.",
+		Args:                  cobra.NoArgs,
+		Run:                   logout,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().String("server", "", "Specify server `alias` where the repository will be created. See also 'gin servers'.")

@@ -33,11 +33,11 @@ func remotes(cmd *cobra.Command, args []string) {
 func RemotesCmd() *cobra.Command {
 	description := `List configured remotes and their information.`
 	var cmd = &cobra.Command{
-		Use:   "remotes",
-		Short: "List the repository's configured remotes",
-		Long:  formatdesc(description, nil),
-		Args:  cobra.NoArgs,
-		Run:   remotes,
+		Use:                   "remotes",
+		Short:                 "List the repository's configured remotes",
+		Long:                  formatdesc(description, nil),
+		Args:                  cobra.NoArgs,
+		Run:                   remotes,
 		DisableFlagsInUseLine: true,
 	}
 	return cmd

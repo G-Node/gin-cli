@@ -138,12 +138,12 @@ func VersionCmd() *cobra.Command {
 		"Show the 15 most recent versions of data.zip, prompt for version, and copy the selected version to the current directory": "$ gin version -n 15 --copy-to . data.zip",
 	}
 	var cmd = &cobra.Command{
-		Use:     "version [--json] [--max-count n | --id hash | --copy-to location] [<filenames>]...",
-		Short:   "Roll back files or directories to older versions",
-		Long:    formatdesc(description, args),
-		Example: formatexamples(examples),
-		Args:    cobra.ArbitraryArgs,
-		Run:     repoversion,
+		Use:                   "version [--json] [--max-count n | --id hash | --copy-to location] [<filenames>]...",
+		Short:                 "Roll back files or directories to older versions",
+		Long:                  formatdesc(description, args),
+		Example:               formatexamples(examples),
+		Args:                  cobra.ArbitraryArgs,
+		Run:                   repoversion,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print output in JSON format.")

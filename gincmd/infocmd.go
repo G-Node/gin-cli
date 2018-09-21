@@ -54,11 +54,11 @@ func InfoCmd() *cobra.Command {
 		"<username>": "The name of the user whose information should be printed. This can be the username of the currently logged in user (default), in which case the command will print all the profile information with indicators for which data is publicly visible. If it is the username of a different user, only the publicly visible information is printed.",
 	}
 	var cmd = &cobra.Command{
-		Use:   "info [username]",
-		Short: "Print a user's information",
-		Long:  formatdesc(description, args),
-		Args:  cobra.MaximumNArgs(1),
-		Run:   printAccountInfo,
+		Use:                   "info [username]",
+		Short:                 "Print a user's information",
+		Long:                  formatdesc(description, args),
+		Args:                  cobra.MaximumNArgs(1),
+		Run:                   printAccountInfo,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().String("server", "", "Specify server `alias` for info lookup. See also 'gin servers'.")

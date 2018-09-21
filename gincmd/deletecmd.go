@@ -57,11 +57,11 @@ func deleteRepo(cmd *cobra.Command, args []string) {
 // DeleteCmd sets up the 'delete' repository subcommand
 func DeleteCmd() *cobra.Command {
 	var cmd = &cobra.Command{
-		Use:   "delete <repository>",
-		Short: "Delete a repository from the GIN server",
-		Long:  "Delete a repository from the GIN server.",
-		Args:  cobra.ExactArgs(1),
-		Run:   deleteRepo,
+		Use:                   "delete <repository>",
+		Short:                 "Delete a repository from the GIN server",
+		Long:                  "Delete a repository from the GIN server.",
+		Args:                  cobra.ExactArgs(1),
+		Run:                   deleteRepo,
 		DisableFlagsInUseLine: true,
 		Hidden:                true,
 	}

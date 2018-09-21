@@ -28,11 +28,11 @@ func annexrun(cmd *cobra.Command, args []string) {
 // AnnexCmd sets up the 'annex' passthrough subcommand
 func AnnexCmd() *cobra.Command {
 	var cmd = &cobra.Command{
-		Use:   "annex <cmd> [<args>]...",
-		Short: "Run a 'git annex' command through the gin client",
-		Long:  "",
-		Args:  cobra.ArbitraryArgs,
-		Run:   annexrun,
+		Use:                   "annex <cmd> [<args>]...",
+		Short:                 "Run a 'git annex' command through the gin client",
+		Long:                  "",
+		Args:                  cobra.ArbitraryArgs,
+		Run:                   annexrun,
 		DisableFlagsInUseLine: true,
 		Hidden:                true,
 		DisableFlagParsing:    true,

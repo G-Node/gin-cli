@@ -32,11 +32,11 @@ With no arguments, this command simply prints the currently configured default r
 		"<name>": "The name of the remote to use by default",
 	}
 	var cmd = &cobra.Command{
-		Use:   "use-remote [<name>]",
-		Short: "Set the repository's default upload remote",
-		Long:  formatdesc(description, args),
-		Args:  cobra.MaximumNArgs(1),
-		Run:   useRemote,
+		Use:                   "use-remote [<name>]",
+		Short:                 "Set the repository's default upload remote",
+		Long:                  formatdesc(description, args),
+		Args:                  cobra.MaximumNArgs(1),
+		Run:                   useRemote,
 		DisableFlagsInUseLine: true,
 	}
 	return cmd

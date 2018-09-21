@@ -31,11 +31,11 @@ With no arguments, this command simply prints the currently configured default s
 		"<name>": "The name of the server to use by default",
 	}
 	var cmd = &cobra.Command{
-		Use:   "use-server [<name>]",
-		Short: "Set the default server for the client",
-		Long:  formatdesc(description, args),
-		Args:  cobra.MaximumNArgs(1),
-		Run:   useServer,
+		Use:                   "use-server [<name>]",
+		Short:                 "Set the default server for the client",
+		Long:                  formatdesc(description, args),
+		Args:                  cobra.MaximumNArgs(1),
+		Run:                   useServer,
 		DisableFlagsInUseLine: true,
 	}
 	return cmd

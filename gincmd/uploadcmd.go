@@ -24,7 +24,7 @@ func upload(cmd *cobra.Command, args []string) {
 
 	// If any of the specified remotes is the special name 'all', upload to all configured remotes
 	for _, remote := range remotes {
-		if remote == "all" {
+		if remote == allremotes {
 			confremotes, err := git.RemoteShow()
 			CheckErrorMsg(err, fmt.Sprintf("'all' remotes specified, but could not determine configured remotes: %s", err))
 			remotes = make([]string, 0, len(confremotes))
@@ -61,12 +61,12 @@ If no arguments are specified, only changes to files already being tracked are u
 		"Upload all '.zip' files to remotes named 'gin' and 'labdata'":      "$ gin upload --to gin --to labdata *.zip\n    or\n$ gin upload --to gin,labdata *.zip",
 	}
 	var cmd = &cobra.Command{
-		Use:     "upload [--json] [--to <remote>] [<filenames>]...",
-		Short:   "Upload local changes to a remote repository",
-		Long:    formatdesc(description, args),
-		Args:    cobra.ArbitraryArgs,
-		Example: formatexamples(examples),
-		Run:     upload,
+		Use:                   "upload [--json] [--to <remote>] [<filenames>]...",
+		Short:                 "Upload local changes to a remote repository",
+		Long:                  formatdesc(description, args),
+		Args:                  cobra.ArbitraryArgs,
+		Example:               formatexamples(examples),
+		Run:                   upload,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print output in JSON format.")

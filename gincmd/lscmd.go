@@ -92,11 +92,11 @@ RM: The file has been removed from the repository.
 	}
 
 	var cmd = &cobra.Command{
-		Use:   "ls [--json | --short | -s] [<filenames>]...",
-		Short: "List the sync status of files in the local repository",
-		Long:  formatdesc(description, args),
-		Args:  cobra.ArbitraryArgs,
-		Run:   lsRepo,
+		Use:                   "ls [--json | --short | -s] [<filenames>]...",
+		Short:                 "List the sync status of files in the local repository",
+		Long:                  formatdesc(description, args),
+		Args:                  cobra.ArbitraryArgs,
+		Run:                   lsRepo,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print listing in JSON format (uses short form abbreviations).")
