@@ -97,6 +97,7 @@ RM: The file has been removed from the repository.
 		Long:                  formatdesc(description, args),
 		Args:                  cobra.ArbitraryArgs,
 		Run:                   lsRepo,
+		Aliases:               []string{"status"},
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print listing in JSON format (uses short form abbreviations).")
