@@ -247,6 +247,20 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 		return
 	}
 
+	// check which files are annexed
+	wichan := make(chan AnnexWhereisRes)
+	go AnnexWhereis(paths, wichan)
+
+	// collect annex paths for annex copy command
+	annexpaths := make([]string, 0, len(paths))
+	for info := range wichan {
+		annexpaths = append(annexpaths, info.File)
+	}
+
+	if len(annexpaths) == 0 {
+		return
+	}
+
 	args := []string{"copy", "--json-progress", fmt.Sprintf("--to=%s", remote)}
 	if len(paths) == 0 {
 		paths = []string{"--all"}
