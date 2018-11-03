@@ -175,12 +175,12 @@ A new remote is set as the default for uploading if no other remotes are configu
 		"Add a directory on a storage drive as a remote named 'datastore'": "$ gin add-remote datastore dir:/mnt/gindatastore",
 	}
 	var cmd = &cobra.Command{
-		Use:     "add-remote <name> <location>",
-		Short:   "Add a remote to the current repository for uploading and downloading",
-		Long:    formatdesc(description, args),
-		Example: formatexamples(examples),
-		Args:    cobra.ExactArgs(2),
-		Run:     addRemote,
+		Use:                   "add-remote <name> <location>",
+		Short:                 "Add a remote to the current repository for uploading and downloading",
+		Long:                  formatdesc(description, args),
+		Example:               formatexamples(examples),
+		Args:                  cobra.ExactArgs(2),
+		Run:                   addRemote,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("create", false, "Create the remote on the server if it does not already exist.")

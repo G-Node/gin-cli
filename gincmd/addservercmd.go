@@ -173,12 +173,12 @@ See the Examples section for a full example.
 		"This is what configuring the built-in G-Node GIN server would look like (note: this is already configured)": "$ gin add-server --web https://web.gin.g-node.org:443 --git git@git.g-node.org:22 gin",
 	}
 	var cmd = &cobra.Command{
-		Use:     "add-server [--web http[s]://<hostname>[:<port>]] [--git [<gituser>@]<hostname>[:<port>]] <alias>",
-		Short:   "Add a new GIN server configuration",
-		Long:    formatdesc(description, args),
-		Args:    cobra.ExactArgs(1),
-		Example: formatexamples(examples),
-		Run:     addServer,
+		Use:                   "add-server [--web http[s]://<hostname>[:<port>]] [--git [<gituser>@]<hostname>[:<port>]] <alias>",
+		Short:                 "Add a new GIN server configuration",
+		Long:                  formatdesc(description, args),
+		Args:                  cobra.ExactArgs(1),
+		Example:               formatexamples(examples),
+		Run:                   addServer,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().String("web", "", "Set the address and port for the web server.")

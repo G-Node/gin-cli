@@ -228,9 +228,8 @@ func parseFilesOverwrite(errmsg string) []string {
 // (git annex sync --no-pull; git annex copy --to=<defaultremote>)
 func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
-	cmd := AnnexCommand("sync", "--no-pull", "--no-commit") // NEVER commit changes when doing annex-sync
+	cmd := AnnexCommand("sync", "--no-pull", "--no-commit", remote) // NEVER commit changes when doing annex-sync
 	stdout, stderr, err := cmd.OutputError()
-	// TODO: Parse git push output for progress
 	if err != nil {
 		log.Write("Error during AnnexPush (sync --no-pull)")
 		log.Write("[Error]: %v", err)

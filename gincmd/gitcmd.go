@@ -32,11 +32,11 @@ func gitrun(cmd *cobra.Command, args []string) {
 // GitCmd sets up the 'git' passthrough subcommand
 func GitCmd() *cobra.Command {
 	var cmd = &cobra.Command{
-		Use:   "git <cmd> [<args>]...",
-		Short: "Run a 'git' command through the gin client",
-		Long:  "",
-		Args:  cobra.ArbitraryArgs,
-		Run:   gitrun,
+		Use:                   "git <cmd> [<args>]...",
+		Short:                 "Run a 'git' command through the gin client",
+		Long:                  "",
+		Args:                  cobra.ArbitraryArgs,
+		Run:                   gitrun,
 		DisableFlagsInUseLine: true,
 		Hidden:                true,
 		DisableFlagParsing:    true,

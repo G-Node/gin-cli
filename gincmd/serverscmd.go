@@ -29,11 +29,11 @@ func servers(cmd *cobra.Command, args []string) {
 func ServersCmd() *cobra.Command {
 	description := `List globally configured servers and their information.`
 	var cmd = &cobra.Command{
-		Use:   "servers",
-		Short: "List the globally configured servers",
-		Long:  formatdesc(description, nil),
-		Args:  cobra.NoArgs,
-		Run:   servers,
+		Use:                   "servers",
+		Short:                 "List the globally configured servers",
+		Long:                  formatdesc(description, nil),
+		Args:                  cobra.NoArgs,
+		Run:                   servers,
 		DisableFlagsInUseLine: true,
 	}
 	return cmd

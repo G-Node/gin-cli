@@ -92,11 +92,11 @@ func ReposCmd() *cobra.Command {
 		"<username>": "The name of the user whose repositories should be listed. The list consists of public repositories and repositories shared with the logged in user.",
 	}
 	var cmd = &cobra.Command{
-		Use:   "repos [--shared | --all | <username>]",
-		Short: "List available remote repositories",
-		Long:  formatdesc(description, args),
-		Args:  cobra.MaximumNArgs(1),
-		Run:   repos,
+		Use:                   "repos [--shared | --all | <username>]",
+		Short:                 "List available remote repositories",
+		Long:                  formatdesc(description, args),
+		Args:                  cobra.MaximumNArgs(1),
+		Run:                   repos,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("all", false, "List all repositories accessible to the logged in user.")

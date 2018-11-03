@@ -99,12 +99,12 @@ func KeysCmd() *cobra.Command {
 		"Add a public key to your account, as generated from the default ssh-keygen command": "$ gin keys --add ~/.ssh/id_rsa.pub",
 	}
 	var cmd = &cobra.Command{
-		Use:     "keys [--add <filename> | --delete <keynum> | --verbose | -v]",
-		Short:   "List, add, or delete public keys on the GIN services",
-		Long:    formatdesc(description, nil),
-		Example: formatexamples(examples),
-		Args:    cobra.MaximumNArgs(1),
-		Run:     keys,
+		Use:                   "keys [--add <filename> | --delete <keynum> | --verbose | -v]",
+		Short:                 "List, add, or delete public keys on the GIN services",
+		Long:                  formatdesc(description, nil),
+		Example:               formatexamples(examples),
+		Args:                  cobra.MaximumNArgs(1),
+		Run:                   keys,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().String("add", "", "Specify a `filename` which contains a public key to be added to the GIN server.")
