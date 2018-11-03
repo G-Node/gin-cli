@@ -285,28 +285,14 @@ func (gincl *Client) Upload(paths []string, remotes []string, uploadchan chan<- 
 			continue
 		}
 
-		// start routine to check which files are annexed
-		wichan := make(chan git.AnnexWhereisRes)
-		go git.AnnexWhereis(paths, wichan)
-
 		gitpushchan := make(chan git.RepoFileStatus)
 		go git.Push(remote, gitpushchan)
 		for stat := range gitpushchan {
 			uploadchan <- stat
 		}
 
-		// collect annex paths for annex copy command
-		annexpaths := make([]string, 0, len(paths))
-		for info := range wichan {
-			annexpaths = append(annexpaths, info.File)
-		}
-
-		if len(annexpaths) == 0 {
-			continue
-		}
-
 		annexpushchan := make(chan git.RepoFileStatus)
-		go git.AnnexPush(annexpaths, remote, annexpushchan)
+		go git.AnnexPush(paths, remote, annexpushchan)
 		for stat := range annexpushchan {
 			uploadchan <- stat
 		}
