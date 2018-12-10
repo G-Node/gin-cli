@@ -303,7 +303,6 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 				// Couldn't parse output
 				log.Write("Could not parse 'git annex copy' output")
 				log.Write(string(outline))
-				log.Write(err.Error())
 				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
 				continue
 			}
@@ -392,7 +391,6 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 				// Couldn't parse output
 				log.Write("Could not parse 'git annex get' output")
 				log.Write(string(outline))
-				log.Write(err.Error())
 				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
 				continue
 			}
@@ -654,7 +652,6 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 			// Couldn't parse output
 			log.Write("Could not parse 'git annex unlock' output")
 			log.Write(string(outline))
-			log.Write(err.Error())
 			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
 			continue
 		}
@@ -795,7 +792,6 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 			// Couldn't parse output
 			log.Write("Could not parse 'git annex add' output")
 			log.Write(string(outline))
-			log.Write(err.Error())
 			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
 			continue
 		}
