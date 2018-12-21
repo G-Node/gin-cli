@@ -35,7 +35,7 @@ func upload(cmd *cobra.Command, args []string) {
 			break
 		}
 	}
-
+	fmt.Println(args)
 	paths := args
 	if len(paths) > 0 {
 		commit(cmd, paths)
