@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"runtime"
@@ -227,6 +228,15 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	if len(lastprint) > 0 {
 		fmt.Println()
 	}
+	return
+}
+
+func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
+	filesuccess = make(map[string]bool)
+	// if git.Command {
+	path, _ := // some file which captures output in shell
+	file, _ := ioutil.ReadFile("path")
+	fmt.Sprintf("a %s", file)
 	return
 }
 
