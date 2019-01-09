@@ -234,7 +234,12 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus, cmdc string, cmd_spec_v
 
 	switch c := cmdc; {
 	case c == "upload":
-		fmt.Printf("Currently uploading to  %v", cmd_spec_var)
+		for _, url := range cmd_spec_var {
+			fmt.Printf("Currently uploading to  %v", url)
+			fmt.Println()
+		}
+	case c == "commit":
+
 	}
 }
 
