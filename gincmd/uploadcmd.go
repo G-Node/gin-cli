@@ -42,11 +42,13 @@ func upload(cmd *cobra.Command, args []string) {
 	}
 
 	uploadchan := make(chan git.RepoFileStatus)
-	go gincl.Upload(paths, remotes, uploadchan)
+	gincl.Upload(paths, remotes, uploadchan)
 	if verbose == false {
 		formatOutput(uploadchan, 0, jsonout)
 	} else {
-		fmt.Println("abc")
+		fmt.Println("testing")
+		formatOutput(uploadchan, 0, jsonout)
+		verboseOutput(uploadchan, "upload", paths)
 	}
 }
 
@@ -75,7 +77,7 @@ If no arguments are specified, only changes to files already being tracked are u
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print output in JSON format.")
-	cmd.Flags().Bool("verbose", false, "Print all information")
+	cmd.Flags().Bool("verbose", false, "Print all information.")
 	cmd.Flags().StringSliceP("to", "t", nil, "Upload to specific `remote`. Supports multiple remotes, either by specifying multiple times or as a comma separated list (see Examples). If the keyword 'all' is specified, the data is uploaded to all configured remotes.")
 	return cmd
 }

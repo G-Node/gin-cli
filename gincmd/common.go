@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"runtime"
@@ -231,13 +230,12 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	return
 }
 
-func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
-	filesuccess = make(map[string]bool)
-	// if git.Command {
-	path, _ := // some file which captures output in shell
-	file, _ := ioutil.ReadFile("path")
-	fmt.Sprintf("a %s", file)
-	return
+func verboseOutput(statuschan <-chan git.RepoFileStatus, cmdc string, cmd_spec_var []string) {
+
+	switch c := cmdc; {
+	case c == "upload":
+		fmt.Printf("Currently uploading to  %v", cmd_spec_var)
+	}
 }
 
 func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool) {
