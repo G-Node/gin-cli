@@ -230,16 +230,33 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	return
 }
 
-func verboseOutput(statuschan <-chan git.RepoFileStatus, cmdc string, cmd_spec_var []string) {
+func verboseOutput(statuschan <-chan git.RepoFileStatus, cmdc string, cmd_spec_var []string, files []string) {
 
-	switch c := cmdc; {
-	case c == "upload":
+	fmt.Printf("File name | Size | \n")
+	for _, file := range files {
+		fi, _ := os.Stat(file)
+		fmt.Printf("%v  %v \n", file, fi.Size())
+	}
+
+	// for command specific output
+	switch c := cmdc; c {
+	case "upload":
 		for _, url := range cmd_spec_var {
 			fmt.Printf("Currently uploading to  %v", url)
 			fmt.Println()
 		}
-	case c == "commit":
-
+	case "add":
+		fmt.Printf("add file: <%v>", nil) // add
+		fmt.Println()
+	case "download":
+		for _, url := range cmd_spec_var {
+			fmt.Printf("Currently downloading from  %v", url)
+			fmt.Println()
+		}
+	case "commit":
+		// do something like git diff, show detailed difference (maybe size) of changed files
+	case "ls":
+		// print also time file-size last-commit last-author  os.Stat
 	}
 }
 

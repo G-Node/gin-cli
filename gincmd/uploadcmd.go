@@ -43,16 +43,14 @@ func upload(cmd *cobra.Command, args []string) {
 
 	uploadchan := make(chan git.RepoFileStatus)
 	go gincl.Upload(paths, remotes, uploadchan)
-	if verbose == false {
-		formatOutput(uploadchan, 0, jsonout)
-	} else {
+	formatOutput(uploadchan, 0, jsonout)
+	if verbose == true {
 		var cmd_spec_var []string
-		formatOutput(uploadchan, 0, jsonout)
 		path, _ := git.RemoteShow()
 		for _, v := range path {
 			cmd_spec_var = append(cmd_spec_var, v)
 		}
-		verboseOutput(uploadchan, "upload", cmd_spec_var)
+		verboseOutput(uploadchan, "upload", cmd_spec_var, paths)
 	}
 }
 
