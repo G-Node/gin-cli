@@ -250,7 +250,7 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus, cmdc string, cmd_spec_v
 		fmt.Println()
 	case "download":
 		for _, url := range cmd_spec_var {
-			fmt.Printf("Currently downloading from  %v", url)
+			fmt.Printf("Currently downloading from  %v \n", url)
 			fmt.Println()
 		}
 	case "commit":

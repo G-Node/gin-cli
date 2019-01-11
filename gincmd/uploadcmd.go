@@ -2,6 +2,7 @@ package gincmd
 
 import (
 	"fmt"
+	"os"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
@@ -14,6 +15,7 @@ func upload(cmd *cobra.Command, args []string) {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	remotes, _ := cmd.Flags().GetStringSlice("to")
 	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
+	if ver
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -51,6 +53,9 @@ func upload(cmd *cobra.Command, args []string) {
 			cmd_spec_var = append(cmd_spec_var, v)
 		}
 		verboseOutput(uploadchan, "upload", cmd_spec_var, paths)
+		// fmt.Printf("%v", *os.Stdin)
+		s, _ := os.Getwd()
+		fmt.Printf("%v", s)
 	}
 }
 
