@@ -37,6 +37,10 @@ type RepoFileStatus struct {
 	Progress string `json:"progress"`
 	// The data rate, if available.
 	Rate string `json:"rate"`
+	// original cmd input
+	RawInput string `json:"rawinput"`
+	// original command output
+	RawOutput string `json:"rawoutput"`
 	// Errors
 	Err error `json:"err"`
 }
@@ -222,6 +226,9 @@ func Push(remote string, pushchan chan<- RepoFileStatus) {
 	var line string
 	var rerr error
 	re := regexp.MustCompile(`(?P<state>Compressing|Writing) objects:\s+(?P<progress>[0-9]{2,3})% \((?P<n>[0-9]+)/(?P<N>[0-9]+)\)`)
+	li_input := cmd.Args
+	input := strings.Join(li_input, " ")
+	status.RawInput = input
 	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\r') {
 		if !re.MatchString(line) {
 			continue
@@ -232,6 +239,7 @@ func Push(remote string, pushchan chan<- RepoFileStatus) {
 			status.State = fmt.Sprintf("Uploading git files (to: %s)", remote)
 		}
 		status.Progress = fmt.Sprintf("%s%%", match[2])
+		status.RawOutput = fmt.Sprintf("%s", line)
 		pushchan <- status
 	}
 	return

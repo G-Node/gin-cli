@@ -2,7 +2,6 @@ package gincmd
 
 import (
 	"fmt"
-	"os"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
@@ -12,10 +11,10 @@ import (
 
 func upload(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
-	verbose, _ := cmd.Flags().GetBool("verbose")
+	// verbose, _ := cmd.Flags().GetBool("verbose")
 	remotes, _ := cmd.Flags().GetStringSlice("to")
 	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
-	if ver
+	// if ver
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -46,17 +45,17 @@ func upload(cmd *cobra.Command, args []string) {
 	uploadchan := make(chan git.RepoFileStatus)
 	go gincl.Upload(paths, remotes, uploadchan)
 	formatOutput(uploadchan, 0, jsonout)
-	if verbose == true {
-		var cmd_spec_var []string
-		path, _ := git.RemoteShow()
-		for _, v := range path {
-			cmd_spec_var = append(cmd_spec_var, v)
-		}
-		verboseOutput(uploadchan, "upload", cmd_spec_var, paths)
-		// fmt.Printf("%v", *os.Stdin)
-		s, _ := os.Getwd()
-		fmt.Printf("%v", s)
-	}
+	// if verbose == true {
+	// 	var cmd_spec_var []string
+	// 	path, _ := git.RemoteShow()
+	// 	for _, v := range path {
+	// 		cmd_spec_var = append(cmd_spec_var, v)
+	// 	}
+	// 	verboseOutput(uploadchan, "upload", cmd_spec_var, paths)
+	// 	// fmt.Printf("%v", *os.Stdin)
+	// 	s, _ := os.Getwd()
+	// 	fmt.Printf("%v", s)
+	// }
 }
 
 // UploadCmd sets up the 'upload' subcommand

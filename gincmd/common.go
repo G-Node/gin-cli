@@ -232,10 +232,26 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 
 func verboseOutput(statuschan <-chan git.RepoFileStatus, cmdc string, cmd_spec_var []string, files []string) {
 
-	fmt.Printf("File name | Size | \n")
-	for _, file := range files {
-		fi, _ := os.Stat(file)
-		fmt.Printf("%v  %v \n", file, fi.Size())
+	var lastprint string
+	outline := new(bytes.Buffer)
+	outappend := func(part string) {
+		if len(part) > 0 {
+			outline.WriteString(part)
+			outline.WriteString(" ")
+		}
+	}
+	for stat := range statuschan {
+		outline.Reset()
+		outline.WriteString(" ")
+		outappend(stat.RawInput)
+		outappend(stat.RawOutput)
+		newprint := outline.String()
+		if newprint != lastprint {
+			fmt.Printf("\r%s\r", strings.Repeat(" ", len(lastprint))) // clear the line
+			fmt.Fprint(color.Output, newprint)
+			fmt.Print("\r")
+			lastprint = newprint
+		}
 	}
 
 	// for command specific output
@@ -258,13 +274,31 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus, cmdc string, cmd_spec_v
 	case "ls":
 		// print also time file-size last-commit last-author  os.Stat
 	}
+
+	fmt.Printf("File name | Size | \n")
+	for _, file := range files {
+		fi, _ := os.Stat(file)
+		fmt.Printf("%v  %v \n", file, fi.Size())
+	}
 }
 
 func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool) {
 	// TODO: instead of a true/false success, add an error for every file and then group the errors by type and print a report
 	var filesuccess map[string]bool
+	verbose := true
 	if jsonout {
 		filesuccess = printJSON(statuschan)
+		if verbose {
+			fmt.Fprint(color.Output, "json and verbose cannot be used together")
+		}
+	} else if verbose {
+		var cmd_spec_var []string
+		path, _ := git.RemoteShow()
+		for _, v := range path {
+			cmd_spec_var = append(cmd_spec_var, v)
+		}
+		paths := []string{"abc.txt"}
+		verboseOutput(statuschan, "upload", cmd_spec_var, paths)
 	} else if nitems > 0 {
 		filesuccess = printProgressWithBar(statuschan, nitems)
 	} else {
