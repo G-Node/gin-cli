@@ -230,8 +230,9 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	return
 }
 
-func verboseOutput(statuschan <-chan git.RepoFileStatus, cmdc string, cmd_spec_var []string, files []string) {
-
+func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
+	filesuccess = make(map[string]bool)
+	var fname, state, raw_in, raw_out string
 	var lastprint string
 	outline := new(bytes.Buffer)
 	outappend := func(part string) {
@@ -240,11 +241,61 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus, cmdc string, cmd_spec_v
 			outline.WriteString(" ")
 		}
 	}
+	//
+	// // for command specific output
+	// switch c := cmdc; c {
+	// case "upload":
+	// 	for _, url := range cmd_spec_var {
+	// 		fmt.Printf("Currently uploading to  %v", url)
+	// 		fmt.Println()
+	// 	}
+	// case "add":
+	// 	fmt.Printf("add file: <%v>", nil) // add
+	// 	fmt.Println()
+	// case "download":
+	// 	for _, url := range cmd_spec_var {
+	// 		fmt.Printf("Currently downloading from  %v \n", url)
+	// 		fmt.Println()
+	// 	}
+	// case "commit":
+	// 	// do something like git diff, show detailed difference (maybe size) of changed files
+	// case "ls":
+	// 	// print also time file-size last-commit last-author  os.Stat
+	// }
+	//
 	for stat := range statuschan {
 		outline.Reset()
 		outline.WriteString(" ")
+
+		if stat.FileName != fname || stat.State != state || stat.RawInput != raw_in || stat.RawOutput != raw_out {
+			// New line if new file or new state
+			if len(lastprint) > 0 {
+				fmt.Println()
+			}
+			lastprint = ""
+			fname = stat.FileName
+			state = stat.State
+			raw_in = stat.RawInput
+			raw_out = stat.RawOutput
+		}
 		outappend(stat.RawInput)
 		outappend(stat.RawOutput)
+		outappend(stat.State)
+		outappend(stat.FileName)
+		// fi, _ := os.Stat(stat.FileName)
+		// outappend(string(fi.Size()))
+		if stat.Err == nil {
+			if stat.Progress == "100%" {
+				outappend(green("OK"))
+				filesuccess[stat.FileName] = true
+			} else {
+				outappend(stat.Progress)
+				outappend(stat.Rate)
+			}
+		} else {
+			outappend(stat.Err.Error())
+			filesuccess[stat.FileName] = false
+		}
 		newprint := outline.String()
 		if newprint != lastprint {
 			fmt.Printf("\r%s\r", strings.Repeat(" ", len(lastprint))) // clear the line
@@ -253,52 +304,22 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus, cmdc string, cmd_spec_v
 			lastprint = newprint
 		}
 	}
-
-	// for command specific output
-	switch c := cmdc; c {
-	case "upload":
-		for _, url := range cmd_spec_var {
-			fmt.Printf("Currently uploading to  %v", url)
-			fmt.Println()
-		}
-	case "add":
-		fmt.Printf("add file: <%v>", nil) // add
+	if len(lastprint) > 0 {
 		fmt.Println()
-	case "download":
-		for _, url := range cmd_spec_var {
-			fmt.Printf("Currently downloading from  %v \n", url)
-			fmt.Println()
-		}
-	case "commit":
-		// do something like git diff, show detailed difference (maybe size) of changed files
-	case "ls":
-		// print also time file-size last-commit last-author  os.Stat
 	}
-
-	fmt.Printf("File name | Size | \n")
-	for _, file := range files {
-		fi, _ := os.Stat(file)
-		fmt.Printf("%v  %v \n", file, fi.Size())
-	}
+	return
 }
 
-func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool) {
+func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool, verbose bool) {
 	// TODO: instead of a true/false success, add an error for every file and then group the errors by type and print a report
 	var filesuccess map[string]bool
-	verbose := true
 	if jsonout {
 		filesuccess = printJSON(statuschan)
 		if verbose {
 			fmt.Fprint(color.Output, "json and verbose cannot be used together")
 		}
 	} else if verbose {
-		var cmd_spec_var []string
-		path, _ := git.RemoteShow()
-		for _, v := range path {
-			cmd_spec_var = append(cmd_spec_var, v)
-		}
-		paths := []string{"abc.txt"}
-		verboseOutput(statuschan, "upload", cmd_spec_var, paths)
+		filesuccess = verboseOutput(statuschan)
 	} else if nitems > 0 {
 		filesuccess = printProgressWithBar(statuschan, nitems)
 	} else {

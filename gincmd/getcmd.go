@@ -15,7 +15,8 @@ func isValidRepoPath(path string) bool {
 }
 
 func getRepo(cmd *cobra.Command, args []string) {
-	flags := cmd.Flags()
+	flags := cmd.Flags() //  change this to make it consistent with other cmd
+	verbose, _ := flags.GetBool("verbose")
 	jsonout, _ := flags.GetBool("json")
 	srvalias, _ := flags.GetString("server")
 	conf := config.Read()
@@ -32,7 +33,7 @@ func getRepo(cmd *cobra.Command, args []string) {
 
 	clonechan := make(chan git.RepoFileStatus)
 	go gincl.CloneRepo(repostr, clonechan)
-	formatOutput(clonechan, 0, jsonout)
+	formatOutput(clonechan, 0, jsonout, verbose)
 	defaultRemoteIfUnset("origin")
 	new, err := ginclient.CommitIfNew()
 	if new {
@@ -57,7 +58,7 @@ func GetCmd() *cobra.Command {
 		"Get and initialise the repository named 'eegdata' owned by user 'peter'": "$ gin get peter/eegdata",
 	}
 	var cmd = &cobra.Command{
-		Use:                   "get [--json] <repopath>",
+		Use:                   "get [--json | --verbose] <repopath>",
 		Short:                 "Retrieve (clone) a repository from the remote server",
 		Long:                  formatdesc(description, args),
 		Example:               formatexamples(examples),
@@ -66,6 +67,7 @@ func GetCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	cmd.Flags().Bool("verbose", false, "Print all raw information.")
 	cmd.Flags().String("server", "", "Specify server `alias` for the repository. See also 'gin servers'.")
 	return cmd
 }

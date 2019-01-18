@@ -140,6 +140,9 @@ func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) 
 	readbuffer := make([]byte, 1024)
 	var nread, errhead int
 	var eob, eof bool
+	lineInput := cmd.Args
+	input := strings.Join(lineInput, " ")
+	status.RawInput = input
 	// git clone progress prints to stderr
 	for eof = false; !eof; nread, rerr = cmd.ErrReader.Read(readbuffer) {
 		if rerr != nil && errhead == len(stderr) {
@@ -164,6 +167,7 @@ func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) 
 						rate = strings.TrimSuffix(rate, ",")
 					}
 					status.Rate = rate
+					status.RawOutput = fmt.Sprintf("%s", line)
 				}
 			}
 			clonechan <- status
@@ -226,8 +230,8 @@ func Push(remote string, pushchan chan<- RepoFileStatus) {
 	var line string
 	var rerr error
 	re := regexp.MustCompile(`(?P<state>Compressing|Writing) objects:\s+(?P<progress>[0-9]{2,3})% \((?P<n>[0-9]+)/(?P<N>[0-9]+)\)`)
-	li_input := cmd.Args
-	input := strings.Join(li_input, " ")
+	lineInput := cmd.Args
+	input := strings.Join(lineInput, " ")
 	status.RawInput = input
 	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\r') {
 		if !re.MatchString(line) {
@@ -239,7 +243,7 @@ func Push(remote string, pushchan chan<- RepoFileStatus) {
 			status.State = fmt.Sprintf("Uploading git files (to: %s)", remote)
 		}
 		status.Progress = fmt.Sprintf("%s%%", match[2])
-		status.RawOutput = fmt.Sprintf("%s", line)
+		status.RawOutput = fmt.Sprintf("%s \r", line)
 		pushchan <- status
 	}
 	return

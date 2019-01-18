@@ -19,6 +19,7 @@ func countItemsUnlock(paths []string) (count int) {
 
 func unlock(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
+	verbose, _ := cmd.Flags().GetBool("verbose")
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -34,7 +35,7 @@ func unlock(cmd *cobra.Command, args []string) {
 	nitems := countItemsUnlock(args)
 	unlockchan := make(chan git.RepoFileStatus)
 	go gincl.UnlockContent(args, unlockchan)
-	formatOutput(unlockchan, nitems, jsonout)
+	formatOutput(unlockchan, nitems, jsonout, verbose)
 }
 
 // UnlockCmd sets up the file 'unlock' subcommand
@@ -44,7 +45,7 @@ func UnlockCmd() *cobra.Command {
 		"<filenames>": "One or more directories or files to unllock.",
 	}
 	var cmd = &cobra.Command{
-		Use:                   "unlock [--json] [<filenames>]...",
+		Use:                   "unlock [--json | --verbose] [<filenames>]...",
 		Short:                 "Unlock files for editing",
 		Long:                  formatdesc(description, args),
 		Args:                  cobra.ArbitraryArgs,
@@ -52,5 +53,6 @@ func UnlockCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	cmd.Flags().Bool("verbose", false, "Print all raw information.")
 	return cmd
 }
