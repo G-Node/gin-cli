@@ -232,62 +232,28 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 
 func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
-	// var fname, state, raw_in, raw_out string
-	var lastprint string
-	outline := new(bytes.Buffer)
-	outappend := func(part string) {
-		if len(part) > 0 {
-			outline.WriteString(part)
-			outline.WriteString(" ")
-		}
-	}
-
 	for stat := range statuschan {
-		outline.Reset()
-		outline.WriteString(" ")
-		//
-		// if stat.FileName != fname || stat.State != state || stat.RawInput != raw_in || stat.RawOutput != raw_out {
-		// 	// New line if new file or new state
-		// 	if len(lastprint) > 0 {
-		// 		fmt.Println()
-		// 	}
-		// 	lastprint = ""
-		// 	fname = stat.FileName
-		// 	state = stat.State
-		// 	raw_in = stat.RawInput
-		// 	raw_out = stat.RawOutput
-		// }
-		if len(lastprint) > 0 {
-			fmt.Println()
-		}
-		outappend(stat.FileName)
-		outappend(stat.State)
+		fname := stat.FileName
+		fmt.Printf("%v\n", fname)
+		rate := stat.Rate
+		state := stat.State
+		progress := stat.Progress
+		rawin := stat.RawInput
+		rawout := stat.RawOutput
+
+		fmt.Printf("%v at the rate of %v\n", state, rate)
+		fmt.Printf("%v %v\n", state, progress)
+		fmt.Printf("Command: %v\n", rawin)
+		fmt.Printf("%v\n", rawout)
 
 		if stat.Err == nil {
 			if stat.Progress == "100%" {
-				outappend(green("OK"))
+				fmt.Printf("%v %v \n", state, green("OK"))
 				filesuccess[stat.FileName] = true
-			} else {
-				outappend(stat.Progress)
-				outappend(stat.Rate)
-				outappend(stat.RawInput)
-				outappend(stat.RawOutput)
 			}
 		} else {
-			outappend(stat.Err.Error())
 			filesuccess[stat.FileName] = false
 		}
-		newprint := outline.String()
-		if newprint != lastprint {
-			fmt.Printf("\r%s\r", strings.Repeat(" ", len(lastprint))) // clear the line
-			fmt.Fprint(color.Output, newprint)
-			fmt.Print("\r")
-			fmt.Printf("The uploading process is at rate: %v", stat.Rate)
-			lastprint = newprint
-		}
-	}
-	if len(lastprint) > 0 {
-		fmt.Println()
 	}
 	//
 	// // for command specific output
