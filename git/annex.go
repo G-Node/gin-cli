@@ -307,6 +307,10 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 				continue
 			}
 			status.FileName = getresult.File
+			linInput := cmd.Args
+			iinput := strings.Join(linInput, " ")
+			status.RawInput = iinput
+			// output shouldn't be needed
 			if getresult.Success {
 				status.Progress = progcomplete
 				status.Err = nil
