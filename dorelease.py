@@ -30,6 +30,11 @@ ETAGS = {}
 VERSION = {}
 
 
+def run(cmd, **kwargs):
+    print(f"> {' '.join(cmd)}")
+    return call(cmd, **kwargs)
+
+
 def load_etags():
     """
     Read in etags file and populates dictionary.
@@ -131,7 +136,7 @@ def build():
         f"-osarch={' '.join(platforms)}", f"-ldflags={ldflags}"
     ]
     print(f"Running {' '.join(cmd)}")
-    if call(cmd) > 0:
+    if run(cmd) > 0:
         die("Build failed")
 
     print()
@@ -213,7 +218,7 @@ def package_linux_plain(binfiles):
         arc = os.path.join(PKGDIR, arc)
         cmd = ["tar", "-czf", arc, "-C", dirname, fname, "README.md"]
         print(f"Running {' '.join(cmd)}")
-        if call(cmd) > 0:
+        if run(cmd) > 0:
             print(f"Failed to make tarball for {binf}", file=sys.stderr)
             continue
         archives.append(arc)
@@ -229,9 +234,9 @@ def debianize(binfiles, annexsa_archive):
     def docker_cleanup():
         print("Stopping and cleaning up docker container")
         cmd = ["docker", "kill", "gin-deb-build"]
-        call(cmd)
+        run(cmd)
         cmd = ["docker", "container", "rm", "gin-deb-build"]
-        call(cmd)
+        run(cmd)
 
     docker_cleanup()
 
@@ -244,33 +249,21 @@ def debianize(binfiles, annexsa_archive):
     with TemporaryDirectory(prefix=tmpprefix, suffix="gin-linux") as tmpdir:
         cmd = ["docker", "build", "-t", "gin-deb", "debdock/."]
         print("Preparing docker image for debian build")
-        call(cmd)
-
-        contdir = "/debbuild/"
-        cmd = [
-            "docker", "run", "-i", "-v", f"{tmpdir}:{contdir}",
-            "--name", "gin-deb-build", "-d", "gin-deb", "bash"
-        ]
-        print("Starting debian docker container")
-        if call(cmd) > 0:
-            print("Container start failed", file=sys.stderr)
-            docker_cleanup()
-            return
-
-        cmd = ["docker", "ps"]
-        print("docker ps")
-        call(cmd)
+        run(cmd)
 
         for binf in binfiles:
             # debian packaged with annex standalone
             # create directory structure
-            # pkg gin-cli_version
+            # pkg gin-cli-version
             # /opt
             # /opt/gin/
             # /opt/gin/git-annex.linux/...
             # /opt/gin/bin/gin (binary)
             # /opt/gin/bin/gin.sh (shell script for running gin cmds)
             # /usr/local/gin -> /opt/gin/bin/gin.sh (symlink)
+
+            # put build script in container build directory
+            shutil.copy(os.path.join("scripts", "makedeb"), tmpdir)
 
             # create directory structure
             pkgname = "gin-cli"
@@ -321,39 +314,29 @@ def debianize(binfiles, annexsa_archive):
                 os.path.join(docdir, "changelog"),
                 os.path.join(docdir, "changelog.Debian")
             ]
-            if call(cmd) > 0:
+            if run(cmd) > 0:
                 print(f"Failed to gzip files in {docdir}", file=sys.stderr)
 
             # extract annex standalone into pkg/opt/gin
             cmd = ["tar", "-xzf", annexsa_archive, "-C", opt_gin_dir]
             print(f"Running {' '.join(cmd)}")
-            if call(cmd) > 0:
+            if run(cmd) > 0:
                 print(f"Failed to extract {annexsa_archive} to {opt_gin_dir}",
                       file=sys.stderr)
                 continue
 
-            dockerexec = ["docker", "exec", "-t", "gin-deb-build"]
-
-            cmd = dockerexec + ["chmod", "go+rX,go-w", "-R", contdir]
-            print("Fixing permissions for build dir")
-            call(cmd)
-
-            cmd = dockerexec + [
-                "fakeroot", "dpkg-deb", "--build",
-                os.path.join(contdir, pkgname)
+            contdir = "/debbuild/"
+            cmd = [
+                "docker", "run", "-it",  "--rm", "-v", f"{tmpdir}:{contdir}",
+                "--name", "gin-deb-build", "gin-deb"
             ]
-            print("Building deb package")
-            if call(cmd) > 0:
+            print("Running debian build script")
+            if run(cmd) > 0:
                 print("Deb build failed", file=sys.stderr)
-                continue
+                docker_cleanup()
+                return
 
             debfilename = f"{pkgname}.deb"
-            cmd = dockerexec + ["lintian", os.path.join(contdir, debfilename)]
-            print("Running lintian on new deb file")
-            if call(cmd, stdout=open(os.devnull, "wb")) > 0:
-                print("Deb file check exited with errors")
-                print("Ignoring for now")
-
             debfilepath = os.path.join(tmpdir, debfilename)
             debfiledest = os.path.join(PKGDIR, f"{pkgnamever}.deb")
             if os.path.exists(debfiledest):
@@ -387,7 +370,7 @@ def package_mac_plain(binfiles):
         arc = os.path.join(PKGDIR, arc)
         cmd = ["tar", "-czf", arc, "-C", dirname, fname, "README.md"]
         print(f"Running {' '.join(cmd)}")
-        if call(cmd) > 0:
+        if run(cmd) > 0:
             print(f"Failed to make tarball for {binf}", file=sys.stderr)
             continue
         archives.append(arc)
@@ -405,7 +388,7 @@ def package_mac_bundle(binfiles, annex_tar):
             # extract macOS git-annex tar into pkgroot
             cmd = ["tar", "-xjf", annex_tar, "-C", tmpdir]
             print(f"Running {' '.join(cmd)}")
-            if call(cmd, stdout=DEVNULL) > 0:
+            if run(cmd, stdout=DEVNULL) > 0:
                 print(f"Failed to extract {annex_tar} to {tmpdir}",
                       file=sys.stderr)
                 continue
@@ -465,7 +448,7 @@ def package_mac_bundle(binfiles, annex_tar):
             # create the archive
             cmd = ["tar", "-cvf", arc_abs, "-C", pkgroot, "."]
             print(f"Running {' '.join(cmd)} (from {pkgroot})")
-            if call(cmd, stdout=DEVNULL) > 0:
+            if run(cmd, stdout=DEVNULL) > 0:
                 print(f"Failed to create archive {arc} in {pkgroot}",
                       file=sys.stderr)
                 continue
@@ -495,14 +478,14 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             # extract git portable and annex into git dir
             cmd = ["7z", "x", f"-o{gitdir}", git_pkg]
             print(f"Running {' '.join(cmd)}")
-            if call(cmd, stdout=DEVNULL) > 0:
+            if run(cmd, stdout=DEVNULL) > 0:
                 print(f"Failed to extract git archive {git_pkg} to {gitdir}",
                       file=sys.stderr)
                 continue
 
             cmd = ["7z", "x", f"-o{gitdir}", annex_pkg]
             print(f"Running {' '.join(cmd)}")
-            if call(cmd, stdout=DEVNULL) > 0:
+            if run(cmd, stdout=DEVNULL) > 0:
                 print(f"Failed to extract git archive {annex_pkg} to {gitdir}",
                       file=sys.stderr)
                 continue
@@ -520,7 +503,7 @@ def winbundle(binfiles, git_pkg, annex_pkg):
             os.chdir(pkgroot)
             cmd = ["zip", "-r", arc_abs, "."]
             print(f"Running {' '.join(cmd)}")
-            if call(cmd, stdout=DEVNULL) > 0:
+            if run(cmd, stdout=DEVNULL) > 0:
                 print(f"Failed to create archive {arc}", file=sys.stderr)
                 os.chdir(oldwd)
                 continue

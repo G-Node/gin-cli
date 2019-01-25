@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+contdir="/debbuild"
+echo "Fixing permissions for build dir [${contdir}]"
+chmod go+rX,go-w -R ${contdir}
+
+echo "Building deb package"
+fakeroot dpkg-deb --build "${contdir}/gin-cli"
+
+lintian "${contdir}/gin-cli.deb" || true  # ignore failures
