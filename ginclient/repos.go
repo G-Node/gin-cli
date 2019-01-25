@@ -589,6 +589,9 @@ func (gincl *Client) InitDir(bare bool) error {
 			log.Write("Failed to set local git user configuration")
 		}
 	}
+	// Disable quotepath: when enabled prints escape sequences for files with
+	// unicode characters making it hard to work with, can break JSON
+	// formatting, and sometimes impossible to reference specific files.
 	git.ConfigSet("core.quotepath", "false")
 	if runtime.GOOS == "windows" {
 		// force disable symlinks even if user can create them
