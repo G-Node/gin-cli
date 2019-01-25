@@ -554,7 +554,7 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 	}
 }
 
-// InitDir initialises the local directory with the default remote and annex configuration.
+// InitDir initialises the local directory with the default remote and git (and annex) configuration options.
 // Optionally initialised as a bare repository (for annex directory remotes).
 // The status channel 'initchan' is closed when this function returns.
 func (gincl *Client) InitDir(bare bool) error {
@@ -589,6 +589,7 @@ func (gincl *Client) InitDir(bare bool) error {
 			log.Write("Failed to set local git user configuration")
 		}
 	}
+	git.ConfigSet("core.quotepath", "false")
 	if runtime.GOOS == "windows" {
 		// force disable symlinks even if user can create them
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
