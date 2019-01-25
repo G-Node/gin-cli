@@ -2,6 +2,33 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.2
+
+### Changes
+- Merge conflicts:
+    - Downloads will fail with useful error messages if a merge conflict occcurs.
+    - If the conflict is between two annexed files, both versions of the file are kept and a warning is presented.
+- Push to target: Pushing to a specific target remote does not push git files and metadata to all remotes like before. Only the named remote is updated.
+- Commit progress removed: The number of files to be added is no longer counted before doing a `gin commit` so no progress bar is shown. This was removed for performance reasons.
+
+
+### Bug fixes
+- Fixed bug when uploading after annexed file was deleted. The client would try to `annex-copy` the deleted file if it was named and fail with an error.
+- Fixed bug where files with unicode characters would cause errors. The client now disabled `quotepath` in the local git configuration to avoid quotes in filenames that interfere with parsing and JSON encoding.
+
+
+### Internal changes
+- Token reuse: Logging in reuses any existing client token to avoid flooding the user's token list.
+- Token request function: `NewToken()` function can be called to retrieve a new token without creating a key pair or storing it on disk.
+
+### Relevant PRs
+- #214: Split token request code out of Login into new method
+- #215: Reuse tokens
+- #217: Merge conflict error messages and handling
+- #222: Push only to target remote
+- #223: Bugfix: Do not try to annex-copy deleted files
+- #228: Disable 'quotepath' in local git configuration
+
 ## Version 1.1
 
 ### Bug fixes
