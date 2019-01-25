@@ -593,7 +593,7 @@ func (gincl *Client) InitDir(bare bool) error {
 	if runtime.GOOS == "windows" {
 		// force disable symlinks even if user can create them
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
-		git.Command("config", "--local", "core.symlinks", "false").Run()
+		git.ConfigSet("core.symlinks", "false")
 	}
 
 	err = git.AnnexInit(description)
