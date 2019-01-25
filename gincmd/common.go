@@ -212,6 +212,7 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 				outappend(stat.Rate)
 			}
 		} else {
+			log.WriteError(stat.Err)
 			outappend(stat.Err.Error())
 			filesuccess[stat.FileName] = false
 		}
