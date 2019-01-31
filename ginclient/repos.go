@@ -573,10 +573,10 @@ func (gincl *Client) InitDir(bare bool) error {
 	}
 	description := fmt.Sprintf("%s@%s", gincl.Username, hostname)
 
-	// If there is no global git user.name or user.email set local ones
-	cmd := git.Command("config", "--global", "user.name")
+	// If there is no git user.name or user.email set local ones
+	cmd := git.Command("config", "user.name")
 	globalGitName, _ := cmd.Output()
-	cmd = git.Command("config", "--global", "user.email")
+	cmd = git.Command("config", "user.email")
 	globalGitEmail, _ := cmd.Output()
 	if len(globalGitName) == 0 && len(globalGitEmail) == 0 {
 		info, ierr := gincl.RequestAccount(gincl.Username)
