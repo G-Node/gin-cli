@@ -778,10 +778,7 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		status.State = "Locking"
 	}
 
-	// Start the metadata setter routine
-	mdchan := make(chan string)
-	defer close(mdchan)
-	go setAnnexMetadataName(mdchan)
+	var filenames []string
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// Empty line output. Ignore
@@ -799,8 +796,7 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		if addresult.Success {
 			log.Write("%s added to annex", addresult.File)
 			status.Err = nil
-			// Write filename metadata key
-			mdchan <- status.FileName
+			filenames = append(filenames, status.FileName)
 		} else {
 			log.Write("Error adding %s", addresult.File)
 			status.Err = fmt.Errorf("failed")
@@ -816,22 +812,24 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		log.Write("Error during AnnexAdd")
 		logstd(nil, stderr)
 	}
+	// Add metadata
+	for _, fname := range filenames {
+		setAnnexMetadataName(fname)
+	}
 	return
 }
 
 // setAnnexMetadataName starts a routine and waits for input on the provided channel.
 // For each path specified, the name of the file is added to the metadata of the annexed file.
 // The function exits when the channel is closed.
-func setAnnexMetadataName(pathchan <-chan string) {
-	for path := range pathchan {
-		_, fname := filepath.Split(path)
-		cmd := AnnexCommand("metadata", fmt.Sprintf("--set=ginfilename=%s", fname), path)
-		stdout, stderr, err := cmd.OutputError()
-		if err != nil {
-			logstd(stdout, stderr)
-		} else {
-			log.Write("ginfilename metadata key set to %s", fname)
-		}
+func setAnnexMetadataName(path string) {
+	_, fname := filepath.Split(path)
+	cmd := AnnexCommand("metadata", fmt.Sprintf("--set=ginfilename=%s", fname), path)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+	} else {
+		log.Write("ginfilename metadata key set to %s", fname)
 	}
 	return
 }
