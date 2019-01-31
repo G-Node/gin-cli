@@ -115,7 +115,7 @@ type AnnexInfoRes struct {
 // AnnexInit initialises the repository for annex.
 // (git annex init)
 func AnnexInit(description string) error {
-	args := []string{"init", description}
+	args := []string{"init", "--version=5", description}
 	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
