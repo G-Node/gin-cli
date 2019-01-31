@@ -1,3 +1,8 @@
+gin-cli (1.3); urgency=low
+
+  * Release 1.3
+  * Fixed bug when committing or uploading multiple large files. Some files would fail to be added to the annex resulting in them being added to git.
+
 gin-cli (1.2); urgency=low
 
   * Release 1.2

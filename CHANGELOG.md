@@ -2,6 +2,18 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.3
+
+### Bug fixes
+- Fixed bug when committing or uploading multiple large files. Some files would fail to be added to the annex resulting in them being added to git.
+
+### Internal changes
+- Repositories are explicitly set to annex version 5 mode on initialisation.
+
+### Relevant PRs
+- #229: Force v5 repos
+- #231: Fix filename metadata write
+
 ## Version 1.2
 
 ### Changes
