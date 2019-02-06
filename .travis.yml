@@ -1,7 +1,6 @@
 language: go
 
-dist: trusty
-sudo: required
+dist: xenial
 
 services:
     - docker
@@ -15,9 +14,6 @@ matrix:
     - go: tip
   allow_failures:
     - go: tip
-
-before_install:
-  - sudo apt-get update
 
 install:
   # tools
@@ -51,14 +47,4 @@ script:
         ./tests/start-server;
         while ! curl localhost:3000 -so /dev/null; do sleep 1; done;
         ./tests/${testscript};
-    fi
-
-after_script:
-  # push logs to gist
-  - if [[ "${TRAVIS_GO_VERSION}" != "tip" ]]; then
-        echo $GISTTOKEN > ./tests/testuserhome/.gist;
-        mv ./tests/testuserhome/log/gin.log ./tests/testuserhome/log/gin-${TRAVIS_BRANCH}-${testscript}.log;
-        mv ./tests/testuserhome/log/tests.log ./tests/testuserhome/log/tests-${TRAVIS_BRANCH}-${testscript}.log;
-        ./tests/run-cont find ./log -type f -exec gist -u 59e3b1c2fc3ff525127f9b3af81e7f4c {} \+ ;
-        rm ./tests/testuserhome/.gist;
     fi
