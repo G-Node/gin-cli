@@ -2,6 +2,15 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.5
+
+### Bug fixes
+- Fixed bug where the annex initialisation on Windows would fail due to the repository working in direct mode.
+- Fixed minor bug in the error field for JSON output.
+
+### Relevant PRs
+- #232: Use git-annex-sync to create empty init commit
+
 ## Version 1.3
 
 ### Bug fixes
