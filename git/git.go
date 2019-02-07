@@ -78,7 +78,7 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(struct {
 		RFSAlias
-		Err string
+		Err string `json:"err"`
 	}{
 		RFSAlias: RFSAlias(s),
 		Err:      errmsg,
@@ -516,9 +516,17 @@ func Commit(commitmsg string) error {
 
 // CommitEmpty performs a commit even when there are no new changes added to the index.
 // This is useful for initialising new repositories with a usable HEAD.
-// (git commit --allow-empty)
+// In indirect mode (non-bare repositories) simply uses git commit with the '--allow-empty' flag.
+// In direct mode it uses git-annex sync.
+// (git commit --allow-empty or git annex sync --commit)
 func CommitEmpty(commitmsg string) error {
-	cmd := Command("commit", "--allow-empty", fmt.Sprintf("--message=%s", commitmsg))
+	msgarg := fmt.Sprintf("--message=%s", commitmsg)
+	var cmd shell.Cmd
+	if !IsDirect() {
+		cmd = Command("commit", "--allow-empty", msgarg)
+	} else {
+		cmd = AnnexCommand("sync", "--commit", msgarg)
+	}
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error during CommitEmpty")
