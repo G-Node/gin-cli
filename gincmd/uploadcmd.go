@@ -51,7 +51,8 @@ func upload(cmd *cobra.Command, args []string) {
 			cmd_spec_var = append(cmd_spec_var, v)
 		}
 		for _, url := range cmd_spec_var {
-			fmt.Printf("Currently uploading to  %v", url)
+			fmt.Printf("Running Gin Command: %v \n", cmd.Name())
+			fmt.Printf("Currently uploading to  %v ", url)
 			fmt.Println()
 		}
 	}
@@ -83,7 +84,7 @@ If no arguments are specified, only changes to files already being tracked are u
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print output in JSON format.")
-	cmd.Flags().Bool("verbose", false, "Print all raw information.")
+	cmd.Flags().Bool("verbose", false, "Print raw information from git, git-annex and called gin commands.")
 	cmd.Flags().StringSliceP("to", "t", nil, "Upload to specific `remote`. Supports multiple remotes, either by specifying multiple times or as a comma separated list (see Examples). If the keyword 'all' is specified, the data is uploaded to all configured remotes.")
 	return cmd
 }

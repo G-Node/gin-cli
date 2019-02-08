@@ -232,50 +232,54 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 
 func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
-	var fname, state, rawin, rawout string
-	var tmpfname, tmpstate, tmprawin, tmprawout string
+	var fname, state string
 	var lastprint string
-	outline := new(bytes.Buffer)
-	outappend := func(part string) {
-		outline.WriteString(part)
-	}
+	var tmprawin, tmprawout string
 	for stat := range statuschan {
-		outline.Reset()
-		outline.WriteString(" ")
-		fname, state, rawin, rawout = stat.FileName, stat.State, stat.RawInput, stat.RawOutput
-		if fname != tmpfname {
-			outappend(fname)
+		//Raw Input
+		if stat.RawInput != tmprawin {
+			fmt.Printf("InputCommand: %v\n Output: \n", stat.RawInput)
+			tmprawin = stat.RawInput
+		} else {
+			fmt.Println()
 		}
-		outappend("\n")
-		if rawin != tmprawin {
-			outappend(rawin)
 
-		}
-		outappend("\n")
-		if state != tmpstate {
-			outappend(state)
-		}
-		outappend(": ")
-		if stat.Err == nil {
-			if stat.Progress == "100%" {
-				outappend(green("OK"))
-				outappend(" ")
-				filesuccess[stat.FileName] = true
-			} else {
-				if rawout != tmprawout {
-					outappend(stat.RawOutput)
-				}
-				outappend("\n")
-				outappend(stat.Progress)
-				outappend(" ")
-				outappend(stat.Rate)
-				outappend(" ")
+		lastprint = ""
+		fname = stat.FileName
+		state = stat.State
+		//	rate := stat.Rate
+		rate := stat.Rate
+		//progress := stat.Progress
+		rawin := stat.RawInput
+		fmt.Printf("%v\n", stat.RawOutput)
+
+		// Raw Output
+		if strings.Contains(tmprawout, ":") {
+			gss := strings.Split(tmprawout, ":")
+			gs := gss[0]
+			if strings.Contains(rawout, gs) {
+				blank := fmt.Sprintf("\r%s\r", strings.Repeat(" ", len(tmprawout)))
+				rawout = fmt.Sprintf("StdOutput: %v%v\n", rawout, blank)
 			}
 		} else {
-			outappend("Error Occurs!")
-			outappend(" ")
+			rawout = fmt.Sprintf("StdOutput: %v\n", rawout)
+		}
+
+		tmprawout = strings.Replace(rawout, "StdOutput: ", "", -1)
+		outappend(stat.FileName)
+		if stat.Err == nil {
+			if stat.Progress == "100%" {
+				pro := green("OK")
+				prostr := fmt.Sprintf("%v %v %v %v\r", rawin, rawout, state, pro)
+				outappend(prostr)
+				filesuccess[stat.FileName] = true
+			} else {
+				pro := stat.Progress
+				prostr := fmt.Sprintf("%v %v %v %v\r", rawin, rawout, state, pro)
+				outappend(prostr)
+			}
+		} else {
 			outappend(stat.Err.Error())
-			outappend(" ")
 			filesuccess[stat.FileName] = false
 		}
 		newprint := outline.String()
@@ -283,10 +287,11 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string
 			fmt.Printf("\r%s\r", strings.Repeat(" ", len(lastprint))) // clear the line
 			fmt.Fprint(color.Output, newprint)
 			fmt.Print("\r")
-			fmt.Printf("The uploading process is at rate: %v", stat.Rate)
 			lastprint = newprint
 		}
-		tmpfname, tmpstate, tmprawin, tmprawout = fname, state, rawin, rawout
+	}
+	if len(lastprint) > 0 {
+		fmt.Println()
 	}
 	return
 }

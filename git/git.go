@@ -243,7 +243,7 @@ func Push(remote string, pushchan chan<- RepoFileStatus) {
 			status.State = fmt.Sprintf("Uploading git files (to: %s)", remote)
 		}
 		status.Progress = fmt.Sprintf("%s%%", match[2])
-		status.RawOutput = fmt.Sprintf("%s \r", line)
+		status.RawOutput = fmt.Sprintf("%s", line)
 		pushchan <- status
 	}
 	return
