@@ -232,66 +232,41 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 
 func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
-	var fname, state string
-	var lastprint string
-	var tmprawin, tmprawout string
+	var state string
+	var tmprawin, tmpfname string
 	for stat := range statuschan {
 		//Raw Input
 		if stat.RawInput != tmprawin {
-			fmt.Printf("InputCommand: %v\n Output: \n", stat.RawInput)
+			fmt.Printf("InputCommand: %v\nOutput: \n", stat.RawInput)
 			tmprawin = stat.RawInput
-		} else {
-			fmt.Println()
+		}
+		if stat.FileName != tmpfname {
+			fmt.Printf("Currently dealing with: %s", stat.FileName)
+			tmpfname = stat.FileName
 		}
 
-		lastprint = ""
-		fname = stat.FileName
+		fmt.Printf("%v\r", stat.RawOutput)
+		// fname := stat.FileName
 		state = stat.State
 		//	rate := stat.Rate
-		rate := stat.Rate
+		//rate := stat.Rate
 		//progress := stat.Progress
-		rawin := stat.RawInput
-		fmt.Printf("%v\n", stat.RawOutput)
 
-		// Raw Output
-		if strings.Contains(tmprawout, ":") {
-			gss := strings.Split(tmprawout, ":")
-			gs := gss[0]
-			if strings.Contains(rawout, gs) {
-				blank := fmt.Sprintf("\r%s\r", strings.Repeat(" ", len(tmprawout)))
-				rawout = fmt.Sprintf("StdOutput: %v%v\n", rawout, blank)
-			}
-		} else {
-			rawout = fmt.Sprintf("StdOutput: %v\n", rawout)
-		}
-
-		tmprawout = strings.Replace(rawout, "StdOutput: ", "", -1)
-		outappend(stat.FileName)
 		if stat.Err == nil {
 			if stat.Progress == "100%" {
 				pro := green("OK")
-				prostr := fmt.Sprintf("%v %v %v %v\r", rawin, rawout, state, pro)
-				outappend(prostr)
+				fmt.Printf("%v %v\r", state, pro)
 				filesuccess[stat.FileName] = true
 			} else {
 				pro := stat.Progress
-				prostr := fmt.Sprintf("%v %v %v %v\r", rawin, rawout, state, pro)
-				outappend(prostr)
+				fmt.Printf("%v %v\r", state, pro)
 			}
 		} else {
-			outappend(stat.Err.Error())
+			fmt.Printf("%v\n", stat.Err.Error())
 			filesuccess[stat.FileName] = false
+			continue
 		}
-		newprint := outline.String()
-		if newprint != lastprint {
-			fmt.Printf("\r%s\r", strings.Repeat(" ", len(lastprint))) // clear the line
-			fmt.Fprint(color.Output, newprint)
-			fmt.Print("\r")
-			lastprint = newprint
-		}
-	}
-	if len(lastprint) > 0 {
-		fmt.Println()
+		// fmt.Printf("The uploading process is at rate: %v", rate)
 	}
 	return
 }
