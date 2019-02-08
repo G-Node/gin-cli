@@ -232,51 +232,62 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 
 func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
+	var fname, state, rawin, rawout string
+	var tmpfname, tmpstate, tmprawin, tmprawout string
+	var lastprint string
+	outline := new(bytes.Buffer)
+	outappend := func(part string) {
+		outline.WriteString(part)
+	}
 	for stat := range statuschan {
-		fname := stat.FileName
-		fmt.Printf("%v\n", fname)
-		rate := stat.Rate
-		state := stat.State
-		progress := stat.Progress
-		rawin := stat.RawInput
-		rawout := stat.RawOutput
+		outline.Reset()
+		outline.WriteString(" ")
+		fname, state, rawin, rawout = stat.FileName, stat.State, stat.RawInput, stat.RawOutput
+		if fname != tmpfname {
+			outappend(fname)
+		}
+		outappend("\n")
+		if rawin != tmprawin {
+			outappend(rawin)
 
-		fmt.Printf("%v at the rate of %v\n", state, rate)
-		fmt.Printf("%v %v\n", state, progress)
-		fmt.Printf("Command: %v\n", rawin)
-		fmt.Printf("%v\n", rawout)
-
+		}
+		outappend("\n")
+		if state != tmpstate {
+			outappend(state)
+		}
+		outappend(": ")
 		if stat.Err == nil {
 			if stat.Progress == "100%" {
-				fmt.Printf("%v %v \n", state, green("OK"))
+				outappend(green("OK"))
+				outappend(" ")
 				filesuccess[stat.FileName] = true
+			} else {
+				if rawout != tmprawout {
+					outappend(stat.RawOutput)
+				}
+				outappend("\n")
+				outappend(stat.Progress)
+				outappend(" ")
+				outappend(stat.Rate)
+				outappend(" ")
 			}
 		} else {
+			outappend("Error Occurs!")
+			outappend(" ")
+			outappend(stat.Err.Error())
+			outappend(" ")
 			filesuccess[stat.FileName] = false
 		}
+		newprint := outline.String()
+		if newprint != lastprint {
+			fmt.Printf("\r%s\r", strings.Repeat(" ", len(lastprint))) // clear the line
+			fmt.Fprint(color.Output, newprint)
+			fmt.Print("\r")
+			fmt.Printf("The uploading process is at rate: %v", stat.Rate)
+			lastprint = newprint
+		}
+		tmpfname, tmpstate, tmprawin, tmprawout = fname, state, rawin, rawout
 	}
-	//
-	// // for command specific output
-	// switch c := cmdc; c {
-	// case "upload":
-	// 	for _, url := range cmd_spec_var {
-	// 		fmt.Printf("Currently uploading to  %v", url)
-	// 		fmt.Println()
-	// 	}
-	// case "add":
-	// 	fmt.Printf("add file: <%v>", nil) // add
-	// 	fmt.Println()
-	// case "download":
-	// 	for _, url := range cmd_spec_var {
-	// 		fmt.Printf("Currently downloading from  %v \n", url)
-	// 		fmt.Println()
-	// 	}
-	// case "commit":
-	// 	// do something like git diff, show detailed difference (maybe size) of changed files
-	// case "ls":
-	// 	// print also time file-size last-commit last-author  os.Stat
-	// }
-	//
 	return
 }
 
