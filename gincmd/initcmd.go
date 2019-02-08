@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -14,7 +15,7 @@ func initRepo(cmd *cobra.Command, args []string) {
 	CheckError(err)
 	_, err = ginclient.CommitIfNew()
 	CheckError(err)
-	fmt.Println(green("OK"))
+	fmt.Fprintln(color.Output, green("OK"))
 }
 
 // InitCmd sets up the 'init' repository subcommand
