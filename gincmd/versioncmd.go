@@ -8,6 +8,7 @@ import (
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/git"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -91,7 +92,7 @@ func verprompt(commits []git.GinCommit) git.GinCommit {
 	width := termwidth()
 	for idx, commit := range commits {
 		idxstr := fmt.Sprintf(numfmt, idx+1)
-		fmt.Printf("%s  %s * %s\n\n", idxstr, green(commit.AbbreviatedHash), commit.Date.Format("Mon Jan 2 15:04:05 2006 (-0700)"))
+		fmt.Fprintf(color.Output, "%s  %s * %s\n\n", idxstr, green(commit.AbbreviatedHash), commit.Date.Format("Mon Jan 2 15:04:05 2006 (-0700)"))
 		fmt.Printf("%s\n", winner.Wrap(commit.Subject, width))
 		if len(commit.Body) > 0 {
 			fmt.Printf("%s\n", winner.Wrap(commit.Body, width))

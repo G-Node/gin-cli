@@ -333,7 +333,7 @@ func disableCommands(cmds map[string]*cobra.Command, giterr, annexerr error) {
 	errmsg = fmt.Sprintf("%s\n%s", errmsg, dependencyInfo(giterr, annexerr))
 
 	for _, cname := range reqgitannex {
-		cmds[cname].Short = fmt.Sprintf("[%s] %s", red("not available"), cmds[cname].Short)
+		cmds[cname].Short = fmt.Sprintf("[not available] %s", cmds[cname].Short)
 		diemsg := fmt.Sprintf(errmsg, cname)
 		cmds[cname].Run = func(c *cobra.Command, args []string) {
 			Die(diemsg)
@@ -445,7 +445,7 @@ func SetUpCommands(verinfo VersionInfo) *cobra.Command {
 
 	if !(gitok && annexok) {
 		disableCommands(cmds, giterr, annexerr)
-		warnmsg := yellow("Some commands are not available:")
+		warnmsg := "Some commands are not available:"
 		helpTemplate = fmt.Sprintf("%s\n%s\n%s", helpTemplate, warnmsg, dependencyInfo(giterr, annexerr))
 	}
 
