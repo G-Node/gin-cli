@@ -37,7 +37,7 @@ func repoinfo(cmd *cobra.Command, args []string) {
 		srvalias = conf.DefaultServer
 	}
 	gincl := ginclient.New(srvalias)
-	requirelogin(cmd, gincl, true)
+	requirelogin(cmd, gincl, !jsonout)
 	repoinfo, err := gincl.GetRepo(args[0])
 	CheckError(err)
 
