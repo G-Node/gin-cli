@@ -32,7 +32,7 @@ func repos(cmd *cobra.Command, args []string) {
 	}
 
 	gincl := ginclient.New(srvalias)
-	requirelogin(cmd, gincl, true)
+	requirelogin(cmd, gincl, !jsonout)
 	username := gincl.Username
 	if len(args) == 1 && args[0] != username {
 		username = args[0]
