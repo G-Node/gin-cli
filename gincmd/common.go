@@ -232,13 +232,18 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 
 func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
+	var rostr, rsstr string
+	var listStr []string
 	var state, lastState string
-	var lastlen int
+	var ro string
+	var lp bool
 	// var lastprint bool // 1 for rawoutput 0 for state
 	var tmprawin, tmpfname string
+
 	for stat := range statuschan {
+		listStr = nil
 		if stat.FileName != tmpfname {
-			fmt.Printf("Current File: %s\n", stat.FileName)
+			fmt.Printf("\nCurrent File: %s\n", stat.FileName)
 			tmpfname = stat.FileName
 		}
 
@@ -248,36 +253,42 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string
 			tmprawin = stat.RawInput
 		}
 
-		if lastlen > len(stat.RawOutput) {
-			fmt.Printf("%v%v\r", stat.RawOutput, strings.Repeat(" ", lastlen))
-			lastlen = len(stat.RawOutput)
-		} else {
-			fmt.Printf("%v\r", stat.RawOutput)
-			lastlen = len(stat.RawOutput)
+		ro = stat.RawOutput
+		rostr = fmt.Sprintf("%v", ro)
+		listStr = append(listStr, rostr)
+		if strings.Contains(ro, "done") && strings.Contains(ro, "100%") {
+			continue
 		}
 
 		state = stat.State
+
 		if stat.Err == nil {
 			if stat.Progress == "100%" && state != lastState {
-				fmt.Printf("\r%s\r", strings.Repeat(" ", lastlen))
 				pro := green("OK")
-				fmt.Printf("\r%v %v\n", state, pro)
+				rsstr = fmt.Sprintf("%v:%v", state, pro)
+				listStr = append(listStr, rsstr)
 				filesuccess[stat.FileName] = true
 				lastState = state
-			} else {
+				lp = true
+			} else if state != lastState {
 				pro := stat.Progress
-				if state != lastState {
-					fmt.Printf("\r%v %v", state, pro)
-					lastlen = len(fmt.Sprintf("%v %v\r", state, pro))
-				} else {
-					fmt.Printf("\r%v %v\r", state, pro)
-					lastlen = len(fmt.Sprintf("%v %v\r", state, pro))
-				}
+				rsstr = fmt.Sprintf("%v:%v", state, pro)
+				listStr = append(listStr, rsstr)
 			}
 		} else {
 			fmt.Printf("%v\n", stat.Err.Error())
 			filesuccess[stat.FileName] = false
 			continue
+		}
+
+		if len(listStr) == 2 {
+			fmt.Printf("%6s|%6s\r", listStr[1], listStr[0])
+		} else {
+			fmt.Printf("%6s\r", listStr[0])
+		}
+		if lp {
+			fmt.Println()
+			lp = false
 		}
 	}
 	fmt.Println()

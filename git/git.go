@@ -167,7 +167,7 @@ func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) 
 						rate = strings.TrimSuffix(rate, ",")
 					}
 					status.Rate = rate
-					status.RawOutput = fmt.Sprintf("%s", line)
+					status.RawOutput = line
 				}
 			}
 			clonechan <- status
@@ -243,7 +243,7 @@ func Push(remote string, pushchan chan<- RepoFileStatus) {
 			status.State = fmt.Sprintf("Uploading git files (to: %s)", remote)
 		}
 		status.Progress = fmt.Sprintf("%s%%", match[2])
-		status.RawOutput = fmt.Sprintf("%s", line)
+		status.RawOutput = line
 		pushchan <- status
 	}
 	return
