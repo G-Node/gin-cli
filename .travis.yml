@@ -22,7 +22,8 @@ matrix:
 install:
   - go get -v ./...
   # tools
-  - go get github.com/golang/lint/golint
+  - go get -u golang.org/x/lint/golint
+  # codestyle checks
   - go vet ./...
   - golint ./...
   - gofmt -s -l .
