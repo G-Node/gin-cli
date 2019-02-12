@@ -5,6 +5,10 @@ dist: xenial
 services:
     - docker
 
+env:
+  global:
+    - GO111MODULE=on
+
 matrix:
   include:
     - go: "1.11.x"
@@ -16,29 +20,13 @@ matrix:
     - go: tip
 
 install:
+  - go get -v ./...
   # tools
-  - go get github.com/golang/lint/golint
-  # dependencies
-  - go get github.com/spf13/viper
-  - go get github.com/spf13/cobra
-  - go get github.com/howeyc/gopass
-  - go get golang.org/x/crypto/ssh
-  - go get github.com/G-Node/gin-core/gin
-  - go get github.com/G-Node/gin-repo/wire
-  - go get golang.org/x/crypto/ssh
-  - go get github.com/gogits/go-gogs-client
-  - go get github.com/fatih/color
-  - go get github.com/hashicorp/go-version
-  - go get github.com/shibukawa/configdir
-  - go get github.com/bbrks/wrap
-  - go get github.com/docker/docker/pkg/term
-  - go get github.com/dustin/go-humanize
-  - go get github.com/alecthomas/template
-  # import path symlink for forks
-  - if [ ! -d ${GOPATH}/src/github.com/G-Node/gin-cli ]; then ln -vs $(pwd) ${GOPATH}/src/github.com/G-Node/gin-cli; fi
+  - go get -u golang.org/x/lint/golint
+  # codestyle checks
   - go vet ./...
+  - golint ./...
   - gofmt -s -l .
-  - golint github.com/G-Node/gin-cli...
 
 script:
   - make
