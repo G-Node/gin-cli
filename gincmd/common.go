@@ -232,42 +232,55 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 
 func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
-	var state string
+	var state, lastState string
+	var lastlen int
+	// var lastprint bool // 1 for rawoutput 0 for state
 	var tmprawin, tmpfname string
 	for stat := range statuschan {
+		if stat.FileName != tmpfname {
+			fmt.Printf("Current File: %s\n", stat.FileName)
+			tmpfname = stat.FileName
+		}
+
 		//Raw Input
 		if stat.RawInput != tmprawin {
 			fmt.Printf("InputCommand: %v\nOutput: \n", stat.RawInput)
 			tmprawin = stat.RawInput
 		}
-		if stat.FileName != tmpfname {
-			fmt.Printf("Currently dealing with: %s", stat.FileName)
-			tmpfname = stat.FileName
+
+		if lastlen > len(stat.RawOutput) {
+			fmt.Printf("%v%v\r", stat.RawOutput, strings.Repeat(" ", lastlen))
+			lastlen = len(stat.RawOutput)
+		} else {
+			fmt.Printf("%v\r", stat.RawOutput)
+			lastlen = len(stat.RawOutput)
 		}
 
-		fmt.Printf("%v\r", stat.RawOutput)
-		// fname := stat.FileName
 		state = stat.State
-		//	rate := stat.Rate
-		//rate := stat.Rate
-		//progress := stat.Progress
-
 		if stat.Err == nil {
-			if stat.Progress == "100%" {
+			if stat.Progress == "100%" && state != lastState {
+				fmt.Printf("\r%s\r", strings.Repeat(" ", lastlen))
 				pro := green("OK")
-				fmt.Printf("%v %v\r", state, pro)
+				fmt.Printf("\r%v %v\n", state, pro)
 				filesuccess[stat.FileName] = true
+				lastState = state
 			} else {
 				pro := stat.Progress
-				fmt.Printf("%v %v\r", state, pro)
+				if state != lastState {
+					fmt.Printf("\r%v %v", state, pro)
+					lastlen = len(fmt.Sprintf("%v %v\r", state, pro))
+				} else {
+					fmt.Printf("\r%v %v\r", state, pro)
+					lastlen = len(fmt.Sprintf("%v %v\r", state, pro))
+				}
 			}
 		} else {
 			fmt.Printf("%v\n", stat.Err.Error())
 			filesuccess[stat.FileName] = false
 			continue
 		}
-		// fmt.Printf("The uploading process is at rate: %v", rate)
 	}
+	fmt.Println()
 	return
 }
 
