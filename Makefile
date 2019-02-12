@@ -18,7 +18,7 @@ VERNUM = $(shell cut -d= -f2 version)
 ncommits = $(shell git rev-list --count HEAD)
 BUILDNUM = $(shell printf '%06d' $(ncommits))
 COMMITHASH = $(shell git rev-parse HEAD)
-LDFLAGS = -ldflags=$(PKG)="-X main.gincliversion=$(VERNUM) -X main.build=$(BUILDNUM) -X main.commit=$(COMMITHASH)"
+LDFLAGS = -ldflags="-X main.gincliversion=$(VERNUM) -X main.build=$(BUILDNUM) -X main.commit=$(COMMITHASH)"
 
 SOURCES = $(shell find . -type f -iname "*.go") version
 
