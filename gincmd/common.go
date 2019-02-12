@@ -256,7 +256,8 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string
 		ro = stat.RawOutput
 		rostr = fmt.Sprintf("%v", ro)
 		listStr = append(listStr, rostr)
-		if strings.Contains(ro, "done") && strings.Contains(ro, "100%") {
+		if strings.Contains(ro, "done") {
+			fmt.Printf("%s\n", ro)
 			continue
 		}
 
