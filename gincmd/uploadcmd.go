@@ -14,7 +14,6 @@ func upload(cmd *cobra.Command, args []string) {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	remotes, _ := cmd.Flags().GetStringSlice("to")
 	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
-	// if ver
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}

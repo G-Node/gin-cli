@@ -232,18 +232,11 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 
 func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
-	// var rostr, rsstr string
-	// var listStr []string
-	// var state, lastState string
 	var ro string
-	// var lp bool
-	// var lastprint bool // 1 for rawoutput 0 for state
 	var tmprawin, tmpfname string
 
 	for stat := range statuschan {
-		// listStr = nil
 		if stat.FileName != tmpfname {
-			// fmt.Printf("Current File: %s\n", stat.FileName)
 			tmpfname = stat.FileName
 		}
 
@@ -252,46 +245,8 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string
 			fmt.Printf("Running Command: %v\n", stat.RawInput)
 			tmprawin = stat.RawInput
 		}
-
 		ro = stat.RawOutput
-		// rostr = fmt.Sprintf("%v", ro)
-		// listStr = append(listStr, rostr)
 		fmt.Printf("%s", ro)
-		// if strings.Contains(ro, "done") {
-		//
-		// 	continue
-		// }
-
-		// state = stat.State
-		//
-		// if stat.Err == nil {
-		// 	if stat.Progress == "100%" && state != lastState {
-		// 		pro := green("OK")
-		// 		rsstr = fmt.Sprintf("%v:%v", state, pro)
-		// 		listStr = append(listStr, rsstr)
-		// 		filesuccess[stat.FileName] = true
-		// 		lastState = state
-		// 		lp = true
-		// 	} else if state != lastState {
-		// 		pro := stat.Progress
-		// 		rsstr = fmt.Sprintf("%v:%v", state, pro)
-		// 		listStr = append(listStr, rsstr)
-		// 	}
-		// } else {
-		// 	fmt.Printf("%v\n", stat.Err.Error())
-		// 	filesuccess[stat.FileName] = false
-		// 	continue
-		// }
-		//
-		// if len(listStr) == 2 {
-		// 	fmt.Printf("%6s|%6s\r", listStr[1], listStr[0])
-		// } else {
-		// 	fmt.Printf("%6s\r", listStr[0])
-		// }
-		// if lp {
-		// 	fmt.Println()
-		// 	lp = false
-		// }
 	}
 	fmt.Println()
 	return
