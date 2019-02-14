@@ -27,6 +27,9 @@ func commit(cmd *cobra.Command, args []string) {
 	if !jsonout && !verbose {
 		fmt.Print(":: Recording changes ")
 	}
+	if verbose {
+		fmt.Printf("Running Gin Command: %v \n", cmd.Name())
+	}
 	err := git.Commit(makeCommitMessage("commit", paths))
 	var stat string
 	if err != nil {

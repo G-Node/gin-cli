@@ -1,6 +1,8 @@
 package gincmd
 
 import (
+	"fmt"
+
 	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
@@ -34,7 +36,11 @@ func lock(cmd *cobra.Command, args []string) {
 	gincl := ginclient.New(conf.DefaultServer)
 	nitems := countItemsLock(args)
 	lockchan := make(chan git.RepoFileStatus)
+
 	go gincl.LockContent(args, lockchan)
+	if verbose == true {
+		fmt.Printf("Running Gin Command: %v \n", cmd.Name())
+	}
 	formatOutput(lockchan, nitems, jsonout, verbose)
 }
 

@@ -15,7 +15,7 @@ import (
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/G-Node/gin-cli/web"
-	"github.com/gogits/go-gogs-client"
+	gogs "github.com/gogits/go-gogs-client"
 )
 
 // High level functions for managing repositories.
