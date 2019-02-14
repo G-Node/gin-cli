@@ -283,8 +283,12 @@ func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 	var status RepoFileStatus
 	var line string
 	var rerr error
+	lineInput := cmd.Args
+	input := strings.Join(lineInput, " ")
+	status.RawInput = input
 	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
 		fname := strings.TrimSpace(line)
+		status.RawOutput = line
 		if len(fname) == 0 {
 			// skip empty lines
 			continue

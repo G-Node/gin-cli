@@ -24,7 +24,7 @@ func commit(cmd *cobra.Command, args []string) {
 	go ginclient.Add(paths, addchan)
 	formatOutput(addchan, 0, jsonout, verbose)
 
-	if !jsonout {
+	if !jsonout && !verbose {
 		fmt.Print(":: Recording changes ")
 	}
 	err := git.Commit(makeCommitMessage("commit", paths))
@@ -38,7 +38,7 @@ func commit(cmd *cobra.Command, args []string) {
 	} else {
 		stat = green("OK")
 	}
-	if !jsonout {
+	if !jsonout && !verbose {
 		fmt.Fprintln(color.Output, stat)
 	}
 }
