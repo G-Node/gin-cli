@@ -22,7 +22,9 @@ type VersionInfo struct {
 // String constructs a human-readable string that contains the version numbers.
 func (v *VersionInfo) String() string {
 	if v.Version == "" {
-		return "GIN command line client [dev build]"
+		v.Version = "[dev build]"
+		v.Build = "[dev]"
+		v.Commit = "???"
 	}
 
 	gitver := v.Git
