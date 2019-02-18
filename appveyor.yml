@@ -8,11 +8,17 @@ stack: go 1.11
 environment:
   GOPATH: c:\gopath
   BINDIR: bin
+  ANNEXURL: https://web.gin.g-node.org/G-Node/git-annex-windows/raw/master/git-annex-windows-v6.exe
 
 
 install:
+  - set PATH=%PATH%;%GOPATH%\bin;c:\git-annex\usr\bin
+  # download git-annex-windows-v6.exe
+  - md \git-annex; cd \git-annex
+  - ps: Invoke-WebRequest -URI $env:ANNEXURL -OutFile "git-annex-windows-v6.exe"
+  - 7z x git-annex-windows-v6.exe
+  - dir usr\bin
   # go stuff
-  - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
   - go version
   - go env
   - go get -u github.com/golang/lint/golint
