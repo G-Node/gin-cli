@@ -31,8 +31,8 @@ allplatforms: linux windows macos
 install: gin
 	install $(BUILDLOC)/$(GIN) $(INSTLOC)/$(GIN)
 
-installtest: gin
-	install $(BUILDLOC)/$(GIN) $(TESTBINLOC)/$(GIN)
+testbuild: linux
+	install $(BUILDLOC)/linux/$(GIN) $(TESTBINLOC)/$(GIN)
 
 linux: $(BUILDLOC)/linux/$(GIN)
 
@@ -50,11 +50,10 @@ $(BUILDLOC)/$(GIN): $(SOURCES)
 	go build $(LDFLAGS) -o $(BUILDLOC)/$(GIN)
 
 $(BUILDLOC)/linux/$(GIN): $(SOURCES)
-	gox -output=$(BUILDLOC)/linux/$(GIN) -osarch=linux/amd64 $(LDFLAGS)
-
+	GOOS=linux GOARCH=amd64 go build -o $(BUILDLOC)/linux/$(GIN) $(LDFLAGS)
 
 $(BUILDLOC)/windows/$(GIN).exe: $(SOURCES)
-	gox -output=$(BUILDLOC)/windows/$(GIN) -osarch=windows/386 $(LDFLAGS)
+	GOOS=windows GOARCH=386 go build -o $(BUILDLOC)/windows/$(GIN) $(LDFLAGS)
 
 $(BUILDLOC)/darwin/$(GIN): $(SOURCES)
-	gox -output=$(BUILDLOC)/darwin/$(GIN) -osarch=darwin/amd64 $(LDFLAGS)
+	GOOS=darwin GOARCH=amd64 go build -o $(BUILDLOC)/darwin/$(GIN) $(LDFLAGS)
