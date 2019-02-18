@@ -2,13 +2,11 @@ package gincmd
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
-
-	version "github.com/hashicorp/go-version"
 )
 
 const minAnnexVersion = "6.20171108" // tested working
-var minver, _ = version.NewVersion(minAnnexVersion)
 
 // VersionInfo holds the version numbers supplied by the linker flags in a convenient struct.
 type VersionInfo struct {
@@ -45,10 +43,9 @@ func (v *VersionInfo) String() string {
 	return fmt.Sprintf("GIN command line client %s Build %s (%s)\n  git: %s\n  git-annex: %s", v.Version, v.Build, v.Commit, gitver, annexver)
 }
 
-// GitOK checks if the system git version is higher than the required one.
-// If it is not, or the git binary is not found, an appropriate error message is returned.
+// GitOK checks if git runs and returns an understandable version string.
 func (v *VersionInfo) GitOK() (bool, error) {
-	_, err := version.NewVersion(v.Git)
+	_, err := parsever(v.Git)
 	if err != nil {
 		return false, fmt.Errorf(v.Git)
 	}
@@ -58,27 +55,55 @@ func (v *VersionInfo) GitOK() (bool, error) {
 // AnnexOK checks if the system annex version is higher than the required one.
 // If it is not, or the git-annex binary is not found, an appropriate error message is returned.
 func (v *VersionInfo) AnnexOK() (bool, error) {
-	compare := func(sv *version.Version) (bool, error) {
-		if sv.LessThan(minver) {
-			return false, fmt.Errorf("git-annex version %s found, but %s or newer is required", v.Annex, minAnnexVersion)
+	systemver, err := parsever(v.Annex)
+	if err != nil {
+		return false, err
+	}
+	minver, _ := parsever(minAnnexVersion)
+
+	errmsg := fmt.Errorf("git-annex version %s found, but %s or newer is required", v.Annex, minAnnexVersion)
+
+	for idx := range minver {
+		if idx >= len(systemver) || systemver[idx] < minver[idx] {
+			// if we run out of components for systemver, assume 0 => not newer
+			return false, errmsg
 		}
-		return true, nil
+		if systemver[idx] > minver[idx] {
+			return true, nil
+		}
 	}
 
-	systemver, err := version.NewVersion(v.Annex)
-	if err == nil {
-		return compare(systemver)
+	// all components equal: OK!
+	return true, nil
+}
+
+// parsever is a very lax version parser that simply splits a version string on '.', '-', and '~' and returns the components in an integer slice.
+// The parsing stops when it finds anything that doesn't look like an integer.
+// An error is returned only if the first component is not a number.
+func parsever(v string) ([]int, error) {
+
+	delims := []rune{'.', '-', '~'}
+	f := func(r rune) bool {
+		for _, s := range delims {
+			if r == s {
+				return true
+			}
+		}
+		return false
+	}
+	components := strings.FieldsFunc(v, f)
+	verints := make([]int, 0, len(components))
+
+	for idx, comp := range components {
+		vi, err := strconv.Atoi(comp)
+		if err != nil {
+			if idx == 0 {
+				return nil, fmt.Errorf("%s: version string not understood", v)
+			}
+			break
+		}
+		verints = append(verints, vi)
 	}
 
-	// Special case for neurodebian git-annex version
-	// The version string contains a tilde as a separator for the arch suffix
-	// Cutting off the suffix and checking again
-	verstring := strings.Split(v.Annex, "~")[0]
-	systemver, err = version.NewVersion(verstring)
-	if err == nil {
-		return compare(systemver)
-	}
-
-	// Can't figure out the version: print error from AnnexVersion
-	return false, fmt.Errorf(v.Annex)
+	return verints, nil
 }
