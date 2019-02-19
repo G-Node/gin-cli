@@ -991,13 +991,14 @@ func gitAddDirect(paths []string) (filtered []string) {
 		if wiInfo.Err != nil {
 			continue
 		}
-		annexfiles = append(annexfiles, wiInfo.File)
+		annexfiles = append(annexfiles, filepath.Clean(wiInfo.File))
 	}
 	filtered = filterpaths(paths, annexfiles)
 
 	lschan := make(chan string)
 	go LsFiles(paths, lschan)
 	for gitfile := range lschan {
+		gitfile = filepath.Clean(gitfile)
 		if !stringInSlice(gitfile, annexfiles) && !stringInSlice(gitfile, filtered) {
 			filtered = append(filtered, gitfile)
 		}

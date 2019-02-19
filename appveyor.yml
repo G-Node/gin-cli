@@ -1,24 +1,33 @@
 version: '{build}'
 build: off
 
-clone_folder: c:\gopath\src\github.com\G-Node\gin-cli
+clone_folder: C:\gopath\src\github.com\G-Node\gin-cli
 
 stack: go 1.11
 
 environment:
-  GOPATH: c:\gopath
+  SRCDIR: C:\gopath\src\github.com\G-Node\gin-cli
+  GOPATH: C:\gopath
   BINDIR: bin
+  ANNEXURL: https://web.gin.g-node.org/G-Node/git-annex-windows/raw/master/git-annex-windows-v6.exe
 
 
 install:
+  - set PATH=C:\Python37-x64\;%PATH%;%GOPATH%\bin;c:\git-annex\usr\bin
+  # download git-annex-windows-v6.exe
+  - md c:\git-annex
+  - cd c:\git-annex
+  - ps: Invoke-WebRequest -URI $env:ANNEXURL -OutFile "git-annex-windows-v6.exe"
+  - 7z x git-annex-windows-v6.exe
+  - dir usr\bin
+  - git-annex version
   # go stuff
-  - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
   - go version
   - go env
   - go get -u github.com/golang/lint/golint
 
 build_script:
-  - cd %clone_folder%
+  - cd %SRCDIR%
   # download deps
   - go get github.com/spf13/viper
   - go get github.com/spf13/cobra
@@ -29,7 +38,6 @@ build_script:
   - go get golang.org/x/crypto/ssh
   - go get github.com/gogits/go-gogs-client
   - go get github.com/fatih/color
-  - go get github.com/hashicorp/go-version
   - go get github.com/shibukawa/configdir
   - go get github.com/bbrks/wrap
   - go get github.com/docker/docker/pkg/term
@@ -38,9 +46,24 @@ build_script:
   - go vet ./...
   - gofmt -s -l .
   - golint github.com/G-Node/gin-cli...
+  - go build -ldflags "-X main.gincliversion=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o %GOPATH%\bin\gin.exe .
 
-after_test:
-  - go build -ldflags "-X main.gincliversion=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o gin.exe .
+before_test:
+  # python stuff
+  - python -m pip install pytest pyyaml
+  # clone tests submodule
+  - git submodule init
+  - git submodule update
+  # check that git and annex versions are detected properly
+  - gin --version
+  - gin help
+
+test_script:
+  - git config --global user.email "appveyor@example.com"
+  - git config --global user.name "GIN Appveyor"
+  - cd %SRCDIR%\tests
+  - xcopy /e /s /y /i conf %userprofile%\conf
+  - python -m pytest -k "annex_content"
 
 # to disable deployment
 deploy: off
