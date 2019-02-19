@@ -2,6 +2,18 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.6
+
+### Bug fixes
+- Fixed bug where commands `repos` and `repoinfo` would still prompt for login when called with `--json` flag and the user was not logged in. Commands invoked with the `--json` flag should never prompt for any input.
+- Fixed colour output in Windows.
+- Fixed bug where annexed content would also be added to git on Windows.
+
+### Relevant PRs
+- #236: Don't prompt for login with --json
+- #237: Windows colours
+- #241: Fix for adding annexed content to git on Windows
+
 ## Version 1.5
 
 ### Bug fixes
