@@ -11,8 +11,10 @@ import (
 func countItemsLock(paths []string) (count int) {
 	statchan := make(chan git.AnnexStatusRes)
 	go git.AnnexStatus(paths, statchan)
-	for range statchan {
-		count++
+	for stat := range statchan {
+		if stat.Status == "T" {
+			count++
+		}
 	}
 	return
 }
