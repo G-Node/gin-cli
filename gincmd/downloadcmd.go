@@ -26,9 +26,6 @@ func download(cmd *cobra.Command, args []string) {
 
 	content, _ := cmd.Flags().GetBool("content")
 	lockchan := make(chan git.RepoFileStatus)
-	if verbose {
-		fmt.Printf("Running Gin Command: %v \n", cmd.Name())
-	}
 	go gincl.LockContent([]string{}, lockchan)
 	formatOutput(lockchan, 0, jsonout, verbose)
 	if !jsonout && !verbose {

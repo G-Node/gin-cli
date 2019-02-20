@@ -1,8 +1,6 @@
 package gincmd
 
 import (
-	"fmt"
-
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
@@ -33,9 +31,6 @@ func remove(cmd *cobra.Command, args []string) {
 	nitems := countItemsRemove(args)
 	rmchan := make(chan git.RepoFileStatus)
 	go gincl.RemoveContent(args, rmchan)
-	if verbose {
-		fmt.Printf("Running Gin Command: %v \n", cmd.Name())
-	}
 	formatOutput(rmchan, nitems, jsonout, verbose)
 }
 

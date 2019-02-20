@@ -1,8 +1,6 @@
 package gincmd
 
 import (
-	"fmt"
-
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
@@ -24,9 +22,6 @@ func getContent(cmd *cobra.Command, args []string) {
 
 	getcchan := make(chan git.RepoFileStatus)
 	go gincl.GetContent(args, getcchan)
-	if verbose {
-		fmt.Printf("Running Gin Command: %v \n", cmd.Name())
-	}
 	formatOutput(getcchan, 0, jsonout, verbose)
 }
 

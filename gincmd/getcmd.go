@@ -33,9 +33,6 @@ func getRepo(cmd *cobra.Command, args []string) {
 	}
 
 	clonechan := make(chan git.RepoFileStatus)
-	if verbose {
-		fmt.Printf("Running Gin Command: %v \n", cmd.Name())
-	}
 	go gincl.CloneRepo(repostr, clonechan)
 	formatOutput(clonechan, 0, jsonout, verbose)
 	defaultRemoteIfUnset("origin")
