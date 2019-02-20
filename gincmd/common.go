@@ -234,9 +234,22 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string
 	filesuccess = make(map[string]bool)
 	var ro string
 	var tmprawin, tmpfname string
-
+	type Act struct {
+		Command string `json:"command"`
+		Note    string `json:"note"`
+		Key     string `json:"key"`
+		File    string `json:"file"`
+	}
+	type Jsonout struct {
+		ByteProgress    int    `json:"byte-progress"`
+		Action          Act    `json:"action"`
+		TotalSize       int    `json:"total-size"`
+		PercentProgress string `json:"percent-progress"`
+		Success         bool   `json:"success"`
+	}
 	for stat := range statuschan {
 		if stat.FileName != tmpfname {
+			fmt.Printf("File: %v\n", stat.FileName)
 			tmpfname = stat.FileName
 		}
 
@@ -245,8 +258,25 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string
 			fmt.Printf("Running Command: %v\n", stat.RawInput)
 			tmprawin = stat.RawInput
 		}
-		ro = stat.RawOutput
-		fmt.Printf("%s", ro)
+		if strings.Contains(stat.RawInput, "json") {
+			outline := []byte(stat.RawOutput)
+			if json.Valid(outline) {
+				var output Jsonout
+				_ = json.Unmarshal(outline, &output)
+				if output.Success {
+					fmt.Printf("\n%s", green("Success"))
+				} else {
+					fmt.Printf("%s %s %s Progress:%d/%d(%s) FileKey:%s\r", output.Action.Command, output.Action.File, output.Action.Note,
+						output.ByteProgress, output.TotalSize, output.PercentProgress, output.Action.Key)
+				}
+			} else {
+				ro = stat.RawOutput
+				fmt.Printf("%s", ro)
+			}
+		} else {
+			ro = stat.RawOutput
+			fmt.Printf("%s", ro)
+		}
 	}
 	fmt.Println()
 	return
