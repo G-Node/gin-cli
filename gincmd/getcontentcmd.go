@@ -13,6 +13,7 @@ import (
 func getContent(cmd *cobra.Command, args []string) {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	jsonout, _ := cmd.Flags().GetBool("json")
+	checkVerboseJson(verbose, jsonout)
 	conf := config.Read()
 	// TODO: no need for client; use remotes (and all keys?)
 	gincl := ginclient.New(conf.DefaultServer)

@@ -294,6 +294,7 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 			// skip empty lines
 			continue
 		}
+		status.RawOutput = string(outline)
 		err := json.Unmarshal(outline, &progress)
 		if err != nil || progress == (annexProgress{}) {
 			time.Sleep(1 * time.Second)
@@ -310,7 +311,6 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 			lineInput := cmd.Args
 			input := strings.Join(lineInput, " ")
 			status.RawInput = input
-			// output shouldn't be needed
 			if getresult.Success {
 				status.Progress = progcomplete
 				status.Err = nil

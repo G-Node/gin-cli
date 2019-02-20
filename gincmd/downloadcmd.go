@@ -15,6 +15,7 @@ import (
 func download(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	verbose, _ := cmd.Flags().GetBool("verbose")
+	checkVerboseJson(verbose, jsonout)
 	// TODO: no client necessary? Just use remotes
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)

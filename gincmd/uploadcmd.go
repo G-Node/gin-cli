@@ -13,6 +13,7 @@ func upload(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	remotes, _ := cmd.Flags().GetStringSlice("to")
+	checkVerboseJson(verbose, jsonout)
 	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
@@ -35,7 +36,6 @@ func upload(cmd *cobra.Command, args []string) {
 			break
 		}
 	}
-	fmt.Println(args)
 	paths := args
 	if len(paths) > 0 {
 		commit(cmd, paths)
@@ -43,7 +43,7 @@ func upload(cmd *cobra.Command, args []string) {
 
 	uploadchan := make(chan git.RepoFileStatus)
 	go gincl.Upload(paths, remotes, uploadchan)
-	if verbose == true {
+	if verbose {
 		var cmd_spec_var []string
 		path, _ := git.RemoteShow()
 		for _, v := range path {

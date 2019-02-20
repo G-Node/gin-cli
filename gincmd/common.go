@@ -230,6 +230,12 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	return
 }
 
+func checkVerboseJson(verbose bool, json bool) {
+	if verbose && json {
+		Die("Verbose flag and Json flag cannot be used together")
+	}
+}
+
 func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
 	var ro string
@@ -264,7 +270,7 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string
 				var output Jsonout
 				_ = json.Unmarshal(outline, &output)
 				if output.Success {
-					fmt.Printf("\n%s", green("Success"))
+
 				} else {
 					fmt.Printf("%s %s %s Progress:%d/%d(%s) FileKey:%s\r", output.Action.Command, output.Action.File, output.Action.Note,
 						output.ByteProgress, output.TotalSize, output.PercentProgress, output.Action.Key)
@@ -287,9 +293,6 @@ func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool
 	var filesuccess map[string]bool
 	if jsonout {
 		filesuccess = printJSON(statuschan)
-		if verbose {
-			fmt.Fprint(color.Output, "json and verbose cannot be used together")
-		}
 	} else if verbose {
 		filesuccess = verboseOutput(statuschan)
 	} else if nitems > 0 {

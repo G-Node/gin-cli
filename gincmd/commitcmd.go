@@ -15,6 +15,7 @@ import (
 func commit(cmd *cobra.Command, args []string) {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	jsonout, _ := cmd.Flags().GetBool("json")
+	checkVerboseJson(verbose, jsonout)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
