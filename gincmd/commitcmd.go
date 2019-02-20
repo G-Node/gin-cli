@@ -75,6 +75,6 @@ func CommitCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print output in JSON format.")
-	cmd.Flags().Bool("verbose", false, "Print all raw information.")
+	cmd.Flags().Bool("verbose", false, "Print raw information from git and git-annex commands directly.")
 	return cmd
 }

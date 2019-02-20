@@ -70,7 +70,7 @@ func GetCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, "Print output in JSON format.")
-	cmd.Flags().Bool("verbose", false, "Print all raw information.")
+	cmd.Flags().Bool("verbose", false, "Print raw information from git and git-annex commands directly.")
 	cmd.Flags().String("server", "", "Specify server `alias` for the repository. See also 'gin servers'.")
 	return cmd
 }
