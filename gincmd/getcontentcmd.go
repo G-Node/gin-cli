@@ -9,7 +9,9 @@ import (
 )
 
 func getContent(cmd *cobra.Command, args []string) {
+	verbose, _ := cmd.Flags().GetBool("verbose")
 	jsonout, _ := cmd.Flags().GetBool("json")
+	checkVerboseJson(verbose, jsonout)
 	conf := config.Read()
 	// TODO: no need for client; use remotes (and all keys?)
 	gincl := ginclient.New(conf.DefaultServer)
@@ -20,7 +22,7 @@ func getContent(cmd *cobra.Command, args []string) {
 
 	getcchan := make(chan git.RepoFileStatus)
 	go gincl.GetContent(args, getcchan)
-	formatOutput(getcchan, 0, jsonout)
+	formatOutput(getcchan, 0, jsonout, verbose)
 }
 
 // GetContentCmd sets up the 'get-content' subcommand
@@ -30,7 +32,7 @@ func GetContentCmd() *cobra.Command {
 		"<filenames>": "One or more directories or files to download.",
 	}
 	var cmd = &cobra.Command{
-		Use:                   "get-content [--json] [<filenames>]...",
+		Use:                   "get-content [--json | --verbose] [<filenames>]...",
 		Short:                 "Download the content of files from a remote repository",
 		Long:                  formatdesc(description, args),
 		Args:                  cobra.ArbitraryArgs,
@@ -38,6 +40,7 @@ func GetContentCmd() *cobra.Command {
 		Aliases:               []string{"getc"},
 		DisableFlagsInUseLine: true,
 	}
-	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	cmd.Flags().Bool("json", false, "Print raw information from git and git-annex commands directly.")
+	cmd.Flags().Bool("verbose", false, "Print raw information from git and git-annex commands directly.")
 	return cmd
 }

@@ -230,11 +230,64 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	return
 }
 
-func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool) {
+func checkVerboseJson(verbose bool, json bool) {
+	if verbose && json {
+		Die("Verbose flag and Json flag cannot be used together")
+	}
+}
+
+func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
+	filesuccess = make(map[string]bool)
+	var ro string
+	var tmprawin, tmpfname string
+	type Act struct {
+		Command string `json:"command"`
+		Note    string `json:"note"`
+		Key     string `json:"key"`
+		File    string `json:"file"`
+	}
+	type Jsonout struct {
+		ByteProgress    int    `json:"byte-progress"`
+		Action          Act    `json:"action"`
+		TotalSize       int    `json:"total-size"`
+		PercentProgress string `json:"percent-progress"`
+		Success         bool   `json:"success"`
+	}
+	for stat := range statuschan {
+		if stat.FileName != tmpfname {
+			fmt.Printf("File: %v\n", stat.FileName)
+			tmpfname = stat.FileName
+		}
+
+		//Raw Input
+		if stat.RawInput != tmprawin {
+			fmt.Printf("Running Command: %v\n", stat.RawInput)
+			tmprawin = stat.RawInput
+		}
+		outline := []byte(stat.RawOutput)
+		if json.Valid(outline) {
+			var output Jsonout
+			_ = json.Unmarshal(outline, &output)
+			if !output.Success {
+				fmt.Printf("%s %s %s Progress:%d/%d(%s) FileKey:%s\r", output.Action.Command, output.Action.File, output.Action.Note,
+					output.ByteProgress, output.TotalSize, output.PercentProgress, output.Action.Key)
+			}
+		} else {
+			ro = stat.RawOutput
+			fmt.Printf("%s", ro)
+		}
+	}
+	fmt.Println()
+	return
+}
+
+func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool, verbose bool) {
 	// TODO: instead of a true/false success, add an error for every file and then group the errors by type and print a report
 	var filesuccess map[string]bool
 	if jsonout {
 		filesuccess = printJSON(statuschan)
+	} else if verbose {
+		filesuccess = verboseOutput(statuschan)
 	} else if nitems > 0 {
 		filesuccess = printProgressWithBar(statuschan, nitems)
 	} else {

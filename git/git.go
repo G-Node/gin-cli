@@ -37,6 +37,10 @@ type RepoFileStatus struct {
 	Progress string `json:"progress"`
 	// The data rate, if available.
 	Rate string `json:"rate"`
+	// original cmd input
+	RawInput string `json:"rawinput"`
+	// original command output
+	RawOutput string `json:"rawoutput"`
 	// Errors
 	Err error `json:"err"`
 }
@@ -136,6 +140,9 @@ func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) 
 	readbuffer := make([]byte, 1024)
 	var nread, errhead int
 	var eob, eof bool
+	lineInput := cmd.Args
+	input := strings.Join(lineInput, " ")
+	status.RawInput = input
 	// git clone progress prints to stderr
 	for eof = false; !eof; nread, rerr = cmd.ErrReader.Read(readbuffer) {
 		if rerr != nil && errhead == len(stderr) {
@@ -160,6 +167,7 @@ func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) 
 						rate = strings.TrimSuffix(rate, ",")
 					}
 					status.Rate = rate
+					status.RawOutput = line
 				}
 			}
 			clonechan <- status
@@ -222,6 +230,9 @@ func Push(remote string, pushchan chan<- RepoFileStatus) {
 	var line string
 	var rerr error
 	re := regexp.MustCompile(`(?P<state>Compressing|Writing) objects:\s+(?P<progress>[0-9]{2,3})% \((?P<n>[0-9]+)/(?P<N>[0-9]+)\)`)
+	lineInput := cmd.Args
+	input := strings.Join(lineInput, " ")
+	status.RawInput = input
 	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\r') {
 		if !re.MatchString(line) {
 			continue
@@ -232,6 +243,7 @@ func Push(remote string, pushchan chan<- RepoFileStatus) {
 			status.State = fmt.Sprintf("Uploading git files (to: %s)", remote)
 		}
 		status.Progress = fmt.Sprintf("%s%%", match[2])
+		status.RawOutput = line
 		pushchan <- status
 	}
 	return
@@ -271,8 +283,12 @@ func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 	var status RepoFileStatus
 	var line string
 	var rerr error
+	lineInput := cmd.Args
+	input := strings.Join(lineInput, " ")
+	status.RawInput = input
 	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
 		fname := strings.TrimSpace(line)
+		status.RawOutput = line
 		if len(fname) == 0 {
 			// skip empty lines
 			continue
