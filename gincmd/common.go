@@ -264,20 +264,13 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string
 			fmt.Printf("Running Command: %v\n", stat.RawInput)
 			tmprawin = stat.RawInput
 		}
-		if strings.Contains(stat.RawInput, "json") {
-			outline := []byte(stat.RawOutput)
-			if json.Valid(outline) {
-				var output Jsonout
-				_ = json.Unmarshal(outline, &output)
-				if output.Success {
-
-				} else {
-					fmt.Printf("%s %s %s Progress:%d/%d(%s) FileKey:%s\r", output.Action.Command, output.Action.File, output.Action.Note,
-						output.ByteProgress, output.TotalSize, output.PercentProgress, output.Action.Key)
-				}
-			} else {
-				ro = stat.RawOutput
-				fmt.Printf("%s", ro)
+		outline := []byte(stat.RawOutput)
+		if json.Valid(outline) {
+			var output Jsonout
+			_ = json.Unmarshal(outline, &output)
+			if !output.Success {
+				fmt.Printf("%s %s %s Progress:%d/%d(%s) FileKey:%s\r", output.Action.Command, output.Action.File, output.Action.Note,
+					output.ByteProgress, output.TotalSize, output.PercentProgress, output.Action.Key)
 			}
 		} else {
 			ro = stat.RawOutput
