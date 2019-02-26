@@ -53,7 +53,7 @@ $(BUILDLOC)/linux/$(GIN): $(SOURCES)
 	GOOS=linux GOARCH=amd64 go build -o $(BUILDLOC)/linux/$(GIN) $(LDFLAGS)
 
 $(BUILDLOC)/windows/$(GIN).exe: $(SOURCES)
-	GOOS=windows GOARCH=386 go build -o $(BUILDLOC)/windows/$(GIN) $(LDFLAGS)
+	GOOS=windows GOARCH=386 go build -o $(BUILDLOC)/windows/$(GIN).exe $(LDFLAGS)
 
 $(BUILDLOC)/darwin/$(GIN): $(SOURCES)
 	GOOS=darwin GOARCH=amd64 go build -o $(BUILDLOC)/darwin/$(GIN) $(LDFLAGS)

@@ -25,21 +25,27 @@ func trim(file *os.File) {
 	if err != nil {
 		return
 	}
-	if filestat.Size() < loglimit {
+	fsize := filestat.Size()
+	if fsize < loglimit {
 		return
 	}
-	contents := make([]byte, filestat.Size())
-	nbytes, err := file.ReadAt(contents, 0)
+	contents := make([]byte, loglimit)
+	offset := fsize - loglimit
+	_, err = file.ReadAt(contents, offset)
 	if err != nil {
 		return
 	}
-	file.Truncate(0)
-	file.Write(contents[nbytes-loglimit : nbytes])
+	// Close logfile, recreate (empty), and write the trimmed contents
+	file.Close()
+	file, err = os.Create(file.Name())
+	if err == nil {
+		file.Write(contents)
+	}
 }
 
 // Init initialises the log file and logger.
 func Init(ver string) error {
-	cachepath, err := logpath(true)
+	cachepath, err := mklogdir(true)
 	if err != nil {
 		return err
 	}
@@ -58,8 +64,8 @@ func Init(ver string) error {
 	return nil
 }
 
-// logpath returns the path where gin cache files (logs) should be stored.
-func logpath(create bool) (string, error) {
+// mklogdir returns the path where gin cache files (logs) should be stored.
+func mklogdir(create bool) (string, error) {
 	var err error
 	logpath := os.Getenv("GIN_LOG_DIR")
 	if logpath == "" {
