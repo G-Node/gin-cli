@@ -25,16 +25,18 @@ func trim(file *os.File) {
 	if err != nil {
 		return
 	}
-	if filestat.Size() < loglimit {
+	fsize := filestat.Size()
+	if fsize < loglimit {
 		return
 	}
-	contents := make([]byte, filestat.Size())
-	nbytes, err := file.ReadAt(contents, 0)
+	contents := make([]byte, loglimit)
+	offset := fsize - loglimit
+	_, err = file.ReadAt(contents, offset)
 	if err != nil {
 		return
 	}
 	file.Truncate(0)
-	file.Write(contents[nbytes-loglimit : nbytes])
+	file.Write(contents)
 }
 
 // Init initialises the log file and logger.
