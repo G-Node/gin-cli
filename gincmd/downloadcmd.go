@@ -13,13 +13,11 @@ import (
 )
 
 func download(cmd *cobra.Command, args []string) {
-	jsonout, _ := cmd.Flags().GetBool("json")
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	checkVerboseJSON(verbose, jsonout)
+	prStyle := determinePrintStyle(cmd)
 	// TODO: no client necessary? Just use remotes
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)
-	requirelogin(cmd, gincl, !jsonout)
+	requirelogin(cmd, gincl, prStyle != psJSON)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -27,13 +25,13 @@ func download(cmd *cobra.Command, args []string) {
 	content, _ := cmd.Flags().GetBool("content")
 	lockchan := make(chan git.RepoFileStatus)
 	go gincl.LockContent([]string{}, lockchan)
-	formatOutput(lockchan, 0, jsonout, verbose)
-	if !jsonout && !verbose {
+	formatOutput(lockchan, prStyle, 0)
+	if prStyle == psDefault {
 		fmt.Print("Downloading changes ")
 	}
 	err := gincl.Download()
 	CheckError(err)
-	if !jsonout && !verbose {
+	if prStyle == psDefault {
 		fmt.Fprintln(color.Output, green("OK"))
 	}
 	if content {

@@ -13,9 +13,7 @@ import (
 )
 
 func commit(cmd *cobra.Command, args []string) {
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	jsonout, _ := cmd.Flags().GetBool("json")
-	checkVerboseJSON(verbose, jsonout)
+	prStyle := determinePrintStyle(cmd)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -23,9 +21,9 @@ func commit(cmd *cobra.Command, args []string) {
 	paths := args
 	addchan := make(chan git.RepoFileStatus)
 	go ginclient.Add(paths, addchan)
-	formatOutput(addchan, 0, jsonout, verbose)
+	formatOutput(addchan, prStyle, 0)
 
-	if !jsonout && !verbose {
+	if prStyle == psDefault {
 		fmt.Print(":: Recording changes ")
 	}
 	err := git.Commit(makeCommitMessage("commit", paths))
@@ -39,7 +37,7 @@ func commit(cmd *cobra.Command, args []string) {
 	} else {
 		stat = green("OK")
 	}
-	if !jsonout && !verbose {
+	if prStyle == psDefault {
 		fmt.Fprintln(color.Output, stat)
 	}
 }

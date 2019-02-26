@@ -49,6 +49,15 @@ var (
 	}
 )
 
+type printstyle uint8
+
+const (
+	psDefault printstyle = iota
+	psProgress
+	psJSON
+	psVerbose
+)
+
 // Die prints an error message to stderr and exits the program with status 1.
 func Die(msg interface{}) {
 	msgstring := fmt.Sprintf("%s", msg)
@@ -234,12 +243,6 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	return
 }
 
-func checkVerboseJSON(verbose bool, json bool) {
-	if verbose && json {
-		Die("--verbose and --json cannot be used together")
-	}
-}
-
 func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
 	var ro string
@@ -285,16 +288,48 @@ func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string
 	return
 }
 
-func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool, verbose bool) {
+// determinePrintStyle determines the print style to use based on the flags supplied by the user and the subcommand that is being called.
+// If incompatible flags are received (--json and --verbose), it immediately exits using Die().
+func determinePrintStyle(cmd *cobra.Command) printstyle {
+	verboseOn, _ := cmd.Flags().GetBool("verbose")
+	jsonOn, _ := cmd.Flags().GetBool("json")
+
+	isProgressCmd := func() bool {
+		progressCmds := []string{"lock", "unlock", "remove-content"}
+		for _, cname := range progressCmds {
+			if cname == cmd.Name() {
+				return true
+			}
+		}
+		return false
+	}
+
+	switch {
+	case verboseOn && jsonOn:
+		Die("--verbose and --json cannot be used together")
+	case verboseOn:
+		return psVerbose
+	case jsonOn:
+		return psJSON
+	case isProgressCmd():
+		return psProgress
+	default:
+		return psDefault
+	}
+	return psDefault
+}
+
+func formatOutput(statuschan <-chan git.RepoFileStatus, pstyle printstyle, nitems int) {
 	// TODO: instead of a true/false success, add an error for every file and then group the errors by type and print a report
 	var filesuccess map[string]bool
-	if jsonout {
+	switch pstyle {
+	case psJSON:
 		filesuccess = printJSON(statuschan)
-	} else if verbose {
+	case psVerbose:
 		filesuccess = verboseOutput(statuschan)
-	} else if nitems > 0 {
+	case psProgress:
 		filesuccess = printProgressWithBar(statuschan, nitems)
-	} else {
+	case psDefault:
 		filesuccess = printProgressOutput(statuschan)
 	}
 

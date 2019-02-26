@@ -17,13 +17,11 @@ func countItemsRemove(paths []string) int {
 }
 
 func remove(cmd *cobra.Command, args []string) {
-	jsonout, _ := cmd.Flags().GetBool("json")
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	checkVerboseJSON(verbose, jsonout)
+	prStyle := determinePrintStyle(cmd)
 	// TODO: Need server config? just use remotes (and all keys)
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)
-	requirelogin(cmd, gincl, !jsonout)
+	requirelogin(cmd, gincl, prStyle != psJSON)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -31,7 +29,7 @@ func remove(cmd *cobra.Command, args []string) {
 	nitems := countItemsRemove(args)
 	rmchan := make(chan git.RepoFileStatus)
 	go gincl.RemoveContent(args, rmchan)
-	formatOutput(rmchan, nitems, jsonout, verbose)
+	formatOutput(rmchan, prStyle, nitems)
 }
 
 // RemoveContentCmd sets up the 'remove-content' subcommand

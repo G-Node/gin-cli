@@ -20,9 +20,7 @@ func countItemsLock(paths []string) (count int) {
 }
 
 func lock(cmd *cobra.Command, args []string) {
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	jsonout, _ := cmd.Flags().GetBool("json")
-	checkVerboseJSON(verbose, jsonout)
+	prStyle := determinePrintStyle(cmd)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -37,7 +35,7 @@ func lock(cmd *cobra.Command, args []string) {
 	lockchan := make(chan git.RepoFileStatus)
 
 	go gincl.LockContent(args, lockchan)
-	formatOutput(lockchan, nitems, jsonout, verbose)
+	formatOutput(lockchan, prStyle, nitems)
 }
 
 // LockCmd sets up the file 'lock' subcommand
