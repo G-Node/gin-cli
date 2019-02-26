@@ -40,7 +40,7 @@ func GetContentCmd() *cobra.Command {
 		Aliases:               []string{"getc"},
 		DisableFlagsInUseLine: true,
 	}
-	cmd.Flags().Bool("json", false, "Print raw information from git and git-annex commands directly.")
+	cmd.Flags().Bool("json", false, "Print output in JSON format.")
 	cmd.Flags().Bool("verbose", false, "Print raw information from git and git-annex commands directly.")
 	return cmd
 }
