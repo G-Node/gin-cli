@@ -45,7 +45,7 @@ func trim(file *os.File) {
 
 // Init initialises the log file and logger.
 func Init(ver string) error {
-	cachepath, err := logpath(true)
+	cachepath, err := mklogdir(true)
 	if err != nil {
 		return err
 	}
@@ -64,8 +64,8 @@ func Init(ver string) error {
 	return nil
 }
 
-// logpath returns the path where gin cache files (logs) should be stored.
-func logpath(create bool) (string, error) {
+// mklogdir returns the path where gin cache files (logs) should be stored.
+func mklogdir(create bool) (string, error) {
 	var err error
 	logpath := os.Getenv("GIN_LOG_DIR")
 	if logpath == "" {
