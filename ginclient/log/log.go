@@ -35,8 +35,12 @@ func trim(file *os.File) {
 	if err != nil {
 		return
 	}
-	file.Truncate(0)
-	file.Write(contents)
+	// Close logfile, recreate (empty), and write the trimmed contents
+	file.Close()
+	file, err = os.Create(file.Name())
+	if err == nil {
+		file.Write(contents)
+	}
 }
 
 // Init initialises the log file and logger.
