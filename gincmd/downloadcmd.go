@@ -54,8 +54,8 @@ func DownloadCmd() *cobra.Command {
 		Run:                   download,
 		DisableFlagsInUseLine: true,
 	}
-	cmd.Flags().Bool("json", false, "Print output in JSON format.")
-	cmd.Flags().Bool("verbose", false, "Print raw information from git and git-annex commands directly.")
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
+	cmd.Flags().Bool("verbose", false, verboseHelpMsg)
 	cmd.Flags().Bool("content", false, "Download the content for all files in the repository.")
 	return cmd
 }

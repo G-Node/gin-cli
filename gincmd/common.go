@@ -18,7 +18,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const unknownhostname = "(unknown)"
+const (
+	unknownhostname = "(unknown)"
+	jsonHelpMsg     = "Print output in JSON format."
+	verboseHelpMsg  = "Print underlying git and git-annex calls and their unmodified output."
+)
 
 var (
 	green  = color.New(color.FgGreen).SprintFunc()
