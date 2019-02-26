@@ -22,7 +22,7 @@ LDFLAGS = -ldflags="-X main.gincliversion=$(VERNUM) -X main.build=$(BUILDNUM) -X
 
 SOURCES = $(shell find . -type f -iname "*.go") version
 
-.PHONY: gin allplatforms Install linux windows macos clean uninstall
+.PHONY: gin allplatforms install linux windows macos clean uninstall doc
 
 gin: $(BUILDLOC)/$(GIN)
 
