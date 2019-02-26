@@ -22,7 +22,7 @@ func countItemsLock(paths []string) (count int) {
 func lock(cmd *cobra.Command, args []string) {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	jsonout, _ := cmd.Flags().GetBool("json")
-	checkVerboseJson(verbose, jsonout)
+	checkVerboseJSON(verbose, jsonout)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}

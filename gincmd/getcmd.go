@@ -18,7 +18,7 @@ func getRepo(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags() //  change this to make it consistent with other cmd
 	verbose, _ := flags.GetBool("verbose")
 	jsonout, _ := flags.GetBool("json")
-	checkVerboseJson(verbose, jsonout)
+	checkVerboseJSON(verbose, jsonout)
 	srvalias, _ := flags.GetString("server")
 	conf := config.Read()
 	if srvalias == "" {

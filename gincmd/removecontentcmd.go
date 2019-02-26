@@ -19,7 +19,7 @@ func countItemsRemove(paths []string) int {
 func remove(cmd *cobra.Command, args []string) {
 	jsonout, _ := cmd.Flags().GetBool("json")
 	verbose, _ := cmd.Flags().GetBool("verbose")
-	checkVerboseJson(verbose, jsonout)
+	checkVerboseJSON(verbose, jsonout)
 	// TODO: Need server config? just use remotes (and all keys)
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)

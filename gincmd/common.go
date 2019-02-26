@@ -230,9 +230,9 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	return
 }
 
-func checkVerboseJson(verbose bool, json bool) {
+func checkVerboseJSON(verbose bool, json bool) {
 	if verbose && json {
-		Die("Verbose flag and Json flag cannot be used together")
+		Die("--verbose and --json cannot be used together")
 	}
 }
 
