@@ -42,7 +42,7 @@ type RepoFileStatus struct {
 	// original command output
 	RawOutput string `json:"rawoutput"`
 	// Errors
-	Err error `json:"err"`
+	Err error
 }
 
 // TODO: Create structs to accommodate extra information for other operations
@@ -81,11 +81,11 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 		errmsg = s.Err.Error()
 	}
 	return json.Marshal(struct {
-		RFSAlias
 		Err string `json:"err"`
+		RFSAlias
 	}{
-		RFSAlias: RFSAlias(s),
 		Err:      errmsg,
+		RFSAlias: RFSAlias(s),
 	})
 }
 
