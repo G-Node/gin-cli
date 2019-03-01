@@ -16,6 +16,9 @@ import (
 
 // Git annex commands
 
+// Determine if json or normal command is used
+var JsonBool bool = true
+
 // Types (private)
 type annexAction struct {
 	Command string `json:"command"`
@@ -261,7 +264,12 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 		return
 	}
 
-	args := []string{"copy", "--json-progress", fmt.Sprintf("--to=%s", remote)}
+	var args []string
+	if JsonBool {
+		args = []string{"copy", "--json-progress", fmt.Sprintf("--to=%s", remote)}
+	} else {
+		args = []string{"copy", "--verbose", fmt.Sprintf("--to=%s", remote)}
+	}
 	if len(paths) == 0 {
 		paths = []string{"--all"}
 	}
@@ -294,7 +302,14 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 			// skip empty lines
 			continue
 		}
-		status.RawOutput = string(outline)
+		if !JsonBool {
+			status.RawOutput = string(outline)
+			lineInput := cmd.Args
+			input := strings.Join(lineInput, " ")
+			status.RawInput = input
+			pushchan <- status
+			continue
+		}
 		err := json.Unmarshal(outline, &progress)
 		if err != nil || progress == (annexProgress{}) {
 			time.Sleep(1 * time.Second)
@@ -767,7 +782,12 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		log.Write("No paths to add to annex. Nothing to do.")
 		return
 	}
-	cmdargs := []string{"add", "--json"}
+	var cmdargs []string
+	// if JsonBool {
+	cmdargs = []string{"add", "--json"}
+	// } else {
+	// 	cmdargs = []string{"add"}
+	// }
 	if update {
 		cmdargs = append(cmdargs, "--update")
 	}
