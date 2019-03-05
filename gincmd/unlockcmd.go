@@ -44,10 +44,10 @@ func UnlockCmd() *cobra.Command {
 		"<filenames>": "One or more directories or files to unllock.",
 	}
 	var cmd = &cobra.Command{
-		Use:                   "unlock [--json | --verbose] [<filenames>]...",
+		Use:                   "unlock [--json | --verbose] <filenames>...",
 		Short:                 "Unlock files for editing",
 		Long:                  formatdesc(description, args),
-		Args:                  cobra.ArbitraryArgs,
+		Args:                  cobra.MinimumNArgs(1),
 		Run:                   unlock,
 		DisableFlagsInUseLine: true,
 	}
