@@ -161,6 +161,7 @@ func printProgressWithBar(statuschan <-chan git.RepoFileStatus, nitems int) (fil
 			outline.WriteString(" ")
 		}
 	}
+	printed := false
 	for stat := range statuschan {
 		ncomplt++
 		outline.Reset()
@@ -184,6 +185,10 @@ func printProgressWithBar(statuschan <-chan git.RepoFileStatus, nitems int) (fil
 		blanks := strings.Repeat(" ", barwidth-complsigns)
 		dprg := fmt.Sprintf(dfmt, ncomplt, nitems)
 		fmt.Printf("\n [%s%s] %s\r", blocks, blanks, dprg)
+		printed = true
+	}
+	if !printed {
+		fmt.Println("   Nothing to do")
 	}
 	if outline.Len() > 0 {
 		fmt.Println()
@@ -202,6 +207,8 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 			outline.WriteString(" ")
 		}
 	}
+
+	printed := false
 	for stat := range statuschan {
 		outline.Reset()
 		outline.WriteString(" ")
@@ -235,7 +242,11 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 			fmt.Fprint(color.Output, newprint)
 			fmt.Print("\r")
 			lastprint = newprint
+			printed = true
 		}
+	}
+	if !printed {
+		fmt.Println("   Nothing to do")
 	}
 	if len(lastprint) > 0 {
 		fmt.Println()

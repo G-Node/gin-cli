@@ -34,9 +34,14 @@ func upload(cmd *cobra.Command, args []string) {
 			break
 		}
 	}
+
 	paths := args
 	if len(paths) > 0 {
 		commit(cmd, paths)
+	}
+
+	if prStyle != psJSON {
+		fmt.Println(":: Uploading")
 	}
 
 	uploadchan := make(chan git.RepoFileStatus)

@@ -1,6 +1,8 @@
 package gincmd
 
 import (
+	"fmt"
+
 	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
@@ -24,8 +26,12 @@ func lock(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
+	if prStyle != psJSON {
+		fmt.Println(":: Locking files")
+	}
 	// lock should do nothing in direct mode
 	if git.IsDirect() {
+		fmt.Print("   Repository is in DIRECT mode: files are always unlocked")
 		return
 	}
 	// TODO: need server config? Just use remotes
