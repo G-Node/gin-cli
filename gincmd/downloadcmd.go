@@ -23,9 +23,6 @@ func download(cmd *cobra.Command, args []string) {
 	}
 
 	content, _ := cmd.Flags().GetBool("content")
-	lockchan := make(chan git.RepoFileStatus)
-	go gincl.LockContent([]string{}, lockchan)
-	formatOutput(lockchan, prStyle, 0)
 	if prStyle == psDefault {
 		fmt.Print(":: Downloading changes ")
 	}
