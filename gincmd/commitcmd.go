@@ -19,9 +19,11 @@ func commit(cmd *cobra.Command, args []string) {
 	}
 
 	paths := args
-	addchan := make(chan git.RepoFileStatus)
-	go ginclient.Add(paths, addchan)
-	formatOutput(addchan, prStyle, 0)
+	if len(paths) > 0 {
+		addchan := make(chan git.RepoFileStatus)
+		go ginclient.Add(paths, addchan)
+		formatOutput(addchan, prStyle, 0)
+	}
 
 	if prStyle == psDefault {
 		fmt.Print(":: Recording changes ")
