@@ -27,7 +27,7 @@ func download(cmd *cobra.Command, args []string) {
 	go gincl.LockContent([]string{}, lockchan)
 	formatOutput(lockchan, prStyle, 0)
 	if prStyle == psDefault {
-		fmt.Print("Downloading changes ")
+		fmt.Print(":: Downloading changes ")
 	}
 	err := gincl.Download()
 	CheckError(err)
