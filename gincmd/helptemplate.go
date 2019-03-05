@@ -13,17 +13,16 @@ func wrappedFlagUsages(cmd *cobra.Command) string {
 	return cmd.Flags().FlagUsagesWrapped(width - 1)
 }
 
-var helpTemplate = `Usage:
+var helpTemplate = `{{.UsageString}}`
+var usageTemplate = `Usage:
 
   {{if .HasAvailableSubCommands}}{{.CommandPath}} [command]{{else}}{{.UseLine}}{{end}}
 
-{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
-
-var usageTemplate = `{{if gt (len .Aliases) 0}}
+{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}{{end}}{{if gt (len .Aliases) 0}}
 
 Aliases:
 
-  {{.NameAndAliases}}{{end}}{{if .HasAvailableSubCommands}}
+{{.NameAndAliases}}{{end}}{{if .HasAvailableSubCommands}}
 
 Available Commands:{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
