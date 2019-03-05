@@ -76,6 +76,6 @@ func CommitCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, jsonHelpMsg)
-	cmd.Flags().Bool("verbose", false, verboseHelpMsg)
+	// cmd.Flags().Bool("verbose", false, verboseHelpMsg)
 	return cmd
 }

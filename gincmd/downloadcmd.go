@@ -50,7 +50,7 @@ func DownloadCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, jsonHelpMsg)
-	cmd.Flags().Bool("verbose", false, verboseHelpMsg)
+	// cmd.Flags().Bool("verbose", false, verboseHelpMsg)
 	cmd.Flags().Bool("content", false, "Download the content for all files in the repository.")
 	return cmd
 }
