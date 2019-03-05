@@ -13,13 +13,11 @@ import (
 )
 
 func download(cmd *cobra.Command, args []string) {
-	jsonout, _ := cmd.Flags().GetBool("json")
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	checkVerboseJson(verbose, jsonout)
+	prStyle := determinePrintStyle(cmd)
 	// TODO: no client necessary? Just use remotes
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)
-	requirelogin(cmd, gincl, !jsonout)
+	requirelogin(cmd, gincl, prStyle != psJSON)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -27,13 +25,13 @@ func download(cmd *cobra.Command, args []string) {
 	content, _ := cmd.Flags().GetBool("content")
 	lockchan := make(chan git.RepoFileStatus)
 	go gincl.LockContent([]string{}, lockchan)
-	formatOutput(lockchan, 0, jsonout, verbose)
-	if !jsonout && !verbose {
+	formatOutput(lockchan, prStyle, 0)
+	if prStyle == psDefault {
 		fmt.Print("Downloading changes ")
 	}
 	err := gincl.Download()
 	CheckError(err)
-	if !jsonout && !verbose {
+	if prStyle == psDefault {
 		fmt.Fprintln(color.Output, green("OK"))
 	}
 	if content {
@@ -54,8 +52,8 @@ func DownloadCmd() *cobra.Command {
 		Run:                   download,
 		DisableFlagsInUseLine: true,
 	}
-	cmd.Flags().Bool("json", false, "Print output in JSON format.")
-	cmd.Flags().Bool("verbose", false, "Print raw information from git and git-annex commands directly.")
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
+	cmd.Flags().Bool("verbose", false, verboseHelpMsg)
 	cmd.Flags().Bool("content", false, "Download the content for all files in the repository.")
 	return cmd
 }

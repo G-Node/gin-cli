@@ -9,20 +9,18 @@ import (
 )
 
 func getContent(cmd *cobra.Command, args []string) {
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	jsonout, _ := cmd.Flags().GetBool("json")
-	checkVerboseJson(verbose, jsonout)
+	prStyle := determinePrintStyle(cmd)
 	conf := config.Read()
 	// TODO: no need for client; use remotes (and all keys?)
 	gincl := ginclient.New(conf.DefaultServer)
-	requirelogin(cmd, gincl, !jsonout)
+	requirelogin(cmd, gincl, prStyle != psJSON)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
 
 	getcchan := make(chan git.RepoFileStatus)
 	go gincl.GetContent(args, getcchan)
-	formatOutput(getcchan, 0, jsonout, verbose)
+	formatOutput(getcchan, prStyle, 0)
 }
 
 // GetContentCmd sets up the 'get-content' subcommand
@@ -40,7 +38,7 @@ func GetContentCmd() *cobra.Command {
 		Aliases:               []string{"getc"},
 		DisableFlagsInUseLine: true,
 	}
-	cmd.Flags().Bool("json", false, "Print raw information from git and git-annex commands directly.")
-	cmd.Flags().Bool("verbose", false, "Print raw information from git and git-annex commands directly.")
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
+	cmd.Flags().Bool("verbose", false, verboseHelpMsg)
 	return cmd
 }

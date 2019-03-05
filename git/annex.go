@@ -16,6 +16,9 @@ import (
 
 // Git annex commands
 
+// Determine if json or normal command is used
+var JsonBool bool = true
+
 // Types (private)
 type annexAction struct {
 	Command string `json:"command"`
@@ -261,7 +264,12 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 		return
 	}
 
-	args := []string{"copy", "--json-progress", fmt.Sprintf("--to=%s", remote)}
+	var args []string
+	if JsonBool {
+		args = []string{"copy", "--json-progress", fmt.Sprintf("--to=%s", remote)}
+	} else {
+		args = []string{"copy", "--verbose", fmt.Sprintf("--to=%s", remote)}
+	}
 	if len(paths) == 0 {
 		paths = []string{"--all"}
 	}
@@ -294,7 +302,14 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 			// skip empty lines
 			continue
 		}
-		status.RawOutput = string(outline)
+		if !JsonBool {
+			status.RawOutput = string(outline)
+			lineInput := cmd.Args
+			input := strings.Join(lineInput, " ")
+			status.RawInput = input
+			pushchan <- status
+			continue
+		}
 		err := json.Unmarshal(outline, &progress)
 		if err != nil || progress == (annexProgress{}) {
 			time.Sleep(1 * time.Second)
@@ -366,7 +381,12 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 // (git annex get)
 func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 	defer close(getchan)
-	cmdargs := append([]string{"get", "--json-progress"}, filepaths...)
+	var cmdargs []string
+	if JsonBool {
+		cmdargs = append([]string{"get", "--json-progress"}, filepaths...)
+	} else {
+		cmdargs = append([]string{"get"}, filepaths...)
+	}
 	cmd := AnnexCommand(cmdargs...)
 	if err := cmd.Start(); err != nil {
 		getchan <- RepoFileStatus{Err: err}
@@ -382,12 +402,19 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 	var getresult annexAction
 	var prevByteProgress int
 	var prevT time.Time
-	lineInput := cmd.Args
-	input := strings.Join(lineInput, " ")
-	status.RawInput = input
+
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// skip empty lines
+			continue
+		}
+		lineInput := cmd.Args
+		input := strings.Join(lineInput, " ")
+		status.RawInput = input
+
+		if !JsonBool {
+			status.RawOutput = string(outline)
+			getchan <- status
 			continue
 		}
 		status.RawOutput = string(outline)
@@ -443,7 +470,12 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 // (git annex drop)
 func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 	defer close(dropchan)
-	cmdargs := append([]string{"drop", "--json"}, filepaths...)
+	var cmdargs []string
+	if JsonBool {
+		cmdargs = append([]string{"drop", "--json"}, filepaths...)
+	} else {
+		cmdargs = append([]string{"drop"}, filepaths...)
+	}
 	cmd := AnnexCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
@@ -472,6 +504,10 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 			continue
 		}
 		status.RawOutput = line
+		if !JsonBool {
+			dropchan <- status
+			continue
+		}
 		// Send file name
 		err = json.Unmarshal([]byte(line), &annexDropRes)
 		if err != nil {
@@ -507,7 +543,9 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 // getAnnexMetadataName returns the filename, key, and last modification time stored in the metadata of an annexed file given the key.
 // If an unused key does not have a name associated with it, the filename will be empty.
 func getAnnexMetadataName(key string) annexFilenameDate {
-	cmd := AnnexCommand("metadata", "--json", fmt.Sprintf("--key=%s", key))
+	var cmdargs []string
+	cmdargs = []string{"metadata", "--json", fmt.Sprintf("--key=%s", key)}
+	cmd := AnnexCommand(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error retrieving annexed content metadata")
@@ -639,7 +677,12 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 // (git annex unlock)
 func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 	defer close(unlockchan)
-	cmdargs := []string{"unlock", "--json"}
+	var cmdargs []string
+	if JsonBool {
+		cmdargs = []string{"unlock", "--json"}
+	} else {
+		cmdargs = []string{"unlock"}
+	}
 	cmdargs = append(cmdargs, filepaths...)
 	cmd := AnnexCommand(cmdargs...)
 	err := cmd.Start()
@@ -660,6 +703,10 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 		status.RawOutput = string(outline)
 		if len(outline) == 0 {
 			// Empty line output. Ignore
+			continue
+		}
+		if !JsonBool {
+			unlockchan <- status
 			continue
 		}
 		// Send file name
@@ -767,7 +814,12 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		log.Write("No paths to add to annex. Nothing to do.")
 		return
 	}
-	cmdargs := []string{"add", "--json"}
+	var cmdargs []string
+	if JsonBool {
+		cmdargs = []string{"add", "--json"}
+	} else {
+		cmdargs = []string{"add"}
+	}
 	if update {
 		cmdargs = append(cmdargs, "--update")
 	}
@@ -798,6 +850,14 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
 			// Empty line output. Ignore
+			continue
+		}
+		if !JsonBool {
+			status.RawOutput = string(outline)
+			lineInput := cmd.Args
+			input := strings.Join(lineInput, " ")
+			status.RawInput = input
+			addchan <- status
 			continue
 		}
 		err := json.Unmarshal(outline, &addresult)

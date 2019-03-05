@@ -10,10 +10,8 @@ import (
 )
 
 func upload(cmd *cobra.Command, args []string) {
-	jsonout, _ := cmd.Flags().GetBool("json")
-	verbose, _ := cmd.Flags().GetBool("verbose")
+	prStyle := determinePrintStyle(cmd)
 	remotes, _ := cmd.Flags().GetStringSlice("to")
-	checkVerboseJson(verbose, jsonout)
 	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
@@ -43,7 +41,7 @@ func upload(cmd *cobra.Command, args []string) {
 
 	uploadchan := make(chan git.RepoFileStatus)
 	go gincl.Upload(paths, remotes, uploadchan)
-	formatOutput(uploadchan, 0, jsonout, verbose)
+	formatOutput(uploadchan, prStyle, 0)
 }
 
 // UploadCmd sets up the 'upload' subcommand
@@ -70,8 +68,8 @@ If no arguments are specified, only changes to files already being tracked are u
 		Run:                   upload,
 		DisableFlagsInUseLine: true,
 	}
-	cmd.Flags().Bool("json", false, "Print output in JSON format.")
-	cmd.Flags().Bool("verbose", false, "Print raw information from git and git-annex commands directly.")
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
+	cmd.Flags().Bool("verbose", false, verboseHelpMsg)
 	cmd.Flags().StringSliceP("to", "t", nil, "Upload to specific `remote`. Supports multiple remotes, either by specifying multiple times or as a comma separated list (see Examples). If the keyword 'all' is specified, the data is uploaded to all configured remotes.")
 	return cmd
 }

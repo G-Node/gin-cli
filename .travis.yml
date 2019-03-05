@@ -9,6 +9,11 @@ env:
   global:
     - GO111MODULE=on
 
+
+# Three builds:
+# - Build with latest stable Go and run tests
+# - Build with latest stable Go and run tests with the minimum supported version of Git-annex
+# - Build with Go 'tip' (devel version).  This is allowed to fail.  It's meant to catch upcoming build, lint, and vet errors early.
 matrix:
   include:
     - go: "1.11.x"

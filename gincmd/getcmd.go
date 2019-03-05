@@ -15,18 +15,15 @@ func isValidRepoPath(path string) bool {
 }
 
 func getRepo(cmd *cobra.Command, args []string) {
-	flags := cmd.Flags() //  change this to make it consistent with other cmd
-	verbose, _ := flags.GetBool("verbose")
-	jsonout, _ := flags.GetBool("json")
-	checkVerboseJson(verbose, jsonout)
-	srvalias, _ := flags.GetString("server")
+	prStyle := determinePrintStyle(cmd)
+	srvalias, _ := cmd.Flags().GetString("server")
 	conf := config.Read()
 	if srvalias == "" {
 		srvalias = conf.DefaultServer
 	}
 	repostr := args[0]
 	gincl := ginclient.New(srvalias)
-	requirelogin(cmd, gincl, !jsonout)
+	requirelogin(cmd, gincl, prStyle != psJSON)
 
 	if !isValidRepoPath(repostr) {
 		Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
@@ -34,7 +31,7 @@ func getRepo(cmd *cobra.Command, args []string) {
 
 	clonechan := make(chan git.RepoFileStatus)
 	go gincl.CloneRepo(repostr, clonechan)
-	formatOutput(clonechan, 0, jsonout, verbose)
+	formatOutput(clonechan, prStyle, 0)
 	defaultRemoteIfUnset("origin")
 	new, err := ginclient.CommitIfNew()
 	if new {
@@ -67,8 +64,8 @@ func GetCmd() *cobra.Command {
 		Run:                   getRepo,
 		DisableFlagsInUseLine: true,
 	}
-	cmd.Flags().Bool("json", false, "Print output in JSON format.")
-	cmd.Flags().Bool("verbose", false, "Print raw information from git and git-annex commands directly.")
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
+	cmd.Flags().Bool("verbose", false, verboseHelpMsg)
 	cmd.Flags().String("server", "", "Specify server `alias` for the repository. See also 'gin servers'.")
 	return cmd
 }

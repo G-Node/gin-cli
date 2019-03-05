@@ -18,7 +18,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const unknownhostname = "(unknown)"
+const (
+	unknownhostname = "(unknown)"
+	jsonHelpMsg     = "Print output in JSON format."
+	verboseHelpMsg  = "Print underlying git and git-annex calls and their unmodified output."
+)
 
 var (
 	green  = color.New(color.FgGreen).SprintFunc()
@@ -43,6 +47,15 @@ var (
 		"use-remote",
 		"version",
 	}
+)
+
+type printstyle uint8
+
+const (
+	psDefault printstyle = iota
+	psProgress
+	psJSON
+	psVerbose
 )
 
 // Die prints an error message to stderr and exits the program with status 1.
@@ -230,67 +243,72 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 	return
 }
 
-func checkVerboseJson(verbose bool, json bool) {
-	if verbose && json {
-		Die("Verbose flag and Json flag cannot be used together")
-	}
-}
-
 func verboseOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
 	var ro string
 	var tmprawin, tmpfname string
-	type Act struct {
-		Command string `json:"command"`
-		Note    string `json:"note"`
-		Key     string `json:"key"`
-		File    string `json:"file"`
-	}
-	type Jsonout struct {
-		ByteProgress    int    `json:"byte-progress"`
-		Action          Act    `json:"action"`
-		TotalSize       int    `json:"total-size"`
-		PercentProgress string `json:"percent-progress"`
-		Success         bool   `json:"success"`
-	}
 	for stat := range statuschan {
-		if stat.FileName != tmpfname {
-			fmt.Printf("File: %v\n", stat.FileName)
-			tmpfname = stat.FileName
-		}
-
 		//Raw Input
 		if stat.RawInput != tmprawin {
 			fmt.Printf("Running Command: %v\n", stat.RawInput)
 			tmprawin = stat.RawInput
 		}
-		outline := []byte(stat.RawOutput)
-		if json.Valid(outline) {
-			var output Jsonout
-			_ = json.Unmarshal(outline, &output)
-			if !output.Success {
-				fmt.Printf("%s %s %s Progress:%d/%d(%s) FileKey:%s\r", output.Action.Command, output.Action.File, output.Action.Note,
-					output.ByteProgress, output.TotalSize, output.PercentProgress, output.Action.Key)
-			}
-		} else {
-			ro = stat.RawOutput
-			fmt.Printf("%s", ro)
+		//File Name
+		if stat.FileName != tmpfname {
+			fmt.Printf("File: %v\n", stat.FileName)
+			tmpfname = stat.FileName
 		}
+		//Raw Output
+		ro = stat.RawOutput
+		fmt.Printf("%s", ro)
 	}
 	fmt.Println()
 	return
 }
 
-func formatOutput(statuschan <-chan git.RepoFileStatus, nitems int, jsonout bool, verbose bool) {
+// determinePrintStyle determines the print style to use based on the flags supplied by the user and the subcommand that is being called.
+// If incompatible flags are received (--json and --verbose), it immediately exits using Die().
+func determinePrintStyle(cmd *cobra.Command) printstyle {
+	verboseOn, _ := cmd.Flags().GetBool("verbose")
+	jsonOn, _ := cmd.Flags().GetBool("json")
+
+	isProgressCmd := func() bool {
+		progressCmds := []string{"lock", "unlock", "remove-content"}
+		for _, cname := range progressCmds {
+			if cname == cmd.Name() {
+				return true
+			}
+		}
+		return false
+	}
+
+	switch {
+	case verboseOn && jsonOn:
+		Die("--verbose and --json cannot be used together")
+	case verboseOn:
+		git.JsonBool = false
+		return psVerbose
+	case jsonOn:
+		return psJSON
+	case isProgressCmd():
+		return psProgress
+	default:
+		return psDefault
+	}
+	return psDefault
+}
+
+func formatOutput(statuschan <-chan git.RepoFileStatus, pstyle printstyle, nitems int) {
 	// TODO: instead of a true/false success, add an error for every file and then group the errors by type and print a report
 	var filesuccess map[string]bool
-	if jsonout {
+	switch pstyle {
+	case psJSON:
 		filesuccess = printJSON(statuschan)
-	} else if verbose {
+	case psVerbose:
 		filesuccess = verboseOutput(statuschan)
-	} else if nitems > 0 {
+	case psProgress:
 		filesuccess = printProgressWithBar(statuschan, nitems)
-	} else {
+	case psDefault:
 		filesuccess = printProgressOutput(statuschan)
 	}
 

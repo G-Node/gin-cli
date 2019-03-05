@@ -147,7 +147,7 @@ func VersionCmd() *cobra.Command {
 		Run:                   repoversion,
 		DisableFlagsInUseLine: true,
 	}
-	cmd.Flags().Bool("json", false, "Print output in JSON format.")
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
 	cmd.Flags().UintP("max-count", "n", 10, "Maximum `number` of versions to display before prompting. 0 means 'all'.")
 	cmd.Flags().String("id", "", "Commit `ID` (hash) to return to.")
 	cmd.Flags().String("copy-to", "", "Retrieve files from history and copy them to a new `location` instead of overwriting the existing ones. The new files will be placed in the directory specified and will be renamed to include the date and time of their version.")
