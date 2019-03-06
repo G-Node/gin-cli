@@ -587,7 +587,6 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 
 // InitDir initialises the local directory with the default remote and git (and annex) configuration options.
 // Optionally initialised as a bare repository (for annex directory remotes).
-// The status channel 'initchan' is closed when this function returns.
 func (gincl *Client) InitDir(bare bool) error {
 	initerr := ginerror{Origin: "InitDir", Description: "Error initialising local directory"}
 	if !git.IsRepo() {
