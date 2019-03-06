@@ -323,9 +323,6 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 				continue
 			}
 			status.FileName = getresult.File
-			lineInput := cmd.Args
-			input := strings.Join(lineInput, " ")
-			status.RawInput = input
 			if getresult.Success {
 				status.Progress = progcomplete
 				status.Err = nil
@@ -408,16 +405,15 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 			// skip empty lines
 			continue
 		}
-		lineInput := cmd.Args
-		input := strings.Join(lineInput, " ")
-		status.RawInput = input
 
 		if !JsonBool {
+			lineInput := cmd.Args
+			input := strings.Join(lineInput, " ")
+			status.RawInput = input
 			status.RawOutput = string(outline)
 			getchan <- status
 			continue
 		}
-		status.RawOutput = string(outline)
 		err := json.Unmarshal(outline, &progress)
 		if err != nil || progress == (annexProgress{}) {
 			// File done? Check if succeeded and continue to next line
@@ -494,17 +490,18 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 	status.State = "Removing content"
 	var line string
 	var rerr error
-	lineInput := cmd.Args
-	input := strings.Join(lineInput, " ")
-	status.RawInput = input
 	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
 		line = strings.TrimSpace(line)
 		if len(line) == 0 {
 			// Empty line output. Ignore
 			continue
 		}
-		status.RawOutput = line
+
 		if !JsonBool {
+			lineInput := cmd.Args
+			input := strings.Join(lineInput, " ")
+			status.RawInput = input
+			status.RawOutput = line
 			dropchan <- status
 			continue
 		}
@@ -696,16 +693,17 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 	var outline []byte
 	var rerr error
 	var unlockres annexAction
-	lineInput := cmd.Args
-	input := strings.Join(lineInput, " ")
-	status.RawInput = input
+
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
-		status.RawOutput = string(outline)
 		if len(outline) == 0 {
 			// Empty line output. Ignore
 			continue
 		}
 		if !JsonBool {
+			lineInput := cmd.Args
+			input := strings.Join(lineInput, " ")
+			status.RawInput = input
+			status.RawOutput = string(outline)
 			unlockchan <- status
 			continue
 		}
