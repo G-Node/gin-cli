@@ -17,7 +17,6 @@ func download(cmd *cobra.Command, args []string) {
 	// TODO: no client necessary? Just use remotes
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)
-	requirelogin(cmd, gincl, prStyle != psJSON)
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
