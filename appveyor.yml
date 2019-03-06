@@ -9,17 +9,24 @@ environment:
   SRCDIR: C:\gopath\src\github.com\G-Node\gin-cli
   GOPATH: C:\gopath
   BINDIR: bin
-  ANNEXURL: https://web.gin.g-node.org/G-Node/git-annex-windows/raw/master/git-annex-windows-v6.exe
+  # BUNDLEURL: https://web.gin.g-node.org/G-Node/gin-cli-releases/raw/master/gin-cli-latest-windows-386.zip
+  # ANNEXURL: https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe
+  # download dev build
+  BUNDLEURL: https://web.gin.g-node.org/achilleas/gin-cli-builds/raw/master/gin-cli-latest-windows-386.zip
+  GIN_LOG_DIR: C:\gin-log
+  GIN_CONFIG_DIR: C:\gin-config
 
 
 install:
-  - set PATH=C:\Python37-x64\;%PATH%;%GOPATH%\bin;c:\git-annex\usr\bin
-  # download git-annex-windows-v6.exe
-  - md c:\git-annex
-  - cd c:\git-annex
-  - ps: Invoke-WebRequest -URI $env:ANNEXURL -OutFile "git-annex-windows-v6.exe"
-  - 7z x git-annex-windows-v6.exe
-  - dir usr\bin
+  - set PATH=C:\Python37-x64\;%PATH%;%GOPATH%\bin;c:\gin-bundle\git\usr\bin
+  # download latest stable gin-cli-windows-bundle
+  - md c:\gin-bundle
+  - cd c:\gin-bundle
+  - ps: Invoke-WebRequest -URI $env:BUNDLEURL -OutFile "gin-cli-bundle.zip"
+  - 7z x gin-cli-bundle.zip
+  # - dir git\usr\bin
+  # - ps: Invoke-WebRequest -URI $env:ANNEXURL -OutFile "git-annex-new.exe"
+  # - 7z x git-annex-new.exe
   - git-annex version
   # go stuff
   - go version
@@ -62,12 +69,19 @@ test_script:
   - git config --global user.email "appveyor@example.com"
   - git config --global user.name "GIN Appveyor"
   - cd %SRCDIR%\tests
-  - xcopy /e /s /y /i conf %userprofile%\conf
-  - python -m pytest -k "annex_content"
+  - xcopy /e /s /y /i conf %GIN_CONFIG_DIR%
+  # - python -m pytest -k "annex_content"
+  # - python -m pytest -k "test_workflow_dir"
+  - python -m pytest -k "directory or offline"
 
 # to disable deployment
 deploy: off
 
-# Uncomment on_finish block to enable RDP
-# on_finish:
+artifacts:
+  - path: '%GIN_LOG_DIR%\*'
+    name: Log
+
+on_finish:
+  - appveyor PushArtifact %GIN_LOG_DIR%\gin.log
+# Uncomment next line
 #   - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
