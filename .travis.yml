@@ -44,5 +44,5 @@ script:
   - if [[ "${TRAVIS_GO_VERSION}" != "tip" ]]; then
         ./tests/start-server;
         while ! curl localhost:3000 -so /dev/null; do sleep 1; done;
-        ./tests/run-all-tests.sh;
+        ./tests/run-all-tests;
     fi
