@@ -86,20 +86,25 @@ type ServerCfg struct {
 	Git GitCfg
 }
 
+// BinCfg holds the paths to the external binaries that the client depends on.
+type BinCfg struct {
+	Git      string
+	GitAnnex string
+	SSH      string
+}
+
+// AnnexCfg holds the configuration options for Git Annex (filtering rules).
+type AnnexCfg struct {
+	Exclude []string
+	MinSize string
+}
+
 // GinCliCfg holds the client configuration values.
 type GinCliCfg struct {
 	Servers       map[string]ServerCfg
 	DefaultServer string
-	Bin           struct {
-		Git          string
-		GitAnnex     string
-		GitAnnexPath string
-		SSH          string
-	}
-	Annex struct {
-		Exclude []string
-		MinSize string
-	}
+	Bin           BinCfg
+	Annex         AnnexCfg
 }
 
 // Read loads in the configuration from the config file(s), merges any defined values into the default configuration, and returns a populated GinConfiguration struct.
