@@ -23,11 +23,8 @@ func download(cmd *cobra.Command, args []string) {
 	}
 
 	content, _ := cmd.Flags().GetBool("content")
-	lockchan := make(chan git.RepoFileStatus)
-	go gincl.LockContent([]string{}, lockchan)
-	formatOutput(lockchan, prStyle, 0)
 	if prStyle == psDefault {
-		fmt.Print("Downloading changes ")
+		fmt.Print(":: Downloading changes ")
 	}
 	err := gincl.Download()
 	CheckError(err)
@@ -53,7 +50,7 @@ func DownloadCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, jsonHelpMsg)
-	cmd.Flags().Bool("verbose", false, verboseHelpMsg)
+	// cmd.Flags().Bool("verbose", false, verboseHelpMsg)
 	cmd.Flags().Bool("content", false, "Download the content for all files in the repository.")
 	return cmd
 }

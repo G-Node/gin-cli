@@ -19,9 +19,14 @@ func commit(cmd *cobra.Command, args []string) {
 	}
 
 	paths := args
-	addchan := make(chan git.RepoFileStatus)
-	go ginclient.Add(paths, addchan)
-	formatOutput(addchan, prStyle, 0)
+	if len(paths) > 0 {
+		if prStyle == psDefault {
+			fmt.Println(":: Adding file changes")
+		}
+		addchan := make(chan git.RepoFileStatus)
+		go ginclient.Add(paths, addchan)
+		formatOutput(addchan, prStyle, 0)
+	}
 
 	if prStyle == psDefault {
 		fmt.Print(":: Recording changes ")
@@ -30,7 +35,7 @@ func commit(cmd *cobra.Command, args []string) {
 	var stat string
 	if err != nil {
 		if err.Error() == "Nothing to commit" {
-			stat = "N/A\n:: No changes recorded"
+			stat = "\n   No changes recorded"
 		} else {
 			Die(err)
 		}
@@ -71,6 +76,6 @@ func CommitCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, jsonHelpMsg)
-	cmd.Flags().Bool("verbose", false, verboseHelpMsg)
+	// cmd.Flags().Bool("verbose", false, verboseHelpMsg)
 	return cmd
 }

@@ -1,6 +1,8 @@
 package gincmd
 
 import (
+	"fmt"
+
 	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
@@ -24,8 +26,12 @@ func lock(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
+	if prStyle != psJSON {
+		fmt.Println(":: Locking files")
+	}
 	// lock should do nothing in direct mode
 	if git.IsDirect() {
+		fmt.Print("   Repository is in DIRECT mode: files are always unlocked")
 		return
 	}
 	// TODO: need server config? Just use remotes
@@ -45,14 +51,14 @@ func LockCmd() *cobra.Command {
 		"<filenames>": "One or more directories or files to lock.",
 	}
 	var cmd = &cobra.Command{
-		Use:                   "lock [--json | --verbose] [<filenames>]...",
+		Use:                   "lock [--json | --verbose] <filenames>...",
 		Short:                 "Lock files",
 		Long:                  formatdesc(description, args),
-		Args:                  cobra.ArbitraryArgs,
+		Args:                  cobra.MinimumNArgs(1),
 		Run:                   lock,
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().Bool("json", false, jsonHelpMsg)
-	cmd.Flags().Bool("verbose", false, verboseHelpMsg)
+	// cmd.Flags().Bool("verbose", false, verboseHelpMsg)
 	return cmd
 }
