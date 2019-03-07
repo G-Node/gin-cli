@@ -107,7 +107,7 @@ func filterpaths(paths, excludes []string) (filtered []string) {
 		if filepath.Base(path) == ".git" {
 			return filepath.SkipDir
 		}
-		if info.IsDir() {
+		if info == nil || info.IsDir() {
 			return nil
 		}
 		if !stringInSlice(path, excludes) {
