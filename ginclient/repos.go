@@ -666,7 +666,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		if wiInfo.Err != nil {
 			continue
 		}
-		fname := wiInfo.File
+		fname := filepath.Clean(wiInfo.File)
 		for _, remote := range wiInfo.Whereis {
 			// if no remotes are "here", the file is NoContent
 			statuses[fname] = NoContent
@@ -693,12 +693,13 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		if item.Err != nil {
 			return nil, item.Err
 		}
+		fname := filepath.Clean(item.File)
 		if item.Status == "?" {
-			statuses[item.File] = Untracked
+			statuses[fname] = Untracked
 		} else if item.Status == "M" {
-			statuses[item.File] = Modified
+			statuses[fname] = Modified
 		} else if item.Status == "D" {
-			statuses[item.File] = Removed
+			statuses[fname] = Removed
 		}
 	}
 
@@ -710,6 +711,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	go git.LsFiles(paths, lschan)
 	var gitfiles []string
 	for fname := range lschan {
+		fname = filepath.Clean(fname)
 		if _, ok := statuses[fname]; !ok {
 			statuses[fname] = Synced
 			gitfiles = append(gitfiles, fname)
@@ -724,7 +726,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 			upstream := fmt.Sprintf("%s/master", remote)
 			go git.DiffUpstream(gitfiles, upstream, diffchan)
 			for fname := range diffchan {
-				statuses[fname] = LocalChanges
+				statuses[filepath.Clean(fname)] = LocalChanges
 			}
 		}
 	}
@@ -756,29 +758,30 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	lsfilesargs = append([]string{"--deleted"}, paths...)
 	go git.LsFiles(lsfilesargs, deletedchan)
 
+	// TODO: Use a WaitGroup
 	for {
 		select {
 		case fname, ok := <-cachedchan:
 			if ok {
-				cachedfiles = append(cachedfiles, fname)
+				cachedfiles = append(cachedfiles, filepath.Clean(fname))
 			} else {
 				cachedchan = nil
 			}
 		case fname, ok := <-modifiedchan:
 			if ok {
-				modifiedfiles = append(modifiedfiles, fname)
+				modifiedfiles = append(modifiedfiles, filepath.Clean(fname))
 			} else {
 				modifiedchan = nil
 			}
 		case fname, ok := <-otherschan:
 			if ok {
-				untrackedfiles = append(untrackedfiles, fname)
+				untrackedfiles = append(untrackedfiles, filepath.Clean(fname))
 			} else {
 				otherschan = nil
 			}
 		case fname, ok := <-deletedchan:
 			if ok {
-				deletedfiles = append(deletedfiles, fname)
+				deletedfiles = append(deletedfiles, filepath.Clean(fname))
 			} else {
 				deletedchan = nil
 			}
@@ -796,7 +799,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 			if wiInfo.Err != nil {
 				continue
 			}
-			fname := wiInfo.File
+			fname := filepath.Clean(wiInfo.File)
 			for _, remote := range wiInfo.Whereis {
 				// if no remotes are "here", the file is NoContent
 				statuses[fname] = NoContent
@@ -817,6 +820,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 			upstream := fmt.Sprintf("%s/master", remote)
 			go git.DiffUpstream(cachedfiles, upstream, diffchan)
 			for fname := range diffchan {
+				fname = filepath.Clean(fname)
 				// Two notes:
 				//		1. There will definitely be overlap here with the same status in annex (not a problem)
 				//		2. The diff might be due to remote or local changes, but for now we're going to assume local
@@ -847,7 +851,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 				// lockchan <- git.RepoFileStatus{Err: item.Err}
 			}
 			if item.Status == "T" {
-				statuses[item.File] = Unlocked
+				statuses[filepath.Clean(item.File)] = Unlocked
 			}
 		}
 	}
