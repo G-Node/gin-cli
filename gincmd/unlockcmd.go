@@ -11,6 +11,7 @@ import (
 )
 
 func countItemsLockChange(paths []string) (count int) {
+	// BUG: Miscalculates number in some cases
 	wichan := make(chan git.AnnexWhereisRes)
 	go git.AnnexWhereis(paths, wichan)
 	for range wichan {

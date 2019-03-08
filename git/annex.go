@@ -910,6 +910,7 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	var rerr error
 	var status RepoFileStatus
 	var addresult annexAction
+	// NOTE Can differentiate "git" and "annex" files from note in JSON struct
 	status.State = "Adding"
 	var filenames []string
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
