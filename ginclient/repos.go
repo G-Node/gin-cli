@@ -852,7 +852,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		statuses[fname] = Modified
 	}
 
-	// Check if there are any Unlocked files (marked by typechange in annex status)
+	// Check if there are any TypeChange files (lock state change)
 	statuschan := make(chan git.AnnexStatusRes)
 	go git.AnnexStatus(paths, statuschan)
 	for item := range statuschan {
@@ -860,7 +860,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 			log.Write("Error during annex status while searching for unlocked files")
 		}
 		if item.Status == "T" {
-			statuses[filepath.Clean(item.File)] = Unlocked
+			statuses[filepath.Clean(item.File)] = TypeChange
 		}
 	}
 

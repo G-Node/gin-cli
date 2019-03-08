@@ -46,7 +46,7 @@ func unlock(cmd *cobra.Command, args []string) {
 
 // UnlockCmd sets up the file 'unlock' subcommand
 func UnlockCmd() *cobra.Command {
-	description := "Unlock one or more files for editing. Files added to the repository are left in a locked state, which allows reading but prevents editing. In order to edit or write to a file, it must first be unlocked. When done editing, it is recommended that the file be locked again using the 'lock' command.\n\nAfter performing an 'upload, 'download', or 'get', affected files are always reverted to the locked state.\n\nUnlocking a file takes longer depending on its size."
+	description := "Unlock one or more files to allow editing. This changes the type of the file in the repository. A 'commit' command is required to save the change. Unmodified unlocked files that have not yet been committed are marked as 'Lock status changed' (short TC) in the output of the 'ls' command.\n\nUnlocking a file takes longer depending on its size."
 	args := map[string]string{
 		"<filenames>": "One or more directories or files to unlock.",
 	}
