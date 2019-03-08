@@ -822,13 +822,12 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 	if update {
 		cmdargs = append(cmdargs, "--update")
 	}
-	cmdargs = append(cmdargs, filepaths...)
-
 	exclargs := annexExclArgs()
 	if len(exclargs) > 0 {
 		cmdargs = append(cmdargs, "-c", exclargs)
 	}
 
+	cmdargs = append(cmdargs, filepaths...)
 	cmd := AnnexCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
