@@ -787,21 +787,22 @@ func AnnexFromKey(key, filepath string) error {
 // build exclusion argument list
 // files < annex.minsize or matching exclusion extensions will not be annexed and
 // will instead be handled by git
-func annexExclArgs() (exclargs []string) {
+func annexExclArgs() string {
+	var expbuilder strings.Builder
 	config := config.Read()
 	if config.Annex.MinSize != "" {
-		sizefilterarg := fmt.Sprintf("--largerthan=%s", config.Annex.MinSize)
-		exclargs = append(exclargs, sizefilterarg)
+		largerthan := fmt.Sprintf("(largerthan=%s)", config.Annex.MinSize)
+		expbuilder.WriteString(largerthan)
 	}
 
 	for _, pattern := range config.Annex.Exclude {
-		arg := fmt.Sprintf("--exclude=%s", pattern)
-		exclargs = append(exclargs, arg)
+		exclarg := fmt.Sprintf(" and (exclude=%s)", pattern)
+		expbuilder.WriteString(exclarg)
 	}
 
 	// explicitly exclude config file
-	exclargs = append(exclargs, "--exclude=config.yml")
-	return
+	expbuilder.WriteString(fmt.Sprintf(" and (exclude=config.yml)"))
+	return fmt.Sprintf("annex.largefiles=(%s)", expbuilder.String())
 }
 
 // annexAddCommon is the common function that serves both AnnexAdd() and AnnexLock().
@@ -825,7 +826,7 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 
 	exclargs := annexExclArgs()
 	if len(exclargs) > 0 {
-		cmdargs = append(cmdargs, exclargs...)
+		cmdargs = append(cmdargs, "-c", exclargs)
 	}
 
 	cmd := AnnexCommand(cmdargs...)

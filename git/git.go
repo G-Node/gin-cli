@@ -273,7 +273,9 @@ func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 		filepaths = gitAddDirect(filepaths)
 	}
 
-	cmdargs := append([]string{"add", "--verbose", "--"}, filepaths...)
+	exclargs := annexExclArgs()
+	cmdargs := []string{"add", "--verbose", "-c", exclargs, "--"}
+	cmdargs = append(cmdargs, filepaths...)
 	cmd := Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {

@@ -237,18 +237,19 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 	}
 
 	if len(paths) > 0 {
-		// Run git annex add using exclusion filters and then add the rest to git
+		// Run git annex add using exclusion filters
+		// Files matching filters are automatically added to git
 		annexaddchan := make(chan git.RepoFileStatus)
 		go git.AnnexAdd(paths, annexaddchan)
 		for addstat := range annexaddchan {
 			addchan <- addstat
 		}
 
-		gitaddchan := make(chan git.RepoFileStatus)
-		go git.Add(paths, gitaddchan)
-		for addstat := range gitaddchan {
-			addchan <- addstat
-		}
+		// gitaddchan := make(chan git.RepoFileStatus)
+		// go git.Add(paths, gitaddchan)
+		// for addstat := range gitaddchan {
+		// 	addchan <- addstat
+		// }
 	}
 }
 
