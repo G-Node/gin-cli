@@ -910,7 +910,7 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	var rerr error
 	var status RepoFileStatus
 	var addresult annexAction
-	status.State = "Adding (annex)"
+	status.State = "Adding"
 	var filenames []string
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
