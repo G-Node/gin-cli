@@ -119,6 +119,15 @@ type AnnexInfoRes struct {
 // AnnexInit initialises the repository for annex.
 // (git annex init)
 func AnnexInit(description string) error {
+	err := ConfigSet("annex.backends", "MD5")
+	if err != nil {
+		log.Write("Failed to set default annex backend MD5")
+	}
+	err = ConfigSet("annex.addunlocked", "true")
+	if err != nil {
+		log.Write("Failed to initialise annex in unlocked mode")
+		return err
+	}
 	args := []string{"init", "--version=7", description}
 	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
@@ -126,10 +135,6 @@ func AnnexInit(description string) error {
 		initError := fmt.Errorf("Repository annex initialisation failed.\n%s", string(stderr))
 		logstd(stdout, stderr)
 		return initError
-	}
-	err = ConfigSet("annex.backends", "MD5")
-	if err != nil {
-		log.Write("Failed to set default annex backend MD5")
 	}
 	return nil
 }
