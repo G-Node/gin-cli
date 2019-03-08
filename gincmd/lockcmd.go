@@ -10,17 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func countItemsLock(paths []string) (count int) {
-	statchan := make(chan git.AnnexStatusRes)
-	go git.AnnexStatus(paths, statchan)
-	for stat := range statchan {
-		if stat.Status == "T" {
-			count++
-		}
-	}
-	return
-}
-
 func lock(cmd *cobra.Command, args []string) {
 	prStyle := determinePrintStyle(cmd)
 	if !git.IsRepo() {
@@ -30,6 +19,8 @@ func lock(cmd *cobra.Command, args []string) {
 		fmt.Println(":: Locking files")
 	}
 	// lock should do nothing in direct mode
+	// NOTE: Direct mode repositories are deprecated, but we should still look
+	// out for them
 	if git.IsDirect() {
 		fmt.Print("   Repository is in DIRECT mode: files are always unlocked")
 		return
@@ -37,7 +28,7 @@ func lock(cmd *cobra.Command, args []string) {
 	// TODO: need server config? Just use remotes
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)
-	nitems := countItemsLock(args)
+	nitems := countItemsLockChange(args)
 	lockchan := make(chan git.RepoFileStatus)
 
 	go gincl.LockContent(args, lockchan)

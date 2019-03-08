@@ -49,6 +49,8 @@ const (
 	RemoteChanges
 	// Unlocked indicates that a file is being tracked and is unlocked for editing
 	Unlocked
+	// TypeChange indicates that a file being tracked as locked (unlocked) is now unlocked (locked)
+	TypeChange
 	// Removed indicates that a (previously) tracked file has been deleted or moved
 	Removed
 	// Untracked indicates that a file is not being tracked by neither git nor git annex
@@ -624,6 +626,8 @@ func (fs FileStatus) Description() string {
 		return "Remotely modified (not downloaded)"
 	case fs == Unlocked:
 		return "Unlocked for editing"
+	case fs == TypeChange:
+		return "Lock status changed"
 	case fs == Removed:
 		return "Removed"
 	case fs == Untracked:
@@ -634,7 +638,7 @@ func (fs FileStatus) Description() string {
 }
 
 // Abbrev returns the two-letter abbrevation of the file status
-// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), UL (Unlocked), RM (Removed), ?? (Untracked)
+// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), UL (Unlocked), TC (TypeChange), RM (Removed), ?? (Untracked)
 func (fs FileStatus) Abbrev() string {
 	switch {
 	case fs == Synced:
@@ -649,6 +653,8 @@ func (fs FileStatus) Abbrev() string {
 		return "RC"
 	case fs == Unlocked:
 		return "UL"
+	case fs == TypeChange:
+		return "TC"
 	case fs == Removed:
 		return "RM"
 	case fs == Untracked:

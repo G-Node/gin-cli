@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func countItemsUnlock(paths []string) (count int) {
+func countItemsLockChange(paths []string) (count int) {
 	wichan := make(chan git.AnnexWhereisRes)
 	go git.AnnexWhereis(paths, wichan)
 	for range wichan {
@@ -38,7 +38,7 @@ func unlock(cmd *cobra.Command, args []string) {
 	conf := config.Read()
 	defserver := conf.DefaultServer
 	gincl := ginclient.New(defserver)
-	nitems := countItemsUnlock(args)
+	nitems := countItemsLockChange(args)
 	unlockchan := make(chan git.RepoFileStatus)
 	go gincl.UnlockContent(args, unlockchan)
 	formatOutput(unlockchan, prStyle, nitems)

@@ -21,11 +21,12 @@ var JsonBool bool = true
 
 // Types (private)
 type annexAction struct {
-	Command string `json:"command"`
-	Note    string `json:"note"`
-	Success bool   `json:"success"`
-	Key     string `json:"key"`
-	File    string `json:"file"`
+	Command string   `json:"command"`
+	Note    string   `json:"note"`
+	Success bool     `json:"success"`
+	Key     string   `json:"key"`
+	File    string   `json:"file"`
+	Errors  []string `json:"error-messages"`
 }
 
 type annexProgress struct {
@@ -311,11 +312,11 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 			continue
 		}
 		err := json.Unmarshal(outline, &progress)
-		if err != nil || progress == (annexProgress{}) {
+		if err != nil || progress.Action.Command == "" {
 			time.Sleep(1 * time.Second)
 			// File done? Check if succeeded and continue to next line
 			err = json.Unmarshal(outline, &getresult)
-			if err != nil || getresult == (annexAction{}) {
+			if err != nil || getresult.Command == "" {
 				// Couldn't parse output
 				log.Write("Could not parse 'git annex copy' output")
 				log.Write(string(outline))
@@ -415,10 +416,10 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 			continue
 		}
 		err := json.Unmarshal(outline, &progress)
-		if err != nil || progress == (annexProgress{}) {
+		if err != nil || progress.Action.Command == "" {
 			// File done? Check if succeeded and continue to next line
 			err = json.Unmarshal(outline, &getresult)
-			if err != nil || getresult == (annexAction{}) {
+			if err != nil || getresult.Command == "" {
 				// Couldn't parse output
 				log.Write("Could not parse 'git annex get' output")
 				log.Write(string(outline))
@@ -559,14 +560,6 @@ func getAnnexMetadataName(key string) annexFilenameDate {
 	return annexFilenameDate{Key: key, FileName: annexmd.File}
 }
 
-// AnnexAdd adds paths to the annex.
-// Files specified for exclusion in the configuration are ignored automatically.
-// The status channel 'addchan' is closed when this function returns.
-// (git annex add)
-func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
-	annexAddCommon(filepaths, false, addchan)
-}
-
 // AnnexWhereis returns information about annexed files in the repository
 // The output channel 'wichan' is closed when this function returns.
 // (git annex whereis)
@@ -661,12 +654,91 @@ func AnnexInfo() (AnnexInfoRes, error) {
 }
 
 // AnnexLock locks the specified files and directory contents if they are annexed.
-// Note that this function uses 'git annex add' to lock files, but only if they are marked as unlocked (T) by git annex.
-// Attempting to lock an untracked file, or a file in any state other than T will have no effect.
+// If an unlocked file has modifications, it wont be locked and an error will be returned for that file.
 // The status channel 'lockchan' is closed when this function returns.
-// (git annex add --update)
+// (git annex lock)
 func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
-	annexAddCommon(filepaths, true, lockchan)
+	defer close(lockchan)
+	if len(filepaths) == 0 {
+		log.Write("No paths to lock. Nothing to do.")
+		return
+	}
+	var cmdargs []string
+	if JsonBool {
+		cmdargs = []string{"lock", "--json-error-messages"}
+	} else {
+		cmdargs = []string{"lock"}
+	}
+
+	cmdargs = append(cmdargs, filepaths...)
+	cmd := AnnexCommand(cmdargs...)
+	err := cmd.Start()
+	if err != nil {
+		lockchan <- RepoFileStatus{Err: err}
+		return
+	}
+
+	var outline []byte
+	var rerr error
+	var status RepoFileStatus
+	var addresult annexAction
+	status.State = "Locking"
+
+	var filenames []string
+	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+		if len(outline) == 0 {
+			// Empty line output. Ignore
+			continue
+		}
+		if !JsonBool {
+			status.RawOutput = string(outline)
+			lineInput := cmd.Args
+			input := strings.Join(lineInput, " ")
+			status.RawInput = input
+			lockchan <- status
+			continue
+		}
+		err := json.Unmarshal(outline, &addresult)
+		if err != nil || addresult.Command == "" {
+			// Couldn't parse output
+			log.Write("Could not parse 'git annex lock' output")
+			log.Write(string(outline))
+			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+			continue
+		}
+		status.FileName = addresult.File
+		lineInput := cmd.Args
+		input := strings.Join(lineInput, " ")
+		status.RawInput = input
+		status.RawOutput = string(outline)
+		if addresult.Success {
+			log.Write("%s locked", addresult.File)
+			status.Err = nil
+			filenames = append(filenames, status.FileName)
+		} else {
+			errmsgs := strings.Join(addresult.Errors, " | ")
+			log.Write("Error locking %s: %s", addresult.File, errmsgs)
+			if strings.Contains(errmsgs, "Locking this file would discard any changes") {
+				errmsgs = "Locking this file would discard any changes you have made to it. Commit (with 'gin commit') or discard any changes before locking."
+			}
+			status.Err = fmt.Errorf(errmsgs)
+		}
+		status.Progress = progcomplete
+		lockchan <- status
+	}
+	var stderr, errline []byte
+	if cmd.Wait() != nil {
+		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+			stderr = append(stderr, errline...)
+		}
+		log.Write("Error during lock")
+		logstd(nil, stderr)
+	}
+	// Add metadata
+	for _, fname := range filenames {
+		setAnnexMetadataName(fname)
+	}
+	return
 }
 
 // AnnexUnlock unlocks the specified files and directory contents if they are annexed
@@ -709,7 +781,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 		}
 		// Send file name
 		err = json.Unmarshal(outline, &unlockres)
-		if err != nil || unlockres == (annexAction{}) {
+		if err != nil || unlockres.Command == "" {
 			// Couldn't parse output
 			log.Write("Could not parse 'git annex unlock' output")
 			log.Write(string(outline))
@@ -805,9 +877,11 @@ func annexExclArgs() string {
 	return fmt.Sprintf("annex.largefiles=(%s)", expbuilder.String())
 }
 
-// annexAddCommon is the common function that serves both AnnexAdd() and AnnexLock().
-// AnnexLock() is performed by passing true to 'update'.
-func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStatus) {
+// AnnexAdd adds paths to the annex.
+// Files specified for exclusion in the configuration are ignored automatically.
+// The status channel 'addchan' is closed when this function returns.
+// (git annex add)
+func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	defer close(addchan)
 	if len(filepaths) == 0 {
 		log.Write("No paths to add to annex. Nothing to do.")
@@ -818,9 +892,6 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 		cmdargs = []string{"add", "--json"}
 	} else {
 		cmdargs = []string{"add"}
-	}
-	if update {
-		cmdargs = append(cmdargs, "--update")
 	}
 	exclargs := annexExclArgs()
 	if len(exclargs) > 0 {
@@ -840,10 +911,6 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 	var status RepoFileStatus
 	var addresult annexAction
 	status.State = "Adding (annex)"
-	if update {
-		status.State = "Locking"
-	}
-
 	var filenames []string
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
@@ -859,7 +926,7 @@ func annexAddCommon(filepaths []string, update bool, addchan chan<- RepoFileStat
 			continue
 		}
 		err := json.Unmarshal(outline, &addresult)
-		if err != nil || addresult == (annexAction{}) {
+		if err != nil || addresult.Command == "" {
 			// Couldn't parse output
 			log.Write("Could not parse 'git annex add' output")
 			log.Write(string(outline))
