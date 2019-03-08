@@ -24,7 +24,7 @@ install:
   # go stuff
   - go version
   - go env
-  - go get -u github.com/golang/lint/golint
+  # - go get -u github.com/golang/lint/golint
 
 build_script:
   - cd %SRCDIR%
@@ -44,8 +44,8 @@ build_script:
   - go get github.com/alecthomas/template
   - go get github.com/dustin/go-humanize
   - go vet ./...
-  - gofmt -s -l .
-  - golint github.com/G-Node/gin-cli...
+  # - gofmt -s -l .
+  # - golint github.com/G-Node/gin-cli...
   - go build -ldflags "-X main.gincliversion=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o %GOPATH%\bin\gin.exe .
 
 before_test:
