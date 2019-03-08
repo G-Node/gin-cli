@@ -793,28 +793,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	}
 
 	if len(cachedfiles) > 0 {
-		// Run whereis on cached files (if any)
-		wichan := make(chan git.AnnexWhereisRes)
-		go git.AnnexWhereis(cachedfiles, wichan)
-		for wiInfo := range wichan {
-			if wiInfo.Err != nil {
-				continue
-			}
-			fname := filepath.Clean(wiInfo.File)
-			for _, remote := range wiInfo.Whereis {
-				// if no remotes are "here", the file is NoContent
-				statuses[fname] = NoContent
-				if remote.Here {
-					if len(wiInfo.Whereis) > 1 {
-						statuses[fname] = Synced
-					} else {
-						statuses[fname] = LocalChanges
-					}
-					break
-				}
-			}
-		}
-
+		// Check for git diffs with upstream
 		diffchan := make(chan string)
 		remote, err := DefaultRemote()
 		if err == nil {
@@ -828,6 +807,31 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 				statuses[fname] = LocalChanges
 			}
 		}
+
+		// Run whereis on cached files (if any) to see if content is synced for annexed files
+		wichan := make(chan git.AnnexWhereisRes)
+		go git.AnnexWhereis(cachedfiles, wichan)
+		for wiInfo := range wichan {
+			if wiInfo.Err != nil {
+				continue
+			}
+			fname := filepath.Clean(wiInfo.File)
+			// if no content location for this file is "here", the status is NoContent
+			statuses[fname] = NoContent
+			for _, remote := range wiInfo.Whereis {
+				if remote.Here {
+					if len(wiInfo.Whereis) > 1 {
+						// content is here and in one other location: Synced
+						statuses[fname] = Synced
+					} else {
+						// content is here only: LocalChanges (not uploaded)
+						statuses[fname] = LocalChanges
+					}
+					break
+				}
+			}
+		}
+
 	}
 
 	// Add leftover cached files to the map
