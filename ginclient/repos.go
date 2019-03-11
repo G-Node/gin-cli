@@ -513,8 +513,8 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 	}
 
 	for _, obj := range objects {
+		var status FileCheckoutStatus
 		if obj.Type == "blob" {
-			var status FileCheckoutStatus
 			status.Filename = obj.Name
 
 			filext := filepath.Ext(obj.Name)
@@ -561,6 +561,12 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 			} else {
 				status.Err = fmt.Errorf("Unexpected object found in tree: %s", obj.Name)
 			}
+			cochan <- status
+		} else if obj.Type == "tree" {
+			status.Type = "Tree"
+			status.Filename = obj.Name
+			status.Destination = filepath.Join(outpath, obj.Name)
+			os.MkdirAll(status.Destination, 0777)
 			cochan <- status
 		}
 	}
