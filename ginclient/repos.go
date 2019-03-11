@@ -543,7 +543,9 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 			if isAnnexPath(string(content[:maxpathidx])) {
 				// Pointer file to annexed content
 				status.Type = "Annex"
-				_, key := path.Split(string(content))
+				// strip any newlines from the end of the path
+				keypath := strings.TrimSpace(string(content))
+				_, key := path.Split(keypath)
 				fkerr := git.AnnexFromKey(key, outfile)
 				if fkerr != nil {
 					status.Err = fmt.Errorf("Error creating placeholder file %s: %s", outfile, fkerr.Error())
