@@ -78,7 +78,7 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 //isAnnexPath returns true if a given string represents the path to an annex object.
 func isAnnexPath(path string) bool {
 	// TODO: Check paths on Windows
-	return strings.Contains(path, ".git/annex/objects")
+	return strings.Contains(path, "/annex/objects")
 }
 
 // MakeSessionKey creates a private+public key pair.
