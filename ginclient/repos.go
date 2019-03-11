@@ -503,7 +503,7 @@ func CheckoutVersion(commithash string, paths []string) error {
 
 // CheckoutFileCopies checks out copies of files specified by path from the revision with the specified commithash.
 // The checked out files are stored in the location specified by outpath.
-// The timestamp of the revision is appended to the original filenames.
+// The timestamp of the revision is appended to the original filenames (before the extension).
 func CheckoutFileCopies(commithash string, paths []string, outpath string, suffix string, cochan chan<- FileCheckoutStatus) {
 	defer close(cochan)
 	objects, err := git.LsTree(commithash, paths)
@@ -532,25 +532,34 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 				cochan <- FileCheckoutStatus{Err: mderr}
 				return
 			}
-			if obj.Mode == "120000" {
-				linkdst := string(content)
-				if isAnnexPath(linkdst) {
-					status.Type = "Annex"
-					_, key := path.Split(linkdst)
-					fkerr := git.AnnexFromKey(key, outfile)
-					if fkerr != nil {
-						status.Err = fmt.Errorf("Error creating placeholder file %s: %s", outfile, fkerr.Error())
-					}
-				} else {
-					status.Type = "Link"
-					status.Destination = string(content)
+
+			// heuristic check for annexed pointer file:
+			// - check if the first 255 bytes of the file (or the entire contents if smaller) contain the string
+			maxpathidx := 255
+			if len(content) < maxpathidx {
+				maxpathidx = len(content)
+			}
+
+			if isAnnexPath(string(content[:maxpathidx])) {
+				// Pointer file to annexed content
+				status.Type = "Annex"
+				_, key := path.Split(string(content))
+				fkerr := git.AnnexFromKey(key, outfile)
+				if fkerr != nil {
+					status.Err = fmt.Errorf("Error creating placeholder file %s: %s", outfile, fkerr.Error())
 				}
+			} else if obj.Mode == "120000" {
+				// Plain symlink
+				status.Type = "Link"
+				status.Destination = string(content)
 			} else if obj.Mode == "100755" || obj.Mode == "100644" {
 				status.Type = "Git"
 				werr := ioutil.WriteFile(outfile, content, 0666)
 				if werr != nil {
 					status.Err = fmt.Errorf("Error writing %s: %s", outfile, werr.Error())
 				}
+			} else {
+				status.Err = fmt.Errorf("Unexpected object found in tree: %s", obj.Name)
 			}
 			cochan <- status
 		}
