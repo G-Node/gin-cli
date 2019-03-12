@@ -18,8 +18,8 @@ matrix:
   include:
     - go: "1.11.x"
       env: testscript="run-cont-tests"
-    - go: "1.11.x"
-      env: testscript="run-cont-tests-mv"
+    # - go: "1.11.x"
+    #   env: testscript="run-cont-tests-mv"
     - go: tip
   allow_failures:
     - go: tip
