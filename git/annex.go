@@ -1010,10 +1010,20 @@ func GetAnnexVersion() (string, error) {
 // AnnexCommand sets up a git annex command with the provided arguments and returns a GinCmd struct.
 func AnnexCommand(args ...string) shell.Cmd {
 	config := config.Read()
-	gitannexbin := config.Bin.GitAnnex
-	cmd := shell.Command(gitannexbin, args...)
+	// gitannexbin := config.Bin.GitAnnex
+	gitbin := config.Bin.Git
+	gitannexpath := config.Bin.GitAnnexPath
+	cmdargs := []string{"annex"}
+	cmdargs = append(cmdargs, args...)
+	cmd := shell.Command(gitbin, cmdargs...)
 	env := os.Environ()
-	cmd.Env = append(env, sshEnv())
+	cmd.Env = env
+	if gitannexpath != "" {
+		syspath := os.Getenv("PATH")
+		syspath += string(os.PathListSeparator) + gitannexpath
+		cmd.Env = append(cmd.Env, syspath)
+	}
+	cmd.Env = append(cmd.Env, sshEnv())
 	cmd.Env = append(cmd.Env, "GIT_ANNEX_USE_GIT_SSH=1")
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))

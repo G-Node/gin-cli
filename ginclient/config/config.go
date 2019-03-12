@@ -36,9 +36,10 @@ var (
 
 	defaultConf = map[string]interface{}{
 		// Binaries
-		"bin.git":      "git",
-		"bin.gitannex": "git-annex",
-		"bin.ssh":      "ssh",
+		"bin.git":          "git",
+		"bin.gitannex":     "git-annex",
+		"gin.gitannexpath": "",
+		"bin.ssh":          "ssh",
 		// Annex filters
 		"annex.minsize": "10M",
 		"servers.gin":   ginDefaultServer,
@@ -90,9 +91,10 @@ type GinCliCfg struct {
 	Servers       map[string]ServerCfg
 	DefaultServer string
 	Bin           struct {
-		Git      string
-		GitAnnex string
-		SSH      string
+		Git          string
+		GitAnnex     string
+		GitAnnexPath string
+		SSH          string
 	}
 	Annex struct {
 		Exclude []string
@@ -138,6 +140,12 @@ func Read() GinCliCfg {
 	}
 	configuration.Annex.Exclude = viper.GetStringSlice("annex.exclude")
 	configuration.Annex.MinSize = viper.GetString("annex.minsize")
+
+	// if Bin.GitAnnex is set but Bin.GitAnnexPath is not, set the path
+	if configuration.Bin.GitAnnexPath == "" && configuration.Bin.GitAnnex != "" {
+		path, _ := filepath.Split(configuration.Bin.GitAnnex)
+		configuration.Bin.GitAnnexPath = path
+	}
 
 	set = true
 	return configuration
