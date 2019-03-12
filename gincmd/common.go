@@ -493,6 +493,9 @@ func SetUpCommands(verinfo VersionInfo) *cobra.Command {
 	// Download
 	cmds["download"] = DownloadCmd()
 
+	// Sync
+	cmds["sync"] = SyncCmd()
+
 	// Get content
 	cmds["get-content"] = GetContentCmd()
 

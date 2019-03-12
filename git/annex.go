@@ -136,13 +136,22 @@ func AnnexInit(description string) error {
 		logstd(stdout, stderr)
 		return initError
 	}
+
+	fmt.Println("Checkout out master branch")
+	cmd = Command("checkout", "master")
+	stdout, stderr, err = cmd.OutputError()
+	if err != nil {
+		fmt.Println("Failed to switch to master")
+		fmt.Println(string(stdout))
+		fmt.Println(string(stderr))
+	}
 	return nil
 }
 
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // (git annex sync --no-push [--content])
-func AnnexPull() error {
-	args := []string{"sync", "--no-push", "--no-commit"}
+func AnnexPull(remote string) error {
+	args := []string{"sync", "--no-push", "--no-commit", "--no-resolvemerge", remote}
 	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
 	cmd.Wait()
@@ -184,6 +193,26 @@ func checkMergeErrors(stdout, stderr string) error {
 		// Merge conflict in annex files (automatically resolved by keeping both copies)
 		return fmt.Errorf("files changed locally and remotely. Both files have been kept:\n %s", strings.Join(parseFilesAnnexConflict(stdout), ", "))
 		// TODO: This should probably instead become a warning or notice, instead of a full error
+	}
+	return nil
+}
+
+// AnnexSync performs a bidirectional synchronisation between local and remote
+// repositories, automatically resolving merge conflicts.
+// (git annex sync --resolvemerge)
+func AnnexSync(content bool) error {
+	cmdargs := []string{"sync", "--resolvemerge"}
+	if content {
+		cmdargs = append(cmdargs, "--content")
+	}
+	cmd := AnnexCommand(cmdargs...)
+	stdout, stderr, err := cmd.OutputError()
+	cmd.Wait()
+	if err != nil {
+		log.Write("Error during AnnexSync.")
+		log.Write("[Error]: %v", err)
+		logstd(stdout, stderr)
+		return fmt.Errorf(string(stderr))
 	}
 	return nil
 }

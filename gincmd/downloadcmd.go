@@ -20,12 +20,16 @@ func download(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
+	remote, err := ginclient.DefaultRemote()
+	if err != nil { // TODO && len(remotes) == 0 {
+		Die("download failed: no remote configured")
+	}
 
 	content, _ := cmd.Flags().GetBool("content")
 	if prStyle == psDefault {
 		fmt.Print(":: Downloading changes ")
 	}
-	err := gincl.Download()
+	err = gincl.Download(remote)
 	CheckError(err)
 	if prStyle == psDefault {
 		fmt.Fprintln(color.Output, green("OK"))

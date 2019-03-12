@@ -385,9 +385,20 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileSt
 }
 
 // Download downloads changes and placeholder files in an already checked out repository.
-func (gincl *Client) Download() error {
+func (gincl *Client) Download(remote string) error {
 	log.Write("Download")
-	return git.AnnexPull()
+	// err := git.Pull(remote)
+	// if err != nil {
+	// 	return err
+	// }
+	return git.AnnexPull(remote)
+}
+
+// Sync synchronises changes bidirectionally (uploads and downloads),
+// optionally transferring content between remotes and the local clone.
+func (gincl *Client) Sync(content bool) error {
+	log.Write("Sync %t", content)
+	return git.AnnexSync(content)
 }
 
 // CloneRepo clones a remote repository and initialises annex.

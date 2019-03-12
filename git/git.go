@@ -205,6 +205,20 @@ func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) 
 	return
 }
 
+// Pull downloads all small (git) files from the server.
+// (git pull --ff-only)
+func Pull(remote string) error {
+	// TODO: Common output handling with Push
+	cmd := Command("pull", "--ff-only", remote)
+	stdout, stderr, err := cmd.OutputError()
+
+	if err != nil {
+		logstd(stdout, stderr)
+		return fmt.Errorf("download command failed: %s", string(stderr))
+	}
+	return nil
+}
+
 // Push uploads all small (git) files to the server.
 // (git push)
 func Push(remote string, pushchan chan<- RepoFileStatus) {
