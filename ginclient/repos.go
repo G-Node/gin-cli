@@ -632,6 +632,14 @@ func (gincl *Client) InitDir(bare bool) error {
 		git.ConfigSet("core.symlinks", "false")
 	}
 
+	if !bare {
+		_, err = CommitIfNew()
+		if err != nil {
+			initerr.UError = err.Error()
+			return initerr
+		}
+	}
+
 	err = git.AnnexInit(description)
 	if err != nil {
 		initerr.UError = err.Error()

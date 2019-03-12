@@ -137,14 +137,8 @@ func AnnexInit(description string) error {
 		return initError
 	}
 
-	fmt.Println("Checkout out master branch")
-	cmd = Command("checkout", "master")
-	stdout, stderr, err = cmd.OutputError()
-	if err != nil {
-		fmt.Println("Failed to switch to master")
-		fmt.Println(string(stdout))
-		fmt.Println(string(stderr))
-	}
+	// Workaround for Windows which sets up an adjusted branch
+	Command("checkout", "master").Run()
 	return nil
 }
 

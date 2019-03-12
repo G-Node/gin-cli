@@ -13,8 +13,6 @@ func initRepo(cmd *cobra.Command, args []string) {
 	fmt.Print(":: Initialising local storage ")
 	err := gincl.InitDir(false)
 	CheckError(err)
-	_, err = ginclient.CommitIfNew()
-	CheckError(err)
 	fmt.Fprintln(color.Output, green("OK"))
 }
 
