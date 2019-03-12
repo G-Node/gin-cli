@@ -88,9 +88,10 @@ type ServerCfg struct {
 
 // BinCfg holds the paths to the external binaries that the client depends on.
 type BinCfg struct {
-	Git      string
-	GitAnnex string
-	SSH      string
+	Git          string
+	GitAnnex     string
+	GitAnnexPath string
+	SSH          string
 }
 
 // AnnexCfg holds the configuration options for Git Annex (filtering rules).
