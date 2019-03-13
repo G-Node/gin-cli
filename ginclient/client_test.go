@@ -248,5 +248,4 @@ func TestCommitExcludes(t *testing.T) {
 			t.Fatalf("Git file content size doesn't match original file size: %d (expected %d)", len(contents), fsize)
 		}
 	}
-
 }
