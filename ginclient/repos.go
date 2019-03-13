@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/user"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -606,15 +607,17 @@ func (gincl *Client) InitDir(bare bool) error {
 	// If there is no git user.name or user.email set local ones
 	cmd := git.Command("config", "user.name")
 	globalGitName, _ := cmd.Output()
-	cmd = git.Command("config", "user.email")
-	globalGitEmail, _ := cmd.Output()
-	if len(globalGitName) == 0 && len(globalGitEmail) == 0 {
+	if len(globalGitName) == 0 {
 		info, ierr := gincl.RequestAccount(gincl.Username)
 		name := info.FullName
 		if ierr != nil || name == "" {
 			name = gincl.Username
 		}
-		ierr = git.SetGitUser(name, info.Email)
+		if name == "" { // user might not be logged in; fall back to system user
+			u, _ := user.Current()
+			name = u.Name
+		}
+		ierr = git.SetGitUser(name, "")
 		if ierr != nil {
 			log.Write("Failed to set local git user configuration")
 		}
