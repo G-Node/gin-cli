@@ -17,9 +17,6 @@ env:
 matrix:
   include:
     - go: "1.11.x"
-      env: testscript="run-cont-tests"
-    # - go: "1.11.x"
-    #   env: testscript="run-cont-tests-mv"
     - go: tip
   allow_failures:
     - go: tip
@@ -37,11 +34,10 @@ install:
   - gofmt -s -l .
 
 script:
-  - make
-  - make testbuild
+  - make install
   - go test -v ./...
   - if [[ "${TRAVIS_GO_VERSION}" != "tip" ]]; then
         ./tests/start-server;
         while ! curl localhost:3000 -so /dev/null; do sleep 1; done;
-        ./tests/${testscript};
+        ./tests/run-all-tests.sh;
     fi
