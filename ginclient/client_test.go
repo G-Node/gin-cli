@@ -109,8 +109,7 @@ func TestInit(t *testing.T) {
 	}
 }
 
-// TestCommitMinSize tests a single commit creation with size filtering (annex.minsize)
-func TestCommitMinSize(t *testing.T) {
+func TestCommit(t *testing.T) {
 	testclient := New("")
 	_, err := setupLocalRepoWithDirRemote(testclient)
 
@@ -121,6 +120,29 @@ func TestCommitMinSize(t *testing.T) {
 	err = git.Commit("")
 	if err == nil {
 		t.Fatalf("Empty commit should fail")
+	}
+	err = createFile("afile", 10)
+	if err != nil {
+		t.Fatalf("smallfile create failed: %s", err.Error())
+	}
+	addchan := make(chan git.RepoFileStatus)
+	go git.AnnexAdd([]string{"afile"}, addchan)
+	for range addchan {
+	}
+
+	err = git.Commit("Test commit")
+	if err != nil {
+		t.Fatalf("Commit failed: %s", err.Error())
+	}
+}
+
+// TestCommitMinSize tests a single commit creation with size filtering (annex.minsize)
+func TestCommitMinSize(t *testing.T) {
+	testclient := New("")
+	_, err := setupLocalRepoWithDirRemote(testclient)
+
+	if err != nil {
+		t.Fatalf("Failed to initialise local and remote repositories: %s", err.Error())
 	}
 
 	var smallsize int64 = 100       // 100 byte file (for git)
@@ -175,5 +197,56 @@ func TestCommitMinSize(t *testing.T) {
 
 // TestCommitExcludes tests a single commit creation with pattern filtering (annex.excludes)
 func TestCommitExcludes(t *testing.T) {
+	testclient := New("")
+	_, err := setupLocalRepoWithDirRemote(testclient)
+
+	if err != nil {
+		t.Fatalf("Failed to initialise local and remote repositories: %s", err.Error())
+	}
+
+	var fsize int64 = 1024 * 1024 // 1 MiB files, greater than annex.minsize
+
+	fnames := []string{
+		"bigmarkdown.md",
+		"bigpython.py",
+		"somegitfile.git",
+		"plaintextfile.txt",
+	}
+
+	for _, fn := range fnames {
+		err = createFile(fn, fsize)
+		if err != nil {
+			t.Fatalf("[%s] file creation failed: %s", fn, err.Error())
+		}
+	}
+
+	addchan := make(chan git.RepoFileStatus)
+	go git.AnnexAdd([]string{"."}, addchan)
+	for range addchan {
+	}
+
+	err = git.Commit("Test commit")
+	if err != nil {
+		t.Fatalf("Commit failed: %s", err.Error())
+	}
+
+	gitobjs, err := git.LsTree("master", nil)
+	if err != nil {
+		t.Fatalf("git ls-tree failed: %s", err.Error())
+	}
+	if len(gitobjs) != len(fnames) {
+		t.Fatalf("Expected %d git objects, got %d", len(fnames), len(gitobjs))
+	}
+
+	// all file sizes in git should be fsize
+	for _, fn := range fnames {
+		contents, err := git.CatFileContents("master", fn)
+		if err != nil {
+			t.Fatalf("Couldn't read git file contents for %s", fn)
+		}
+		if int64(len(contents)) != fsize {
+			t.Fatalf("Git file content size doesn't match original file size: %d (expected %d)", len(contents), fsize)
+		}
+	}
 
 }
