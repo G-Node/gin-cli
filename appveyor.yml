@@ -66,10 +66,9 @@ before_test:
   - gin help
 
 test_script:
-  - git config --global user.email "appveyor@example.com"
-  - git config --global user.name "GIN Appveyor"
+  - xcopy /e /s /y /i %SRCDIR%\tests\conf %GIN_CONFIG_DIR%
+  - go test -v ./...
   - cd %SRCDIR%\tests
-  - xcopy /e /s /y /i conf %GIN_CONFIG_DIR%
   # - python -m pytest -k "annex_content"
   # - python -m pytest -k "test_workflow_dir"
   - python -m pytest -k "directory or offline"
