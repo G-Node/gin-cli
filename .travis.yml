@@ -21,7 +21,12 @@ matrix:
   allow_failures:
     - go: tip
 
+before_install:
+  - pyenv global 3.7.1
+  - pip3 install pytest --user
+
 install:
+  - pip3 install pytest
   - wget https://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz
   - tar xf git-annex-standalone-amd64.tar.gz
   - export PATH=$PATH:$PWD/git-annex.linux
