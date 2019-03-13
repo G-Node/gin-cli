@@ -23,7 +23,7 @@ matrix:
 
 before_install:
   - pyenv global 3.7.1
-  - pip3 install pytest --user
+  - pip3 install --user pytest pyyaml
 
 install:
   - pip3 install pytest
