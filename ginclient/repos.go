@@ -248,11 +248,11 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 			addchan <- addstat
 		}
 
-		// gitaddchan := make(chan git.RepoFileStatus)
-		// go git.Add(paths, gitaddchan)
-		// for addstat := range gitaddchan {
-		// 	addchan <- addstat
-		// }
+		gitaddchan := make(chan git.RepoFileStatus)
+		go git.Add(paths, gitaddchan)
+		for addstat := range gitaddchan {
+			addchan <- addstat
+		}
 	}
 }
 
