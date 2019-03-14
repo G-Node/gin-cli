@@ -167,7 +167,7 @@ func TestCommitMinSize(t *testing.T) {
 		t.Fatalf("Commit failed: %s", err.Error())
 	}
 
-	gitobjs, err := git.LsTree("master", nil)
+	gitobjs, err := git.LsTree("HEAD", nil)
 	if err != nil {
 		t.Fatalf("git ls-tree failed: %s", err.Error())
 	}
@@ -175,7 +175,7 @@ func TestCommitMinSize(t *testing.T) {
 		t.Fatalf("Expected 2 git objects, got %d", len(gitobjs))
 	}
 
-	contents, err := git.CatFileContents("master", "smallfile")
+	contents, err := git.CatFileContents("HEAD", "smallfile")
 	if err != nil {
 		t.Fatalf("Couldn't read git file contents for smallfile")
 	}
@@ -183,7 +183,7 @@ func TestCommitMinSize(t *testing.T) {
 		t.Fatalf("Git file content size doesn't match original file size: %d (expected 100)", len(contents))
 	}
 
-	contents, err = git.CatFileContents("master", "bigfile")
+	contents, err = git.CatFileContents("HEAD", "bigfile")
 	if err != nil {
 		t.Fatalf("Couldn't read annex file contents for bigfile")
 	}
@@ -230,7 +230,7 @@ func TestCommitExcludes(t *testing.T) {
 		t.Fatalf("Commit failed: %s", err.Error())
 	}
 
-	gitobjs, err := git.LsTree("master", nil)
+	gitobjs, err := git.LsTree("HEAD", nil)
 	if err != nil {
 		t.Fatalf("git ls-tree failed: %s", err.Error())
 	}
@@ -240,7 +240,7 @@ func TestCommitExcludes(t *testing.T) {
 
 	// all file sizes in git should be fsize
 	for _, fn := range fnames {
-		contents, err := git.CatFileContents("master", fn)
+		contents, err := git.CatFileContents("HEAD", fn)
 		if err != nil {
 			t.Fatalf("Couldn't read git file contents for %s", fn)
 		}
