@@ -145,7 +145,7 @@ func AnnexInit(description string) error {
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // (git annex sync --no-push [--content])
 func AnnexPull(remote string) error {
-	args := []string{"sync", "--no-push", "--no-commit", "--no-resolvemerge", remote}
+	args := []string{"sync", "--verbose", "--no-push", "--no-commit", "--no-resolvemerge", remote}
 	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
 	cmd.Wait()
@@ -195,7 +195,7 @@ func checkMergeErrors(stdout, stderr string) error {
 // repositories, automatically resolving merge conflicts.
 // (git annex sync --resolvemerge)
 func AnnexSync(content bool) error {
-	cmdargs := []string{"sync", "--resolvemerge"}
+	cmdargs := []string{"sync", "--verbose", "--resolvemerge"}
 	if content {
 		cmdargs = append(cmdargs, "--content")
 	}
@@ -260,7 +260,7 @@ func parseFilesOverwrite(errmsg string) []string {
 // (git annex sync --no-pull; git annex copy --to=<defaultremote>)
 func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
-	cmd := AnnexCommand("sync", "--no-pull", "--no-commit", remote) // NEVER commit changes when doing annex-sync
+	cmd := AnnexCommand("sync", "--verbose", "--no-pull", "--no-commit", remote) // NEVER commit changes when doing annex-sync
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error during AnnexPush (sync --no-pull)")
