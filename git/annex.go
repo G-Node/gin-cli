@@ -149,7 +149,7 @@ func AnnexInit(description string) error {
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // (git annex sync --no-push [--content])
 func AnnexPull(remote string) error {
-	args := []string{"sync", "--verbose", "--no-push", "--no-commit", "--no-resolvemerge", remote}
+	args := []string{"sync", "--verbose", "--no-push", "--no-commit", remote}
 	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
 	cmd.Wait()
