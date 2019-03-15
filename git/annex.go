@@ -159,6 +159,7 @@ func AnnexPull(remote string) error {
 		log.Write("Error during AnnexPull.")
 		log.Write("[Error]: %v", err)
 		logstd(stdout, stderr)
+		mergeAbort() // abort a potential failed merge attempte
 		// TODO: Use giterror
 		if strings.Contains(sstderr, "Permission denied") {
 			return fmt.Errorf("download failed: permission denied")
@@ -179,15 +180,15 @@ func AnnexPull(remote string) error {
 }
 
 func checkMergeErrors(stdout, stderr string) error {
-	if strings.Contains(stderr, "would be overwritten by merge") {
+	messages := strings.ToLower(stdout + stderr)
+	if strings.Contains(messages, "would be overwritten by merge") {
 		// Untracked local file conflicts with file being pulled
-		return fmt.Errorf("download failed: local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseFilesOverwrite(stderr), ", "))
-	} else if strings.Contains(stderr, "unresolved conflict") {
+		return fmt.Errorf("download failed: local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseFilesOverwrite(messages), ", "))
+	} else if strings.Contains(messages, "unresolved conflict") {
 		// Merge conflict in git files
-		mergeAbort()
-		return fmt.Errorf("download failed: files changed locally and remotely and cannot be automatically merged (merge conflict):\n %s", strings.Join(parseFilesConflict(string(stdout)), ", "))
+		return fmt.Errorf("download failed: files changed locally and remotely and cannot be automatically merged (merge conflict):\n %s", strings.Join(parseFilesConflict(messages), ", "))
 		// abort merge
-	} else if strings.Contains(stdout, "Merge conflict was automatically resolved") {
+	} else if strings.Contains(messages, "merge conflict was automatically resolved") {
 		// Merge conflict in annex files (automatically resolved by keeping both copies)
 		return fmt.Errorf("files changed locally and remotely. Both files have been kept:\n %s", strings.Join(parseFilesAnnexConflict(stdout), ", "))
 		// TODO: This should probably instead become a warning or notice, instead of a full error
@@ -218,7 +219,7 @@ func AnnexSync(content bool) error {
 func parseFilesConflict(errmsg string) []string {
 	lines := strings.Split(errmsg, "\n")
 	var filenames []string
-	delim := "Merge conflict in "
+	delim := "merge conflict in "
 	for _, l := range lines {
 		if idx := strings.Index(l, delim); idx > -1 {
 			filenames = append(filenames, l[idx+len(delim):])
@@ -244,11 +245,11 @@ func parseFilesOverwrite(errmsg string) []string {
 	var filenames []string
 	start := false
 	for _, l := range lines {
-		if strings.Contains(l, "error: The following") || strings.Contains(l, "error: Your local") {
+		if strings.Contains(l, "error: the following") || strings.Contains(l, "error: your local") {
 			start = true
 			continue
 		}
-		if strings.Contains(l, "Please move or remove") || strings.Contains(l, "Please commit your changes") {
+		if strings.Contains(l, "please move or remove") || strings.Contains(l, "please commit your changes") {
 			break
 		}
 		if start {
