@@ -839,9 +839,14 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	if len(cachedfiles) > 0 {
 		// Check for git diffs with upstream
 		diffchan := make(chan string)
-		remote, err := DefaultRemote()
-		if err == nil {
-			upstream := fmt.Sprintf("%s/master", remote)
+		remote, rerr := DefaultRemote()
+		if remoterefs, lserr := git.LsRemote(remote); remoterefs == "" && lserr == nil {
+			// Remote has not been initialised; Git files should be marked as LC
+			for _, fname := range cachedfiles {
+				statuses[fname] = LocalChanges
+			}
+		} else if rerr == nil {
+			upstream := fmt.Sprintf("%s/master", remote) // TODO: Don't assume master; use current branch name
 			go git.DiffUpstream(cachedfiles, upstream, diffchan)
 			for fname := range diffchan {
 				fname = filepath.Clean(fname)

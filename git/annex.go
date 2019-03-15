@@ -159,7 +159,7 @@ func AnnexPull(remote string) error {
 		log.Write("Error during AnnexPull.")
 		log.Write("[Error]: %v", err)
 		logstd(stdout, stderr)
-		mergeAbort() // abort a potential failed merge attempte
+		mergeAbort() // abort a potential failed merge attempt
 		// TODO: Use giterror
 		if strings.Contains(sstderr, "Permission denied") {
 			return fmt.Errorf("download failed: permission denied")
