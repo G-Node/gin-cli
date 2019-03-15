@@ -137,8 +137,12 @@ func AnnexInit(description string) error {
 		return initError
 	}
 
-	// Workaround for Windows which sets up an adjusted branch
-	Command("checkout", "master").Run()
+	cmd = Command("checkout", "master")
+	stdout, stderr, err = cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+	}
+
 	return nil
 }
 
