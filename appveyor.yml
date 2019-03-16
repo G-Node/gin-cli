@@ -76,10 +76,6 @@ test_script:
 # to disable deployment
 deploy: off
 
-artifacts:
-  - path: '%GIN_LOG_DIR%\*'
-    name: Log
-
 on_finish:
   - appveyor PushArtifact %GIN_LOG_DIR%\gin.log
 # Uncomment next line
