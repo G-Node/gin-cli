@@ -9,8 +9,6 @@ environment:
   SRCDIR: C:\gopath\src\github.com\G-Node\gin-cli
   GOPATH: C:\gopath
   BINDIR: bin
-  # BUNDLEURL: https://web.gin.g-node.org/G-Node/gin-cli-releases/raw/master/gin-cli-latest-windows-386.zip
-  # ANNEXURL: https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe
   # download dev build
   BUNDLEURL: https://web.gin.g-node.org/achilleas/gin-cli-builds/raw/master/gin-cli-latest-windows-386.zip
   GIN_LOG_DIR: C:\gin-log
@@ -24,14 +22,10 @@ install:
   - cd c:\gin-bundle
   - ps: Invoke-WebRequest -URI $env:BUNDLEURL -OutFile "gin-cli-bundle.zip"
   - 7z x gin-cli-bundle.zip
-  # - dir git\usr\bin
-  # - ps: Invoke-WebRequest -URI $env:ANNEXURL -OutFile "git-annex-new.exe"
-  # - 7z x git-annex-new.exe
   - git-annex version
   # go stuff
   - go version
   - go env
-  # - go get -u github.com/golang/lint/golint
 
 build_script:
   - cd %SRCDIR%
@@ -51,8 +45,6 @@ build_script:
   - go get github.com/alecthomas/template
   - go get github.com/dustin/go-humanize
   - go vet ./...
-  # - gofmt -s -l .
-  # - golint github.com/G-Node/gin-cli...
   - go build -ldflags "-X main.gincliversion=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o %GOPATH%\bin\gin.exe .
 
 before_test:
@@ -69,14 +61,12 @@ test_script:
   - xcopy /e /s /y /i %SRCDIR%\tests\conf %GIN_CONFIG_DIR%
   - go test -v ./...
   - cd %SRCDIR%\tests
-  # - python -m pytest -k "annex_content"
-  # - python -m pytest -k "test_workflow_dir"
-  - python -m pytest -k "directory or offline"
+  - python -m pytest -v -k "directory or offline"
 
 # to disable deployment
 deploy: off
 
 on_finish:
   - appveyor PushArtifact %GIN_LOG_DIR%\gin.log
-# Uncomment next line
+# Uncomment next line to enable RDP
 #   - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
