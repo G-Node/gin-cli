@@ -80,7 +80,7 @@ func LsRepoCmd() *cobra.Command {
 
 In the short form, the meaning of the status abbreviations is as follows:
 OK: The file is part of the GIN repository and its contents are synchronised with the server.
-UL: The file has been unlocked for editing.
+TC: The file has been locked or unlocked and the change has not been recorded yet (and it is unmodified).
 NC: The local file is a placeholder and its contents have not been downloaded.
 MD: The file has been modified locally and the changes have not been recorded yet.
 LC: The file has been modified locally, the changes have been recorded but they haven't been uploaded.

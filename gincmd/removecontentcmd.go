@@ -27,7 +27,6 @@ func remove(cmd *cobra.Command, args []string) {
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
-	lock(cmd, args)
 	nitems := countItemsRemove(args)
 	rmchan := make(chan git.RepoFileStatus)
 	if prStyle == psProgress {

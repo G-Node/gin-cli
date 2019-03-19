@@ -36,9 +36,10 @@ var (
 
 	defaultConf = map[string]interface{}{
 		// Binaries
-		"bin.git":      "git",
-		"bin.gitannex": "git-annex",
-		"bin.ssh":      "ssh",
+		"bin.git":          "git",
+		"bin.gitannex":     "git-annex",
+		"gin.gitannexpath": "",
+		"bin.ssh":          "ssh",
 		// Annex filters
 		"annex.minsize": "10M",
 		"servers.gin":   ginDefaultServer,
@@ -85,19 +86,26 @@ type ServerCfg struct {
 	Git GitCfg
 }
 
+// BinCfg holds the paths to the external binaries that the client depends on.
+type BinCfg struct {
+	Git          string
+	GitAnnex     string
+	GitAnnexPath string
+	SSH          string
+}
+
+// AnnexCfg holds the configuration options for Git Annex (filtering rules).
+type AnnexCfg struct {
+	Exclude []string
+	MinSize string
+}
+
 // GinCliCfg holds the client configuration values.
 type GinCliCfg struct {
 	Servers       map[string]ServerCfg
 	DefaultServer string
-	Bin           struct {
-		Git      string
-		GitAnnex string
-		SSH      string
-	}
-	Annex struct {
-		Exclude []string
-		MinSize string
-	}
+	Bin           BinCfg
+	Annex         AnnexCfg
 }
 
 // Read loads in the configuration from the config file(s), merges any defined values into the default configuration, and returns a populated GinConfiguration struct.
@@ -139,6 +147,12 @@ func Read() GinCliCfg {
 	configuration.Annex.Exclude = viper.GetStringSlice("annex.exclude")
 	configuration.Annex.MinSize = viper.GetString("annex.minsize")
 
+	// if Bin.GitAnnex is set but Bin.GitAnnexPath is not, set the path
+	if configuration.Bin.GitAnnexPath == "" && configuration.Bin.GitAnnex != "" {
+		path, _ := filepath.Split(configuration.Bin.GitAnnex)
+		configuration.Bin.GitAnnexPath = path
+	}
+
 	set = true
 	return configuration
 }
@@ -165,10 +179,11 @@ func removeInvalidServerConfs() {
 	}
 }
 
-// appendToFile appends a key-value to the configuration file.
-// A useful utility function that loads the configuration only from the file, adds the new key-value pair, and saves it back, without loading the built-in defaults.
-// On successful write, the read cache is invalidated.
-func appendToFile(key string, value interface{}) error {
+// SetConfig appends a key-value to the configuration file.  A useful
+// utility function that loads the configuration only from the file, adds the
+// new key-value pair, and saves it back, without loading the built-in
+// defaults.  On successful write, the read cache is invalidated.
+func SetConfig(key string, value interface{}) error {
 	// Read in the file configuration ONLY
 	confpath, err := Path(true) // create config path if necessary
 	if err != nil {
@@ -189,7 +204,7 @@ func appendToFile(key string, value interface{}) error {
 // AddServerConf writes a new server configuration into the user config file.
 func AddServerConf(alias string, newcfg ServerCfg) error {
 	key := fmt.Sprintf("servers.%s", alias)
-	return appendToFile(key, newcfg)
+	return SetConfig(key, newcfg)
 }
 
 // RmServerConf removes a server configuration from the user config file.
@@ -211,7 +226,7 @@ func RmServerConf(alias string) {
 // SetDefaultServer writes the given name to the config file to server as the default server for web calls.
 // An error is returned if the name doesn't exist in the current configuration.
 func SetDefaultServer(alias string) {
-	appendToFile("defaultserver", alias)
+	SetConfig("defaultserver", alias)
 }
 
 // Path returns the configuration path where configuration files should be stored.

@@ -44,7 +44,7 @@ func trim(file *os.File) {
 }
 
 // Init initialises the log file and logger.
-func Init(ver string) error {
+func Init() error {
 	cachepath, err := mklogdir(true)
 	if err != nil {
 		return err
@@ -59,7 +59,6 @@ func Init(ver string) error {
 	logger = log.New(logfile, "", flags)
 
 	Write("=== LOGINIT ===")
-	Write("VERSION: %s", ver)
 
 	return nil
 }

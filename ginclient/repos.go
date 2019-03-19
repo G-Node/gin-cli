@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/user"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -49,6 +50,8 @@ const (
 	RemoteChanges
 	// Unlocked indicates that a file is being tracked and is unlocked for editing
 	Unlocked
+	// TypeChange indicates that a file being tracked as locked (unlocked) is now unlocked (locked)
+	TypeChange
 	// Removed indicates that a (previously) tracked file has been deleted or moved
 	Removed
 	// Untracked indicates that a file is not being tracked by neither git nor git annex
@@ -76,7 +79,7 @@ func (fsSlice FileStatusSlice) Less(i, j int) bool {
 //isAnnexPath returns true if a given string represents the path to an annex object.
 func isAnnexPath(path string) bool {
 	// TODO: Check paths on Windows
-	return strings.Contains(path, ".git/annex/objects")
+	return strings.Contains(path, "/annex/objects")
 }
 
 // MakeSessionKey creates a private+public key pair.
@@ -237,7 +240,8 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 	}
 
 	if len(paths) > 0 {
-		// Run git annex add using exclusion filters and then add the rest to git
+		// Run git annex add using exclusion filters
+		// Files matching filters are automatically added to git
 		annexaddchan := make(chan git.RepoFileStatus)
 		go git.AnnexAdd(paths, annexaddchan)
 		for addstat := range annexaddchan {
@@ -382,9 +386,20 @@ func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileSt
 }
 
 // Download downloads changes and placeholder files in an already checked out repository.
-func (gincl *Client) Download() error {
+func (gincl *Client) Download(remote string) error {
 	log.Write("Download")
-	return git.AnnexPull()
+	// err := git.Pull(remote)
+	// if err != nil {
+	// 	return err
+	// }
+	return git.AnnexPull(remote)
+}
+
+// Sync synchronises changes bidirectionally (uploads and downloads),
+// optionally transferring content between remotes and the local clone.
+func (gincl *Client) Sync(content bool) error {
+	log.Write("Sync %t", content)
+	return git.AnnexSync(content)
 }
 
 // CloneRepo clones a remote repository and initialises annex.
@@ -500,7 +515,7 @@ func CheckoutVersion(commithash string, paths []string) error {
 
 // CheckoutFileCopies checks out copies of files specified by path from the revision with the specified commithash.
 // The checked out files are stored in the location specified by outpath.
-// The timestamp of the revision is appended to the original filenames.
+// The timestamp of the revision is appended to the original filenames (before the extension).
 func CheckoutFileCopies(commithash string, paths []string, outpath string, suffix string, cochan chan<- FileCheckoutStatus) {
 	defer close(cochan)
 	objects, err := git.LsTree(commithash, paths)
@@ -510,8 +525,8 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 	}
 
 	for _, obj := range objects {
+		var status FileCheckoutStatus
 		if obj.Type == "blob" {
-			var status FileCheckoutStatus
 			status.Filename = obj.Name
 
 			filext := filepath.Ext(obj.Name)
@@ -529,26 +544,43 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 				cochan <- FileCheckoutStatus{Err: mderr}
 				return
 			}
-			if obj.Mode == "120000" {
-				linkdst := string(content)
-				if isAnnexPath(linkdst) {
-					status.Type = "Annex"
-					_, key := path.Split(linkdst)
-					fkerr := git.AnnexFromKey(key, outfile)
-					if fkerr != nil {
-						status.Err = fmt.Errorf("Error creating placeholder file %s: %s", outfile, fkerr.Error())
-					}
-				} else {
-					status.Type = "Link"
-					status.Destination = string(content)
+
+			// heuristic check for annexed pointer file:
+			// - check if the first 255 bytes of the file (or the entire contents if smaller) contain the string
+			maxpathidx := 255
+			if len(content) < maxpathidx {
+				maxpathidx = len(content)
+			}
+
+			if isAnnexPath(string(content[:maxpathidx])) {
+				// Pointer file to annexed content
+				status.Type = "Annex"
+				// strip any newlines from the end of the path
+				keypath := strings.TrimSpace(string(content))
+				_, key := path.Split(keypath)
+				fkerr := git.AnnexFromKey(key, outfile)
+				if fkerr != nil {
+					status.Err = fmt.Errorf("Error creating placeholder file %s: %s", outfile, fkerr.Error())
 				}
+			} else if obj.Mode == "120000" {
+				// Plain symlink
+				status.Type = "Link"
+				status.Destination = string(content)
 			} else if obj.Mode == "100755" || obj.Mode == "100644" {
 				status.Type = "Git"
 				werr := ioutil.WriteFile(outfile, content, 0666)
 				if werr != nil {
 					status.Err = fmt.Errorf("Error writing %s: %s", outfile, werr.Error())
 				}
+			} else {
+				status.Err = fmt.Errorf("Unexpected object found in tree: %s", obj.Name)
 			}
+			cochan <- status
+		} else if obj.Type == "tree" {
+			status.Type = "Tree"
+			status.Filename = obj.Name
+			status.Destination = filepath.Join(outpath, obj.Name)
+			os.MkdirAll(status.Destination, 0777)
 			cochan <- status
 		}
 	}
@@ -556,7 +588,6 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 
 // InitDir initialises the local directory with the default remote and git (and annex) configuration options.
 // Optionally initialised as a bare repository (for annex directory remotes).
-// The status channel 'initchan' is closed when this function returns.
 func (gincl *Client) InitDir(bare bool) error {
 	initerr := ginerror{Origin: "InitDir", Description: "Error initialising local directory"}
 	if !git.IsRepo() {
@@ -576,15 +607,17 @@ func (gincl *Client) InitDir(bare bool) error {
 	// If there is no git user.name or user.email set local ones
 	cmd := git.Command("config", "user.name")
 	globalGitName, _ := cmd.Output()
-	cmd = git.Command("config", "user.email")
-	globalGitEmail, _ := cmd.Output()
-	if len(globalGitName) == 0 && len(globalGitEmail) == 0 {
+	if len(globalGitName) == 0 {
 		info, ierr := gincl.RequestAccount(gincl.Username)
 		name := info.FullName
 		if ierr != nil || name == "" {
 			name = gincl.Username
 		}
-		ierr = git.SetGitUser(name, info.Email)
+		if name == "" { // user might not be logged in; fall back to system user
+			u, _ := user.Current()
+			name = u.Name
+		}
+		ierr = git.SetGitUser(name, "")
 		if ierr != nil {
 			log.Write("Failed to set local git user configuration")
 		}
@@ -597,6 +630,14 @@ func (gincl *Client) InitDir(bare bool) error {
 		// force disable symlinks even if user can create them
 		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
 		git.ConfigSet("core.symlinks", "false")
+	}
+
+	if !bare {
+		_, err = CommitIfNew()
+		if err != nil {
+			initerr.UError = err.Error()
+			return initerr
+		}
 	}
 
 	err = git.AnnexInit(description)
@@ -623,6 +664,8 @@ func (fs FileStatus) Description() string {
 		return "Remotely modified (not downloaded)"
 	case fs == Unlocked:
 		return "Unlocked for editing"
+	case fs == TypeChange:
+		return "Lock status changed"
 	case fs == Removed:
 		return "Removed"
 	case fs == Untracked:
@@ -633,7 +676,7 @@ func (fs FileStatus) Description() string {
 }
 
 // Abbrev returns the two-letter abbrevation of the file status
-// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), UL (Unlocked), RM (Removed), ?? (Untracked)
+// OK (Synced), NC (NoContent), MD (Modified), LC (LocalUpdates), RC (RemoteUpdates), UL (Unlocked), TC (TypeChange), RM (Removed), ?? (Untracked)
 func (fs FileStatus) Abbrev() string {
 	switch {
 	case fs == Synced:
@@ -648,6 +691,8 @@ func (fs FileStatus) Abbrev() string {
 		return "RC"
 	case fs == Unlocked:
 		return "UL"
+	case fs == TypeChange:
+		return "TC"
 	case fs == Removed:
 		return "RM"
 	case fs == Untracked:
@@ -666,7 +711,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		if wiInfo.Err != nil {
 			continue
 		}
-		fname := wiInfo.File
+		fname := filepath.Clean(wiInfo.File)
 		for _, remote := range wiInfo.Whereis {
 			// if no remotes are "here", the file is NoContent
 			statuses[fname] = NoContent
@@ -693,12 +738,13 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		if item.Err != nil {
 			return nil, item.Err
 		}
+		fname := filepath.Clean(item.File)
 		if item.Status == "?" {
-			statuses[item.File] = Untracked
+			statuses[fname] = Untracked
 		} else if item.Status == "M" {
-			statuses[item.File] = Modified
+			statuses[fname] = Modified
 		} else if item.Status == "D" {
-			statuses[item.File] = Removed
+			statuses[fname] = Removed
 		}
 	}
 
@@ -710,6 +756,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	go git.LsFiles(paths, lschan)
 	var gitfiles []string
 	for fname := range lschan {
+		fname = filepath.Clean(fname)
 		if _, ok := statuses[fname]; !ok {
 			statuses[fname] = Synced
 			gitfiles = append(gitfiles, fname)
@@ -724,7 +771,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 			upstream := fmt.Sprintf("%s/master", remote)
 			go git.DiffUpstream(gitfiles, upstream, diffchan)
 			for fname := range diffchan {
-				statuses[fname] = LocalChanges
+				statuses[filepath.Clean(fname)] = LocalChanges
 			}
 		}
 	}
@@ -756,29 +803,30 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	lsfilesargs = append([]string{"--deleted"}, paths...)
 	go git.LsFiles(lsfilesargs, deletedchan)
 
+	// TODO: Use a WaitGroup
 	for {
 		select {
 		case fname, ok := <-cachedchan:
 			if ok {
-				cachedfiles = append(cachedfiles, fname)
+				cachedfiles = append(cachedfiles, filepath.Clean(fname))
 			} else {
 				cachedchan = nil
 			}
 		case fname, ok := <-modifiedchan:
 			if ok {
-				modifiedfiles = append(modifiedfiles, fname)
+				modifiedfiles = append(modifiedfiles, filepath.Clean(fname))
 			} else {
 				modifiedchan = nil
 			}
 		case fname, ok := <-otherschan:
 			if ok {
-				untrackedfiles = append(untrackedfiles, fname)
+				untrackedfiles = append(untrackedfiles, filepath.Clean(fname))
 			} else {
 				otherschan = nil
 			}
 		case fname, ok := <-deletedchan:
 			if ok {
-				deletedfiles = append(deletedfiles, fname)
+				deletedfiles = append(deletedfiles, filepath.Clean(fname))
 			} else {
 				deletedchan = nil
 			}
@@ -789,21 +837,43 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	}
 
 	if len(cachedfiles) > 0 {
-		// Run whereis on cached files (if any)
+		// Check for git diffs with upstream
+		diffchan := make(chan string)
+		remote, rerr := DefaultRemote()
+		if remoterefs, lserr := git.LsRemote(remote); remoterefs == "" && lserr == nil {
+			// Remote has not been initialised; Git files should be marked as LC
+			for _, fname := range cachedfiles {
+				statuses[fname] = LocalChanges
+			}
+		} else if rerr == nil {
+			upstream := fmt.Sprintf("%s/master", remote) // TODO: Don't assume master; use current branch name
+			go git.DiffUpstream(cachedfiles, upstream, diffchan)
+			for fname := range diffchan {
+				fname = filepath.Clean(fname)
+				// Two notes:
+				//		1. There will definitely be overlap here with the same status in annex (not a problem)
+				//		2. The diff might be due to remote or local changes, but for now we're going to assume local
+				statuses[fname] = LocalChanges
+			}
+		}
+
+		// Run whereis on cached files (if any) to see if content is synced for annexed files
 		wichan := make(chan git.AnnexWhereisRes)
 		go git.AnnexWhereis(cachedfiles, wichan)
 		for wiInfo := range wichan {
 			if wiInfo.Err != nil {
 				continue
 			}
-			fname := wiInfo.File
+			fname := filepath.Clean(wiInfo.File)
+			// if no content location for this file is "here", the status is NoContent
+			statuses[fname] = NoContent
 			for _, remote := range wiInfo.Whereis {
-				// if no remotes are "here", the file is NoContent
-				statuses[fname] = NoContent
 				if remote.Here {
 					if len(wiInfo.Whereis) > 1 {
+						// content is here and in one other location: Synced
 						statuses[fname] = Synced
 					} else {
+						// content is here only: LocalChanges (not uploaded)
 						statuses[fname] = LocalChanges
 					}
 					break
@@ -811,18 +881,6 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 			}
 		}
 
-		diffchan := make(chan string)
-		remote, err := DefaultRemote()
-		if err == nil {
-			upstream := fmt.Sprintf("%s/master", remote)
-			go git.DiffUpstream(cachedfiles, upstream, diffchan)
-			for fname := range diffchan {
-				// Two notes:
-				//		1. There will definitely be overlap here with the same status in annex (not a problem)
-				//		2. The diff might be due to remote or local changes, but for now we're going to assume local
-				statuses[fname] = LocalChanges
-			}
-		}
 	}
 
 	// Add leftover cached files to the map
@@ -837,18 +895,15 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		statuses[fname] = Modified
 	}
 
-	// Check if modified files are actually annex unlocked instead
-	if len(modifiedfiles) > 0 {
-		statuschan := make(chan git.AnnexStatusRes)
-		go git.AnnexStatus(modifiedfiles, statuschan)
-		for item := range statuschan {
-			if item.Err != nil {
-				log.Write("Error during annex status while searching for unlocked files")
-				// lockchan <- git.RepoFileStatus{Err: item.Err}
-			}
-			if item.Status == "T" {
-				statuses[item.File] = Unlocked
-			}
+	// Check if there are any TypeChange files (lock state change)
+	statuschan := make(chan git.AnnexStatusRes)
+	go git.AnnexStatus(paths, statuschan)
+	for item := range statuschan {
+		if item.Err != nil {
+			log.Write("Error during annex status while searching for unlocked files")
+		}
+		if item.Status == "T" {
+			statuses[filepath.Clean(item.File)] = TypeChange
 		}
 	}
 

@@ -37,11 +37,14 @@ func init() {
 		annexVer = err.Error()
 	}
 	verinfo.Annex = annexVer
+	if err != nil {
+		fmt.Println("Failed to initialise log file")
+	}
+	err = log.Init()
+	log.Write("VERSION: %s", verinfo.String())
 }
 
 func main() {
-	err := log.Init(verinfo.String())
-	gincmd.CheckError(err)
 	defer log.Close()
 
 	var args = make([]string, len(os.Args))

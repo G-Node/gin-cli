@@ -109,14 +109,7 @@ func CheckErrorMsg(err error, msg string) {
 // It only checks if a local token exists and does not confirm its validity with the server.
 // The function should be called at the start of any command that requires being logged in to run.
 func requirelogin(cmd *cobra.Command, gincl *ginclient.Client, prompt bool) {
-	err := gincl.LoadToken()
-	if prompt {
-		if err != nil {
-			login(cmd, nil)
-		}
-		err = gincl.LoadToken()
-	}
-	CheckError(err)
+	gincl.LoadToken()
 }
 
 func usageDie(cmd *cobra.Command) {
@@ -499,6 +492,9 @@ func SetUpCommands(verinfo VersionInfo) *cobra.Command {
 
 	// Download
 	cmds["download"] = DownloadCmd()
+
+	// Sync
+	cmds["sync"] = SyncCmd()
 
 	// Get content
 	cmds["get-content"] = GetContentCmd()

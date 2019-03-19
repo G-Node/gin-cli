@@ -9,22 +9,23 @@ environment:
   SRCDIR: C:\gopath\src\github.com\G-Node\gin-cli
   GOPATH: C:\gopath
   BINDIR: bin
-  ANNEXURL: https://web.gin.g-node.org/G-Node/git-annex-windows/raw/master/git-annex-windows-v6.exe
+  # download dev build
+  BUNDLEURL: https://web.gin.g-node.org/achilleas/gin-cli-builds/raw/master/gin-cli-latest-windows-386.zip
+  GIN_LOG_DIR: C:\gin-log
+  GIN_CONFIG_DIR: C:\gin-config
 
 
 install:
-  - set PATH=C:\Python37-x64\;%PATH%;%GOPATH%\bin;c:\git-annex\usr\bin
-  # download git-annex-windows-v6.exe
-  - md c:\git-annex
-  - cd c:\git-annex
-  - ps: Invoke-WebRequest -URI $env:ANNEXURL -OutFile "git-annex-windows-v6.exe"
-  - 7z x git-annex-windows-v6.exe
-  - dir usr\bin
+  - set PATH=C:\Python37-x64\;%PATH%;%GOPATH%\bin;c:\gin-bundle\git\usr\bin
+  # download latest stable gin-cli-windows-bundle
+  - md c:\gin-bundle
+  - cd c:\gin-bundle
+  - ps: Invoke-WebRequest -URI $env:BUNDLEURL -OutFile "gin-cli-bundle.zip"
+  - 7z x gin-cli-bundle.zip
   - git-annex version
   # go stuff
   - go version
   - go env
-  - go get -u github.com/golang/lint/golint
 
 build_script:
   - cd %SRCDIR%
@@ -44,8 +45,6 @@ build_script:
   - go get github.com/alecthomas/template
   - go get github.com/dustin/go-humanize
   - go vet ./...
-  - gofmt -s -l .
-  - golint github.com/G-Node/gin-cli...
   - go build -ldflags "-X main.gincliversion=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o %GOPATH%\bin\gin.exe .
 
 before_test:
@@ -59,15 +58,15 @@ before_test:
   - gin help
 
 test_script:
-  - git config --global user.email "appveyor@example.com"
-  - git config --global user.name "GIN Appveyor"
+  - xcopy /e /s /y /i %SRCDIR%\tests\conf %GIN_CONFIG_DIR%
+  - go test -v ./...
   - cd %SRCDIR%\tests
-  - xcopy /e /s /y /i conf %userprofile%\conf
-  - python -m pytest -k "annex_content"
+  - python -m pytest -v -k "directory or offline"
 
 # to disable deployment
 deploy: off
 
-# Uncomment on_finish block to enable RDP
-# on_finish:
+on_finish:
+  - appveyor PushArtifact %GIN_LOG_DIR%\gin.log
+# Uncomment next line to enable RDP
 #   - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
