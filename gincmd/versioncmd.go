@@ -60,58 +60,39 @@ func checkoutcopies(commit git.GinCommit, paths []string, destination string) {
 	go ginclient.CheckoutFileCopies(hash, paths, destination, isodate, checkoutchan)
 
 	// TODO: JSON output
-	var newfiles []string
-	var nannexed int
+	var newfiles int
+	var nerr int
 	fmt.Println(":: Checking out old file versions")
 	for costatus := range checkoutchan {
 		if costatus.Err != nil {
-			fmt.Println(costatus.Err.Error())
+			fmt.Printf("Failed to retrieve copy of '%s': %s\n", costatus.Filename, costatus.Err.Error())
+			nerr++
 			continue
 		}
 		switch costatus.Type {
 		case "Git":
-			fmt.Printf(" Copied git file '%s' from revision %s (%s) to '%s'\n", costatus.Filename, hash, prettydate, costatus.Destination)
-			newfiles = append(newfiles, costatus.Destination)
+			fallthrough
 		case "Annex":
-			fmt.Printf(" Copied placeholder file '%s' from revision %s (%s) to '%s'\n", costatus.Filename, hash, prettydate, costatus.Destination)
-			// TODO: Check if contents are available locally and if not advise with 'gin get-content' command
-			// This is unnecessary since the fromkey command handles annex add,
-			// but it doesn't hurt and is consistent with what we do with git
-			// files
-			newfiles = append(newfiles, costatus.Destination)
-			nannexed++
+			fallthrough
 		case "Link":
-			fmt.Printf(" '%s' is a link to '%s' and it not a placeholder file; cannot recover\n", costatus.Filename, costatus.Destination)
+			newfiles++
+			fmt.Printf(" Copied file '%s' from revision %s (%s) to '%s'\n", costatus.Filename, hash, prettydate, costatus.Destination)
 		case "Tree":
 			fmt.Printf(" Created subdirectory '%s'\n", costatus.Destination)
 		}
 	}
-	// Add new files to index but do not upload
-	addchan := make(chan git.RepoFileStatus)
-	go git.AnnexAdd(newfiles, addchan)
-	for range addchan {
-		// Wait for channel to close
-	}
-
-	// Unlock any annexed files
-	if nannexed > 0 {
-		ulchan := make(chan git.RepoFileStatus)
-		go git.AnnexUnlock(newfiles, ulchan)
-		for range ulchan {
-			// Wait for channel to close
-		}
-	}
-
 	width := termwidth()
 	wrapprint := func(fmtstr string, args ...interface{}) {
 		fmt.Print(wouter.Wrap(fmt.Sprintf(fmtstr, args...), width))
 	}
-	// TODO: Instead of adding git files, would it be better if we did get-content on annex files and then removed them from the index?
 	fmt.Println()
-	wrapprint("%d files were checked out from an older version (%d annexed files)", len(newfiles), nannexed)
-	wrapprint("Running 'gin commit' now will save these files to the current state of the repository.")
-	if nannexed > 0 {
-		wrapprint("If you want to remove the recovered files from the current repository, make sure you use 'gin get-content' on the annexed files before moving.")
+	wrapprint("%d files were checked out from an older version", newfiles)
+	if nerr > 0 {
+		plural := ""
+		if nerr > 1 {
+			plural = "s"
+		}
+		Die(fmt.Sprintf("%d operation%s failed", nerr, plural))
 	}
 }
 

@@ -558,9 +558,15 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 				// strip any newlines from the end of the path
 				keypath := strings.TrimSpace(string(content))
 				_, key := path.Split(keypath)
-				fkerr := git.AnnexFromKey(key, outfile)
-				if fkerr != nil {
-					status.Err = fmt.Errorf("Error creating placeholder file %s: %s", outfile, fkerr.Error())
+				contentloc, err := git.AnnexContentLocation(key)
+				if err != nil {
+					status.Err = fmt.Errorf("Annexed content is not available locally")
+					cochan <- status
+					continue
+				}
+				err = git.CopyFile(contentloc, outfile)
+				if err != nil {
+					status.Err = fmt.Errorf("Error writing %s: %s", outfile, err.Error())
 				}
 			} else if obj.Mode == "120000" {
 				// Plain symlink

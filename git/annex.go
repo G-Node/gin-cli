@@ -889,6 +889,25 @@ func AnnexFromKey(key, filepath string) error {
 	return nil
 }
 
+// AnnexContentLocation returns the location of the content for a given annex
+// key. This is the location of the content file in the object store. If the
+// annexed content is not available locally, the function returns an error.
+func AnnexContentLocation(key string) (string, error) {
+	cmd := AnnexCommand("contentlocation", key)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+		errmsg := "content not available locally"
+		if len(stderr) > 0 {
+			errmsg = string(stderr)
+		}
+		return "", fmt.Errorf(errmsg)
+	}
+	sstdout := string(stdout)
+	sstdout = strings.TrimSpace(sstdout)
+	return sstdout, nil
+}
+
 // build exclusion argument list
 // files < annex.minsize or matching exclusion extensions will not be annexed and
 // will instead be handled by git

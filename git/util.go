@@ -1,8 +1,10 @@
 package git
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -125,3 +127,35 @@ func filterpaths(paths, excludes []string) (filtered []string) {
 
 	return
 }
+
+// CopyFile copies the contents of src file into dest file.
+func CopyFile(src, dest string) error {
+	if !pathExists(src) {
+		return fmt.Errorf("source file '%s' does not exist", src)
+	}
+	if pathExists(dest) {
+		return fmt.Errorf("destination file '%s' exists; refusing to overwrite", dest)
+	}
+
+	// set up read buffer
+	srcfile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source file for copy: %v", err.Error())
+	}
+	reader := bufio.NewReader(srcfile)
+
+	// set up write buffer
+	destfile, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file for copy: %v", err.Error())
+	}
+	writer := bufio.NewWriter(destfile)
+
+	if nw, err := io.Copy(writer, reader); err != nil {
+		println(nw)
+	}
+
+	return nil
+}
+
+// TODO: Move CopyFile and pathExists to a new subpackage: ginclient/ginutil or simply ginutil
