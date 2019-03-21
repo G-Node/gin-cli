@@ -510,7 +510,12 @@ func RemoveRemote(remote string) error {
 
 // CheckoutVersion checks out all files specified by paths from the revision with the specified commithash.
 func CheckoutVersion(commithash string, paths []string) error {
-	return git.Checkout(commithash, paths)
+	err := git.Checkout(commithash, paths)
+	if err != nil {
+		return err
+	}
+
+	return git.AnnexFsck(paths)
 }
 
 // CheckoutFileCopies checks out copies of files specified by path from the revision with the specified commithash.

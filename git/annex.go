@@ -922,6 +922,20 @@ func AnnexContentLocation(key string) (string, error) {
 	return sstdout, nil
 }
 
+// AnnexFsck runs fsck (filesystem check) on the specified files, fixing any
+// issues with the annexed files in the working tree.
+func AnnexFsck(paths []string) error {
+	cmdargs := []string{"fsck"}
+	cmdargs = append(cmdargs, paths...)
+	cmd := AnnexCommand(cmdargs...)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+		return fmt.Errorf("error fixing working tree files: %s", string(stderr))
+	}
+	return nil
+}
+
 // build exclusion argument list
 // files < annex.minsize or matching exclusion extensions will not be annexed and
 // will instead be handled by git
