@@ -546,7 +546,8 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 			}
 
 			// heuristic check for annexed pointer file:
-			// - check if the first 255 bytes of the file (or the entire contents if smaller) contain the string
+			// - check if the first 255 bytes of the file (or the entire
+			// contents if smaller) contain the string /annex/objects
 			maxpathidx := 255
 			if len(content) < maxpathidx {
 				maxpathidx = len(content)
@@ -560,9 +561,17 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 				_, key := path.Split(keypath)
 				contentloc, err := git.AnnexContentLocation(key)
 				if err != nil {
-					status.Err = fmt.Errorf("Annexed content is not available locally")
-					cochan <- status
-					continue
+					getchan := make(chan git.RepoFileStatus)
+					go git.AnnexGetKey(key, getchan)
+					for range getchan {
+					}
+					contentloc, err = git.AnnexContentLocation(key)
+					if err != nil {
+						status.Err = fmt.Errorf("Annexed content is not available locally")
+						cochan <- status
+						continue
+					}
+					status.Err = nil
 				}
 				err = git.CopyFile(contentloc, outfile)
 				if err != nil {
