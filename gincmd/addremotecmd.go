@@ -78,12 +78,12 @@ func parseRemote(remotestr string) remote {
 
 func checkRemote(cmd *cobra.Command, url string) (err error) {
 	// Check if the remote is accessible
-	fmt.Print(":: Checking remote ")
+	fmt.Print(":: Checking remote: ")
 	if _, err = git.LsRemote(url); err == nil {
 		fmt.Fprintln(color.Output, green("OK"))
 		return nil
 	}
-	fmt.Fprintln(color.Output, red("FAILED"))
+	fmt.Println("not found")
 	return err
 }
 
