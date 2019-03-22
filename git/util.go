@@ -142,6 +142,7 @@ func CopyFile(src, dest string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source file for copy: %v", err.Error())
 	}
+	defer srcfile.Close()
 	reader := bufio.NewReader(srcfile)
 
 	// set up write buffer
@@ -149,10 +150,12 @@ func CopyFile(src, dest string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination file for copy: %v", err.Error())
 	}
+	defer destfile.Close()
 	writer := bufio.NewWriter(destfile)
+	defer writer.Flush()
 
-	if nw, err := io.Copy(writer, reader); err != nil {
-		println(nw)
+	if _, err := io.Copy(writer, reader); err != nil {
+		return fmt.Errorf("file copy failed: %v", err.Error())
 	}
 
 	return nil
