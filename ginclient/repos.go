@@ -510,7 +510,12 @@ func RemoveRemote(remote string) error {
 
 // CheckoutVersion checks out all files specified by paths from the revision with the specified commithash.
 func CheckoutVersion(commithash string, paths []string) error {
-	return git.Checkout(commithash, paths)
+	err := git.Checkout(commithash, paths)
+	if err != nil {
+		return err
+	}
+
+	return git.AnnexFsck(paths)
 }
 
 // CheckoutFileCopies checks out copies of files specified by path from the revision with the specified commithash.
@@ -546,7 +551,8 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 			}
 
 			// heuristic check for annexed pointer file:
-			// - check if the first 255 bytes of the file (or the entire contents if smaller) contain the string
+			// - check if the first 255 bytes of the file (or the entire
+			// contents if smaller) contain the string /annex/objects
 			maxpathidx := 255
 			if len(content) < maxpathidx {
 				maxpathidx = len(content)
@@ -558,9 +564,23 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 				// strip any newlines from the end of the path
 				keypath := strings.TrimSpace(string(content))
 				_, key := path.Split(keypath)
-				fkerr := git.AnnexFromKey(key, outfile)
-				if fkerr != nil {
-					status.Err = fmt.Errorf("Error creating placeholder file %s: %s", outfile, fkerr.Error())
+				contentloc, err := git.AnnexContentLocation(key)
+				if err != nil {
+					getchan := make(chan git.RepoFileStatus)
+					go git.AnnexGetKey(key, getchan)
+					for range getchan {
+					}
+					contentloc, err = git.AnnexContentLocation(key)
+					if err != nil {
+						status.Err = fmt.Errorf("Annexed content is not available locally")
+						cochan <- status
+						continue
+					}
+					status.Err = nil
+				}
+				err = git.CopyFile(contentloc, outfile)
+				if err != nil {
+					status.Err = fmt.Errorf("Error writing %s: %s", outfile, err.Error())
 				}
 			} else if obj.Mode == "120000" {
 				// Plain symlink

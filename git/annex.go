@@ -407,17 +407,7 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 	return
 }
 
-// AnnexGet retrieves the content of specified files.
-// The status channel 'getchan' is closed when this function returns.
-// (git annex get)
-func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
-	defer close(getchan)
-	var cmdargs []string
-	if JsonBool {
-		cmdargs = append([]string{"get", "--json-progress"}, filepaths...)
-	} else {
-		cmdargs = append([]string{"get"}, filepaths...)
-	}
+func baseAnnexGet(cmdargs []string, getchan chan<- RepoFileStatus) {
 	cmd := AnnexCommand(cmdargs...)
 	if err := cmd.Start(); err != nil {
 		getchan <- RepoFileStatus{Err: err}
@@ -492,6 +482,30 @@ func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 		log.Write("Error during AnnexGet")
 		log.Write(string(stderr))
 	}
+	return
+}
+
+// AnnexGet retrieves the content of specified files.
+// The status channel 'getchan' is closed when this function returns.
+// (git annex get)
+func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
+	defer close(getchan)
+	var cmdargs []string
+	if JsonBool {
+		cmdargs = append([]string{"get", "--json-progress"}, filepaths...)
+	} else {
+		cmdargs = append([]string{"get"}, filepaths...)
+	}
+	baseAnnexGet(cmdargs, getchan)
+}
+
+// AnnexGetKey retrieves the content of a single specified key.
+// The status channel 'getchan' is closed when this function returns.
+// (git annex get)
+func AnnexGetKey(key string, getchan chan<- RepoFileStatus) {
+	defer close(getchan)
+	cmdargs := []string{"get", "--json-progress", fmt.Sprintf("--key=%s", key)}
+	baseAnnexGet(cmdargs, getchan)
 	return
 }
 
@@ -885,6 +899,39 @@ func AnnexFromKey(key, filepath string) error {
 	if err != nil {
 		logstd(stdout, stderr)
 		return fmt.Errorf(string(stderr))
+	}
+	return nil
+}
+
+// AnnexContentLocation returns the location of the content for a given annex
+// key. This is the location of the content file in the object store. If the
+// annexed content is not available locally, the function returns an error.
+func AnnexContentLocation(key string) (string, error) {
+	cmd := AnnexCommand("contentlocation", key)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+		errmsg := "content not available locally"
+		if len(stderr) > 0 {
+			errmsg = string(stderr)
+		}
+		return "", fmt.Errorf(errmsg)
+	}
+	sstdout := string(stdout)
+	sstdout = strings.TrimSpace(sstdout)
+	return sstdout, nil
+}
+
+// AnnexFsck runs fsck (filesystem check) on the specified files, fixing any
+// issues with the annexed files in the working tree.
+func AnnexFsck(paths []string) error {
+	cmdargs := []string{"fsck"}
+	cmdargs = append(cmdargs, paths...)
+	cmd := AnnexCommand(cmdargs...)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		logstd(stdout, stderr)
+		return fmt.Errorf("error fixing working tree files: %s", string(stderr))
 	}
 	return nil
 }

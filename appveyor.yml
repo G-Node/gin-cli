@@ -61,7 +61,7 @@ test_script:
   - xcopy /e /s /y /i %SRCDIR%\tests\conf %GIN_CONFIG_DIR%
   - go test -v ./...
   - cd %SRCDIR%\tests
-  - python -m pytest -v -k "directory or offline"
+  - python -m pytest -v -m "offline"
 
 # to disable deployment
 deploy: off
@@ -69,4 +69,4 @@ deploy: off
 on_finish:
   - appveyor PushArtifact %GIN_LOG_DIR%\gin.log
 # Uncomment next line to enable RDP
-#   - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+# - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
