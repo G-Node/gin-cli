@@ -68,7 +68,17 @@ func lsRepo(cmd *cobra.Command, args []string) {
 		// print each category with len(items) > 0 with appropriate header
 		for _, status := range statuses {
 			fmt.Printf("%s:\n", status.Description())
-			fmt.Printf("\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
+			switch d := status.Description(); {
+			case strings.Contains(d, "modified"):
+				fmt.Printf(green("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
+			case d == "Untracked":
+				fmt.Printf(red("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
+			case d == "Removed":
+				fmt.Printf(yellow("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
+			default:
+				fmt.Printf("\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
+			}
+
 		}
 	}
 }
