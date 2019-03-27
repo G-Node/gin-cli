@@ -9,6 +9,7 @@ import (
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -68,15 +69,32 @@ func lsRepo(cmd *cobra.Command, args []string) {
 		// print each category with len(items) > 0 with appropriate header
 		for _, status := range statuses {
 			fmt.Printf("%s:\n", status.Description())
-			switch d := status.Description(); {
-			case strings.Contains(d, "modified"):
-				fmt.Printf(green("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
-			case d == "Untracked":
-				fmt.Printf(red("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
-			case d == "Removed":
-				fmt.Printf(yellow("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
+			switch d := status; {
+			case d == 0: //Synced
+				fmt.Fprintf(color.Output, green("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
+			case d == 1: //No Content
+				fmt.Fprintf(color.Output, "  (use \"gin get-content <file>...\" to download content)\n")
+				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
+			case d == 2: // Modified
+				fmt.Fprintf(color.Output, "  (use \"gin upload <file>...\" to upload changes\n")
+				fmt.Fprintf(color.Output, "  (use \"gin commit <file>...\" to save changes locally)\n")
+				fmt.Fprintf(color.Output, yellow("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
+			case d == 3: //LocalChanges
+				fmt.Fprintf(color.Output, "  (use \"gin upload <file>...\" to upload changes)\n")
+				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
+			case d == 4: //RemoteChanges
+				fmt.Fprintf(color.Output, "  (use \"gin download <file>...\" to download changes)\n")
+				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
+			case d == 5: // Unlocked
+				fmt.Fprintf(color.Output, "  (use \"gin lock <file>...\" to lock file)\n")
+				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
+			case d == 7: // Removed
+				fmt.Fprintf(color.Output, red("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
+			case d == 8: // Untracked
+				fmt.Fprintf(color.Output, "  (use \"gin upload <file>...\" to upload file and begin tracking)\n")
+				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
 			default:
-				fmt.Printf("\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
+				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
 			}
 
 		}
