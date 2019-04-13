@@ -19,7 +19,7 @@ func rmRemote(cmd *cobra.Command, args []string) {
 	fmt.Printf(":: Remote removed: %s\n", name)
 	defremote, _ := ginclient.DefaultRemote()
 	if defremote == name {
-		ginclient.SetDefaultRemote("")
+		ginclient.UnsetDefaultRemote()
 		fmt.Printf(":: %s was the default remote. Current default is unset.\n:: Use 'gin use-remote' to set a new default.\n", name)
 	}
 }
