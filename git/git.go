@@ -902,7 +902,7 @@ func LsTree(revision string, paths []string) ([]Object, error) {
 
 // CatFileContents performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
 func CatFileContents(revision, filepath string) ([]byte, error) {
-	cmd := Command("cat-file", "blob", fmt.Sprintf("%s:./%s", revision, filepath))
+	cmd := Command("cat-file", "blob", fmt.Sprintf("%s:%s", revision, filepath))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error during GitCatFile (Contents)")
