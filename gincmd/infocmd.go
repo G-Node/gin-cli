@@ -2,6 +2,7 @@ package gincmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
@@ -13,6 +14,7 @@ func printAccountInfo(cmd *cobra.Command, args []string) {
 	var username string
 
 	flags := cmd.Flags()
+	jsonout, _ := flags.GetBool("json")
 	srvalias, _ := flags.GetString("server")
 
 	conf := config.Read()
@@ -39,9 +41,14 @@ func printAccountInfo(cmd *cobra.Command, args []string) {
 	CheckError(err)
 
 	var outBuffer bytes.Buffer
-	_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.UserName, info.FullName))
-	if info.Email != "" {
-		_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email))
+	if jsonout {
+		infojson, _ := json.Marshal(info)
+		outBuffer.Write(infojson)
+	} else {
+		_, _ = outBuffer.WriteString(fmt.Sprintf("User %s\nName: %s\n", info.UserName, info.FullName))
+		if info.Email != "" {
+			_, _ = outBuffer.WriteString(fmt.Sprintf("Email: %s\n", info.Email))
+		}
 	}
 
 	fmt.Println(outBuffer.String())
@@ -62,5 +69,6 @@ func InfoCmd() *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 	cmd.Flags().String("server", "", "Specify server `alias` for info lookup. See also 'gin servers'.")
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
 	return cmd
 }
