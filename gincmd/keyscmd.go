@@ -1,6 +1,7 @@
 package gincmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"strconv"
@@ -15,6 +16,10 @@ import (
 func keys(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags()
 	srvalias, _ := flags.GetString("server")
+	keyfilename, _ := flags.GetString("add")
+	keyidx, _ := flags.GetInt("delete")
+
+	prStyle := determinePrintStyle(cmd)
 
 	conf := config.Read()
 	if srvalias == "" {
@@ -22,10 +27,6 @@ func keys(cmd *cobra.Command, args []string) {
 	}
 	gincl := ginclient.New(srvalias)
 	requirelogin(cmd, gincl, true)
-
-	keyfilename, _ := flags.GetString("add")
-	keyidx, _ := flags.GetInt("delete")
-	verbose, _ := flags.GetBool("verbose")
 
 	if keyfilename != "" && keyidx > 0 {
 		Die("can't add and delete key at the same time")
@@ -39,10 +40,10 @@ func keys(cmd *cobra.Command, args []string) {
 		delKey(gincl, keyidx)
 		return
 	}
-	printKeys(gincl, verbose)
+	printKeys(gincl, prStyle)
 }
 
-func printKeys(gincl *ginclient.Client, verbose bool) {
+func printKeys(gincl *ginclient.Client, prStyle printstyle) {
 	keys, err := gincl.GetUserKeys()
 	CheckError(err)
 
@@ -60,12 +61,19 @@ func printKeys(gincl *ginclient.Client, verbose bool) {
 	} else {
 		nkeysStr = fmt.Sprintf("%d", nkeys)
 	}
-	fmt.Printf("You have %s key%s associated with your account.\n\n", nkeysStr, plural)
-	for idx, key := range keys {
-		fmt.Printf("[%v] \"%s\"\n", idx+1, key.Title)
-		if verbose {
-			fmt.Printf("--- Key ---\n%s\n", key.Key)
+
+	if prStyle == psJSON {
+		keyjson, _ := json.Marshal(keys)
+		fmt.Print(string(keyjson))
+	} else {
+		fmt.Printf("You have %s key%s associated with your account.\n\n", nkeysStr, plural)
+		for idx, key := range keys {
+			fmt.Printf("[%v] \"%s\"\n", idx+1, key.Title)
+			if prStyle == psVerbose {
+				fmt.Printf("--- Key ---\n%s\n", key.Key)
+			}
 		}
+
 	}
 }
 
@@ -111,5 +119,6 @@ func KeysCmd() *cobra.Command {
 	cmd.Flags().Int("delete", 0, "Specify a `number` to delete the corresponding key from the server. Use 'gin keys' to get the numbered listing of keys.")
 	cmd.Flags().BoolP("verbose", "v", false, "Verbose printing. Prints the entire public key.")
 	cmd.Flags().String("server", "", "Specify server `alias` to query, add, or remove keys. See also 'gin servers'.")
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
 	return cmd
 }
