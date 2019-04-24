@@ -495,6 +495,15 @@ func SetDefaultRemote(remote string) error {
 	return nil
 }
 
+// UnsetDefaultRemote unsets the default gin remote in the git configuration.
+func UnsetDefaultRemote() error {
+	err := git.ConfigUnset("gin.remote")
+	if err != nil {
+		return fmt.Errorf("failed to unset default remote: %s", err)
+	}
+	return nil
+}
+
 // RemoveRemote removes a remote from the repository configuration.
 func RemoveRemote(remote string) error {
 	remotes, err := git.RemoteShow()
@@ -859,9 +868,16 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	if len(cachedfiles) > 0 {
 		// Check for git diffs with upstream
 		diffchan := make(chan string)
+		noremotes := true
 		remote, rerr := DefaultRemote()
-		if remoterefs, lserr := git.LsRemote(remote); remoterefs == "" && lserr == nil {
-			// Remote has not been initialised; Git files should be marked as LC
+		if rerr == nil {
+			noremotes = false // default remote set
+			remoterefs, lserr := git.LsRemote(remote)
+			if lserr == nil && remoterefs == "" {
+				noremotes = true // default remote is uninitialised; treat as missing
+			}
+		}
+		if noremotes {
 			for _, fname := range cachedfiles {
 				statuses[fname] = LocalChanges
 			}

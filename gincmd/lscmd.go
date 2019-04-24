@@ -1,6 +1,7 @@
 package gincmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -56,49 +57,58 @@ func lsRepo(cmd *cobra.Command, args []string) {
 		for file, status := range filesStatus {
 			statFiles[status] = append(statFiles[status], file)
 		}
-
-		// sort files in each status (stable sorting unnecessary)
-		// also collect active statuses for sorting
-		var statuses ginclient.FileStatusSlice
-		for status := range statFiles {
-			sort.Sort(sort.StringSlice(statFiles[status]))
-			statuses = append(statuses, status)
-		}
-		sort.Sort(statuses)
-
-		// print each category with len(items) > 0 with appropriate header
-		for _, status := range statuses {
-			fmt.Printf("%s:\n", status.Description())
-			switch d := status; {
-			case d == ginclient.Synced:
-				fmt.Fprintf(color.Output, green("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
-			case d == ginclient.NoContent:
-				fmt.Fprintf(color.Output, "  (use \"gin get-content <file>...\" to download content)\n")
-				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
-			case d == ginclient.Modified:
-				fmt.Fprintf(color.Output, "  (use \"gin upload <file>...\" to upload changes\n")
-				fmt.Fprintf(color.Output, "  (use \"gin commit <file>...\" to save changes locally)\n")
-				fmt.Fprintf(color.Output, yellow("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
-			case d == ginclient.LocalChanges:
-				fmt.Fprintf(color.Output, "  (use \"gin upload <file>...\" to upload changes)\n")
-				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
-			case d == ginclient.RemoteChanges:
-				fmt.Fprintf(color.Output, "  (use \"gin download <file>...\" to download changes)\n")
-				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
-			case d == ginclient.Unlocked:
-				fmt.Fprintf(color.Output, "  (use \"gin lock <file>...\" to lock file)\n")
-				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
-			case d == ginclient.Removed:
-				fmt.Fprintf(color.Output, red("\n\t%s\n\n"), strings.Join(statFiles[status], "\n\t"))
-			case d == ginclient.Untracked:
-				fmt.Fprintf(color.Output, "  (use \"gin upload <file>...\" to upload file and begin tracking)\n")
-				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
-			default:
-				fmt.Fprintf(color.Output, "\n\t%s\n\n", strings.Join(statFiles[status], "\n\t"))
-			}
-
-		}
+		printFileStatusList(statFiles)
 	}
+}
+
+func printFileStatusList(statFiles map[ginclient.FileStatus][]string) {
+	// sort files in each status (stable sorting unnecessary)
+	// also collect active statuses for sorting
+	var statuses ginclient.FileStatusSlice
+	for status := range statFiles {
+		sort.Sort(sort.StringSlice(statFiles[status]))
+		statuses = append(statuses, status)
+	}
+	sort.Sort(statuses)
+
+	summary := new(bytes.Buffer)
+	summary.WriteString("Summary\n")
+	// print each category with len(items) > 0 with appropriate header
+	for _, status := range statuses {
+		fmt.Printf("%s:\n", status.Description())
+		cwriter := fmt.Sprint
+		switch status {
+		case ginclient.Synced:
+			cwriter = green
+		case ginclient.NoContent:
+			fmt.Print("  (use \"gin get-content <file>...\" to download content)\n")
+			cwriter = cyan
+		case ginclient.Modified:
+			fmt.Print("  (use \"gin commit <file>...\" to save changes locally)\n")
+			fmt.Print("  (use \"gin upload <file>...\" to save changes and upload them\n")
+			cwriter = yellow
+		case ginclient.LocalChanges:
+			fmt.Print("  (use \"gin upload\" to upload changes)\n")
+			cwriter = yellow
+		case ginclient.RemoteChanges:
+			fmt.Print("  (use \"gin download <file>...\" to download changes)\n")
+			cwriter = yellow
+		case ginclient.TypeChange:
+			fallthrough
+		case ginclient.Unlocked:
+			fmt.Print("  (use \"gin lock <file>...\" to lock file(s))\n")
+			cwriter = yellow
+		case ginclient.Removed:
+			fmt.Print("  (use \"gin commit <file>...\" to record deletion)\n")
+			cwriter = red
+		case ginclient.Untracked:
+			fmt.Print("  (use \"gin commit <file>...\" to begin tracking and save the current state)\n")
+			fmt.Print("  (use \"gin upload <file>...\" to save the current state and upload directly)\n")
+		}
+		fmt.Fprintf(color.Output, "\n\t%s\n\n", cwriter(strings.Join(statFiles[status], "\n\t")))
+		summary.WriteString(fmt.Sprintf("   %s: %d", cwriter(status.Abbrev()), len(statFiles[status])))
+	}
+	fmt.Println(summary)
 }
 
 // LsRepoCmd sets up the file 'ls' subcommand

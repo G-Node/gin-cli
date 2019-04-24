@@ -379,6 +379,21 @@ func ConfigSet(key, value string) error {
 	return nil
 }
 
+// ConfigUnset unsets a configuration value in the local git config.
+// (git config unset --local)
+func ConfigUnset(key string) error {
+	fn := fmt.Sprintf("ConfigUnset(%s)", key)
+	cmd := Command("config", "--unset", "--local", key)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		log.Write("Error during config unset")
+		logstd(stdout, stderr)
+		return gerr
+	}
+	return nil
+}
+
 // RemoteShow returns the configured remotes and their URL.
 // (git remote -v show -n)
 func RemoteShow() (map[string]string, error) {
@@ -573,7 +588,7 @@ func CommitEmpty(commitmsg string) error {
 // (git diff --name-only --relative @{upstream})
 func DiffUpstream(paths []string, upstream string, diffchan chan<- string) {
 	defer close(diffchan)
-	diffargs := []string{"diff", "-z", "--name-only", "--relative", upstream}
+	diffargs := []string{"diff", "-z", "--name-only", "--relative", upstream, "--"}
 	diffargs = append(diffargs, paths...)
 	cmd := Command(diffargs...)
 	err := cmd.Start()

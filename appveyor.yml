@@ -12,7 +12,6 @@ environment:
   # download dev build
   BUNDLEURL: https://web.gin.g-node.org/achilleas/gin-cli-builds/raw/master/gin-cli-latest-windows-386.zip
   GIN_LOG_DIR: C:\gin-log
-  GIN_CONFIG_DIR: C:\gin-config
 
 
 install:
@@ -58,7 +57,6 @@ before_test:
   - gin help
 
 test_script:
-  - xcopy /e /s /y /i %SRCDIR%\tests\conf %GIN_CONFIG_DIR%
   - go test -v ./...
   - cd %SRCDIR%\tests
   - python -m pytest -v -m "offline"
