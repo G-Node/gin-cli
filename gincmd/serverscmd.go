@@ -1,6 +1,7 @@
 package gincmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/G-Node/gin-cli/ginclient/config"
@@ -9,19 +10,26 @@ import (
 )
 
 func servers(cmd *cobra.Command, args []string) {
+	flags := cmd.Flags()
+	jsonout, _ := flags.GetBool("json")
 	conf := config.Read()
 	servermap := conf.Servers
 	defserver := conf.DefaultServer
 
-	fmt.Println(":: Configured servers")
-	for alias, srvcfg := range servermap {
-		fmt.Printf("* %s", alias)
-		if alias == defserver {
-			fmt.Fprintf(color.Output, green(" [default]"))
+	if jsonout {
+		serversjson, _ := json.Marshal(conf.Servers)
+		fmt.Print(string(serversjson))
+	} else {
+		fmt.Println(":: Configured servers")
+		for alias, srvcfg := range servermap {
+			fmt.Printf("* %s", alias)
+			if alias == defserver {
+				fmt.Fprintf(color.Output, green(" [default]"))
+			}
+			fmt.Println()
+			fmt.Printf("  web: %s\n", srvcfg.Web.AddressStr())
+			fmt.Printf("  git: %s\n\n", srvcfg.Git.AddressStr())
 		}
-		fmt.Println()
-		fmt.Printf("  web: %s\n", srvcfg.Web.AddressStr())
-		fmt.Printf("  git: %s\n\n", srvcfg.Git.AddressStr())
 	}
 }
 
@@ -36,5 +44,6 @@ func ServersCmd() *cobra.Command {
 		Run:                   servers,
 		DisableFlagsInUseLine: true,
 	}
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
 	return cmd
 }

@@ -1,6 +1,7 @@
 package gincmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
@@ -10,7 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func remotes(cmd *cobra.Command, args []string) {
+func printremotes(cmd *cobra.Command, args []string) {
+	flags := cmd.Flags()
+	jsonout, _ := flags.GetBool("json")
+
 	if !git.IsRepo() {
 		Die(ginerrors.NotInRepo)
 	}
@@ -19,13 +23,18 @@ func remotes(cmd *cobra.Command, args []string) {
 	CheckError(err)
 	defremote, err := ginclient.DefaultRemote()
 	CheckError(err)
-	fmt.Println(":: Configured remotes")
-	for name, loc := range remotes {
-		fmt.Printf(" %s: %s", name, loc)
-		if name == defremote {
-			fmt.Fprintf(color.Output, green(" [default]"))
+	if jsonout {
+		remotesjson, _ := json.Marshal(remotes)
+		fmt.Print(string(remotesjson))
+	} else {
+		fmt.Println(":: Configured remotes")
+		for name, loc := range remotes {
+			fmt.Printf(" %s: %s", name, loc)
+			if name == defremote {
+				fmt.Fprintf(color.Output, green(" [default]"))
+			}
+			fmt.Println()
 		}
-		fmt.Println()
 	}
 }
 
@@ -37,8 +46,9 @@ func RemotesCmd() *cobra.Command {
 		Short:                 "List the repository's configured remotes",
 		Long:                  formatdesc(description, nil),
 		Args:                  cobra.NoArgs,
-		Run:                   remotes,
+		Run:                   printremotes,
 		DisableFlagsInUseLine: true,
 	}
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
 	return cmd
 }

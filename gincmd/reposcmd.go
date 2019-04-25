@@ -101,7 +101,7 @@ func ReposCmd() *cobra.Command {
 	}
 	cmd.Flags().Bool("all", false, "List all repositories accessible to the logged in user.")
 	cmd.Flags().Bool("shared", false, "List all repositories that the user is a member of (excluding own repositories).")
-	cmd.Flags().Bool("json", false, "Print listing in JSON format.")
+	cmd.Flags().Bool("json", false, jsonHelpMsg)
 	cmd.Flags().String("server", "", "Specify server `alias` where the repository will be created. See also 'gin servers'.")
 	return cmd
 }
