@@ -2,6 +2,50 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.7
+
+### Changes
+- Git annex v7 mode: With this version, new repositories and local clones are initialised in git-annex v7 mode. This brings several changes in the behaviour of file locking:
+    - Files are added **unlocked** by default.
+    - Locking a file is a persistent status change that can be committed to the repository and will affect other clones.
+    - **Locked** files are not usable on Windows (not even for reading) and need to be unlocked.
+    - If no locking or unlocking is performed, the behaviour is is identical across all platforms.
+- New command: `gin sync`
+    - Synchronises changes bidirectionally between remote repositories and the local clone.
+    - Content can be synchronised at the same time with the `--content` flag.
+    - Using the `--content` flag will download **all** data in the repository.
+- `gin version --copy-to` behaviour changes:
+    - Files can now be checked out from older versions to any location, i.e., the destination directory does not need to be under the repository root.
+    - Checked out files (the old versions) are not added to the repository.
+    - Annexed content of checked out files is automatically downloaded.
+- Custom commit messages: Users can now specify a custom commit message when performing a `gin commit` by specifying the `--message` flag (`-m` for short).
+- Better handling of merge conflicts.
+- `gin ls` file listings are colour coded. Synced files are green, pointer files without content are cyan, modified files are yellow/orange, removed files are red.
+- `gin ls` prints a summary with file counts for each status at the bottom of the output.
+- JSON output has been added (`--json` flag) to the `info`, `keys`, `servers`, and `remotes` commands.
+- A message is always printed when there is "Nothing to do".
+- Output is more consistent across all file operations.
+
+### Bug fixes
+- Fixed bugs with colours in Windows terminals.
+- Fixed bug where the log would not be properly trimmed on Windows.
+- Fixed bug where `gin version --copy-to` would fail on Windows.
+
+### Relevant PRs
+- #237: Windows colours
+- #241: Fix for adding annexed content to git on Windows
+- #242: Count only T (typechange) files
+- #244: Log trim fix
+- #247: More consistent file operation messages
+- #248: Small Changes to Verbose flag
+- #250: Windows fixes and annex v7
+- #253: Support custom commit messages
+- #254: Changes to 'gin version' command behaviour
+- #256: LScmd enhancement
+- #257: Bugfix for 'git cat-file' on Windows (for 'gin version --copy-to')
+- #258: gin ls summary
+- #260: Add JSON output to info, keys, servers, and remotes commands
+
 ## Version 1.6
 
 ### Bug fixes
