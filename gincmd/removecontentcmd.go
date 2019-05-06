@@ -43,7 +43,8 @@ func RemoveContentCmd() *cobra.Command {
 		"<filenames>": "One or more directories or files to remove.",
 	}
 	var cmd = &cobra.Command{
-		Use:                   "remove-content [--json | --verbose] [<filenames>]...",
+		// Use:                   "remove-content [--json | --verbose] [<filenames>]...",
+		Use:                   "remove-content [--json] [<filenames>]...",
 		Short:                 "Remove the content of local files that have already been uploaded",
 		Long:                  formatdesc(description, args),
 		Args:                  cobra.ArbitraryArgs,

@@ -42,7 +42,8 @@ func LockCmd() *cobra.Command {
 		"<filenames>": "One or more directories or files to lock.",
 	}
 	var cmd = &cobra.Command{
-		Use:                   "lock [--json | --verbose] <filenames>...",
+		// Use:                   "lock [--json | --verbose] <filenames>...",
+		Use:                   "lock [--json] <filenames>...",
 		Short:                 "Lock files",
 		Long:                  formatdesc(description, args),
 		Args:                  cobra.MinimumNArgs(1),

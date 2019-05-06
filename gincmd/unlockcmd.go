@@ -52,7 +52,8 @@ func UnlockCmd() *cobra.Command {
 		"<filenames>": "One or more directories or files to unlock.",
 	}
 	var cmd = &cobra.Command{
-		Use:                   "unlock [--json | --verbose] <filenames>...",
+		// Use:                   "unlock [--json | --verbose] <filenames>...",
+		Use:                   "unlock [--json] <filenames>...",
 		Short:                 "Unlock files for editing",
 		Long:                  formatdesc(description, args),
 		Args:                  cobra.MinimumNArgs(1),

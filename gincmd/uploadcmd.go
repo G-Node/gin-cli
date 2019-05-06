@@ -65,7 +65,8 @@ If no arguments are specified, only changes to files already being tracked are u
 		"Upload all '.zip' files to remotes named 'gin' and 'labdata'":      "$ gin upload --to gin --to labdata *.zip\n    or\n$ gin upload --to gin,labdata *.zip",
 	}
 	var cmd = &cobra.Command{
-		Use:                   "upload [--json | --verbose] [--to <remote>] [<filenames>]...",
+		// Use:                   "upload [--json | --verbose] [--to <remote>] [<filenames>]...",
+		Use:                   "upload [--json] [--to <remote>] [<filenames>]...",
 		Short:                 "Upload local changes to a remote repository",
 		Long:                  formatdesc(description, args),
 		Args:                  cobra.ArbitraryArgs,

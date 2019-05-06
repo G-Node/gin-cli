@@ -35,7 +35,8 @@ func GetContentCmd() *cobra.Command {
 		"<filenames>": "One or more directories or files to download.",
 	}
 	var cmd = &cobra.Command{
-		Use:                   "get-content [--json | --verbose] [<filenames>]...",
+		// Use:                   "get-content [--json | --verbose] [<filenames>]...",
+		Use:                   "get-content [--json] [<filenames>]...",
 		Short:                 "Download the content of files from a remote repository",
 		Long:                  formatdesc(description, args),
 		Args:                  cobra.ArbitraryArgs,
