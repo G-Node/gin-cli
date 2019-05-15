@@ -9,6 +9,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type srvcfgWithDefault struct {
+	config.ServerCfg
+	Default bool
+}
+
 func servers(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags()
 	jsonout, _ := flags.GetBool("json")
@@ -16,14 +21,20 @@ func servers(cmd *cobra.Command, args []string) {
 	servermap := conf.Servers
 	defserver := conf.DefaultServer
 
+	// augment servermap with Default field
+	serverdefaultmap := make(map[string]srvcfgWithDefault, len(servermap))
+	for alias, srvcfg := range servermap {
+		serverdefaultmap[alias] = srvcfgWithDefault{srvcfg, defserver == alias}
+	}
+
 	if jsonout {
-		serversjson, _ := json.Marshal(conf.Servers)
+		serversjson, _ := json.Marshal(serverdefaultmap)
 		fmt.Print(string(serversjson))
 	} else {
 		fmt.Println(":: Configured servers")
-		for alias, srvcfg := range servermap {
+		for alias, srvcfg := range serverdefaultmap {
 			fmt.Printf("* %s", alias)
-			if alias == defserver {
+			if srvcfg.Default {
 				fmt.Fprintf(color.Output, green(" [default]"))
 			}
 			fmt.Println()
