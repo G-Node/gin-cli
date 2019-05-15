@@ -2,6 +2,14 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.8
+
+### Changes
+- Added `Default` field to `gin servers` JSON output.
+
+### Relevant PRs
+- #262: [serverscmd] Include "default" in servers JSON output
+
 ## Version 1.7
 
 ### Changes
