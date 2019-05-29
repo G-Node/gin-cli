@@ -2,7 +2,6 @@ package gincmd
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/G-Node/gin-cli/ginclient/config"
@@ -37,46 +36,6 @@ func promptForGit() (gitconf config.GitCfg) {
 	if err != nil {
 		Die(ginerrors.BadPort)
 	}
-	return
-}
-
-func parseWebstring(webstring string) (webconf config.WebCfg) {
-	errmsg := fmt.Sprintf("invalid web configuration line %s", webstring)
-	split := strings.SplitN(webstring, "://", 2)
-	if len(split) != 2 {
-		Die(errmsg)
-	}
-	webconf.Protocol = split[0]
-
-	split = strings.SplitN(split[1], ":", 2)
-	if len(split) != 2 {
-		Die(errmsg)
-	}
-	port, err := strconv.ParseUint(split[1], 10, 16)
-	if err != nil {
-		Die(fmt.Sprintf("%s: %s", errmsg, ginerrors.BadPort))
-	}
-	webconf.Host, webconf.Port = split[0], uint16(port)
-	return
-}
-
-func parseGitstring(gitstring string) (gitconf config.GitCfg) {
-	errmsg := fmt.Sprintf("invalid git configuration line %s", gitstring)
-	split := strings.SplitN(gitstring, "@", 2)
-	if len(split) != 2 {
-		Die(errmsg)
-	}
-	gitconf.User = split[0]
-
-	split = strings.SplitN(split[1], ":", 2)
-	if len(split) != 2 {
-		Die(errmsg)
-	}
-	port, err := strconv.ParseUint(split[1], 10, 16)
-	if err != nil {
-		Die(fmt.Sprintf("%s: %s", errmsg, ginerrors.BadPort))
-	}
-	gitconf.Host, gitconf.Port = split[0], uint16(port)
 	return
 }
 
@@ -115,22 +74,25 @@ func addServer(cmd *cobra.Command, args []string) {
 
 	serverConf := config.ServerCfg{}
 
+	var err error
 	if webstring == "" {
 		serverConf.Web = promptForWeb()
 	} else {
-		serverConf.Web = parseWebstring(webstring)
+		serverConf.Web, err = config.ParseWebString(webstring)
+		CheckError(err)
 	}
 
 	if gitstring == "" {
 		serverConf.Git = promptForGit()
 	} else {
-		serverConf.Git = parseGitstring(gitstring)
+		serverConf.Git, err = config.ParseGitString(gitstring)
+		CheckError(err)
 	}
 
 	addHostKey(&serverConf.Git)
 
 	// Save to config
-	err := config.AddServerConf(alias, serverConf)
+	err = config.AddServerConf(alias, serverConf)
 	if err != nil {
 		Die("failed to update configuration file")
 	}

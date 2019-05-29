@@ -9,4 +9,10 @@ const (
 
 	// BadPort is returned when a port number is outside the valid range (1..65535)
 	BadPort = "port must be between 0 and 65535 (inclusive)"
+
+	// MissingURLScheme is returned when a string is assumed to be a URL but does not contain a scheme (missing ://)
+	MissingURLScheme = "could not determine protocol scheme (no ://)"
+
+	// MissingGitUser is returned when a string is assumed to be a git configuration but does not contain a user (missing @)
+	MissingGitUser = "could not determine git username (no @)"
 )

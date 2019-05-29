@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/G-Node/gin-cli/ginclient/log"
+	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/fatih/color"
 	"github.com/shibukawa/configdir"
 	"github.com/spf13/viper"
@@ -248,6 +251,54 @@ func Path(create bool) (string, error) {
 }
 
 // Util functions //
+
+// ParseWebString takes a string which contains all information about a
+// server's web configuration (e.g., https://gin.g-node.org:443) and returns a
+// WebCfg struct.
+func ParseWebString(webstring string) (WebCfg, error) {
+	var webconf WebCfg
+	errmsg := fmt.Sprintf("invalid web configuration line %s", webstring)
+	split := strings.SplitN(webstring, "://", 2)
+	if len(split) != 2 {
+		return webconf, fmt.Errorf("%s: %s", errmsg, ginerrors.MissingURLScheme)
+	}
+	webconf.Protocol = split[0]
+
+	split = strings.SplitN(split[1], ":", 2)
+	if len(split) != 2 {
+		return webconf, fmt.Errorf(errmsg)
+	}
+	port, err := strconv.ParseUint(split[1], 10, 16)
+	if err != nil {
+		return webconf, fmt.Errorf("%s: %s", errmsg, ginerrors.BadPort)
+	}
+	webconf.Host, webconf.Port = split[0], uint16(port)
+	return webconf, nil
+}
+
+// ParseGitString takes a string which contains all information about a
+// server's git configuration (e.g., git@gin.g-node.org:22) and returns a
+// GitCfg struct.
+func ParseGitString(gitstring string) (GitCfg, error) {
+	var gitconf GitCfg
+	errmsg := fmt.Sprintf("invalid git configuration line %s", gitstring)
+	split := strings.SplitN(gitstring, "@", 2)
+	if len(split) != 2 {
+		return gitconf, fmt.Errorf("%s: %s", errmsg, ginerrors.MissingGitUser)
+	}
+	gitconf.User = split[0]
+
+	split = strings.SplitN(split[1], ":", 2)
+	if len(split) != 2 {
+		return gitconf, fmt.Errorf(errmsg)
+	}
+	port, err := strconv.ParseUint(split[1], 10, 16)
+	if err != nil {
+		return gitconf, fmt.Errorf("%s: %s", errmsg, ginerrors.BadPort)
+	}
+	gitconf.Host, gitconf.Port = split[0], uint16(port)
+	return gitconf, nil
+}
 
 // pathExists returns true if the path exists
 func pathExists(path string) bool {
