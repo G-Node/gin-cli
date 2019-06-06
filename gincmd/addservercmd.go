@@ -132,7 +132,7 @@ See the Examples section for a full example.
 		"<alias>": "The alias (name) for the server.",
 	}
 	examples := map[string]string{
-		"This is what configuring the built-in G-Node GIN server would look like (note: this is already configured)": "$ gin add-server --web https://web.gin.g-node.org:443 --git git@git.g-node.org:22 gin",
+		"This is what configuring the built-in G-Node GIN server would look like (note: this is already configured)": "$ gin add-server --web https://web.gin.g-node.org:443 --git git@gin.g-node.org:22 gin",
 	}
 	var cmd = &cobra.Command{
 		Use:                   "add-server [--web http[s]://<hostname>[:<port>]] [--git [<gituser>@]<hostname>[:<port>]] <alias>",
