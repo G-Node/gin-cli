@@ -19,7 +19,7 @@ servers:
   gin:
     web:
       protocol: https
-      host: web.gin.g-node.org
+      host: gin.g-node.org
       port: 443
 
     git:

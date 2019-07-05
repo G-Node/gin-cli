@@ -117,7 +117,7 @@ The following information is required to configure a new server:
 For the web server: the protocol, hostname, and port
 
     The protocol should be either 'http' or 'https'.
-    The hostname for the server (e.g., web.gin.g-node.org).
+    The hostname for the server (e.g., gin.g-node.org).
     The web port for the server (e.g., 80, 443).
 
 For the git server: the git user, hostname, and port
@@ -132,7 +132,7 @@ See the Examples section for a full example.
 		"<alias>": "The alias (name) for the server.",
 	}
 	examples := map[string]string{
-		"This is what configuring the built-in G-Node GIN server would look like (note: this is already configured)": "$ gin add-server --web https://web.gin.g-node.org:443 --git git@gin.g-node.org:22 gin",
+		"This is what configuring the built-in G-Node GIN server would look like (note: this is already configured)": "$ gin add-server --web https://gin.g-node.org:443 --git git@gin.g-node.org:22 gin",
 	}
 	var cmd = &cobra.Command{
 		Use:                   "add-server [--web http[s]://<hostname>[:<port>]] [--git [<gituser>@]<hostname>[:<port>]] <alias>",

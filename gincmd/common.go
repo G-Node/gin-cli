@@ -381,7 +381,7 @@ func dependencyInfo(giterr, annexerr error) string {
 		errmsg = fmt.Sprintf("%s  %s\n", errmsg, annexerr)
 	}
 
-	helppage := "https://web.gin.g-node.org/G-Node/Info/wiki/GinCli"
+	helppage := "https://gin.g-node.org/G-Node/Info/wiki/GinCli"
 	var anchor string
 	switch runtime.GOOS {
 	case "windows":
