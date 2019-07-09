@@ -62,3 +62,8 @@ script:
           popd;
       fi;
     fi
+
+after_failure:
+  # upload logs to gist.github.com
+  - pip3 install requests
+  - python3 ./tests/scripts/pushtogist.py ./tests/log
