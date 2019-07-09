@@ -49,7 +49,7 @@ install:
   - gofmt -s -l .
 
 script:
-  - make install
+  - make testbuild
   - go test -v ./...
   - if [[ "${TRAVIS_GO_VERSION}" != "tip" ]]; then
       if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then

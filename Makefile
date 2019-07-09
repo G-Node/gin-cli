@@ -31,6 +31,10 @@ allplatforms: linux windows macos
 install: gin
 	install $(BUILDLOC)/$(GIN) $(INSTLOC)/$(GIN)
 
+testbuild: gin
+	mkdir -p $(TESTBINLOC)
+	install $(BUILDLOC)/$(GIN) $(TESTBINLOC)/$(GIN)
+
 linux: $(BUILDLOC)/linux/$(GIN)
 
 windows: $(BUILDLOC)/windows/$(GIN).exe
