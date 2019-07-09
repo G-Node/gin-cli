@@ -138,16 +138,42 @@ func printProgressWithBar(statuschan <-chan git.RepoFileStatus, nitems int) (fil
 		return printProgressOutput(statuschan)
 	}
 	ndigits := len(fmt.Sprintf("%d", nitems))
-	dfmt := fmt.Sprintf("%%%dd/%%%dd", ndigits, ndigits)
+	dfmt := fmt.Sprintf("%%%dd/%%%dd", ndigits, ndigits) // dynamic formatting string adapts to number of digits in item count
 	filesuccess = make(map[string]bool)
-	var barratio float64
-	var ncomplt int
-	linewidth := termwidth()
-	if linewidth > 80 {
-		linewidth = 80
+
+	// closure binds ndigits and nitems but keeps bar width dynamic so it can
+	// adapt to terminal resizing -- introduces a few operations per refresh,
+	// but makes the bar printing much nicer
+	printbar := func(completed int) int {
+		linewidth := termwidth()
+		if linewidth > 80 {
+			linewidth = 80
+		} else if linewidth < 30 {
+			// Skip bar printing for very small terminals
+			fmt.Println()
+			return 0
+		}
+		fullbarwidth := linewidth - (5 + ndigits*2)
+		if fullbarwidth < 0 {
+			// Again, skip bar printing if ndigits is so large that a bar would
+			// have negative width.  Since we skip printing the bar if the
+			// termwidth is < 30, this can only happen when processing more
+			// than 1e13 files, but if we ever change the min width to
+			// something smaller than 30 (or make it dynamic somehow), this
+			// guard will be useful.
+			fmt.Println()
+			return 0
+		}
+		barratio := float64(fullbarwidth) / float64(nitems)
+
+		complsigns := int(math.Floor(float64(completed) * barratio))
+		blocks := strings.Repeat("=", complsigns)
+		blanks := strings.Repeat(" ", fullbarwidth-complsigns)
+		dprg := fmt.Sprintf(dfmt, completed, nitems)
+		fmt.Printf("\n [%s%s] %s\r", blocks, blanks, dprg)
+		return linewidth
 	}
-	barwidth := linewidth - (5 + ndigits*2)
-	barratio = float64(barwidth) / float64(nitems)
+
 	outline := new(bytes.Buffer)
 	outappend := func(part string) {
 		if len(part) > 0 {
@@ -155,9 +181,18 @@ func printProgressWithBar(statuschan <-chan git.RepoFileStatus, nitems int) (fil
 			outline.WriteString(" ")
 		}
 	}
+
 	printed := false
+	prevlinewidth := 0
+	ncompleted := 0
 	for stat := range statuschan {
-		ncomplt++
+		ncompleted++
+		if ncompleted > nitems {
+			// BUG: Not sure when this occurs, but it's been happening in the
+			// CI environment for some remove-content calls and I haven't been
+			// able to reproduce - AK, 2019-07-07
+			nitems = ncompleted
+		}
 		outline.Reset()
 		outline.WriteString(" ")
 		outappend(stat.State)
@@ -172,13 +207,9 @@ func printProgressWithBar(statuschan <-chan git.RepoFileStatus, nitems int) (fil
 			filesuccess[stat.FileName] = false
 		}
 		newprint := outline.String()
-		fmt.Printf("\r%s\r", strings.Repeat(" ", linewidth)) // clear the line
+		fmt.Printf("\r%s\r", strings.Repeat(" ", prevlinewidth)) // clear the line
 		fmt.Fprint(color.Output, newprint)
-		complsigns := int(math.Floor(float64(ncomplt) * barratio))
-		blocks := strings.Repeat("=", complsigns)
-		blanks := strings.Repeat(" ", barwidth-complsigns)
-		dprg := fmt.Sprintf(dfmt, ncomplt, nitems)
-		fmt.Printf("\n [%s%s] %s\r", blocks, blanks, dprg)
+		prevlinewidth = printbar(ncompleted)
 		printed = true
 	}
 	if !printed {
