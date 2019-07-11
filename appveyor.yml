@@ -10,8 +10,16 @@ environment:
   GOPATH: C:\gopath
   BINDIR: bin
   # download dev build
-  BUNDLEURL: https://gin.g-node.org/achilleas/gin-cli-builds/raw/master/gin-cli-latest-windows-386.zip
+  BUNDLEREPO: https://web.gin.g-node.org/achilleas/gin-cli-builds/raw/master
   GIN_LOG_DIR: C:\gin-log
+
+  matrix:
+    # 32-bit
+    - arch: "386"
+
+    # 64-bit
+    - arch: "amd64"
+
 
 
 install:
@@ -19,7 +27,7 @@ install:
   # download latest stable gin-cli-windows-bundle
   - md c:\gin-bundle
   - cd c:\gin-bundle
-  - ps: Invoke-WebRequest -URI $env:BUNDLEURL -OutFile "gin-cli-bundle.zip"
+  - ps: Invoke-WebRequest -URI $env:BUNDLEREPO/gin-cli-latest-windows-$env:arch.zip -OutFile "gin-cli-bundle.zip"
   - 7z x gin-cli-bundle.zip
   - git-annex version
   # go stuff
@@ -44,6 +52,7 @@ build_script:
   - go get github.com/alecthomas/template
   - go get github.com/dustin/go-humanize
   - go vet ./...
+  - set GOARCH=%arch%
   - go build -ldflags "-X main.gincliversion=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o %GOPATH%\bin\gin.exe .
 
 before_test:
