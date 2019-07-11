@@ -108,7 +108,7 @@ func printFileStatusList(statFiles map[ginclient.FileStatus][]string) {
 		fmt.Fprintf(color.Output, "\n\t%s\n\n", cwriter(strings.Join(statFiles[status], "\n\t")))
 		summary.WriteString(fmt.Sprintf("   %s: %d", cwriter(status.Abbrev()), len(statFiles[status])))
 	}
-	fmt.Println(summary)
+	fmt.Fprintln(color.Output, summary)
 }
 
 // LsRepoCmd sets up the file 'ls' subcommand
