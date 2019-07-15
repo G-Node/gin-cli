@@ -1076,6 +1076,8 @@ func parseSyncErrors(messages string) error {
 	} else if strings.Contains(messages, "Host key verification failed") {
 		// Bad host key configured
 		return fmt.Errorf("server key does not match known host key")
+	} else if strings.Contains(messages, "rejected") { // push error: remote is ahead of local
+		return fmt.Errorf("changes were made on the server that have not been downloaded; run 'gin download' to update local copies")
 	}
 	return nil
 }
