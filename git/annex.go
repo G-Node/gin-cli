@@ -146,18 +146,6 @@ func AnnexInit(description string) error {
 	return nil
 }
 
-// parseSyncErrors should be used by all annex sync commands to check the
-// output for common error messages and return the appropriate gin message.
-func parseSyncErrors(messages string) error {
-	if strings.Contains(messages, "Permission denied") {
-		return fmt.Errorf("permission denied")
-	} else if strings.Contains(messages, "Host key verification failed") {
-		// Bad host key configured
-		return fmt.Errorf("server key does not match known host key")
-	}
-	return nil
-}
-
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // (git annex sync --no-push [--content])
 func AnnexPull(remote string) error {
@@ -190,23 +178,6 @@ func AnnexPull(remote string) error {
 		return fmt.Errorf("download failed: %s", sstderr)
 	}
 
-	return nil
-}
-
-func checkMergeErrors(stdout, stderr string) error {
-	messages := strings.ToLower(stdout + stderr)
-	if strings.Contains(messages, "would be overwritten by merge") {
-		// Untracked local file conflicts with file being pulled
-		return fmt.Errorf("local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseFilesOverwrite(messages), ", "))
-	} else if strings.Contains(messages, "unresolved conflict") {
-		// Merge conflict in git files
-		return fmt.Errorf("files changed locally and remotely and cannot be automatically merged (merge conflict):\n %s", strings.Join(parseFilesConflict(messages), ", "))
-		// abort merge
-	} else if strings.Contains(messages, "merge conflict was automatically resolved") {
-		// Merge conflict in annex files (automatically resolved by keeping both copies)
-		return fmt.Errorf("files changed locally and remotely. Both files have been kept:\n %s", strings.Join(parseFilesAnnexConflict(stdout), ", "))
-		// TODO: This should probably instead become a warning or notice, instead of a full error
-	}
 	return nil
 }
 
@@ -246,50 +217,6 @@ func AnnexSync(content bool) error {
 		return fmt.Errorf("sync failed: %s", sstderr)
 	}
 	return nil
-}
-
-func parseFilesConflict(errmsg string) []string {
-	lines := strings.Split(errmsg, "\n")
-	var filenames []string
-	delim := "merge conflict in "
-	for _, l := range lines {
-		if idx := strings.Index(l, delim); idx > -1 {
-			filenames = append(filenames, l[idx+len(delim):])
-		}
-	}
-	return filenames
-}
-
-func parseFilesAnnexConflict(errmsg string) []string {
-	lines := strings.Split(errmsg, "\n")
-	var filenames []string
-	delim := ": needs merge"
-	for _, l := range lines {
-		if idx := strings.Index(l, delim); idx > -1 {
-			filenames = append(filenames, l[0:idx])
-		}
-	}
-	return filenames
-}
-
-func parseFilesOverwrite(errmsg string) []string {
-	lines := strings.Split(errmsg, "\n")
-	var filenames []string
-	start := false
-	for _, l := range lines {
-		if strings.Contains(l, "error: the following") || strings.Contains(l, "error: your local") {
-			start = true
-			continue
-		}
-		if strings.Contains(l, "please move or remove") || strings.Contains(l, "please commit your changes") {
-			break
-		}
-		if start {
-			filenames = append(filenames, strings.TrimSpace(l))
-		}
-	}
-	return filenames
-
 }
 
 // AnnexPush uploads all changes and new content to the default remote.
@@ -1139,4 +1066,77 @@ func AnnexCommand(args ...string) shell.Cmd {
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
 	return cmd
+}
+
+// parseSyncErrors is used by all annex sync commands to check the
+// output for common error messages and return the appropriate gin message.
+func parseSyncErrors(messages string) error {
+	if strings.Contains(messages, "Permission denied") {
+		return fmt.Errorf("permission denied")
+	} else if strings.Contains(messages, "Host key verification failed") {
+		// Bad host key configured
+		return fmt.Errorf("server key does not match known host key")
+	}
+	return nil
+}
+
+func checkMergeErrors(stdout, stderr string) error {
+	messages := strings.ToLower(stdout + stderr)
+	if strings.Contains(messages, "would be overwritten by merge") {
+		// Untracked local file conflicts with file being pulled
+		return fmt.Errorf("local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseFilesOverwrite(messages), ", "))
+	} else if strings.Contains(messages, "unresolved conflict") {
+		// Merge conflict in git files
+		return fmt.Errorf("files changed locally and remotely and cannot be automatically merged (merge conflict):\n %s", strings.Join(parseFilesConflict(messages), ", "))
+		// abort merge
+	} else if strings.Contains(messages, "merge conflict was automatically resolved") {
+		// Merge conflict in annex files (automatically resolved by keeping both copies)
+		return fmt.Errorf("files changed locally and remotely. Both files have been kept:\n %s", strings.Join(parseFilesAnnexConflict(stdout), ", "))
+		// TODO: This should probably instead become a warning or notice, instead of a full error
+	}
+	return nil
+}
+
+func parseFilesConflict(errmsg string) []string {
+	lines := strings.Split(errmsg, "\n")
+	var filenames []string
+	delim := "merge conflict in "
+	for _, l := range lines {
+		if idx := strings.Index(l, delim); idx > -1 {
+			filenames = append(filenames, l[idx+len(delim):])
+		}
+	}
+	return filenames
+}
+
+func parseFilesAnnexConflict(errmsg string) []string {
+	lines := strings.Split(errmsg, "\n")
+	var filenames []string
+	delim := ": needs merge"
+	for _, l := range lines {
+		if idx := strings.Index(l, delim); idx > -1 {
+			filenames = append(filenames, l[0:idx])
+		}
+	}
+	return filenames
+}
+
+func parseFilesOverwrite(errmsg string) []string {
+	lines := strings.Split(errmsg, "\n")
+	var filenames []string
+	start := false
+	for _, l := range lines {
+		if strings.Contains(l, "error: the following") || strings.Contains(l, "error: your local") {
+			start = true
+			continue
+		}
+		if strings.Contains(l, "please move or remove") || strings.Contains(l, "please commit your changes") {
+			break
+		}
+		if start {
+			filenames = append(filenames, strings.TrimSpace(l))
+		}
+	}
+	return filenames
+
 }
