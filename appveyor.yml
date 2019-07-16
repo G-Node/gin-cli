@@ -3,14 +3,14 @@ build: off
 
 clone_folder: C:\gopath\src\github.com\G-Node\gin-cli
 
-stack: go 1.11
+stack: go 1.12
 
 environment:
   SRCDIR: C:\gopath\src\github.com\G-Node\gin-cli
   GOPATH: C:\gopath
   BINDIR: bin
   # download dev build
-  BUNDLEURL: https://web.gin.g-node.org/achilleas/gin-cli-builds/raw/master/gin-cli-latest-windows-386.zip
+  BUNDLEURL: https://gin.g-node.org/achilleas/gin-cli-builds/raw/master/gin-cli-latest-windows-386.zip
   GIN_LOG_DIR: C:\gin-log
 
 

@@ -15,10 +15,10 @@ It offers a simplified interface for downloading and uploading files from reposi
 It consists of commands for interfacing with the GIN web API (e.g., listing repositories, creating repositories, managing SSH keys) but primarily, it wraps **git** and **git-annex** commands to make working with data repositories easier.
 
 ## Information, setup, and guides
-For installation instructions see the [GIN Client Setup](https://web.gin.g-node.org/G-Node/Info/wiki/GinCliSetup) page.
+For installation instructions see the [GIN Client Setup](https://gin.g-node.org/G-Node/Info/wiki/GinCliSetup) page.
 
-General information, help, and guides for using GIN can be found on the [GIN Info Wiki](https://web.gin.g-node.org/G-Node/info/wiki).
+General information, help, and guides for using GIN can be found on the [GIN Info Wiki](https://gin.g-node.org/G-Node/info/wiki).
 Help and information for the client in particular can be on the following pages:
-- [Usage guide (tutorial)](https://web.gin.g-node.org/G-Node/Info/wiki/GinUsageTutorial)
-- [Useful recipes and short workflows](https://web.gin.g-node.org/G-Node/Info/wiki/GinCliRecipes)
-- [Detailed command overview](https://web.gin.g-node.org/G-Node/Info/wiki/GinClientHelp)
+- [Usage guide (tutorial)](https://gin.g-node.org/G-Node/Info/wiki/GinUsageTutorial)
+- [Useful recipes and short workflows](https://gin.g-node.org/G-Node/Info/wiki/GinCliRecipes)
+- [Detailed command overview](https://gin.g-node.org/G-Node/Info/wiki/GinClientHelp)

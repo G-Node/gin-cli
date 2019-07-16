@@ -26,7 +26,7 @@ var (
 	ginDefaultServer = ServerCfg{
 		WebCfg{
 			Protocol: "https",
-			Host:     "web.gin.g-node.org",
+			Host:     "gin.g-node.org",
 			Port:     443,
 		},
 		GitCfg{
@@ -64,7 +64,7 @@ type WebCfg struct {
 }
 
 // AddressStr constructs a full address string from the configuration.
-// The string has the format Scheme://Host:Port (e.g., https://web.gin.g-node.org:443)
+// The string has the format Scheme://Host:Port (e.g., https://gin.g-node.org:443)
 func (c WebCfg) AddressStr() string {
 	return fmt.Sprintf("%s://%s:%d", c.Protocol, c.Host, c.Port)
 }

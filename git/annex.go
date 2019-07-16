@@ -152,47 +152,32 @@ func AnnexPull(remote string) error {
 	args := []string{"sync", "--verbose", "--no-push", "--no-commit", remote}
 	cmd := AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
-	cmd.Wait()
 	sstdout := string(stdout)
 	sstderr := string(stderr)
-	if err != nil {
-		log.Write("Error during AnnexPull.")
-		log.Write("[Error]: %v", err)
-		logstd(stdout, stderr)
-		mergeAbort() // abort a potential failed merge attempt
-		// TODO: Use giterror
-		if strings.Contains(sstderr, "Permission denied") {
-			return fmt.Errorf("download failed: permission denied")
-		} else if strings.Contains(sstderr, "Host key verification failed") {
-			// Bad host key configured
-			return fmt.Errorf("download failed: server key does not match known host key")
-		} else {
-			err = checkMergeErrors(sstdout, sstderr)
-			if err == nil {
-				err = fmt.Errorf("failed")
-			}
-			return err
-		}
+
+	// some errors don't return with an error status, so we need to check
+	// stderr for common error strings
+	if err := parseSyncErrors(sstderr); err != nil {
+		return fmt.Errorf("download failed: %v", err)
 	}
 
 	// some conflicts are resolved automatically and don't produce an error in some combinations
-	return checkMergeErrors(sstdout, sstderr)
-}
-
-func checkMergeErrors(stdout, stderr string) error {
-	messages := strings.ToLower(stdout + stderr)
-	if strings.Contains(messages, "would be overwritten by merge") {
-		// Untracked local file conflicts with file being pulled
-		return fmt.Errorf("download failed: local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseFilesOverwrite(messages), ", "))
-	} else if strings.Contains(messages, "unresolved conflict") {
-		// Merge conflict in git files
-		return fmt.Errorf("download failed: files changed locally and remotely and cannot be automatically merged (merge conflict):\n %s", strings.Join(parseFilesConflict(messages), ", "))
-		// abort merge
-	} else if strings.Contains(messages, "merge conflict was automatically resolved") {
-		// Merge conflict in annex files (automatically resolved by keeping both copies)
-		return fmt.Errorf("files changed locally and remotely. Both files have been kept:\n %s", strings.Join(parseFilesAnnexConflict(stdout), ", "))
-		// TODO: This should probably instead become a warning or notice, instead of a full error
+	if err := checkMergeErrors(sstdout, sstderr); err != nil {
+		mergeAbort() // abort a potential failed merge attempt
+		return fmt.Errorf("download failed: %v", err)
 	}
+
+	if err != nil { // command actually failed
+		log.Write("Error during AnnexPull")
+		log.Write("[Error]: %v", err)
+		logstd(stdout, stderr)
+		mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
+
+		// since we don't know what the error was, show the internal annex sync
+		// error to the user
+		return fmt.Errorf("download failed: %s", sstderr)
+	}
+
 	return nil
 }
 
@@ -206,58 +191,32 @@ func AnnexSync(content bool) error {
 	}
 	cmd := AnnexCommand(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
-	cmd.Wait()
-	if err != nil {
-		log.Write("Error during AnnexSync.")
+	sstdout := string(stdout)
+	sstderr := string(stderr)
+
+	// some errors don't return with an error status, so we need to check
+	// stderr for common error strings
+	if err := parseSyncErrors(sstderr); err != nil {
+		return fmt.Errorf("sync failed: %v", err)
+	}
+
+	// some conflicts are resolved automatically and don't produce an error in some combinations
+	if err := checkMergeErrors(sstdout, sstderr); err != nil {
+		mergeAbort() // abort a potential failed merge attempt
+		return fmt.Errorf("sync failed: %v", err)
+	}
+
+	if err != nil { // command actually failed
+		log.Write("Error during AnnexSync")
 		log.Write("[Error]: %v", err)
 		logstd(stdout, stderr)
-		return fmt.Errorf(string(stderr))
+		mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
+
+		// since we don't know what the error was, show the internal annex sync
+		// error to the user
+		return fmt.Errorf("sync failed: %s", sstderr)
 	}
 	return nil
-}
-
-func parseFilesConflict(errmsg string) []string {
-	lines := strings.Split(errmsg, "\n")
-	var filenames []string
-	delim := "merge conflict in "
-	for _, l := range lines {
-		if idx := strings.Index(l, delim); idx > -1 {
-			filenames = append(filenames, l[idx+len(delim):])
-		}
-	}
-	return filenames
-}
-
-func parseFilesAnnexConflict(errmsg string) []string {
-	lines := strings.Split(errmsg, "\n")
-	var filenames []string
-	delim := ": needs merge"
-	for _, l := range lines {
-		if idx := strings.Index(l, delim); idx > -1 {
-			filenames = append(filenames, l[0:idx])
-		}
-	}
-	return filenames
-}
-
-func parseFilesOverwrite(errmsg string) []string {
-	lines := strings.Split(errmsg, "\n")
-	var filenames []string
-	start := false
-	for _, l := range lines {
-		if strings.Contains(l, "error: the following") || strings.Contains(l, "error: your local") {
-			start = true
-			continue
-		}
-		if strings.Contains(l, "please move or remove") || strings.Contains(l, "please commit your changes") {
-			break
-		}
-		if start {
-			filenames = append(filenames, strings.TrimSpace(l))
-		}
-	}
-	return filenames
-
 }
 
 // AnnexPush uploads all changes and new content to the default remote.
@@ -267,20 +226,24 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 	defer close(pushchan)
 	cmd := AnnexCommand("sync", "--verbose", "--no-pull", "--no-commit", remote) // NEVER commit changes when doing annex-sync
 	stdout, stderr, err := cmd.OutputError()
-	if err != nil {
-		log.Write("Error during AnnexPush (sync --no-pull)")
+	sstderr := string(stderr)
+
+	// some errors don't return with an error status, so we need to check
+	// stderr for common error strings
+	if err := parseSyncErrors(sstderr); err != nil {
+		pushchan <- RepoFileStatus{Err: fmt.Errorf("upload failed: %v", err)}
+		return
+	}
+
+	if err != nil { // command actually failed
+		log.Write("Error during AnnexPush")
 		log.Write("[Error]: %v", err)
 		logstd(stdout, stderr)
-		errmsg := "failed"
-		sstderr := string(stderr)
-		if strings.Contains(sstderr, "Permission denied") {
-			errmsg = "upload failed: permission denied"
-		} else if strings.Contains(sstderr, "Host key verification failed") {
-			errmsg = "upload failed: server key does not match known host key"
-		} else if strings.Contains(sstderr, "rejected") {
-			errmsg = "upload failed: changes were made on the server that have not been downloaded; run 'gin download' to update local copies"
-		}
-		pushchan <- RepoFileStatus{Err: fmt.Errorf(errmsg)}
+		mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
+
+		// since we don't know what the error was, show the internal annex sync
+		// error to the user
+		pushchan <- RepoFileStatus{Err: fmt.Errorf(sstderr)}
 		return
 	}
 
@@ -1103,4 +1066,79 @@ func AnnexCommand(args ...string) shell.Cmd {
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
 	return cmd
+}
+
+// parseSyncErrors is used by all annex sync commands to check the
+// output for common error messages and return the appropriate gin message.
+func parseSyncErrors(messages string) error {
+	if strings.Contains(messages, "Permission denied") {
+		return fmt.Errorf("permission denied")
+	} else if strings.Contains(messages, "Host key verification failed") {
+		// Bad host key configured
+		return fmt.Errorf("server key does not match known host key")
+	} else if strings.Contains(messages, "rejected") { // push error: remote is ahead of local
+		return fmt.Errorf("changes were made on the server that have not been downloaded; run 'gin download' to update local copies")
+	}
+	return nil
+}
+
+func checkMergeErrors(stdout, stderr string) error {
+	messages := strings.ToLower(stdout + stderr)
+	if strings.Contains(messages, "would be overwritten by merge") {
+		// Untracked local file conflicts with file being pulled
+		return fmt.Errorf("local modified or untracked files would be overwritten by download:\n  %s", strings.Join(parseFilesOverwrite(messages), ", "))
+	} else if strings.Contains(messages, "unresolved conflict") {
+		// Merge conflict in git files
+		return fmt.Errorf("files changed locally and remotely and cannot be automatically merged (merge conflict):\n %s", strings.Join(parseFilesConflict(messages), ", "))
+		// abort merge
+	} else if strings.Contains(messages, "merge conflict was automatically resolved") {
+		// Merge conflict in annex files (automatically resolved by keeping both copies)
+		return fmt.Errorf("files changed locally and remotely. Both files have been kept:\n %s", strings.Join(parseFilesAnnexConflict(stdout), ", "))
+		// TODO: This should probably instead become a warning or notice, instead of a full error
+	}
+	return nil
+}
+
+func parseFilesConflict(errmsg string) []string {
+	lines := strings.Split(errmsg, "\n")
+	var filenames []string
+	delim := "merge conflict in "
+	for _, l := range lines {
+		if idx := strings.Index(l, delim); idx > -1 {
+			filenames = append(filenames, l[idx+len(delim):])
+		}
+	}
+	return filenames
+}
+
+func parseFilesAnnexConflict(errmsg string) []string {
+	lines := strings.Split(errmsg, "\n")
+	var filenames []string
+	delim := ": needs merge"
+	for _, l := range lines {
+		if idx := strings.Index(l, delim); idx > -1 {
+			filenames = append(filenames, l[0:idx])
+		}
+	}
+	return filenames
+}
+
+func parseFilesOverwrite(errmsg string) []string {
+	lines := strings.Split(errmsg, "\n")
+	var filenames []string
+	start := false
+	for _, l := range lines {
+		if strings.Contains(l, "error: the following") || strings.Contains(l, "error: your local") {
+			start = true
+			continue
+		}
+		if strings.Contains(l, "please move or remove") || strings.Contains(l, "please commit your changes") {
+			break
+		}
+		if start {
+			filenames = append(filenames, strings.TrimSpace(l))
+		}
+	}
+	return filenames
+
 }
