@@ -2,6 +2,16 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.9
+
+### Changes
+- Default address for GIN server is now `gin.g-node.org`.  The old web address, `web.gin.g-node.org` still works but will be unavailable in the future.
+- 64-bit version for Windows now available.  This version is necessary for managing files larger than 4 GiB.
+
+### Relevant PRs
+- #266: Changing web addresses to gin.g-node.org
+- #267: Package 64-bit version for Windows
+
 ## Version 1.8
 
 ### Changes
