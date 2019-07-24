@@ -169,7 +169,7 @@ def check_macos_tarball():
     """
     Checks if git-annex tarball is in the download location
     """
-    path = "./dist/downloads/git-annex-latest.tar.bz2"
+    path = "./dist/downloads/git-annex-latest-macos.tar.bz2"
     if os.path.exists(path):
         print(f"Found {path}")
         return path
@@ -442,7 +442,7 @@ def package_mac_bundle(binfile, annex_tar):
                     os.path.join(macosdir, "launch"))
 
         # create the archive
-        cmd = ["tar", "-cvf", arc_abs, "-C", pkgroot, "."]
+        cmd = ["tar", "-czf", arc_abs, "-C", pkgroot, "."]
         print(f"Running {' '.join(cmd)} (from {pkgroot})")
         if run(cmd, stdout=DEVNULL) > 0:
             print(f"Failed to create archive {archive} in {pkgroot}",
