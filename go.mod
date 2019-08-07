@@ -6,7 +6,6 @@ require (
 	cloud.google.com/go v0.41.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
-	github.com/Sirupsen/logrus v1.4.2 // indirect
 	github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc
 	github.com/bbrks/wrap v2.3.0+incompatible
 	github.com/coreos/bbolt v1.3.3 // indirect
@@ -36,6 +35,7 @@ require (
 	github.com/rogpeppe/fastuuid v1.2.0 // indirect
 	github.com/russross/blackfriday v2.0.0+incompatible // indirect
 	github.com/shibukawa/configdir v0.0.0-20170330084843-e180dbdc8da0
+	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cobra v0.0.5
@@ -57,5 +57,3 @@ require (
 	google.golang.org/grpc v1.22.0 // indirect
 	honnef.co/go/tools v0.0.0-20190607002114-91b34a6dad6c // indirect
 )
-
-replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
