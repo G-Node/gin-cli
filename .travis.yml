@@ -22,15 +22,14 @@ matrix:
         homebrew:
           packages:
             - python3
+            - git-annex
+          update: true
   allow_failures:
     - go: tip
 
 before_install:
   - if [[ "${TRAVIS_OS_NAME}" != "osx" ]]; then
       pyenv global 3.7.1;
-    else
-      brew update;
-      brew install git-annex;
     fi
   - pip3 install --user pytest pyyaml
 
