@@ -965,6 +965,7 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			addchan <- status
 			continue
 		}
+		addresult = annexAction{} // clear existing result
 		err := json.Unmarshal(outline, &addresult)
 		if err != nil || addresult.Command == "" {
 			// Couldn't parse output
