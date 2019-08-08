@@ -20,8 +20,8 @@ const addedToGitNote = "non-large file; adding content to git repository"
 
 // Git annex commands
 
-// Determine if json or normal command is used
-var JsonBool bool = true
+// RawMode disables --json output for annex commands
+var RawMode bool = false
 
 // Types (private)
 type annexAction struct {
@@ -266,11 +266,11 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 	}
 
 	var args []string
-	if JsonBool {
-		args = []string{"copy", "--json-progress", fmt.Sprintf("--to=%s", remote)}
-	} else {
-		args = []string{"copy", "--verbose", fmt.Sprintf("--to=%s", remote)}
+	outflag := "--json-progress"
+	if RawMode {
+		outflag = "--verbose"
 	}
+	args = []string{"copy", outflag, fmt.Sprintf("--to=%s", remote)}
 	if len(paths) == 0 {
 		paths = []string{"--all"}
 	}
@@ -303,7 +303,7 @@ func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
 			// skip empty lines
 			continue
 		}
-		if !JsonBool {
+		if RawMode {
 			status.RawOutput = string(outline)
 			lineInput := cmd.Args
 			input := strings.Join(lineInput, " ")
@@ -397,7 +397,7 @@ func baseAnnexGet(cmdargs []string, getchan chan<- RepoFileStatus) {
 			continue
 		}
 
-		if !JsonBool {
+		if RawMode {
 			lineInput := cmd.Args
 			input := strings.Join(lineInput, " ")
 			status.RawInput = input
@@ -457,12 +457,11 @@ func baseAnnexGet(cmdargs []string, getchan chan<- RepoFileStatus) {
 // (git annex get)
 func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
 	defer close(getchan)
-	var cmdargs []string
-	if JsonBool {
-		cmdargs = append([]string{"get", "--json-progress"}, filepaths...)
-	} else {
-		cmdargs = append([]string{"get"}, filepaths...)
+	cmdargs := []string{"get"}
+	if !RawMode {
+		cmdargs = append(cmdargs, "--json-progress")
 	}
+	cmdargs = append(cmdargs, filepaths...)
 	baseAnnexGet(cmdargs, getchan)
 }
 
@@ -481,12 +480,12 @@ func AnnexGetKey(key string, getchan chan<- RepoFileStatus) {
 // (git annex drop)
 func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 	defer close(dropchan)
-	var cmdargs []string
-	if JsonBool {
-		cmdargs = append([]string{"drop", "--json"}, filepaths...)
-	} else {
-		cmdargs = append([]string{"drop"}, filepaths...)
+	cmdargs := []string{"drop"}
+	if !RawMode {
+		cmdargs = append(cmdargs, "--json")
 	}
+	cmdargs = append(cmdargs, filepaths...)
+
 	cmd := AnnexCommand(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
@@ -512,7 +511,7 @@ func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
 			continue
 		}
 
-		if !JsonBool {
+		if RawMode {
 			lineInput := cmd.Args
 			input := strings.Join(lineInput, " ")
 			status.RawInput = input
@@ -677,11 +676,9 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 		log.Write("No paths to lock. Nothing to do.")
 		return
 	}
-	var cmdargs []string
-	if JsonBool {
-		cmdargs = []string{"lock", "--json-error-messages"}
-	} else {
-		cmdargs = []string{"lock"}
+	cmdargs := []string{"lock"}
+	if !RawMode {
+		cmdargs = append(cmdargs, "--json-error-messages")
 	}
 
 	cmdargs = append(cmdargs, filepaths...)
@@ -704,7 +701,7 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 			// Empty line output. Ignore
 			continue
 		}
-		if !JsonBool {
+		if RawMode {
 			status.RawOutput = string(outline)
 			lineInput := cmd.Args
 			input := strings.Join(lineInput, " ")
@@ -760,11 +757,9 @@ func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
 // (git annex unlock)
 func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 	defer close(unlockchan)
-	var cmdargs []string
-	if JsonBool {
-		cmdargs = []string{"unlock", "--json"}
-	} else {
-		cmdargs = []string{"unlock"}
+	cmdargs := []string{"unlock"}
+	if !RawMode {
+		cmdargs = append(cmdargs, "--json")
 	}
 	cmdargs = append(cmdargs, filepaths...)
 	cmd := AnnexCommand(cmdargs...)
@@ -785,7 +780,7 @@ func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
 			// Empty line output. Ignore
 			continue
 		}
-		if !JsonBool {
+		if RawMode {
 			lineInput := cmd.Args
 			input := strings.Join(lineInput, " ")
 			status.RawInput = input
@@ -934,11 +929,9 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		log.Write("No paths to add to annex. Nothing to do.")
 		return
 	}
-	var cmdargs []string
-	if JsonBool {
-		cmdargs = []string{"add", "--json"}
-	} else {
-		cmdargs = []string{"add"}
+	cmdargs := []string{"add"}
+	if !RawMode {
+		cmdargs = append(cmdargs, "--json")
 	}
 	exclargs := annexExclArgs()
 	if len(exclargs) > 0 {
@@ -964,7 +957,7 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 			// Empty line output. Ignore
 			continue
 		}
-		if !JsonBool {
+		if RawMode {
 			status.RawOutput = string(outline)
 			lineInput := cmd.Args
 			input := strings.Join(lineInput, " ")

@@ -315,7 +315,7 @@ func determinePrintStyle(cmd *cobra.Command) printstyle {
 	case verboseOn && jsonOn:
 		Die("--verbose and --json cannot be used together")
 	case verboseOn:
-		git.JsonBool = false
+		git.RawMode = true
 		return psVerbose
 	case jsonOn:
 		return psJSON
