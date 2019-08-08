@@ -8,6 +8,7 @@ stack: go 1.12
 environment:
   SRCDIR: C:\gopath\src\github.com\G-Node\gin-cli
   GOPATH: C:\gopath
+  GOPROXY: https://proxy.golang.org
   BINDIR: bin
   # download dev build
   BUNDLEREPO: https://gin.g-node.org/achilleas/gin-cli-builds/raw/master
