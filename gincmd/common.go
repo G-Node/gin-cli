@@ -196,7 +196,7 @@ func printProgressWithBar(statuschan <-chan git.RepoFileStatus, nitems int) (fil
 		outline.Reset()
 		outline.WriteString(" ")
 		outappend(stat.State)
-		outappend(stat.FileName)
+		outappend(fmt.Sprintf("%q", stat.FileName))
 		if stat.Err == nil {
 			if stat.Progress == "100%" {
 				outappend(green("OK"))
@@ -247,7 +247,7 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 			state = stat.State
 		}
 		outappend(stat.State)
-		outappend(stat.FileName)
+		outappend(fmt.Sprintf("%q", stat.FileName))
 		if stat.Err == nil {
 			if stat.Progress == "100%" {
 				outappend(green("OK"))
