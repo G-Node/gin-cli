@@ -14,6 +14,10 @@ import (
 	"github.com/G-Node/gin-cli/git/shell"
 )
 
+// The following appears in the 'note' field when a file is added to git
+// instead of annex
+const addedToGitNote = "non-large file; adding content to git repository"
+
 // Git annex commands
 
 // Determine if json or normal command is used
@@ -954,7 +958,6 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 	var status RepoFileStatus
 	var addresult annexAction
 	// NOTE Can differentiate "git" and "annex" files from note in JSON struct
-	status.State = "Adding"
 	var filenames []string
 	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
 		if len(outline) == 0 {
@@ -983,7 +986,13 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		status.RawInput = input
 		status.RawOutput = string(outline)
 		if addresult.Success {
-			log.Write("%s added to annex", addresult.File)
+			if addresult.Note == addedToGitNote {
+				status.State = "Added to git"
+				log.Write("%s added to git", addresult.File)
+			} else {
+				status.State = "Added to annex"
+				log.Write("%s added to annex", addresult.File)
+			}
 			status.Err = nil
 			filenames = append(filenames, status.FileName)
 		} else {
