@@ -22,7 +22,7 @@ import (
 // High level functions for managing repositories.
 // These functions either end up performing web calls (using the web package) or git shell commands (using the git package).
 
-const unknownhostname = "(unknown)"
+const unknownhostname = "(unknownhost)"
 
 // Types
 
