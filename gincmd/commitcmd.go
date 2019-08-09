@@ -31,8 +31,7 @@ func commit(cmd *cobra.Command, args []string) {
 		if prStyle == psDefault {
 			fmt.Println(":: Adding file changes")
 		}
-		addchan := make(chan git.RepoFileStatus)
-		go ginclient.Add(paths, addchan)
+		addchan := ginclient.Add(paths)
 		formatOutput(addchan, prStyle, 0)
 	}
 

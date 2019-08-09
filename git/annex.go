@@ -226,329 +226,335 @@ func AnnexSync(content bool) error {
 // AnnexPush uploads all changes and new content to the default remote.
 // The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull; git annex copy --to=<defaultremote>)
-func AnnexPush(paths []string, remote string, pushchan chan<- RepoFileStatus) {
-	defer close(pushchan)
-	cmd := AnnexCommand("sync", "--verbose", "--no-pull", "--no-commit", remote) // NEVER commit changes when doing annex-sync
-	stdout, stderr, err := cmd.OutputError()
-	sstderr := string(stderr)
+func AnnexPush(paths []string, remote string) chan RepoFileStatus {
+	pushchan := make(chan RepoFileStatus)
+	go func() {
+		defer close(pushchan)
+		cmd := AnnexCommand("sync", "--verbose", "--no-pull", "--no-commit", remote) // NEVER commit changes when doing annex-sync
+		stdout, stderr, err := cmd.OutputError()
+		sstderr := string(stderr)
 
-	// some errors don't return with an error status, so we need to check
-	// stderr for common error strings
-	if err := parseSyncErrors(sstderr); err != nil {
-		pushchan <- RepoFileStatus{Err: fmt.Errorf("upload failed: %v", err)}
-		return
-	}
-
-	if err != nil { // command actually failed
-		log.Write("Error during AnnexPush")
-		log.Write("[Error]: %v", err)
-		logstd(stdout, stderr)
-		mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
-
-		// since we don't know what the error was, show the internal annex sync
-		// error to the user
-		pushchan <- RepoFileStatus{Err: fmt.Errorf(sstderr)}
-		return
-	}
-
-	// check which files are annexed
-	wichan := make(chan AnnexWhereisRes)
-	go AnnexWhereis(paths, wichan)
-
-	// collect annex paths for annex copy command
-	annexpaths := make([]string, 0, len(paths))
-	for info := range wichan {
-		annexpaths = append(annexpaths, info.File)
-	}
-
-	if len(annexpaths) == 0 {
-		return
-	}
-
-	var args []string
-	outflag := "--json-progress"
-	if RawMode {
-		outflag = "--verbose"
-	}
-	args = []string{"copy", outflag, fmt.Sprintf("--to=%s", remote)}
-	if len(paths) == 0 {
-		paths = []string{"--all"}
-	}
-	args = append(args, paths...)
-
-	cmd = AnnexCommand(args...)
-	err = cmd.Start()
-	if err != nil {
-		pushchan <- RepoFileStatus{Err: err}
-		return
-	}
-
-	var status RepoFileStatus
-	status.State = fmt.Sprintf("Uploading (to: %s)", remote)
-
-	var outline []byte
-	var rerr error
-	var progress annexProgress
-	var getresult annexAction
-
-	var prevByteProgress int
-	var prevT time.Time
-
-	// 'git-annex copy --all' copies all local keys to the server.
-	// When no filenames are specified, the command doesn't print filenames, just keys.
-	// getAnnexMetadataName gives us the original filename and the time it was set.
-	var currentkey = ""
-	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
-		if len(outline) == 0 {
-			// skip empty lines
-			continue
+		// some errors don't return with an error status, so we need to check
+		// stderr for common error strings
+		if err := parseSyncErrors(sstderr); err != nil {
+			pushchan <- RepoFileStatus{Err: fmt.Errorf("upload failed: %v", err)}
+			return
 		}
+
+		if err != nil { // command actually failed
+			log.Write("Error during AnnexPush")
+			log.Write("[Error]: %v", err)
+			logstd(stdout, stderr)
+			mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
+
+			// since we don't know what the error was, show the internal annex sync
+			// error to the user
+			pushchan <- RepoFileStatus{Err: fmt.Errorf(sstderr)}
+			return
+		}
+
+		// check which files are annexed
+		wichan := AnnexWhereis(paths)
+
+		// collect annex paths for annex copy command
+		annexpaths := make([]string, 0, len(paths))
+		for info := range wichan {
+			annexpaths = append(annexpaths, info.File)
+		}
+
+		if len(annexpaths) == 0 {
+			return
+		}
+
+		var args []string
+		outflag := "--json-progress"
 		if RawMode {
-			status.RawOutput = string(outline)
-			lineInput := cmd.Args
-			input := strings.Join(lineInput, " ")
-			status.RawInput = input
-			pushchan <- status
-			continue
+			outflag = "--verbose"
 		}
-		err := json.Unmarshal(outline, &progress)
-		if err != nil || progress.Action.Command == "" {
-			time.Sleep(1 * time.Second)
-			// File done? Check if succeeded and continue to next line
-			err = json.Unmarshal(outline, &getresult)
-			if err != nil || getresult.Command == "" {
-				// Couldn't parse output
-				log.Write("Could not parse 'git annex copy' output")
-				log.Write(string(outline))
-				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+		args = []string{"copy", outflag, fmt.Sprintf("--to=%s", remote)}
+		if len(paths) == 0 {
+			paths = []string{"--all"}
+		}
+		args = append(args, paths...)
+
+		cmd = AnnexCommand(args...)
+		err = cmd.Start()
+		if err != nil {
+			pushchan <- RepoFileStatus{Err: err}
+			return
+		}
+
+		var status RepoFileStatus
+		status.State = fmt.Sprintf("Uploading (to: %s)", remote)
+
+		var outline []byte
+		var rerr error
+		var progress annexProgress
+		var getresult annexAction
+
+		var prevByteProgress int
+		var prevT time.Time
+
+		// 'git-annex copy --all' copies all local keys to the server.
+		// When no filenames are specified, the command doesn't print filenames, just keys.
+		// getAnnexMetadataName gives us the original filename and the time it was set.
+		var currentkey = ""
+		for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+			if len(outline) == 0 {
+				// skip empty lines
 				continue
 			}
-			status.FileName = getresult.File
-			if getresult.Success {
-				status.Progress = progcomplete
-				status.Err = nil
-			} else {
-				errmsg := getresult.Note
-				if strings.Contains(errmsg, "Unable to access") {
-					errmsg = "authorisation failed or remote storage unavailable"
-				}
-				status.Err = fmt.Errorf("failed: %s", errmsg)
+			if RawMode {
+				status.RawOutput = string(outline)
+				lineInput := cmd.Args
+				input := strings.Join(lineInput, " ")
+				status.RawInput = input
+				pushchan <- status
+				continue
 			}
-		} else {
-			key := progress.Action.Key
-			if currentkey != key {
-				if md := getAnnexMetadataName(key); md.FileName != "" {
-					timestamp := md.ModTime.Format("2006-01-02 15:04:05")
-					status.FileName = fmt.Sprintf("%s (version: %s)", md.FileName, timestamp)
+			err := json.Unmarshal(outline, &progress)
+			if err != nil || progress.Action.Command == "" {
+				time.Sleep(1 * time.Second)
+				// File done? Check if succeeded and continue to next line
+				err = json.Unmarshal(outline, &getresult)
+				if err != nil || getresult.Command == "" {
+					// Couldn't parse output
+					log.Write("Could not parse 'git annex copy' output")
+					log.Write(string(outline))
+					// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+					continue
+				}
+				status.FileName = getresult.File
+				if getresult.Success {
+					status.Progress = progcomplete
+					status.Err = nil
 				} else {
-					status.FileName = "(unknown)"
+					errmsg := getresult.Note
+					if strings.Contains(errmsg, "Unable to access") {
+						errmsg = "authorisation failed or remote storage unavailable"
+					}
+					status.Err = fmt.Errorf("failed: %s", errmsg)
 				}
-				currentkey = key
+			} else {
+				key := progress.Action.Key
+				if currentkey != key {
+					if md := getAnnexMetadataName(key); md.FileName != "" {
+						timestamp := md.ModTime.Format("2006-01-02 15:04:05")
+						status.FileName = fmt.Sprintf("%s (version: %s)", md.FileName, timestamp)
+					} else {
+						status.FileName = "(unknown)"
+					}
+					currentkey = key
+				}
+				// otherwise the same name as before is used
+				status.Progress = progress.PercentProgress
+
+				dbytes := progress.ByteProgress - prevByteProgress
+				now := time.Now()
+				dt := now.Sub(prevT)
+				status.Rate = calcRate(dbytes, dt)
+				prevByteProgress = progress.ByteProgress
+				prevT = now
+				status.Err = nil
 			}
-			// otherwise the same name as before is used
-			status.Progress = progress.PercentProgress
 
-			dbytes := progress.ByteProgress - prevByteProgress
-			now := time.Now()
-			dt := now.Sub(prevT)
-			status.Rate = calcRate(dbytes, dt)
-			prevByteProgress = progress.ByteProgress
-			prevT = now
-			status.Err = nil
+			// Don't push message if no filename was set
+			if status.FileName != "" {
+				pushchan <- status
+			}
 		}
-
-		// Don't push message if no filename was set
-		if status.FileName != "" {
-			pushchan <- status
+		if cmd.Wait() != nil {
+			var stderr, errline []byte
+			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+				stderr = append(stderr, errline...)
+			}
+			log.Write("Error during AnnexPush")
+			log.Write(string(stderr))
+			pushchan <- RepoFileStatus{Err: fmt.Errorf(string(stderr))}
 		}
-	}
-	if cmd.Wait() != nil {
-		var stderr, errline []byte
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
-		}
-		log.Write("Error during AnnexPush")
-		log.Write(string(stderr))
-		pushchan <- RepoFileStatus{Err: fmt.Errorf(string(stderr))}
-	}
-	return
+	}()
+	return pushchan
 }
 
-func baseAnnexGet(cmdargs []string, getchan chan<- RepoFileStatus) {
-	cmd := AnnexCommand(cmdargs...)
-	if err := cmd.Start(); err != nil {
-		getchan <- RepoFileStatus{Err: err}
-		return
-	}
-
-	var status RepoFileStatus
-	status.State = "Downloading"
-
-	var outline []byte
-	var rerr error
-	var progress annexProgress
-	var getresult annexAction
-	var prevByteProgress int
-	var prevT time.Time
-
-	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
-		if len(outline) == 0 {
-			// skip empty lines
-			continue
+func baseAnnexGet(cmdargs []string) chan RepoFileStatus {
+	getchan := make(chan RepoFileStatus)
+	go func() {
+		defer close(getchan)
+		cmd := AnnexCommand(cmdargs...)
+		if err := cmd.Start(); err != nil {
+			getchan <- RepoFileStatus{Err: err}
+			return
 		}
 
-		if RawMode {
-			lineInput := cmd.Args
-			input := strings.Join(lineInput, " ")
-			status.RawInput = input
-			status.RawOutput = string(outline)
-			getchan <- status
-			continue
-		}
-		err := json.Unmarshal(outline, &progress)
-		if err != nil || progress.Action.Command == "" {
-			// File done? Check if succeeded and continue to next line
-			err = json.Unmarshal(outline, &getresult)
-			if err != nil || getresult.Command == "" {
-				// Couldn't parse output
-				log.Write("Could not parse 'git annex get' output")
-				log.Write(string(outline))
-				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+		var status RepoFileStatus
+		status.State = "Downloading"
+
+		var outline []byte
+		var rerr error
+		var progress annexProgress
+		var getresult annexAction
+		var prevByteProgress int
+		var prevT time.Time
+
+		for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+			if len(outline) == 0 {
+				// skip empty lines
 				continue
 			}
-			status.FileName = getresult.File
-			if getresult.Success {
-				status.Progress = progcomplete
-				status.Err = nil
-			} else {
-				errmsg := getresult.Note
-				if strings.Contains(errmsg, "Unable to access") {
-					errmsg = "authorisation failed or remote storage unavailable"
-				}
-				status.Err = fmt.Errorf("failed: %s", errmsg)
-			}
-		} else {
-			status.FileName = progress.Action.File
-			status.Progress = progress.PercentProgress
-			dbytes := progress.ByteProgress - prevByteProgress
-			now := time.Now()
-			dt := now.Sub(prevT)
-			status.Rate = calcRate(dbytes, dt)
-			prevByteProgress = progress.ByteProgress
-			prevT = now
-			status.Err = nil
-		}
 
-		getchan <- status
-	}
-	if cmd.Wait() != nil {
-		var stderr, errline []byte
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
+			if RawMode {
+				lineInput := cmd.Args
+				input := strings.Join(lineInput, " ")
+				status.RawInput = input
+				status.RawOutput = string(outline)
+				getchan <- status
+				continue
+			}
+			err := json.Unmarshal(outline, &progress)
+			if err != nil || progress.Action.Command == "" {
+				// File done? Check if succeeded and continue to next line
+				err = json.Unmarshal(outline, &getresult)
+				if err != nil || getresult.Command == "" {
+					// Couldn't parse output
+					log.Write("Could not parse 'git annex get' output")
+					log.Write(string(outline))
+					// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+					continue
+				}
+				status.FileName = getresult.File
+				if getresult.Success {
+					status.Progress = progcomplete
+					status.Err = nil
+				} else {
+					errmsg := getresult.Note
+					if strings.Contains(errmsg, "Unable to access") {
+						errmsg = "authorisation failed or remote storage unavailable"
+					}
+					status.Err = fmt.Errorf("failed: %s", errmsg)
+				}
+			} else {
+				status.FileName = progress.Action.File
+				status.Progress = progress.PercentProgress
+				dbytes := progress.ByteProgress - prevByteProgress
+				now := time.Now()
+				dt := now.Sub(prevT)
+				status.Rate = calcRate(dbytes, dt)
+				prevByteProgress = progress.ByteProgress
+				prevT = now
+				status.Err = nil
+			}
+
+			getchan <- status
 		}
-		log.Write("Error during AnnexGet")
-		log.Write(string(stderr))
-	}
-	return
+		if cmd.Wait() != nil {
+			var stderr, errline []byte
+			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+				stderr = append(stderr, errline...)
+			}
+			log.Write("Error during AnnexGet")
+			log.Write(string(stderr))
+		}
+	}()
+	return getchan
 }
 
 // AnnexGet retrieves the content of specified files.
 // The status channel 'getchan' is closed when this function returns.
 // (git annex get)
-func AnnexGet(filepaths []string, getchan chan<- RepoFileStatus) {
-	defer close(getchan)
+func AnnexGet(filepaths []string) chan RepoFileStatus {
 	cmdargs := []string{"get"}
 	if !RawMode {
 		cmdargs = append(cmdargs, "--json-progress")
 	}
 	cmdargs = append(cmdargs, filepaths...)
-	baseAnnexGet(cmdargs, getchan)
+	return baseAnnexGet(cmdargs)
 }
 
 // AnnexGetKey retrieves the content of a single specified key.
 // The status channel 'getchan' is closed when this function returns.
 // (git annex get)
-func AnnexGetKey(key string, getchan chan<- RepoFileStatus) {
-	defer close(getchan)
+func AnnexGetKey(key string) chan RepoFileStatus {
 	cmdargs := []string{"get", "--json-progress", fmt.Sprintf("--key=%s", key)}
-	baseAnnexGet(cmdargs, getchan)
-	return
+	return baseAnnexGet(cmdargs)
 }
 
 // AnnexDrop drops the content of specified files.
 // The status channel 'dropchan' is closed when this function returns.
 // (git annex drop)
-func AnnexDrop(filepaths []string, dropchan chan<- RepoFileStatus) {
-	defer close(dropchan)
-	cmdargs := []string{"drop"}
-	if !RawMode {
-		cmdargs = append(cmdargs, "--json")
-	}
-	cmdargs = append(cmdargs, filepaths...)
-
-	cmd := AnnexCommand(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
-		dropchan <- RepoFileStatus{Err: err}
-		return
-	}
-	var status RepoFileStatus
-	var annexDropRes struct {
-		Command string `json:"command"`
-		File    string `json:"file"`
-		Key     string `json:"key"`
-		Success bool   `json:"success"`
-		Note    string `json:"note"`
-	}
-
-	status.State = "Removing content"
-	var line string
-	var rerr error
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
-			// Empty line output. Ignore
-			continue
+func AnnexDrop(filepaths []string) chan RepoFileStatus {
+	dropchan := make(chan RepoFileStatus)
+	go func() {
+		defer close(dropchan)
+		cmdargs := []string{"drop"}
+		if !RawMode {
+			cmdargs = append(cmdargs, "--json")
 		}
+		cmdargs = append(cmdargs, filepaths...)
 
-		if RawMode {
-			lineInput := cmd.Args
-			input := strings.Join(lineInput, " ")
-			status.RawInput = input
-			status.RawOutput = line
-			dropchan <- status
-			continue
-		}
-		// Send file name
-		err = json.Unmarshal([]byte(line), &annexDropRes)
+		cmd := AnnexCommand(cmdargs...)
+		err := cmd.Start()
 		if err != nil {
 			dropchan <- RepoFileStatus{Err: err}
 			return
 		}
-		status.FileName = annexDropRes.File
-		if annexDropRes.Success {
-			log.Write("%s content dropped", annexDropRes.File)
-			status.Err = nil
-		} else {
-			log.Write("Error dropping %s", annexDropRes.File)
-			errmsg := annexDropRes.Note
-			if strings.Contains(errmsg, "unsafe") {
-				errmsg = "failed (unsafe): could not verify remote copy"
+		var status RepoFileStatus
+		var annexDropRes struct {
+			Command string `json:"command"`
+			File    string `json:"file"`
+			Key     string `json:"key"`
+			Success bool   `json:"success"`
+			Note    string `json:"note"`
+		}
+
+		status.State = "Removing content"
+		var line string
+		var rerr error
+		for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+			line = strings.TrimSpace(line)
+			if len(line) == 0 {
+				// Empty line output. Ignore
+				continue
 			}
-			status.Err = fmt.Errorf(errmsg)
+
+			if RawMode {
+				lineInput := cmd.Args
+				input := strings.Join(lineInput, " ")
+				status.RawInput = input
+				status.RawOutput = line
+				dropchan <- status
+				continue
+			}
+			// Send file name
+			err = json.Unmarshal([]byte(line), &annexDropRes)
+			if err != nil {
+				dropchan <- RepoFileStatus{Err: err}
+				return
+			}
+			status.FileName = annexDropRes.File
+			if annexDropRes.Success {
+				log.Write("%s content dropped", annexDropRes.File)
+				status.Err = nil
+			} else {
+				log.Write("Error dropping %s", annexDropRes.File)
+				errmsg := annexDropRes.Note
+				if strings.Contains(errmsg, "unsafe") {
+					errmsg = "failed (unsafe): could not verify remote copy"
+				}
+				status.Err = fmt.Errorf(errmsg)
+			}
+			status.Progress = progcomplete
+			dropchan <- status
 		}
-		status.Progress = progcomplete
-		dropchan <- status
-	}
-	if cmd.Wait() != nil {
-		var stderr, errline []byte
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
+		if cmd.Wait() != nil {
+			var stderr, errline []byte
+			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+				stderr = append(stderr, errline...)
+			}
+			log.Write("Error during AnnexDrop")
+			log.Write("[stderr]\n%s", string(stderr))
 		}
-		log.Write("Error during AnnexDrop")
-		log.Write("[stderr]\n%s", string(stderr))
-	}
-	return
+	}()
+	return dropchan
 }
 
 // getAnnexMetadataName returns the filename, key, and last modification time stored in the metadata of an annexed file given the key.
@@ -576,64 +582,71 @@ func getAnnexMetadataName(key string) annexFilenameDate {
 // AnnexWhereis returns information about annexed files in the repository
 // The output channel 'wichan' is closed when this function returns.
 // (git annex whereis)
-func AnnexWhereis(paths []string, wichan chan<- AnnexWhereisRes) {
-	defer close(wichan)
-	cmdargs := []string{"whereis", "--json"}
-	cmdargs = append(cmdargs, paths...)
-	cmd := AnnexCommand(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
-		log.Write("Error during AnnexWhereis")
-		wichan <- AnnexWhereisRes{Err: fmt.Errorf("Failed to run git-annex whereis: %s", err)}
-		return
-	}
+func AnnexWhereis(paths []string) chan AnnexWhereisRes {
+	wichan := make(chan AnnexWhereisRes)
 
-	var line string
-	var rerr error
-	var info AnnexWhereisRes
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
-			// Empty line output. Ignore
-			continue
+	go func() {
+		defer close(wichan)
+		cmdargs := []string{"whereis", "--json"}
+		cmdargs = append(cmdargs, paths...)
+		cmd := AnnexCommand(cmdargs...)
+		err := cmd.Start()
+		if err != nil {
+			log.Write("Error during AnnexWhereis")
+			wichan <- AnnexWhereisRes{Err: fmt.Errorf("Failed to run git-annex whereis: %s", err)}
+			return
 		}
-		jsonerr := json.Unmarshal([]byte(line), &info)
-		info.Err = jsonerr
-		wichan <- info
-	}
-	return
+
+		var line string
+		var rerr error
+		var info AnnexWhereisRes
+		for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+			line = strings.TrimSpace(line)
+			if len(line) == 0 {
+				// Empty line output. Ignore
+				continue
+			}
+			jsonerr := json.Unmarshal([]byte(line), &info)
+			info.Err = jsonerr
+			wichan <- info
+		}
+	}()
+	return wichan
 }
 
 // AnnexStatus returns the status of a file or files in a directory
 // The output channel 'statuschan' is closed when this function returns.
 // (git annex status)
-func AnnexStatus(paths []string, statuschan chan<- AnnexStatusRes) {
-	defer close(statuschan)
-	cmdargs := []string{"status", "--json"}
-	cmdargs = append(cmdargs, paths...)
-	cmd := AnnexCommand(cmdargs...)
-	// TODO: Parse output
-	err := cmd.Start()
-	if err != nil {
-		log.Write("Error setting up git-annex status")
-		statuschan <- AnnexStatusRes{Err: fmt.Errorf("Failed to run git-annex status: %s", err)}
-		return
-	}
-
-	var line string
-	var rerr error
-	var status AnnexStatusRes
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
-			// Empty line output. Ignore
-			continue
+func AnnexStatus(paths []string) chan AnnexStatusRes {
+	statuschan := make(chan AnnexStatusRes)
+	go func() {
+		defer close(statuschan)
+		cmdargs := []string{"status", "--json"}
+		cmdargs = append(cmdargs, paths...)
+		cmd := AnnexCommand(cmdargs...)
+		// TODO: Parse output
+		err := cmd.Start()
+		if err != nil {
+			log.Write("Error setting up git-annex status")
+			statuschan <- AnnexStatusRes{Err: fmt.Errorf("Failed to run git-annex status: %s", err)}
+			return
 		}
-		jsonerr := json.Unmarshal([]byte(line), &status)
-		status.Err = jsonerr
-		statuschan <- status
-	}
-	return
+
+		var line string
+		var rerr error
+		var status AnnexStatusRes
+		for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+			line = strings.TrimSpace(line)
+			if len(line) == 0 {
+				// Empty line output. Ignore
+				continue
+			}
+			jsonerr := json.Unmarshal([]byte(line), &status)
+			status.Err = jsonerr
+			statuschan <- status
+		}
+	}()
+	return statuschan
 }
 
 // AnnexDescribe changes the description of a repository.
@@ -670,154 +683,160 @@ func AnnexInfo() (AnnexInfoRes, error) {
 // If an unlocked file has modifications, it wont be locked and an error will be returned for that file.
 // The status channel 'lockchan' is closed when this function returns.
 // (git annex lock)
-func AnnexLock(filepaths []string, lockchan chan<- RepoFileStatus) {
-	defer close(lockchan)
-	if len(filepaths) == 0 {
-		log.Write("No paths to lock. Nothing to do.")
-		return
-	}
-	cmdargs := []string{"lock"}
-	if !RawMode {
-		cmdargs = append(cmdargs, "--json-error-messages")
-	}
-
-	cmdargs = append(cmdargs, filepaths...)
-	cmd := AnnexCommand(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
-		lockchan <- RepoFileStatus{Err: err}
-		return
-	}
-
-	var outline []byte
-	var rerr error
-	var status RepoFileStatus
-	var addresult annexAction
-	status.State = "Locking"
-
-	var filenames []string
-	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
-		if len(outline) == 0 {
-			// Empty line output. Ignore
-			continue
+func AnnexLock(filepaths []string) chan RepoFileStatus {
+	lockchan := make(chan RepoFileStatus)
+	go func() {
+		defer close(lockchan)
+		if len(filepaths) == 0 {
+			log.Write("No paths to lock. Nothing to do.")
+			return
 		}
-		if RawMode {
-			status.RawOutput = string(outline)
+		cmdargs := []string{"lock"}
+		if !RawMode {
+			cmdargs = append(cmdargs, "--json-error-messages")
+		}
+
+		cmdargs = append(cmdargs, filepaths...)
+		cmd := AnnexCommand(cmdargs...)
+		err := cmd.Start()
+		if err != nil {
+			lockchan <- RepoFileStatus{Err: err}
+			return
+		}
+
+		var outline []byte
+		var rerr error
+		var status RepoFileStatus
+		var addresult annexAction
+		status.State = "Locking"
+
+		var filenames []string
+		for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+			if len(outline) == 0 {
+				// Empty line output. Ignore
+				continue
+			}
+			if RawMode {
+				status.RawOutput = string(outline)
+				lineInput := cmd.Args
+				input := strings.Join(lineInput, " ")
+				status.RawInput = input
+				lockchan <- status
+				continue
+			}
+			err := json.Unmarshal(outline, &addresult)
+			if err != nil || addresult.Command == "" {
+				// Couldn't parse output
+				log.Write("Could not parse 'git annex lock' output")
+				log.Write(string(outline))
+				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+				continue
+			}
+			status.FileName = addresult.File
 			lineInput := cmd.Args
 			input := strings.Join(lineInput, " ")
 			status.RawInput = input
-			lockchan <- status
-			continue
-		}
-		err := json.Unmarshal(outline, &addresult)
-		if err != nil || addresult.Command == "" {
-			// Couldn't parse output
-			log.Write("Could not parse 'git annex lock' output")
-			log.Write(string(outline))
-			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
-			continue
-		}
-		status.FileName = addresult.File
-		lineInput := cmd.Args
-		input := strings.Join(lineInput, " ")
-		status.RawInput = input
-		status.RawOutput = string(outline)
-		if addresult.Success {
-			log.Write("%s locked", addresult.File)
-			status.Err = nil
-			filenames = append(filenames, status.FileName)
-		} else {
-			errmsgs := strings.Join(addresult.Errors, " | ")
-			log.Write("Error locking %s: %s", addresult.File, errmsgs)
-			if strings.Contains(errmsgs, "Locking this file would discard any changes") {
-				errmsgs = "Locking this file would discard any changes you have made to it. Commit (with 'gin commit') or discard any changes before locking."
+			status.RawOutput = string(outline)
+			if addresult.Success {
+				log.Write("%s locked", addresult.File)
+				status.Err = nil
+				filenames = append(filenames, status.FileName)
+			} else {
+				errmsgs := strings.Join(addresult.Errors, " | ")
+				log.Write("Error locking %s: %s", addresult.File, errmsgs)
+				if strings.Contains(errmsgs, "Locking this file would discard any changes") {
+					errmsgs = "Locking this file would discard any changes you have made to it. Commit (with 'gin commit') or discard any changes before locking."
+				}
+				status.Err = fmt.Errorf(errmsgs)
 			}
-			status.Err = fmt.Errorf(errmsgs)
+			status.Progress = progcomplete
+			lockchan <- status
 		}
-		status.Progress = progcomplete
-		lockchan <- status
-	}
-	var stderr, errline []byte
-	if cmd.Wait() != nil {
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
+		var stderr, errline []byte
+		if cmd.Wait() != nil {
+			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+				stderr = append(stderr, errline...)
+			}
+			log.Write("Error during lock")
+			logstd(nil, stderr)
 		}
-		log.Write("Error during lock")
-		logstd(nil, stderr)
-	}
-	// Add metadata
-	for _, fname := range filenames {
-		setAnnexMetadataName(fname)
-	}
-	return
+		// Add metadata
+		for _, fname := range filenames {
+			setAnnexMetadataName(fname)
+		}
+	}()
+	return lockchan
 }
 
 // AnnexUnlock unlocks the specified files and directory contents if they are annexed
 // The status channel 'unlockchan' is closed when this function returns.
 // (git annex unlock)
-func AnnexUnlock(filepaths []string, unlockchan chan<- RepoFileStatus) {
-	defer close(unlockchan)
-	cmdargs := []string{"unlock"}
-	if !RawMode {
-		cmdargs = append(cmdargs, "--json")
-	}
-	cmdargs = append(cmdargs, filepaths...)
-	cmd := AnnexCommand(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
-		unlockchan <- RepoFileStatus{Err: err}
-		return
-	}
-	var status RepoFileStatus
-	status.State = "Unlocking"
-
-	var outline []byte
-	var rerr error
-	var unlockres annexAction
-
-	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
-		if len(outline) == 0 {
-			// Empty line output. Ignore
-			continue
+func AnnexUnlock(filepaths []string) chan RepoFileStatus {
+	unlockchan := make(chan RepoFileStatus)
+	go func() {
+		defer close(unlockchan)
+		cmdargs := []string{"unlock"}
+		if !RawMode {
+			cmdargs = append(cmdargs, "--json")
 		}
-		if RawMode {
-			lineInput := cmd.Args
-			input := strings.Join(lineInput, " ")
-			status.RawInput = input
-			status.RawOutput = string(outline)
+		cmdargs = append(cmdargs, filepaths...)
+		cmd := AnnexCommand(cmdargs...)
+		err := cmd.Start()
+		if err != nil {
+			unlockchan <- RepoFileStatus{Err: err}
+			return
+		}
+		var status RepoFileStatus
+		status.State = "Unlocking"
+
+		var outline []byte
+		var rerr error
+		var unlockres annexAction
+
+		for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+			if len(outline) == 0 {
+				// Empty line output. Ignore
+				continue
+			}
+			if RawMode {
+				lineInput := cmd.Args
+				input := strings.Join(lineInput, " ")
+				status.RawInput = input
+				status.RawOutput = string(outline)
+				unlockchan <- status
+				continue
+			}
+			// Send file name
+			err = json.Unmarshal(outline, &unlockres)
+			if err != nil || unlockres.Command == "" {
+				// Couldn't parse output
+				log.Write("Could not parse 'git annex unlock' output")
+				log.Write(string(outline))
+				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+				continue
+			}
+			status.FileName = unlockres.File
+			if unlockres.Success {
+				log.Write("%s unlocked", unlockres.File)
+				status.Err = nil
+			} else {
+				log.Write("Error unlocking %s", unlockres.File)
+				status.Err = fmt.Errorf("Content not available locally. Use 'gin get-content' to download")
+			}
+			status.Progress = progcomplete
 			unlockchan <- status
-			continue
 		}
-		// Send file name
-		err = json.Unmarshal(outline, &unlockres)
-		if err != nil || unlockres.Command == "" {
-			// Couldn't parse output
-			log.Write("Could not parse 'git annex unlock' output")
-			log.Write(string(outline))
-			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
-			continue
-		}
-		status.FileName = unlockres.File
-		if unlockres.Success {
-			log.Write("%s unlocked", unlockres.File)
-			status.Err = nil
-		} else {
-			log.Write("Error unlocking %s", unlockres.File)
-			status.Err = fmt.Errorf("Content not available locally. Use 'gin get-content' to download")
+		var stderr, errline []byte
+		if cmd.Wait() != nil {
+			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+				stderr = append(stderr, errline...)
+			}
+			log.Write("Error during AnnexUnlock")
+			logstd(nil, stderr)
 		}
 		status.Progress = progcomplete
-		unlockchan <- status
-	}
-	var stderr, errline []byte
-	if cmd.Wait() != nil {
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
-		}
-		log.Write("Error during AnnexUnlock")
-		logstd(nil, stderr)
-	}
-	status.Progress = progcomplete
-	return
+	}()
+	return unlockchan
 }
 
 // AnnexFind lists available annexed files in the current directory.
@@ -923,96 +942,99 @@ func annexExclArgs() string {
 // Files specified for exclusion in the configuration are ignored automatically.
 // The status channel 'addchan' is closed when this function returns.
 // (git annex add)
-func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
-	defer close(addchan)
-	if len(filepaths) == 0 {
-		log.Write("No paths to add to annex. Nothing to do.")
-		return
-	}
-	cmdargs := []string{"add"}
-	if !RawMode {
-		cmdargs = append(cmdargs, "--json")
-	}
-	exclargs := annexExclArgs()
-	if len(exclargs) > 0 {
-		cmdargs = append(cmdargs, "-c", exclargs)
-	}
-
-	cmdargs = append(cmdargs, filepaths...)
-	cmd := AnnexCommand(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
-		addchan <- RepoFileStatus{Err: err}
-		return
-	}
-
-	var outline []byte
-	var rerr error
-	var status RepoFileStatus
-	var addresult annexAction
-	// NOTE Can differentiate "git" and "annex" files from note in JSON struct
-	var filenames []string
-	for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
-		if len(outline) == 0 {
-			// Empty line output. Ignore
-			continue
+func AnnexAdd(filepaths []string) chan RepoFileStatus {
+	addchan := make(chan RepoFileStatus)
+	go func() {
+		defer close(addchan)
+		if len(filepaths) == 0 {
+			log.Write("No paths to add to annex. Nothing to do.")
+			return
 		}
-		if RawMode {
-			status.RawOutput = string(outline)
+		cmdargs := []string{"add"}
+		if !RawMode {
+			cmdargs = append(cmdargs, "--json")
+		}
+		exclargs := annexExclArgs()
+		if len(exclargs) > 0 {
+			cmdargs = append(cmdargs, "-c", exclargs)
+		}
+
+		cmdargs = append(cmdargs, filepaths...)
+		cmd := AnnexCommand(cmdargs...)
+		err := cmd.Start()
+		if err != nil {
+			addchan <- RepoFileStatus{Err: err}
+			return
+		}
+
+		var outline []byte
+		var rerr error
+		var status RepoFileStatus
+		var addresult annexAction
+		// NOTE Can differentiate "git" and "annex" files from note in JSON struct
+		var filenames []string
+		for rerr = nil; rerr == nil; outline, rerr = cmd.OutReader.ReadBytes('\n') {
+			if len(outline) == 0 {
+				// Empty line output. Ignore
+				continue
+			}
+			if RawMode {
+				status.RawOutput = string(outline)
+				lineInput := cmd.Args
+				input := strings.Join(lineInput, " ")
+				status.RawInput = input
+				addchan <- status
+				continue
+			}
+			addresult = annexAction{} // clear existing result
+			err := json.Unmarshal(outline, &addresult)
+			if err != nil || addresult.Command == "" {
+				// Couldn't parse output
+				log.Write("Could not parse 'git annex add' output")
+				log.Write(string(outline))
+				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+				continue
+			}
+			status.FileName = addresult.File
 			lineInput := cmd.Args
 			input := strings.Join(lineInput, " ")
 			status.RawInput = input
-			addchan <- status
-			continue
-		}
-		addresult = annexAction{} // clear existing result
-		err := json.Unmarshal(outline, &addresult)
-		if err != nil || addresult.Command == "" {
-			// Couldn't parse output
-			log.Write("Could not parse 'git annex add' output")
-			log.Write(string(outline))
-			// TODO: Print error at the end: Command succeeded but there was an error understanding the output
-			continue
-		}
-		status.FileName = addresult.File
-		lineInput := cmd.Args
-		input := strings.Join(lineInput, " ")
-		status.RawInput = input
-		status.RawOutput = string(outline)
-		if addresult.Success {
-			if addresult.Note == addedToGitNote {
-				status.State = "Added to git"
-				log.Write("%s added to git", addresult.File)
+			status.RawOutput = string(outline)
+			if addresult.Success {
+				if addresult.Note == addedToGitNote {
+					status.State = "Added to git"
+					log.Write("%s added to git", addresult.File)
+				} else {
+					status.State = "Added to annex"
+					log.Write("%s added to annex", addresult.File)
+				}
+				status.Err = nil
+				filenames = append(filenames, status.FileName)
 			} else {
-				status.State = "Added to annex"
-				log.Write("%s added to annex", addresult.File)
+				log.Write("Error adding %s", addresult.File)
+				status.Err = fmt.Errorf("failed")
 			}
-			status.Err = nil
-			filenames = append(filenames, status.FileName)
-		} else {
-			log.Write("Error adding %s", addresult.File)
-			status.Err = fmt.Errorf("failed")
+			status.Progress = progcomplete
+			addchan <- status
 		}
-		status.Progress = progcomplete
-		addchan <- status
-	}
-	var stderr, errline []byte
-	if cmd.Wait() != nil {
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
+		var stderr, errline []byte
+		if cmd.Wait() != nil {
+			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+				stderr = append(stderr, errline...)
+			}
+			log.Write("Error during AnnexAdd")
+			logstd(nil, stderr)
 		}
-		log.Write("Error during AnnexAdd")
-		logstd(nil, stderr)
-	}
-	// Add metadata
-	status.State = "Writing filename metadata"
-	for _, fname := range filenames {
-		setAnnexMetadataName(fname)
-		status.FileName = fname
-		status.Progress = progcomplete
-		addchan <- status
-	}
-	return
+		// Add metadata
+		status.State = "Writing filename metadata"
+		for _, fname := range filenames {
+			setAnnexMetadataName(fname)
+			status.FileName = fname
+			status.Progress = progcomplete
+			addchan <- status
+		}
+	}()
+	return addchan
 }
 
 // setAnnexMetadataName starts a routine and waits for input on the provided channel.

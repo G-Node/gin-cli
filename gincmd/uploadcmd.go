@@ -49,8 +49,7 @@ func upload(cmd *cobra.Command, args []string) {
 		fmt.Println(":: Uploading")
 	}
 
-	uploadchan := make(chan git.RepoFileStatus)
-	go gincl.Upload(paths, remotes, uploadchan)
+	uploadchan := gincl.Upload(paths, remotes)
 	formatOutput(uploadchan, prStyle, 0)
 }
 

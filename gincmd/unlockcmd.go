@@ -12,8 +12,7 @@ import (
 
 func countItemsLockChange(paths []string) (count int) {
 	// BUG: Miscalculates number in some cases
-	wichan := make(chan git.AnnexWhereisRes)
-	go git.AnnexWhereis(paths, wichan)
+	wichan := git.AnnexWhereis(paths)
 	for range wichan {
 		count++
 	}
@@ -45,8 +44,7 @@ func unlock(cmd *cobra.Command, args []string) {
 	defserver := conf.DefaultServer
 	gincl := ginclient.New(defserver)
 	nitems := countItemsLockChange(args)
-	unlockchan := make(chan git.RepoFileStatus)
-	go gincl.UnlockContent(args, unlockchan)
+	unlockchan := gincl.UnlockContent(args)
 	formatOutput(unlockchan, prStyle, nitems)
 }
 

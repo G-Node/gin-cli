@@ -127,95 +127,98 @@ func Init(bare bool) error {
 // Clone downloads a repository and sets the remote fetch and push urls.
 // The status channel 'clonechan' is closed when this function returns.
 // (git clone ...)
-func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) {
+func Clone(remotepath string, repopath string) chan RepoFileStatus {
 	// TODO: This function is crazy huge - simplify
 	fn := fmt.Sprintf("Clone(%s)", remotepath)
-	defer close(clonechan)
-	args := []string{"clone", "--progress", remotepath}
-	if runtime.GOOS == "windows" {
-		// force disable symlinks even if user can create them
-		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
-		args = append([]string{"-c", "core.symlinks=false"}, args...)
-	}
-	cmd := Command(args...)
-	err := cmd.Start()
-	if err != nil {
-		clonechan <- RepoFileStatus{Err: giterror{UError: err.Error(), Origin: fn}}
-		return
-	}
+	clonechan := make(chan RepoFileStatus)
+	go func() {
+		defer close(clonechan)
+		args := []string{"clone", "--progress", remotepath}
+		if runtime.GOOS == "windows" {
+			// force disable symlinks even if user can create them
+			// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
+			args = append([]string{"-c", "core.symlinks=false"}, args...)
+		}
+		cmd := Command(args...)
+		err := cmd.Start()
+		if err != nil {
+			clonechan <- RepoFileStatus{Err: giterror{UError: err.Error(), Origin: fn}}
+			return
+		}
 
-	var line string
-	var stderr []byte
-	var status RepoFileStatus
-	status.State = "Downloading repository"
-	clonechan <- status
-	var rerr error
-	readbuffer := make([]byte, 1024)
-	var nread, errhead int
-	var eob, eof bool
-	lineInput := cmd.Args
-	input := strings.Join(lineInput, " ")
-	status.RawInput = input
-	// git clone progress prints to stderr
-	for eof = false; !eof; nread, rerr = cmd.ErrReader.Read(readbuffer) {
-		if rerr != nil && errhead == len(stderr) {
-			eof = true
-		}
-		stderr = append(stderr, readbuffer[:nread]...)
-		for eob = false; !eob || errhead < len(stderr); line, eob = cutline(stderr[errhead:]) {
-			if len(line) == 0 {
-				errhead++
-				break
-			}
-			errhead += len(line) + 1
-			words := strings.Fields(line)
-			status.FileName = repopath
-			if strings.HasPrefix(line, "Receiving objects") {
-				if len(words) > 2 {
-					status.Progress = words[2]
-				}
-				if len(words) > 8 {
-					rate := fmt.Sprintf("%s%s", words[7], words[8])
-					if strings.HasSuffix(rate, ",") {
-						rate = strings.TrimSuffix(rate, ",")
-					}
-					status.Rate = rate
-					status.RawOutput = line
-				}
-			}
-			clonechan <- status
-		}
-	}
-
-	errstring := string(stderr)
-	if err = cmd.Wait(); err != nil {
-		log.Write("Error during clone command")
-		repoPathParts := strings.SplitN(repopath, "/", 2)
-		repoOwner := repoPathParts[0]
-		repoName := repoPathParts[1]
-		gerr := giterror{UError: errstring, Origin: fn}
-		if strings.Contains(errstring, "does not exist") {
-			gerr.Description = fmt.Sprintf("Repository download failed\n"+
-				"Make sure you typed the repository path correctly\n"+
-				"Type 'gin repos %s' to see if the repository exists and if you have access to it",
-				repoOwner)
-		} else if strings.Contains(errstring, "already exists and is not an empty directory") {
-			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
-				"'%s' already exists in the current directory and is not empty.", repoName)
-		} else if strings.Contains(errstring, "Host key verification failed") {
-			gerr.Description = "Server key does not match known/configured host key."
-		} else {
-			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", errstring)
-		}
-		status.Err = gerr
+		var line string
+		var stderr []byte
+		var status RepoFileStatus
+		status.State = "Downloading repository"
 		clonechan <- status
-		// doesn't really need to break here, but let's not send the progcomplete
-		return
-	}
-	// Progress doesn't show 100% if cloning an empty repository, so let's force it
-	status.Progress = progcomplete
-	clonechan <- status
-	return
+		var rerr error
+		readbuffer := make([]byte, 1024)
+		var nread, errhead int
+		var eob, eof bool
+		lineInput := cmd.Args
+		input := strings.Join(lineInput, " ")
+		status.RawInput = input
+		// git clone progress prints to stderr
+		for eof = false; !eof; nread, rerr = cmd.ErrReader.Read(readbuffer) {
+			if rerr != nil && errhead == len(stderr) {
+				eof = true
+			}
+			stderr = append(stderr, readbuffer[:nread]...)
+			for eob = false; !eob || errhead < len(stderr); line, eob = cutline(stderr[errhead:]) {
+				if len(line) == 0 {
+					errhead++
+					break
+				}
+				errhead += len(line) + 1
+				words := strings.Fields(line)
+				status.FileName = repopath
+				if strings.HasPrefix(line, "Receiving objects") {
+					if len(words) > 2 {
+						status.Progress = words[2]
+					}
+					if len(words) > 8 {
+						rate := fmt.Sprintf("%s%s", words[7], words[8])
+						if strings.HasSuffix(rate, ",") {
+							rate = strings.TrimSuffix(rate, ",")
+						}
+						status.Rate = rate
+						status.RawOutput = line
+					}
+				}
+				clonechan <- status
+			}
+		}
+
+		errstring := string(stderr)
+		if err = cmd.Wait(); err != nil {
+			log.Write("Error during clone command")
+			repoPathParts := strings.SplitN(repopath, "/", 2)
+			repoOwner := repoPathParts[0]
+			repoName := repoPathParts[1]
+			gerr := giterror{UError: errstring, Origin: fn}
+			if strings.Contains(errstring, "does not exist") {
+				gerr.Description = fmt.Sprintf("Repository download failed\n"+
+					"Make sure you typed the repository path correctly\n"+
+					"Type 'gin repos %s' to see if the repository exists and if you have access to it",
+					repoOwner)
+			} else if strings.Contains(errstring, "already exists and is not an empty directory") {
+				gerr.Description = fmt.Sprintf("Repository download failed.\n"+
+					"'%s' already exists in the current directory and is not empty.", repoName)
+			} else if strings.Contains(errstring, "Host key verification failed") {
+				gerr.Description = "Server key does not match known/configured host key."
+			} else {
+				gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", errstring)
+			}
+			status.Err = gerr
+			clonechan <- status
+			// doesn't really need to break here, but let's not send the progcomplete
+			return
+		}
+		// Progress doesn't show 100% if cloning an empty repository, so let's force it
+		status.Progress = progcomplete
+		clonechan <- status
+	}()
+	return clonechan
 }
 
 // Pull downloads all small (git) files from the server.
@@ -234,46 +237,49 @@ func Pull(remote string) error {
 
 // Push uploads all small (git) files to the server.
 // (git push)
-func Push(remote string, pushchan chan<- RepoFileStatus) {
-	defer close(pushchan)
+func Push(remote string) chan RepoFileStatus {
+	pushchan := make(chan RepoFileStatus)
 
-	if IsDirect() {
-		// Set bare false and revert at the end of the function
-		err := setBare(false)
+	go func() {
+		defer close(pushchan)
+		if IsDirect() {
+			// Set bare false and revert at the end of the function
+			err := setBare(false)
+			if err != nil {
+				pushchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
+				return
+			}
+			defer setBare(true)
+		}
+
+		cmd := Command("push", "--progress", remote)
+		err := cmd.Start()
 		if err != nil {
-			pushchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
-			return
+			pushchan <- RepoFileStatus{Err: err}
 		}
-		defer setBare(true)
-	}
 
-	cmd := Command("push", "--progress", remote)
-	err := cmd.Start()
-	if err != nil {
-		pushchan <- RepoFileStatus{Err: err}
-	}
-
-	var status RepoFileStatus
-	var line string
-	var rerr error
-	re := regexp.MustCompile(`(?P<state>Compressing|Writing) objects:\s+(?P<progress>[0-9]{2,3})% \((?P<n>[0-9]+)/(?P<N>[0-9]+)\)`)
-	lineInput := cmd.Args
-	input := strings.Join(lineInput, " ")
-	status.RawInput = input
-	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\r') {
-		if !re.MatchString(line) {
-			continue
+		var status RepoFileStatus
+		var line string
+		var rerr error
+		re := regexp.MustCompile(`(?P<state>Compressing|Writing) objects:\s+(?P<progress>[0-9]{2,3})% \((?P<n>[0-9]+)/(?P<N>[0-9]+)\)`)
+		lineInput := cmd.Args
+		input := strings.Join(lineInput, " ")
+		status.RawInput = input
+		for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\r') {
+			if !re.MatchString(line) {
+				continue
+			}
+			match := re.FindStringSubmatch(line)
+			status.State = match[1]
+			if status.State == "Writing" {
+				status.State = fmt.Sprintf("Uploading git files (to: %s)", remote)
+			}
+			status.Progress = fmt.Sprintf("%s%%", match[2])
+			status.RawOutput = line
+			pushchan <- status
 		}
-		match := re.FindStringSubmatch(line)
-		status.State = match[1]
-		if status.State == "Writing" {
-			status.State = fmt.Sprintf("Uploading git files (to: %s)", remote)
-		}
-		status.Progress = fmt.Sprintf("%s%%", match[2])
-		status.RawOutput = line
-		pushchan <- status
-	}
-	return
+	}()
+	return pushchan
 }
 
 // Add adds paths to git directly (not annex).
@@ -281,70 +287,73 @@ func Push(remote string, pushchan chan<- RepoFileStatus) {
 // In indirect mode, adding annexed files to git has no effect.
 // The status channel 'addchan' is closed when this function returns.
 // (git add)
-func Add(filepaths []string, addchan chan<- RepoFileStatus) {
-	defer close(addchan)
-	if len(filepaths) == 0 {
-		log.Write("No paths to add to git. Nothing to do.")
-		return
-	}
-
-	if IsDirect() {
-		// Set bare false and revert at the end of the function
-		err := setBare(false)
-		if err != nil {
-			addchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
+func Add(filepaths []string) chan RepoFileStatus {
+	addchan := make(chan RepoFileStatus)
+	go func() {
+		defer close(addchan)
+		if len(filepaths) == 0 {
+			log.Write("No paths to add to git. Nothing to do.")
 			return
 		}
-		defer setBare(true)
-		// Call addPathsDirect to collect filenames not in annex and deleted files
-		filepaths = gitAddDirect(filepaths)
-	}
 
-	// exclargs := annexExclArgs()
-	cmdargs := []string{"add", "--verbose", "--"}
-	cmdargs = append(cmdargs, filepaths...)
-	cmd := Command(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
-		addchan <- RepoFileStatus{Err: err}
-		return
-	}
-	var status RepoFileStatus
-	var line string
-	var rerr error
-	lineInput := cmd.Args
-	input := strings.Join(lineInput, " ")
-	status.RawInput = input
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		fname := strings.TrimSpace(line)
-		status.RawOutput = line
-		if len(fname) == 0 {
-			// skip empty lines
-			continue
+		if IsDirect() {
+			// Set bare false and revert at the end of the function
+			err := setBare(false)
+			if err != nil {
+				addchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
+				return
+			}
+			defer setBare(true)
+			// Call addPathsDirect to collect filenames not in annex and deleted files
+			filepaths = gitAddDirect(filepaths)
 		}
-		if strings.HasPrefix(fname, "add") {
-			status.State = "Adding (git)  "
-			fname = strings.TrimPrefix(fname, "add '")
-		} else if strings.HasPrefix(fname, "remove") {
-			status.State = "Removing"
-			fname = strings.TrimPrefix(fname, "remove '")
+
+		// exclargs := annexExclArgs()
+		cmdargs := []string{"add", "--verbose", "--"}
+		cmdargs = append(cmdargs, filepaths...)
+		cmd := Command(cmdargs...)
+		err := cmd.Start()
+		if err != nil {
+			addchan <- RepoFileStatus{Err: err}
+			return
 		}
-		fname = strings.TrimSuffix(fname, "'")
-		status.FileName = fname
-		log.Write("'%s' added to git", fname)
-		// Error conditions?
-		status.Progress = progcomplete
-		addchan <- status
-	}
-	var stderr, errline []byte
-	if cmd.Wait() != nil {
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
+		var status RepoFileStatus
+		var line string
+		var rerr error
+		lineInput := cmd.Args
+		input := strings.Join(lineInput, " ")
+		status.RawInput = input
+		for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+			fname := strings.TrimSpace(line)
+			status.RawOutput = line
+			if len(fname) == 0 {
+				// skip empty lines
+				continue
+			}
+			if strings.HasPrefix(fname, "add") {
+				status.State = "Adding (git)  "
+				fname = strings.TrimPrefix(fname, "add '")
+			} else if strings.HasPrefix(fname, "remove") {
+				status.State = "Removing"
+				fname = strings.TrimPrefix(fname, "remove '")
+			}
+			fname = strings.TrimSuffix(fname, "'")
+			status.FileName = fname
+			log.Write("'%s' added to git", fname)
+			// Error conditions?
+			status.Progress = progcomplete
+			addchan <- status
 		}
-		log.Write("Error during GitAdd")
-		logstd(nil, stderr)
-	}
-	return
+		var stderr, errline []byte
+		if cmd.Wait() != nil {
+			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+				stderr = append(stderr, errline...)
+			}
+			log.Write("Error during GitAdd")
+			logstd(nil, stderr)
+		}
+	}()
+	return addchan
 }
 
 // SetGitUser sets the user.name and user.email configuration values for the local git repository.
@@ -632,66 +641,74 @@ func CommitEmpty(commitmsg string) error {
 // DiffUpstream returns, through the provided channel, the names of all files that differ from the default remote branch.
 // The output channel 'diffchan' is closed when this function returns.
 // (git diff --name-only --relative @{upstream})
-func DiffUpstream(paths []string, upstream string, diffchan chan<- string) {
-	defer close(diffchan)
-	diffargs := []string{"diff", "-z", "--name-only", "--relative", upstream, "--"}
-	diffargs = append(diffargs, paths...)
-	cmd := Command(diffargs...)
-	err := cmd.Start()
-	if err != nil {
-		log.Write("ls-files command set up failed: %s", err)
-		return
-	}
-	var line []byte
-	var rerr error
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadBytes('\000') {
-		line = bytes.TrimSuffix(line, []byte("\000"))
-		if len(line) > 0 {
-			diffchan <- string(line)
-		}
-	}
+func DiffUpstream(paths []string, upstream string) chan string {
+	diffchan := make(chan string)
 
-	var stderr, errline []byte
-	if cmd.Wait() != nil {
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
+	go func() {
+		defer close(diffchan)
+		diffargs := []string{"diff", "-z", "--name-only", "--relative", upstream, "--"}
+		diffargs = append(diffargs, paths...)
+		cmd := Command(diffargs...)
+		err := cmd.Start()
+		if err != nil {
+			log.Write("ls-files command set up failed: %s", err)
+			return
 		}
-		log.Write("Error during DiffUpstream")
-		logstd(nil, stderr)
-	}
-	return
+		var line []byte
+		var rerr error
+		for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadBytes('\000') {
+			line = bytes.TrimSuffix(line, []byte("\000"))
+			if len(line) > 0 {
+				diffchan <- string(line)
+			}
+		}
+
+		var stderr, errline []byte
+		if cmd.Wait() != nil {
+			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+				stderr = append(stderr, errline...)
+			}
+			log.Write("Error during DiffUpstream")
+			logstd(nil, stderr)
+		}
+	}()
+	return diffchan
 }
 
 // LsFiles lists all files known to git.
 // The output channel 'lschan' is closed when this function returns.
 // (git ls-files)
-func LsFiles(args []string, lschan chan<- string) {
-	defer close(lschan)
-	cmdargs := append([]string{"ls-files"}, args...)
-	cmd := Command(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
-		log.Write("ls-files command set up failed: %s", err)
-		return
-	}
-	var line string
-	var rerr error
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		line = strings.TrimSuffix(line, "\n")
-		if line != "" {
-			lschan <- line
-		}
-	}
+func LsFiles(args []string) chan string {
+	lschan := make(chan string)
 
-	var stderr, errline []byte
-	if cmd.Wait() != nil {
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
+	go func() {
+		defer close(lschan)
+		cmdargs := append([]string{"ls-files"}, args...)
+		cmd := Command(cmdargs...)
+		err := cmd.Start()
+		if err != nil {
+			log.Write("ls-files command set up failed: %s", err)
+			return
 		}
-		log.Write("Error during GitLsFiles")
-		logstd(nil, stderr)
-	}
-	return
+		var line string
+		var rerr error
+		for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+			line = strings.TrimSuffix(line, "\n")
+			if line != "" {
+				lschan <- line
+			}
+		}
+
+		var stderr, errline []byte
+		if cmd.Wait() != nil {
+			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+				stderr = append(stderr, errline...)
+			}
+			log.Write("Error during GitLsFiles")
+			logstd(nil, stderr)
+		}
+	}()
+	return lschan
 }
 
 // DescribeIndexShort returns a string which represents a condensed form of the git (annex) index.
@@ -700,8 +717,7 @@ func LsFiles(args []string, lschan chan<- string) {
 // If 'paths' are specified, the status output is limited to files and directories matching those paths.
 func DescribeIndexShort(paths []string) (string, error) {
 	// TODO: 'git annex status' doesn't list added (A) files when in direct mode.
-	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus(paths, statuschan)
+	statuschan := AnnexStatus(paths)
 	statusmap := make(map[string]int)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -728,8 +744,7 @@ func DescribeIndexShort(paths []string) (string, error) {
 // The resulting message can be used to inform the user of changes
 // that are about to be uploaded and as a long commit message.
 func DescribeIndex() (string, error) {
-	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus([]string{}, statuschan)
+	statuschan := AnnexStatus([]string{})
 	statusmap := make(map[string][]string)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -1077,8 +1092,7 @@ func setBare(state bool) error {
 // The filtering is done twice:
 // Once against the provided paths in the current directory (recursively) and once more against the output of 'git ls-files <paths>', in order to include any files that might have been deleted.
 func gitAddDirect(paths []string) (filtered []string) {
-	wichan := make(chan AnnexWhereisRes)
-	go AnnexWhereis(paths, wichan)
+	wichan := AnnexWhereis(paths)
 	var annexfiles []string
 	for wiInfo := range wichan {
 		if wiInfo.Err != nil {
@@ -1088,8 +1102,7 @@ func gitAddDirect(paths []string) (filtered []string) {
 	}
 	filtered = filterpaths(paths, annexfiles)
 
-	lschan := make(chan string)
-	go LsFiles(paths, lschan)
+	lschan := LsFiles(paths)
 	for gitfile := range lschan {
 		gitfile = filepath.Clean(gitfile)
 		if !stringInSlice(gitfile, annexfiles) && !stringInSlice(gitfile, filtered) {

@@ -34,9 +34,8 @@ func lock(cmd *cobra.Command, args []string) {
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)
 	nitems := countItemsLockChange(args)
-	lockchan := make(chan git.RepoFileStatus)
 
-	go gincl.LockContent(args, lockchan)
+	lockchan := gincl.LockContent(args)
 	formatOutput(lockchan, prStyle, nitems)
 }
 

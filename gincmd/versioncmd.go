@@ -62,8 +62,7 @@ func checkoutcopies(commit git.GinCommit, paths []string, destination string) {
 	hash := commit.AbbreviatedHash
 	isodate := commit.Date.Format("2006-01-02-150405")
 	prettydate := commit.Date.Format("Jan 2 15:04:05 2006 (-0700)")
-	checkoutchan := make(chan ginclient.FileCheckoutStatus)
-	go ginclient.CheckoutFileCopies(hash, paths, destination, isodate, checkoutchan)
+	checkoutchan := ginclient.CheckoutFileCopies(hash, paths, destination, isodate)
 
 	// TODO: JSON output
 	var newfiles int

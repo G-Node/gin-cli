@@ -6,7 +6,6 @@ import (
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
-	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
 )
 
@@ -29,15 +28,13 @@ func getRepo(cmd *cobra.Command, args []string) {
 		Die(fmt.Sprintf("Invalid repository path '%s'. Full repository name should be the owner's username followed by the repository name, separated by a '/'.\nType 'gin help get' for information and examples.", repostr))
 	}
 
-	clonechan := make(chan git.RepoFileStatus)
-	go gincl.CloneRepo(repostr, clonechan)
+	clonechan := gincl.CloneRepo(repostr)
 	formatOutput(clonechan, prStyle, 0)
 	defaultRemoteIfUnset("origin")
 	new, err := ginclient.CommitIfNew()
 	if new {
 		// Push the new commit to initialise origin
-		uploadchan := make(chan git.RepoFileStatus)
-		go gincl.Upload(nil, []string{"origin"}, uploadchan)
+		uploadchan := gincl.Upload(nil, []string{"origin"})
 		for range uploadchan {
 			// Wait for channel to close
 		}

@@ -230,19 +230,23 @@ func (gincl *Client) DelRepo(name string) error {
 }
 
 // Add updates the index with the changes in the files specified by 'paths'.
-// The status channel 'addchan' is closed when this function returns.
-func Add(paths []string, addchan chan<- git.RepoFileStatus) {
-	defer close(addchan)
-	paths, err := expandglobs(paths, false)
-	if err != nil {
-		addchan <- git.RepoFileStatus{Err: err}
-		return
+// Returns a channel that should be read to get the states of the operation
+// while it runs.
+func Add(paths []string) chan git.RepoFileStatus {
+	addchan := make(chan git.RepoFileStatus)
+	if len(paths) == 0 {
+		close(addchan)
+		return addchan
 	}
-
-	if len(paths) > 0 {
+	go func() {
+		defer close(addchan)
+		paths, err := expandglobs(paths, false)
+		if err != nil {
+			addchan <- git.RepoFileStatus{Err: err}
+			return
+		}
 		gitaddpaths := make([]string, 0) // most times, this wont be used, so start with 0
-		statuschan := make(chan git.AnnexStatusRes)
-		go git.AnnexStatus(paths, statuschan)
+		statuschan := git.AnnexStatus(paths)
 		for stat := range statuschan {
 			if stat.Status == "D" {
 				// deleted files match but weren't added
@@ -254,8 +258,7 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 
 		// Run git add on deleted files only
 		if len(gitaddpaths) > 0 {
-			gitaddchan := make(chan git.RepoFileStatus)
-			go git.Add(gitaddpaths, gitaddchan)
+			gitaddchan := git.Add(gitaddpaths)
 			for addstat := range gitaddchan {
 				addstat.State = "Removing"
 				addchan <- addstat
@@ -264,141 +267,148 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 
 		// Run git annex add using exclusion filters
 		// Files matching filters are automatically added to git
-		annexaddchan := make(chan git.RepoFileStatus)
-		go git.AnnexAdd(paths, annexaddchan)
+		annexaddchan := git.AnnexAdd(paths)
 		for addstat := range annexaddchan {
 			addchan <- addstat
 		}
-	}
+	}()
+	return addchan
 }
 
 // Upload transfers locally recorded changes to a remote.
 // The status channel 'uploadchan' is closed when this function returns.
-func (gincl *Client) Upload(paths []string, remotes []string, uploadchan chan<- git.RepoFileStatus) {
+func (gincl *Client) Upload(paths []string, remotes []string) chan git.RepoFileStatus {
 	// TODO: Does this need to be a Client method?
-	defer close(uploadchan)
 	log.Write("Upload")
+	uploadchan := make(chan git.RepoFileStatus)
 
-	paths, err := expandglobs(paths, false)
-	if err != nil {
-		uploadchan <- git.RepoFileStatus{Err: err}
-		return
-	}
-
-	if len(remotes) == 0 {
-		remote, ierr := DefaultRemote()
-		if ierr != nil {
-			uploadchan <- git.RepoFileStatus{Err: ierr}
+	go func() {
+		defer close(uploadchan)
+		paths, err := expandglobs(paths, false)
+		if err != nil {
+			uploadchan <- git.RepoFileStatus{Err: err}
 			return
 		}
-		remotes = []string{remote}
-	}
 
-	confremotes, err := git.RemoteShow()
-	if err != nil || len(confremotes) == 0 {
-		uploadchan <- git.RepoFileStatus{Err: fmt.Errorf("failed to validate remote configuration (no configured remotes?)")}
-	}
-
-	for _, remote := range remotes {
-		if _, ok := confremotes[remote]; !ok {
-			uploadchan <- git.RepoFileStatus{FileName: remote, Err: fmt.Errorf("unknown remote name '%s': skipping", remote)}
-			continue
+		if len(remotes) == 0 {
+			remote, ierr := DefaultRemote()
+			if ierr != nil {
+				uploadchan <- git.RepoFileStatus{Err: ierr}
+				return
+			}
+			remotes = []string{remote}
 		}
 
-		gitpushchan := make(chan git.RepoFileStatus)
-		go git.Push(remote, gitpushchan)
-		for stat := range gitpushchan {
-			uploadchan <- stat
+		confremotes, err := git.RemoteShow()
+		if err != nil || len(confremotes) == 0 {
+			uploadchan <- git.RepoFileStatus{Err: fmt.Errorf("failed to validate remote configuration (no configured remotes?)")}
 		}
 
-		annexpushchan := make(chan git.RepoFileStatus)
-		go git.AnnexPush(paths, remote, annexpushchan)
-		for stat := range annexpushchan {
-			uploadchan <- stat
+		for _, remote := range remotes {
+			if _, ok := confremotes[remote]; !ok {
+				uploadchan <- git.RepoFileStatus{FileName: remote, Err: fmt.Errorf("unknown remote name '%s': skipping", remote)}
+				continue
+			}
+
+			gitpushchan := git.Push(remote)
+			for stat := range gitpushchan {
+				uploadchan <- stat
+			}
+
+			annexpushchan := git.AnnexPush(paths, remote)
+			for stat := range annexpushchan {
+				uploadchan <- stat
+			}
 		}
-	}
-	return
+	}()
+	return uploadchan
 }
 
 // GetContent downloads the contents of placeholder files in a checked out repository.
 // The status channel 'getcontchan' is closed when this function returns.
-func (gincl *Client) GetContent(paths []string, getcontchan chan<- git.RepoFileStatus) {
-	defer close(getcontchan)
+func (gincl *Client) GetContent(paths []string) chan git.RepoFileStatus {
+	getcontchan := make(chan git.RepoFileStatus)
 	log.Write("GetContent")
 
-	paths, err := expandglobs(paths, true)
+	go func() {
+		defer close(getcontchan)
+		paths, err := expandglobs(paths, true)
+		if err != nil {
+			getcontchan <- git.RepoFileStatus{Err: err}
+			return
+		}
 
-	if err != nil {
-		getcontchan <- git.RepoFileStatus{Err: err}
-		return
-	}
-
-	annexgetchan := make(chan git.RepoFileStatus)
-	go git.AnnexGet(paths, annexgetchan)
-	for stat := range annexgetchan {
-		getcontchan <- stat
-	}
-	return
+		annexgetchan := git.AnnexGet(paths)
+		for stat := range annexgetchan {
+			getcontchan <- stat
+		}
+	}()
+	return getcontchan
 }
 
 // RemoveContent removes the contents of local files, turning them into placeholders but only if the content is available on a remote.
 // The status channel 'rmcchan' is closed when this function returns.
-func (gincl *Client) RemoveContent(paths []string, rmcchan chan<- git.RepoFileStatus) {
-	defer close(rmcchan)
-	log.Write("RemoveContent")
+func (gincl *Client) RemoveContent(paths []string) chan git.RepoFileStatus {
+	rmcchan := make(chan git.RepoFileStatus)
 
-	paths, err := expandglobs(paths, true)
-	if err != nil {
-		rmcchan <- git.RepoFileStatus{Err: err}
-		return
-	}
-
-	dropchan := make(chan git.RepoFileStatus)
-	go git.AnnexDrop(paths, dropchan)
-	for stat := range dropchan {
-		rmcchan <- stat
-	}
-	return
+	go func() {
+		defer close(rmcchan)
+		log.Write("RemoveContent")
+		paths, err := expandglobs(paths, true)
+		if err != nil {
+			rmcchan <- git.RepoFileStatus{Err: err}
+			return
+		}
+		dropchan := git.AnnexDrop(paths)
+		for stat := range dropchan {
+			rmcchan <- stat
+		}
+	}()
+	return rmcchan
 }
 
 // LockContent locks local files, turning them into symlinks (if supported by the filesystem).
 // The status channel 'lockchan' is closed when this function returns.
-func (gincl *Client) LockContent(paths []string, lcchan chan<- git.RepoFileStatus) {
-	defer close(lcchan)
+func (gincl *Client) LockContent(paths []string) chan git.RepoFileStatus {
+	lcchan := make(chan git.RepoFileStatus)
 	log.Write("LockContent")
 
-	paths, err := expandglobs(paths, true)
-	if err != nil {
-		lcchan <- git.RepoFileStatus{Err: err}
-		return
-	}
+	go func() {
+		defer close(lcchan)
+		paths, err := expandglobs(paths, true)
+		if err != nil {
+			lcchan <- git.RepoFileStatus{Err: err}
+			return
+		}
 
-	lockchan := make(chan git.RepoFileStatus)
-	go git.AnnexLock(paths, lockchan)
-	for stat := range lockchan {
-		lcchan <- stat
-	}
-	return
+		lockchan := git.AnnexLock(paths)
+		for stat := range lockchan {
+			lcchan <- stat
+		}
+	}()
+	return lcchan
 }
 
 // UnlockContent unlocks local files turning them into normal files, if the content is locally available.
 // The status channel 'unlockchan' is closed when this function returns.
-func (gincl *Client) UnlockContent(paths []string, ulcchan chan<- git.RepoFileStatus) {
-	defer close(ulcchan)
+func (gincl *Client) UnlockContent(paths []string) chan git.RepoFileStatus {
+	ulcchan := make(chan git.RepoFileStatus)
 	log.Write("UnlockContent")
 
-	paths, err := expandglobs(paths, true)
-	if err != nil {
-		ulcchan <- git.RepoFileStatus{Err: err}
-		return
-	}
+	go func() {
+		defer close(ulcchan)
+		paths, err := expandglobs(paths, true)
+		if err != nil {
+			ulcchan <- git.RepoFileStatus{Err: err}
+			return
+		}
 
-	unlockchan := make(chan git.RepoFileStatus)
-	go git.AnnexUnlock(paths, unlockchan)
-	for stat := range unlockchan {
-		ulcchan <- stat
-	}
-	return
+		unlockchan := git.AnnexUnlock(paths)
+		for stat := range unlockchan {
+			ulcchan <- stat
+		}
+	}()
+	return ulcchan
 }
 
 // Download downloads changes and placeholder files in an already checked out repository.
@@ -420,34 +430,36 @@ func (gincl *Client) Sync(content bool) error {
 
 // CloneRepo clones a remote repository and initialises annex.
 // The status channel 'clonechan' is closed when this function returns.
-func (gincl *Client) CloneRepo(repopath string, clonechan chan<- git.RepoFileStatus) {
-	defer close(clonechan)
+func (gincl *Client) CloneRepo(repopath string) chan git.RepoFileStatus {
+	clonechan := make(chan git.RepoFileStatus)
 	log.Write("CloneRepo")
-	clonestatus := make(chan git.RepoFileStatus)
-	remotepath := fmt.Sprintf("%s/%s", gincl.GitAddress(), repopath)
-	go git.Clone(remotepath, repopath, clonestatus)
-	for stat := range clonestatus {
-		clonechan <- stat
-		if stat.Err != nil {
+	go func() {
+		defer close(clonechan)
+		remotepath := fmt.Sprintf("%s/%s", gincl.GitAddress(), repopath)
+		clonestatus := git.Clone(remotepath, repopath)
+		for stat := range clonestatus {
+			clonechan <- stat
+			if stat.Err != nil {
+				return
+			}
+		}
+
+		repoPathParts := strings.SplitN(repopath, "/", 2)
+		repoName := repoPathParts[1]
+
+		status := git.RepoFileStatus{State: "Initialising local storage"}
+		clonechan <- status
+		os.Chdir(repoName)
+		err := gincl.InitDir(false)
+		if err != nil {
+			status.Err = err
+			clonechan <- status
 			return
 		}
-	}
-
-	repoPathParts := strings.SplitN(repopath, "/", 2)
-	repoName := repoPathParts[1]
-
-	status := git.RepoFileStatus{State: "Initialising local storage"}
-	clonechan <- status
-	os.Chdir(repoName)
-	err := gincl.InitDir(false)
-	if err != nil {
-		status.Err = err
+		status.Progress = "100%"
 		clonechan <- status
-		return
-	}
-	status.Progress = "100%"
-	clonechan <- status
-	return
+	}()
+	return clonechan
 }
 
 // CommitIfNew creates an empty initial git commit if the current repository is completely new.
@@ -547,89 +559,92 @@ func CheckoutVersion(commithash string, paths []string) error {
 // CheckoutFileCopies checks out copies of files specified by path from the revision with the specified commithash.
 // The checked out files are stored in the location specified by outpath.
 // The timestamp of the revision is appended to the original filenames (before the extension).
-func CheckoutFileCopies(commithash string, paths []string, outpath string, suffix string, cochan chan<- FileCheckoutStatus) {
-	defer close(cochan)
-	objects, err := git.LsTree(commithash, paths)
-	if err != nil {
-		cochan <- FileCheckoutStatus{Err: err}
-		return
-	}
-
-	for _, obj := range objects {
-		var status FileCheckoutStatus
-		if obj.Type == "blob" {
-			status.Filename = obj.Name
-
-			filext := filepath.Ext(obj.Name)
-			outfilename := fmt.Sprintf("%s-%s%s", strings.TrimSuffix(obj.Name, filext), suffix, filext)
-			outfile := filepath.Join(outpath, outfilename)
-			status.Destination = outfile
-
-			// determine if it's an annexed link
-			content, cerr := git.CatFileContents(commithash, obj.Name)
-			if cerr != nil {
-				cochan <- FileCheckoutStatus{Err: cerr}
-				return
-			}
-			if mderr := os.MkdirAll(outpath, 0777); mderr != nil {
-				cochan <- FileCheckoutStatus{Err: mderr}
-				return
-			}
-
-			// heuristic check for annexed pointer file:
-			// - check if the first 255 bytes of the file (or the entire
-			// contents if smaller) contain the string /annex/objects
-			maxpathidx := 255
-			if len(content) < maxpathidx {
-				maxpathidx = len(content)
-			}
-
-			if isAnnexPath(string(content[:maxpathidx])) {
-				// Pointer file to annexed content
-				status.Type = "Annex"
-				// strip any newlines from the end of the path
-				keypath := strings.TrimSpace(string(content))
-				_, key := path.Split(keypath)
-				contentloc, err := git.AnnexContentLocation(key)
-				if err != nil {
-					getchan := make(chan git.RepoFileStatus)
-					go git.AnnexGetKey(key, getchan)
-					for range getchan {
-					}
-					contentloc, err = git.AnnexContentLocation(key)
-					if err != nil {
-						status.Err = fmt.Errorf("Annexed content is not available locally")
-						cochan <- status
-						continue
-					}
-					status.Err = nil
-				}
-				err = git.CopyFile(contentloc, outfile)
-				if err != nil {
-					status.Err = fmt.Errorf("Error writing %s: %s", outfile, err.Error())
-				}
-			} else if obj.Mode == "120000" {
-				// Plain symlink
-				status.Type = "Link"
-				status.Destination = string(content)
-			} else if obj.Mode == "100755" || obj.Mode == "100644" {
-				status.Type = "Git"
-				werr := ioutil.WriteFile(outfile, content, 0666)
-				if werr != nil {
-					status.Err = fmt.Errorf("Error writing %s: %s", outfile, werr.Error())
-				}
-			} else {
-				status.Err = fmt.Errorf("Unexpected object found in tree: %s", obj.Name)
-			}
-			cochan <- status
-		} else if obj.Type == "tree" {
-			status.Type = "Tree"
-			status.Filename = obj.Name
-			status.Destination = filepath.Join(outpath, obj.Name)
-			os.MkdirAll(status.Destination, 0777)
-			cochan <- status
+func CheckoutFileCopies(commithash string, paths []string, outpath string, suffix string) chan FileCheckoutStatus {
+	cochan := make(chan FileCheckoutStatus)
+	go func() {
+		defer close(cochan)
+		objects, err := git.LsTree(commithash, paths)
+		if err != nil {
+			cochan <- FileCheckoutStatus{Err: err}
+			return
 		}
-	}
+
+		for _, obj := range objects {
+			var status FileCheckoutStatus
+			if obj.Type == "blob" {
+				status.Filename = obj.Name
+
+				filext := filepath.Ext(obj.Name)
+				outfilename := fmt.Sprintf("%s-%s%s", strings.TrimSuffix(obj.Name, filext), suffix, filext)
+				outfile := filepath.Join(outpath, outfilename)
+				status.Destination = outfile
+
+				// determine if it's an annexed link
+				content, cerr := git.CatFileContents(commithash, obj.Name)
+				if cerr != nil {
+					cochan <- FileCheckoutStatus{Err: cerr}
+					return
+				}
+				if mderr := os.MkdirAll(outpath, 0777); mderr != nil {
+					cochan <- FileCheckoutStatus{Err: mderr}
+					return
+				}
+
+				// heuristic check for annexed pointer file:
+				// - check if the first 255 bytes of the file (or the entire
+				// contents if smaller) contain the string /annex/objects
+				maxpathidx := 255
+				if len(content) < maxpathidx {
+					maxpathidx = len(content)
+				}
+
+				if isAnnexPath(string(content[:maxpathidx])) {
+					// Pointer file to annexed content
+					status.Type = "Annex"
+					// strip any newlines from the end of the path
+					keypath := strings.TrimSpace(string(content))
+					_, key := path.Split(keypath)
+					contentloc, err := git.AnnexContentLocation(key)
+					if err != nil {
+						getchan := git.AnnexGetKey(key)
+						for range getchan {
+						}
+						contentloc, err = git.AnnexContentLocation(key)
+						if err != nil {
+							status.Err = fmt.Errorf("Annexed content is not available locally")
+							cochan <- status
+							continue
+						}
+						status.Err = nil
+					}
+					err = git.CopyFile(contentloc, outfile)
+					if err != nil {
+						status.Err = fmt.Errorf("Error writing %s: %s", outfile, err.Error())
+					}
+				} else if obj.Mode == "120000" {
+					// Plain symlink
+					status.Type = "Link"
+					status.Destination = string(content)
+				} else if obj.Mode == "100755" || obj.Mode == "100644" {
+					status.Type = "Git"
+					werr := ioutil.WriteFile(outfile, content, 0666)
+					if werr != nil {
+						status.Err = fmt.Errorf("Error writing %s: %s", outfile, werr.Error())
+					}
+				} else {
+					status.Err = fmt.Errorf("Unexpected object found in tree: %s", obj.Name)
+				}
+				cochan <- status
+			} else if obj.Type == "tree" {
+				status.Type = "Tree"
+				status.Filename = obj.Name
+				status.Destination = filepath.Join(outpath, obj.Name)
+				os.MkdirAll(status.Destination, 0777)
+				cochan <- status
+			}
+		}
+	}()
+	return cochan
 }
 
 // InitDir initialises the local directory with the default remote and git (and annex) configuration options.
@@ -751,8 +766,7 @@ func (fs FileStatus) Abbrev() string {
 func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	statuses := make(map[string]FileStatus)
 
-	wichan := make(chan git.AnnexWhereisRes)
-	go git.AnnexWhereis(paths, wichan)
+	wichan := git.AnnexWhereis(paths)
 	for wiInfo := range wichan {
 		if wiInfo.Err != nil {
 			continue
@@ -778,8 +792,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 		asargs = []string{"."}
 	}
 
-	statuschan := make(chan git.AnnexStatusRes)
-	go git.AnnexStatus(asargs, statuschan)
+	statuschan := git.AnnexStatus(asargs)
 	for item := range statuschan {
 		if item.Err != nil {
 			return nil, item.Err
@@ -798,8 +811,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 	// Need to run git ls-files, with bare temporarily disabled, and add only files that haven't been added yet
 	git.SetBare(false)
 	defer git.SetBare(true)
-	lschan := make(chan string)
-	go git.LsFiles(paths, lschan)
+	lschan := git.LsFiles(paths)
 	var gitfiles []string
 	for fname := range lschan {
 		fname = filepath.Clean(fname)
@@ -811,11 +823,10 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 
 	// git files should be checked against upstream (if it exists) for local commits
 	if len(gitfiles) > 0 {
-		diffchan := make(chan string)
 		remote, err := DefaultRemote()
 		if err == nil {
 			upstream := fmt.Sprintf("%s/master", remote)
-			go git.DiffUpstream(gitfiles, upstream, diffchan)
+			diffchan := git.DiffUpstream(gitfiles, upstream)
 			for fname := range diffchan {
 				statuses[filepath.Clean(fname)] = LocalChanges
 			}
@@ -828,26 +839,22 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	// TODO: Determine if added files (LocalChanges) are new or not (new status needed?)
 	statuses := make(map[string]FileStatus)
 
-	cachedchan := make(chan string)
 	var cachedfiles, modifiedfiles, untrackedfiles, deletedfiles []string
 	// Collect checked in files
 	lsfilesargs := append([]string{"--cached"}, paths...)
-	go git.LsFiles(lsfilesargs, cachedchan)
+	cachedchan := git.LsFiles(lsfilesargs)
 
 	// Collect modified files
-	modifiedchan := make(chan string)
 	lsfilesargs = append([]string{"--modified"}, paths...)
-	go git.LsFiles(lsfilesargs, modifiedchan)
+	modifiedchan := git.LsFiles(lsfilesargs)
 
 	// Collect untracked files
-	otherschan := make(chan string)
 	lsfilesargs = append([]string{"--others"}, paths...)
-	go git.LsFiles(lsfilesargs, otherschan)
+	otherschan := git.LsFiles(lsfilesargs)
 
 	// Collect deleted files
-	deletedchan := make(chan string)
 	lsfilesargs = append([]string{"--deleted"}, paths...)
-	go git.LsFiles(lsfilesargs, deletedchan)
+	deletedchan := git.LsFiles(lsfilesargs)
 
 	// TODO: Use a WaitGroup
 	for {
@@ -884,7 +891,6 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 
 	if len(cachedfiles) > 0 {
 		// Check for git diffs with upstream
-		diffchan := make(chan string)
 		noremotes := true
 		remote, rerr := DefaultRemote()
 		if rerr == nil {
@@ -900,7 +906,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 			}
 		} else if rerr == nil {
 			upstream := fmt.Sprintf("%s/master", remote) // TODO: Don't assume master; use current branch name
-			go git.DiffUpstream(cachedfiles, upstream, diffchan)
+			diffchan := git.DiffUpstream(cachedfiles, upstream)
 			for fname := range diffchan {
 				fname = filepath.Clean(fname)
 				// Two notes:
@@ -911,8 +917,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 		}
 
 		// Run whereis on cached files (if any) to see if content is synced for annexed files
-		wichan := make(chan git.AnnexWhereisRes)
-		go git.AnnexWhereis(cachedfiles, wichan)
+		wichan := git.AnnexWhereis(cachedfiles)
 		for wiInfo := range wichan {
 			if wiInfo.Err != nil {
 				continue
@@ -949,8 +954,7 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	}
 
 	// Check if there are any TypeChange files (lock state change)
-	statuschan := make(chan git.AnnexStatusRes)
-	go git.AnnexStatus(paths, statuschan)
+	statuschan := git.AnnexStatus(paths)
 	for item := range statuschan {
 		if item.Err != nil {
 			log.Write("Error during annex status while searching for unlocked files")
