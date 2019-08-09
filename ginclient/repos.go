@@ -252,10 +252,12 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 			}
 		}
 
+		// Run git add on deleted files only
 		if len(gitaddpaths) > 0 {
 			gitaddchan := make(chan git.RepoFileStatus)
 			go git.Add(gitaddpaths, gitaddchan)
 			for addstat := range gitaddchan {
+				addstat.State = "Removing"
 				addchan <- addstat
 			}
 		}
@@ -267,7 +269,6 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 		for addstat := range annexaddchan {
 			addchan <- addstat
 		}
-
 	}
 }
 
