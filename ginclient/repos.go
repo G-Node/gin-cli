@@ -240,6 +240,26 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 	}
 
 	if len(paths) > 0 {
+		gitaddpaths := make([]string, 0) // most times, this wont be used, so start with 0
+		statuschan := make(chan git.AnnexStatusRes)
+		go git.AnnexStatus(paths, statuschan)
+		for stat := range statuschan {
+			if stat.Status == "D" {
+				// deleted files match but weren't added
+				// this can happen when the annex filters don't match a file
+				// and it doesn't go through to get added to git
+				gitaddpaths = append(gitaddpaths, stat.File)
+			}
+		}
+
+		if len(gitaddpaths) > 0 {
+			gitaddchan := make(chan git.RepoFileStatus)
+			go git.Add(gitaddpaths, gitaddchan)
+			for addstat := range gitaddchan {
+				addchan <- addstat
+			}
+		}
+
 		// Run git annex add using exclusion filters
 		// Files matching filters are automatically added to git
 		annexaddchan := make(chan git.RepoFileStatus)
@@ -247,6 +267,7 @@ func Add(paths []string, addchan chan<- git.RepoFileStatus) {
 		for addstat := range annexaddchan {
 			addchan <- addstat
 		}
+
 	}
 }
 
