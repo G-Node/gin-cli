@@ -165,7 +165,7 @@ func sshEnv() string {
 	hostkeyfile, err := GetKnownHosts()
 	var hfoptstr string
 	if err == nil {
-		hfoptstr = fmt.Sprintf("-o 'UserKnownHostsFile=\"%s\"'", hostkeyfile)
+		hfoptstr = fmt.Sprintf("-o 'UserKnownHostsFile=%q'", hostkeyfile)
 	}
 	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes %s", sshbin, keystr, hfoptstr)
 	log.Write("env %s", gitSSHCmd)

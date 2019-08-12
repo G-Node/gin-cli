@@ -68,7 +68,7 @@ func printKeys(gincl *ginclient.Client, prStyle printstyle) {
 	} else {
 		fmt.Printf("You have %s key%s associated with your account.\n\n", nkeysStr, plural)
 		for idx, key := range keys {
-			fmt.Printf("[%v] \"%s\"\n", idx+1, key.Title)
+			fmt.Printf("[%v] %q\n", idx+1, key.Title)
 			if prStyle == psVerbose {
 				fmt.Printf("--- Key ---\n%s\n", key.Key)
 			}
