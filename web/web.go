@@ -7,6 +7,7 @@ package web
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
@@ -19,13 +20,7 @@ import (
 	"strings"
 
 	"github.com/G-Node/gin-cli/ginclient/config"
-	"github.com/G-Node/gin-cli/ginclient/log"
-	"github.com/G-Node/gin-cli/git/shell"
-	gogs "github.com/gogits/go-gogs-client"
 )
-
-// weberror alias to util.Error
-type weberror = shell.Error
 
 // UserToken struct for username and token
 type UserToken struct {
@@ -40,51 +35,58 @@ type Client struct {
 	web *http.Client
 }
 
-func urlJoin(parts ...string) string {
+func urlJoin(parts ...string) (string, error) {
 	// First part must be a valid URL
 	u, err := url.Parse(parts[0])
 	if err != nil {
-		log.Write("Bad URL in urlJoin: %v", parts)
-		return ""
+		return "", fmt.Errorf("Bad URL(s) in join %q: %s", parts, err.Error())
 	}
 
 	for _, part := range parts[1:] {
 		u.Path = path.Join(u.Path, part)
 	}
-	return u.String()
+	return u.String(), nil
 }
 
-func parseServerError(err error) (errmsg string) {
+func parseServerError(err error) error {
 	// should only receive non-nil error messages, but lets check anyway
-	if err != nil {
-		errmsg = err.Error()
-		if strings.HasSuffix(errmsg, "connection refused") {
-			errmsg = "server refused connection"
-		} else if strings.HasSuffix(errmsg, "no such host") {
-			errmsg = "server unreachable"
-		} else if strings.HasSuffix(errmsg, "timeout") {
-			errmsg = "request timed out"
-		}
+	if err == nil {
+		return nil
 	}
-	return
+	errmsg := err.Error()
+	if strings.HasSuffix(errmsg, "connection refused") {
+		errmsg = "server refused connection"
+	} else if strings.HasSuffix(errmsg, "no such host") {
+		errmsg = "server unreachable"
+	} else if strings.HasSuffix(errmsg, "timeout") {
+		errmsg = "request timed out"
+	}
+	return fmt.Errorf(errmsg)
+}
+
+func basicauthenc(username, password string) string {
+	userpass := fmt.Sprintf("%s:%s", username, password)
+	return base64.StdEncoding.EncodeToString([]byte(userpass))
 }
 
 // Get sends a GET request to address.
 // The address is appended to the client host, so it should be specified without a host prefix.
 func (cl *Client) Get(address string) (*http.Response, error) {
-	requrl := urlJoin(cl.Host, address)
+	requrl, err := urlJoin(cl.Host, address)
+	if err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequest("GET", requrl, nil)
 	if err != nil {
-		return nil, weberror{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl)}
+		return nil, err
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
-	log.Write("Performing GET: %s", req.URL)
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
 	}
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		return nil, weberror{UError: err.Error(), Origin: fmt.Sprintf("Get(%s)", requrl), Description: parseServerError(err)}
+		return nil, parseServerError(err)
 	}
 	return resp, nil
 }
@@ -92,25 +94,25 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 // Post sends a POST request to address with the provided data.
 // The address is appended to the client host, so it should be specified without a host prefix.
 func (cl *Client) Post(address string, data interface{}) (*http.Response, error) {
-	fn := fmt.Sprintf("Post(%s, <data>)", address)
 	datajson, err := json.Marshal(data)
 	if err != nil {
-		return nil, weberror{UError: err.Error(), Origin: fn}
+		return nil, err
 	}
-	requrl := urlJoin(cl.Host, address)
+	requrl, err := urlJoin(cl.Host, address)
+	if err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
 	if err != nil {
-		return nil, weberror{UError: err.Error(), Origin: fn}
+		return nil, err
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
-		log.Write("Added token to POST")
 	}
-	log.Write("Performing POST: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		err = weberror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
+		err = parseServerError(err)
 	}
 	return resp, err
 }
@@ -118,18 +120,19 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 // GetBasicAuth sends a GET request to address.
 // The username and password are used to perform Basic authentication.
 func (cl *Client) GetBasicAuth(address, username, password string) (*http.Response, error) {
-	fn := fmt.Sprintf("GetBasicAuth(%s)", address)
-	requrl := urlJoin(cl.Host, address)
+	requrl, err := urlJoin(cl.Host, address)
+	if err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequest("GET", requrl, nil)
 	if err != nil {
-		return nil, weberror{UError: err.Error(), Origin: fn}
+		return nil, err
 	}
 	req.Header.Set("content-type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", gogs.BasicAuthEncode(username, password)))
-	log.Write("Performing GET: %s", req.URL)
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", basicauthenc(username, password)))
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		err = weberror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
+		err = parseServerError(err)
 	}
 	return resp, err
 }
@@ -137,43 +140,44 @@ func (cl *Client) GetBasicAuth(address, username, password string) (*http.Respon
 // PostBasicAuth sends a POST request to address with the provided data.
 // The username and password are used to perform Basic authentication.
 func (cl *Client) PostBasicAuth(address, username, password string, data interface{}) (*http.Response, error) {
-	fn := fmt.Sprintf("PostBasicAuth(%s)", address)
 	datajson, err := json.Marshal(data)
 	if err != nil {
-		return nil, weberror{UError: err.Error(), Origin: fn}
+		return nil, err
 	}
-	requrl := urlJoin(cl.Host, address)
+	requrl, err := urlJoin(cl.Host, address)
+	if err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequest("POST", requrl, bytes.NewReader(datajson))
 	if err != nil {
-		return nil, weberror{UError: err.Error(), Origin: fn}
+		return nil, err
 	}
 	req.Header.Set("content-type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", gogs.BasicAuthEncode(username, password)))
-	log.Write("Performing POST: %s", req.URL)
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", basicauthenc(username, password)))
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		err = weberror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
+		err = parseServerError(err)
 	}
 	return resp, err
 }
 
 // Delete sends a DELETE request to address.
 func (cl *Client) Delete(address string) (*http.Response, error) {
-	fn := fmt.Sprintf("Delete(%s)", address)
-	requrl := urlJoin(cl.Host, address)
+	requrl, err := urlJoin(cl.Host, address)
+	if err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequest("DELETE", requrl, nil)
 	if err != nil {
-		return nil, weberror{UError: err.Error(), Origin: fn}
+		return nil, err
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
 	if cl.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
-		log.Write("Added token to DELETE")
 	}
-	log.Write("Performing DELETE: %s", req.URL)
 	resp, err := cl.web.Do(req)
 	if err != nil {
-		err = weberror{UError: err.Error(), Origin: fn, Description: parseServerError(err)}
+		err = parseServerError(err)
 	}
 	return resp, err
 }
@@ -186,54 +190,45 @@ func New(host string) *Client {
 // LoadToken reads the username and auth token from the token file and sets the
 // values in the struct.
 func (ut *UserToken) LoadToken(srvalias string) error {
-	fn := fmt.Sprintf("LoadToken(%s)", srvalias)
 	if ut.Username != "" && ut.Token != "" {
 		return nil
 	}
 	path, _ := config.Path(false) // Error can only occur when create=True
 	filename := fmt.Sprintf("%s.token", srvalias)
 	filepath := filepath.Join(path, filename)
-	log.Write("Loading token [server %s] %s", srvalias, filepath)
 	file, err := os.Open(filepath)
 	if err != nil {
-		log.Write("Failed to load")
-		return weberror{UError: err.Error(), Origin: fn, Description: "failed to load user token"}
+		return fmt.Errorf("failed to load user token: %s", err.Error())
 	}
 	defer closeFile(file)
 
 	decoder := gob.NewDecoder(file)
 	err = decoder.Decode(ut)
 	if err != nil {
-		log.Write("Failed to parse")
-		return weberror{UError: err.Error(), Origin: fn, Description: "failed to parse user token"}
+		return fmt.Errorf("failed to parse user token: %s", err.Error())
 	}
 	return nil
 }
 
 // StoreToken saves the username and auth token to the token file.
 func (ut *UserToken) StoreToken(srvalias string) error {
-	fn := fmt.Sprintf("StoreToken(%s)", srvalias)
 	path, err := config.Path(true)
 	if err != nil {
-		return weberror{UError: err.Error(), Origin: fn}
+		return err
 	}
 	filename := fmt.Sprintf("%s.token", srvalias)
 	filepath := filepath.Join(path, filename)
-	log.Write("Saving token [server %s] %s", srvalias, filepath)
 	file, err := os.Create(filepath)
 	if err != nil {
-		log.Write("Failed to create token file %s", filepath)
-		return weberror{UError: err.Error(), Origin: fn, Description: fmt.Sprintf("failed to create token file %s", filepath)}
+		return fmt.Errorf("failed to create token file %q: %s", filepath, err.Error())
 	}
 	defer closeFile(file)
 
 	encoder := gob.NewEncoder(file)
 	err = encoder.Encode(ut)
 	if err != nil {
-		log.Write("Failed to write token to file %s", filepath)
-		return weberror{UError: err.Error(), Origin: fn, Description: "failed to store token"}
+		return fmt.Errorf("failed to store token at %q: %s", filepath, err.Error())
 	}
-	log.Write("Saved")
 	return nil
 }
 
@@ -244,9 +239,8 @@ func DeleteToken(srvalias string) error {
 	tokenpath := filepath.Join(path, filename)
 	err := os.Remove(tokenpath)
 	if err != nil {
-		return weberror{UError: err.Error(), Origin: "DeleteToken()", Description: "could not delete token"}
+		return fmt.Errorf("could not delete token at %q: %s", tokenpath, err.Error())
 	}
-	log.Write("Token deleted")
 	return nil
 }
 
