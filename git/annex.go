@@ -122,7 +122,7 @@ type AnnexInfoRes struct {
 
 // AnnexInit initialises the repository for annex.
 // (git annex init)
-func AnnexInit(description string) error {
+func (cl *Client) AnnexInit(description string) error {
 	err := ConfigSet("annex.backends", "MD5")
 	if err != nil {
 		log.Write("Failed to set default annex backend MD5")
@@ -134,6 +134,9 @@ func AnnexInit(description string) error {
 	}
 	args := []string{"init", "--version=7", description}
 	cmd := AnnexCommand(args...)
+	if cl.SSHCmd != "" {
+		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
+	}
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		initError := fmt.Errorf("Repository annex initialisation failed.\n%s", string(stderr))
@@ -917,32 +920,29 @@ func AnnexFsck(paths []string) error {
 	return nil
 }
 
-// build exclusion argument list
-// files < annex.minsize or matching exclusion extensions will not be annexed and
-// will instead be handled by git
-func annexExclArgs() string {
+// Builds exclusion argument string for git annex commands:
+func annexExclArgs(minsize string, exclude []string) string {
 	var expbuilder strings.Builder
-	config := config.Read()
-	if config.Annex.MinSize != "" {
-		largerthan := fmt.Sprintf("(largerthan=%s)", config.Annex.MinSize)
+	if minsize != "" {
+		largerthan := fmt.Sprintf("(largerthan=%s)", minsize)
 		expbuilder.WriteString(largerthan)
 	}
 
-	for _, pattern := range config.Annex.Exclude {
+	// explicitly exclude local (repository) config file
+	for _, pattern := range append(exclude, "config.yml") {
 		exclarg := fmt.Sprintf(" and (exclude=%s)", pattern)
 		expbuilder.WriteString(exclarg)
 	}
 
-	// explicitly exclude config file
-	expbuilder.WriteString(fmt.Sprintf(" and (exclude=config.yml)"))
 	return fmt.Sprintf("annex.largefiles=(%s)", expbuilder.String())
 }
 
 // AnnexAdd adds paths to the annex.
-// Files specified for exclusion in the configuration are ignored automatically.
+// Files smaller than 'minsize' are added to git.
+// Files matching at least one exclusion pattern are also added to git.
 // The status channel 'addchan' is closed when this function returns.
 // (git annex add)
-func AnnexAdd(filepaths []string) chan RepoFileStatus {
+func AnnexAdd(filepaths []string, minsize string, exclude []string) chan RepoFileStatus {
 	addchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(addchan)
@@ -954,7 +954,7 @@ func AnnexAdd(filepaths []string) chan RepoFileStatus {
 		if !RawMode {
 			cmdargs = append(cmdargs, "--json")
 		}
-		exclargs := annexExclArgs()
+		exclargs := annexExclArgs(minsize, exclude)
 		if len(exclargs) > 0 {
 			cmdargs = append(cmdargs, "-c", exclargs)
 		}
@@ -1083,15 +1083,12 @@ func AnnexCommand(args ...string) shell.Cmd {
 	cmdargs := []string{"annex"}
 	cmdargs = append(cmdargs, args...)
 	cmd := shell.Command(gitbin, cmdargs...)
-	env := os.Environ()
-	cmd.Env = env
 	if gitannexpath != "" {
 		syspath := os.Getenv("PATH")
 		syspath += string(os.PathListSeparator) + gitannexpath
-		cmd.Env = append(cmd.Env, syspath)
+		cmd.Setenv("PATH", syspath)
 	}
-	cmd.Env = append(cmd.Env, sshEnv())
-	cmd.Env = append(cmd.Env, "GIT_ANNEX_USE_GIT_SSH=1")
+	cmd.Setenv("GIT_ANNEX_USE_GIT_SSH", "1")
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
 	return cmd

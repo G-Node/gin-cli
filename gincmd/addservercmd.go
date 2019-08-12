@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
-	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,8 @@ func promptForGit() (gitconf config.GitCfg) {
 }
 
 func addHostKey(gitconf *config.GitCfg) {
-	hostkeystr, fingerprint, err := git.GetHostKey(*gitconf)
+	address := fmt.Sprintf("%s:%d", gitconf.Host, gitconf.Port)
+	hostkeystr, fingerprint, err := ginclient.GetHostKey(gitconf.User, address)
 	CheckError(err)
 	fmt.Printf(":: Host key fingerprint for [%s]: %s\n", gitconf.AddressStr(), fingerprint)
 	fmt.Print("Accept [yes/no]: ")
@@ -98,7 +99,7 @@ func addServer(cmd *cobra.Command, args []string) {
 	}
 
 	// Recreate known hosts file
-	err = git.WriteKnownHosts()
+	err = ginclient.WriteKnownHosts()
 	if err != nil {
 		Die("failed to write known_hosts file")
 	}

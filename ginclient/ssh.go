@@ -1,4 +1,4 @@
-package git
+package ginclient
 
 import (
 	"crypto/rand"
@@ -79,7 +79,7 @@ func PrivKeyPath() map[string]string {
 // GetHostKey takes a git server configuration, queries the server via SSH, and
 // returns the public key of the host (in the format required for the
 // known_hosts file) and the key fingerprint.
-func GetHostKey(gitconf config.GitCfg) (hostkeystr, fingerprint string, err error) {
+func GetHostKey(user, address string) (hostkeystr, fingerprint string, err error) {
 	// HostKeyCallback constructs the keystring
 	keycb := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 		addr := []string{hostname, remote.String()}
@@ -89,10 +89,10 @@ func GetHostKey(gitconf config.GitCfg) (hostkeystr, fingerprint string, err erro
 	}
 
 	sshcon := ssh.ClientConfig{
-		User:            gitconf.User,
+		User:            user,
 		HostKeyCallback: keycb,
 	}
-	_, derr := ssh.Dial("tcp", fmt.Sprintf("%s:%d", gitconf.Host, gitconf.Port), &sshcon)
+	_, derr := ssh.Dial("tcp", address, &sshcon)
 	if derr != nil && !strings.Contains(derr.Error(), "unable to authenticate") {
 		// Other errors (auth error in particular) should be ignored
 		err = fmt.Errorf("connection test failed: %s", derr)
@@ -142,10 +142,11 @@ func GetKnownHosts() (string, error) {
 	return hkpath, err
 }
 
-// sshEnv returns the value that should be set for the GIT_SSH_COMMAND environment variable
-// in order to use the user's private keys.
-// The returned string contains all available private keys.
-func sshEnv() string {
+// sshopts returns the a series of SSH options that can be used to connect to
+// the configured server.  The value returned string can be set as the
+// GIT_SSH_COMMAND environment variable in order to use the user's private
+// keys.  The returned string contains all available private keys.
+func sshopts() string {
 	// Windows git seems to require Unix paths for the SSH command -- this is dirty but works
 	fixpathsep := func(p string) string {
 		p = filepath.ToSlash(p)
@@ -167,7 +168,15 @@ func sshEnv() string {
 	if err == nil {
 		hfoptstr = fmt.Sprintf("-o 'UserKnownHostsFile=%q'", hostkeyfile)
 	}
-	gitSSHCmd := fmt.Sprintf("GIT_SSH_COMMAND=%s %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes %s", sshbin, keystr, hfoptstr)
-	log.Write("env %s", gitSSHCmd)
+	gitSSHCmd := fmt.Sprintf("%s %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes %s", sshbin, keystr, hfoptstr)
+	log.Write("SSH Cmd %s", gitSSHCmd)
 	return gitSSHCmd
+}
+
+// pathExists returns true if the path exists
+func pathExists(path string) bool {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }

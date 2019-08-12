@@ -27,6 +27,7 @@ type ginerror = shell.Error
 // Client is a client interface to the GIN server.  Uses web.Client.
 type Client struct {
 	web      *web.Client
+	git      *git.Client
 	Username string
 	Token    string
 	srvalias string
@@ -430,7 +431,7 @@ func (gincl *Client) Logout() {
 	}
 
 	// 2. Delete private key
-	privKeyFiles := git.PrivKeyPath()
+	privKeyFiles := PrivKeyPath()
 	err = os.Remove(privKeyFiles[gincl.srvalias])
 	if err != nil {
 		log.Write("Error deleting key file")

@@ -40,6 +40,16 @@ type giterror = shell.Error
 
 // Types
 
+// Client struct for calling commands with
+type Client struct {
+	Path   string
+	SSHCmd string
+}
+
+func New(path string) *Client {
+	return &Client{Path: path, SSHCmd: ""}
+}
+
 // RepoFileStatus describes the status of files when being added to the repo or transferred to/from remotes.
 type RepoFileStatus struct {
 	// The name of the file.
@@ -127,7 +137,7 @@ func Init(bare bool) error {
 // Clone downloads a repository and sets the remote fetch and push urls.
 // The status channel 'clonechan' is closed when this function returns.
 // (git clone ...)
-func Clone(remotepath string, repopath string) chan RepoFileStatus {
+func (cl *Client) Clone(remotepath string, repopath string) chan RepoFileStatus {
 	// TODO: This function is crazy huge - simplify
 	fn := fmt.Sprintf("Clone(%s)", remotepath)
 	clonechan := make(chan RepoFileStatus)
@@ -139,7 +149,11 @@ func Clone(remotepath string, repopath string) chan RepoFileStatus {
 			// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
 			args = append([]string{"-c", "core.symlinks=false"}, args...)
 		}
+		args = append(args, cl.Path)
 		cmd := Command(args...)
+		if cl.SSHCmd != "" {
+			cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
+		}
 		err := cmd.Start()
 		if err != nil {
 			clonechan <- RepoFileStatus{Err: giterror{UError: err.Error(), Origin: fn}}
@@ -308,7 +322,6 @@ func Add(filepaths []string) chan RepoFileStatus {
 			filepaths = gitAddDirect(filepaths)
 		}
 
-		// exclargs := annexExclArgs()
 		cmdargs := []string{"add", "--verbose", "--"}
 		cmdargs = append(cmdargs, filepaths...)
 		cmd := Command(cmdargs...)
@@ -1144,8 +1157,6 @@ func Command(args ...string) shell.Cmd {
 	gitbin := config.Bin.Git
 	cmd := shell.Command(gitbin)
 	cmd.Args = append(cmd.Args, args...)
-	env := os.Environ()
-	cmd.Env = append(env, sshEnv())
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
 	return cmd

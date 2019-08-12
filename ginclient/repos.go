@@ -86,7 +86,7 @@ func isAnnexPath(path string) bool {
 // The private key is saved in the user's configuration directory, to be used for git commands.
 // The public key is added to the GIN server for the current logged in user.
 func (gincl *Client) MakeSessionKey() error {
-	keyPair, err := git.MakeKeyPair()
+	keyPair, err := MakeKeyPair()
 	if err != nil {
 		return err
 	}
@@ -265,9 +265,11 @@ func Add(paths []string) chan git.RepoFileStatus {
 			}
 		}
 
+		conf := config.Read()
+
 		// Run git annex add using exclusion filters
 		// Files matching filters are automatically added to git
-		annexaddchan := git.AnnexAdd(paths)
+		annexaddchan := git.AnnexAdd(paths, conf.Annex.MinSize, conf.Annex.Exclude)
 		for addstat := range annexaddchan {
 			addchan <- addstat
 		}
@@ -413,11 +415,7 @@ func (gincl *Client) UnlockContent(paths []string) chan git.RepoFileStatus {
 
 // Download downloads changes and placeholder files in an already checked out repository.
 func (gincl *Client) Download(remote string) error {
-	log.Write("Download")
-	// err := git.Pull(remote)
-	// if err != nil {
-	// 	return err
-	// }
+	log.Write("Download: %q", remote)
 	return git.AnnexPull(remote)
 }
 
@@ -436,16 +434,20 @@ func (gincl *Client) CloneRepo(repopath string) chan git.RepoFileStatus {
 	go func() {
 		defer close(clonechan)
 		remotepath := fmt.Sprintf("%s/%s", gincl.GitAddress(), repopath)
-		clonestatus := git.Clone(remotepath, repopath)
+		repoPathParts := strings.SplitN(repopath, "/", 2)
+		repoName := repoPathParts[1]
+
+		here, _ := os.Getwd()
+		cloneloc := filepath.Join(here, repoName)
+		gitcl := git.New(cloneloc)
+		gitcl.SSHCmd = sshopts()
+		clonestatus := gitcl.Clone(remotepath, repopath)
 		for stat := range clonestatus {
 			clonechan <- stat
 			if stat.Err != nil {
 				return
 			}
 		}
-
-		repoPathParts := strings.SplitN(repopath, "/", 2)
-		repoName := repoPathParts[1]
 
 		status := git.RepoFileStatus{State: "Initialising local storage"}
 		clonechan <- status
@@ -701,7 +703,9 @@ func (gincl *Client) InitDir(bare bool) error {
 		}
 	}
 
-	err = git.AnnexInit(description)
+	gitcl := git.New(".")
+	gitcl.SSHCmd = sshopts()
+	err = gitcl.AnnexInit(description)
 	if err != nil {
 		initerr.UError = err.Error()
 		return initerr
