@@ -24,16 +24,11 @@ import (
 // ginerror convenience alias to util.Error
 type ginerror = shell.Error
 
-// UserToken struct for username and token
-type UserToken struct {
+// Client is a client interface to the GIN server.  Uses web.Client.
+type Client struct {
+	web      *web.Client
 	Username string
 	Token    string
-}
-
-// Client is a client interface to the GIN server. Embeds web.Client.
-type Client struct {
-	*web.Client
-	*UserToken
 	srvalias string
 }
 
@@ -41,10 +36,11 @@ func closeFile(f *os.File) {
 	_ = f.Close()
 }
 
-// LoadToken reads the username and auth token from the token file and sets the
-// values in the struct.
-func (ut *UserToken) LoadToken(srvalias string) error {
-	if ut.Username != "" && ut.Token != "" {
+// LoadToken reads the username and auth token from the token file for the
+// configured server alias and sets the values for the Client.
+func (cl *Client) LoadToken() error {
+	srvalias := cl.srvalias
+	if cl.Username != "" && cl.Token != "" {
 		return nil
 	}
 	path, _ := config.Path(false) // Error can only occur when create=True
@@ -57,15 +53,23 @@ func (ut *UserToken) LoadToken(srvalias string) error {
 	defer closeFile(file)
 
 	decoder := gob.NewDecoder(file)
+	ut := &struct {
+		Username string
+		Token    string
+	}{}
 	err = decoder.Decode(ut)
 	if err != nil {
 		return fmt.Errorf("failed to parse user token: %s", err.Error())
 	}
+
+	cl.Username = ut.Username
+	cl.Token = ut.Token
+	cl.web.SetToken(cl.Token)
 	return nil
 }
 
 // StoreToken saves the username and auth token to the token file.
-func (ut *UserToken) StoreToken(srvalias string) error {
+func (cl *Client) StoreToken(srvalias string) error {
 	path, err := config.Path(true)
 	if err != nil {
 		return err
@@ -77,6 +81,14 @@ func (ut *UserToken) StoreToken(srvalias string) error {
 		return fmt.Errorf("failed to create token file %q: %s", filepath, err.Error())
 	}
 	defer closeFile(file)
+
+	ut := struct {
+		Username string
+		Token    string
+	}{
+		cl.Username,
+		cl.Token,
+	}
 
 	encoder := gob.NewEncoder(file)
 	err = encoder.Encode(ut)
@@ -112,15 +124,14 @@ type GINUser struct {
 // name, an empty Client is returned.  This Client can be used for offline
 // operations.
 func New(alias string) *Client {
-	ut := &UserToken{}
 	if alias == "" {
-		return &Client{Client: web.New(""), UserToken: ut, srvalias: ""}
+		return &Client{web: web.New(""), srvalias: ""}
 	}
 	srvcfg, ok := config.Read().Servers[alias]
 	if !ok {
-		return &Client{Client: web.New(""), UserToken: ut, srvalias: ""}
+		return &Client{web: web.New(""), srvalias: ""}
 	}
-	return &Client{Client: web.New(srvcfg.Web.AddressStr()), UserToken: ut, srvalias: alias}
+	return &Client{web: web.New(srvcfg.Web.AddressStr()), srvalias: alias}
 }
 
 // AccessToken represents a API access token.
@@ -146,7 +157,7 @@ func (gincl *Client) WebAddress() string {
 func (gincl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
 	fn := "GetUserKeys()"
 	var keys []gogs.PublicKey
-	res, err := gincl.Get("/api/v1/user/keys")
+	res, err := gincl.web.Get("/api/v1/user/keys")
 	if err != nil {
 		return nil, err // return error from Get() directly
 	}
@@ -176,7 +187,7 @@ func (gincl *Client) GetUserKeys() ([]gogs.PublicKey, error) {
 func (gincl *Client) RequestAccount(name string) (gogs.User, error) {
 	fn := fmt.Sprintf("RequestAccount(%s)", name)
 	var acc gogs.User
-	res, err := gincl.Get(fmt.Sprintf("/api/v1/users/%s", name))
+	res, err := gincl.web.Get(fmt.Sprintf("/api/v1/users/%s", name))
 	if err != nil {
 		return acc, err // return error from Get() directly
 	}
@@ -214,7 +225,7 @@ func (gincl *Client) AddKey(key, description string, force bool) error {
 		// Attempting to delete potential existing key that matches the title
 		_ = gincl.DeletePubKeyByTitle(description)
 	}
-	res, err := gincl.Post("/api/v1/user/keys", newkey)
+	res, err := gincl.web.Post("/api/v1/user/keys", newkey)
 	if err != nil {
 		return err // return error from Post() directly
 	}
@@ -237,7 +248,7 @@ func (gincl *Client) DeletePubKey(id int64) error {
 	fn := "DeletePubKey()"
 
 	address := fmt.Sprintf("/api/v1/user/keys/%d", id)
-	res, err := gincl.Delete(address)
+	res, err := gincl.web.Delete(address)
 	defer web.CloseRes(res.Body)
 	if err != nil {
 		return err // Return error from Delete() directly
@@ -308,14 +319,14 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	for _, token := range tokens {
 		if token.Name == clientID {
 			// found our token
-			gincl.UserToken.Username = username
-			gincl.UserToken.Token = token.Sha1
+			gincl.Username = username
+			gincl.Token = token.Sha1
 			log.Write("Found %s access token", clientID)
 			break
 		}
 	}
 
-	if len(gincl.UserToken.Token) == 0 {
+	if len(gincl.Token) == 0 {
 		// no existing token; creating new one
 		log.Write("Requesting new token from server")
 		err = gincl.NewToken(username, password, clientID)
@@ -331,7 +342,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 		return fmt.Errorf("Error while storing token: %s", err.Error())
 	}
 
-	gincl.SetToken(gincl.Token)
+	gincl.web.SetToken(gincl.Token)
 
 	// Make keys
 	return gincl.MakeSessionKey()
@@ -341,7 +352,7 @@ func (gincl *Client) Login(username, password, clientID string) error {
 func (gincl *Client) GetTokens(username, password string) ([]AccessToken, error) {
 	fn := "GetTokens()"
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
-	res, err := gincl.GetBasicAuth(address, username, password)
+	res, err := gincl.web.GetBasicAuth(address, username, password)
 	if err != nil {
 		return nil, err // return error from GetBasicAuth directly
 	}
@@ -372,7 +383,7 @@ func (gincl *Client) NewToken(username, password, clientID string) error {
 	fn := "NewToken()"
 	tokenCreate := &gogs.CreateAccessTokenOption{Name: clientID}
 	address := fmt.Sprintf("/api/v1/users/%s/tokens", username)
-	res, err := gincl.PostBasicAuth(address, username, password, tokenCreate)
+	res, err := gincl.web.PostBasicAuth(address, username, password, tokenCreate)
 	if err != nil {
 		return err // return error from PostBasicAuth directly
 	}
@@ -396,16 +407,7 @@ func (gincl *Client) NewToken(username, password, clientID string) error {
 	}
 	gincl.Username = username
 	gincl.Token = token.Sha1
-	return nil
-}
-
-// LoadToken calls the embedded UserToken.LoadToken function with the configured server alias.
-func (gincl *Client) LoadToken() error {
-	err := gincl.UserToken.LoadToken(gincl.srvalias)
-	if err != nil {
-		return err
-	}
-	gincl.Client.SetToken(gincl.Token)
+	gincl.web.SetToken(gincl.Token)
 	return nil
 }
 

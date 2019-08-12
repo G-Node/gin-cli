@@ -120,7 +120,7 @@ func (gincl *Client) GetRepo(repoPath string) (gogs.Repository, error) {
 	log.Write("GetRepo")
 	var repo gogs.Repository
 
-	res, err := gincl.Get(fmt.Sprintf("/api/v1/repos/%s", repoPath))
+	res, err := gincl.web.Get(fmt.Sprintf("/api/v1/repos/%s", repoPath))
 	if err != nil {
 		return repo, err // return error from Get() directly
 	}
@@ -153,7 +153,7 @@ func (gincl *Client) ListRepos(user string) ([]gogs.Repository, error) {
 	var repoList []gogs.Repository
 	var res *http.Response
 	var err error
-	res, err = gincl.Get(fmt.Sprintf("/api/v1/users/%s/repos", user))
+	res, err = gincl.web.Get(fmt.Sprintf("/api/v1/users/%s/repos", user))
 	if err != nil {
 		return nil, err // return error from Get() directly
 	}
@@ -185,7 +185,7 @@ func (gincl *Client) CreateRepo(name, description string) error {
 	log.Write("Creating repository")
 	newrepo := gogs.CreateRepoOption{Name: name, Description: description, Private: true}
 	log.Write("Name: %s :: Description: %s", name, description)
-	res, err := gincl.Post("/api/v1/user/repos", newrepo)
+	res, err := gincl.web.Post("/api/v1/user/repos", newrepo)
 	if err != nil {
 		return err // return error from Post() directly
 	}
@@ -208,7 +208,7 @@ func (gincl *Client) CreateRepo(name, description string) error {
 func (gincl *Client) DelRepo(name string) error {
 	fn := fmt.Sprintf("DelRepo(%s)", name)
 	log.Write("Deleting repository")
-	res, err := gincl.Delete(fmt.Sprintf("/api/v1/repos/%s", name))
+	res, err := gincl.web.Delete(fmt.Sprintf("/api/v1/repos/%s", name))
 	if err != nil {
 		return err // return error from Post() directly
 	}
