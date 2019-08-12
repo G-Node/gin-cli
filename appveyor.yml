@@ -8,10 +8,11 @@ stack: go 1.12
 environment:
   SRCDIR: C:\gopath\src\github.com\G-Node\gin-cli
   GOPATH: C:\gopath
+  GO111MODULE: on
+  GOPROXY: https://proxy.golang.org
   BINDIR: bin
   # download dev build
   BUNDLEREPO: https://gin.g-node.org/achilleas/gin-cli-builds/raw/master
-  GIN_LOG_DIR: C:\gin-log
 
   matrix:
     # 32-bit
@@ -19,8 +20,6 @@ environment:
 
     # 64-bit
     - arch: "amd64"
-
-
 
 install:
   - set PATH=C:\Python37-x64\;%PATH%;%GOPATH%\bin;c:\gin-bundle\git\usr\bin
@@ -36,21 +35,7 @@ install:
 
 build_script:
   - cd %SRCDIR%
-  # download deps
-  - go get github.com/spf13/viper
-  - go get github.com/spf13/cobra
-  - go get github.com/howeyc/gopass
-  - go get golang.org/x/crypto/ssh
-  - go get github.com/G-Node/gin-core/gin
-  - go get github.com/G-Node/gin-repo/wire
-  - go get golang.org/x/crypto/ssh
-  - go get github.com/gogits/go-gogs-client
-  - go get github.com/fatih/color
-  - go get github.com/shibukawa/configdir
-  - go get github.com/bbrks/wrap
-  - go get github.com/docker/docker/pkg/term
-  - go get github.com/alecthomas/template
-  - go get github.com/dustin/go-humanize
+  - go get -v ./...
   - go vet ./...
   - set GOARCH=%arch%
   - go build -ldflags "-X main.gincliversion=APPVEYOR-%APPVEYOR_REPO_NAME%-%APPVEYOR_REPO_BRANCH% -X main.build=%APPVEYOR_BUILD_NUMBER% -X main.commit=%APPVEYOR_REPO_COMMIT%" -o %GOPATH%\bin\gin.exe .
@@ -74,6 +59,7 @@ test_script:
 deploy: off
 
 on_finish:
-  - appveyor PushArtifact %GIN_LOG_DIR%\gin.log
+  - appveyor PushArtifact %SRCDIR%\tests\log\gin.log
+  - appveyor PushArtifact %SRCDIR%\tests\log\runner.log
 # Uncomment next line to enable RDP
 # - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))

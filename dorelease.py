@@ -200,16 +200,12 @@ def get_git_annex_for_windows():
     """
     Download the git annex for windows installer.
     """
-    win_git_annex_url = ("https://downloads.kitenet.net/git-annex/windows/"
-                         "current/git-annex-installer.exe")
-    return download(win_git_annex_url)
-    #
-    # git-annex version 7 is very broken on Windows. Until it is fixed, we are
-    # fixing the git-annex version (for Windows) to the last v6 version.
-    # This was obtained from the official git-annex website history:
-    # https://downloads.kitenet.net/.git/
-    # fname = os.path.join(DESTDIR, "downloads", "git-annex-windows-v6.exe")
-    # return fname
+    # win_git_annex_url = ("https://downloads.kitenet.net/git-annex/windows/"
+    #                      "current/git-annex-installer.exe")
+    # return download(win_git_annex_url)
+    # fixing windows installer version (again)
+    fname = os.path.join(DESTDIR, "downloads", "git-annex-installer.exe")
+    return fname
 
 
 def package_linux_plain(binfile):

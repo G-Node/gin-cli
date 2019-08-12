@@ -1,4 +1,5 @@
-// Package shell augments the standard library os/exec Cmd struct and functions with convenience functions for reading piped output.
+// Package shell augments the standard library os/exec Cmd struct and functions
+// with convenience functions for reading piped output.
 package shell
 
 import (
@@ -7,8 +8,8 @@ import (
 	"os/exec"
 )
 
-// Cmd extends the exec.Cmd struct with convenience functions for reading piped output.
-// It also overrides the Wait() method such that the error is stored in the Err field.
+// Cmd extends the exec.Cmd struct with convenience functions for reading piped
+// output.
 type Cmd struct {
 	*exec.Cmd
 	OutReader *bufio.Reader
@@ -16,7 +17,8 @@ type Cmd struct {
 	Err       error
 }
 
-// Command returns the GinCmd struct to execute the named program with the given arguments.
+// Command returns the GinCmd struct to execute the named program with the
+// given arguments.
 func Command(name string, args ...string) Cmd {
 	cmd := exec.Command(name, args...)
 	outpipe, _ := cmd.StdoutPipe()
@@ -26,7 +28,8 @@ func Command(name string, args ...string) Cmd {
 	return Cmd{cmd, outreader, errreader, nil}
 }
 
-// OutputError runs the command and returns the standard output and standard error as two byte slices.
+// OutputError runs the command and returns the standard output and standard
+// error as two byte slices.
 func (cmd *Cmd) OutputError() ([]byte, []byte, error) {
 	var bout, berr bytes.Buffer
 	cmd.Stdout = &bout
@@ -41,8 +44,10 @@ func (cmd *Cmd) Output() ([]byte, error) {
 	return cmd.Cmd.Output()
 }
 
-// Error is used to return errors caused by web requests, API calls, or system calls.
-// It implements the error built-in interface. The Error() method returns the Description unless it is not set, in which case it returns the Underlying Error (UError) message.
+// Error is used to return errors caused by web requests, API calls, or system
+// calls.  It implements the error built-in interface. The Error() method
+// returns the Description unless it is not set, in which case it returns the
+// Underlying Error (UError) message.
 type Error struct {
 	// The error that was returned by the underlying system or API call
 	UError string
