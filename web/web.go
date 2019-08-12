@@ -8,31 +8,26 @@ package web
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
-
-	"github.com/G-Node/gin-cli/ginclient/config"
 )
-
-// UserToken struct for username and token
-type UserToken struct {
-	Username string
-	Token    string
-}
 
 // Client struct for making requests
 type Client struct {
-	Host string
-	UserToken
-	web *http.Client
+	Host  string
+	token string
+	web   *http.Client
+}
+
+// SetToken sets a token that will be used to authorise all subsequent web
+// requests.
+func (cl *Client) SetToken(token string) {
+	cl.token = token
 }
 
 func urlJoin(parts ...string) (string, error) {
@@ -81,8 +76,8 @@ func (cl *Client) Get(address string) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
-	if cl.Token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
+	if cl.token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.token))
 	}
 	resp, err := cl.web.Do(req)
 	if err != nil {
@@ -107,8 +102,8 @@ func (cl *Client) Post(address string, data interface{}) (*http.Response, error)
 		return nil, err
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
-	if cl.Token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
+	if cl.token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.token))
 	}
 	resp, err := cl.web.Do(req)
 	if err != nil {
@@ -172,8 +167,8 @@ func (cl *Client) Delete(address string) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header.Set("content-type", "application/jsonAuthorization")
-	if cl.Token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.Token))
+	if cl.token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", cl.token))
 	}
 	resp, err := cl.web.Do(req)
 	if err != nil {
@@ -187,68 +182,7 @@ func New(host string) *Client {
 	return &Client{Host: host, web: &http.Client{}}
 }
 
-// LoadToken reads the username and auth token from the token file and sets the
-// values in the struct.
-func (ut *UserToken) LoadToken(srvalias string) error {
-	if ut.Username != "" && ut.Token != "" {
-		return nil
-	}
-	path, _ := config.Path(false) // Error can only occur when create=True
-	filename := fmt.Sprintf("%s.token", srvalias)
-	filepath := filepath.Join(path, filename)
-	file, err := os.Open(filepath)
-	if err != nil {
-		return fmt.Errorf("failed to load user token: %s", err.Error())
-	}
-	defer closeFile(file)
-
-	decoder := gob.NewDecoder(file)
-	err = decoder.Decode(ut)
-	if err != nil {
-		return fmt.Errorf("failed to parse user token: %s", err.Error())
-	}
-	return nil
-}
-
-// StoreToken saves the username and auth token to the token file.
-func (ut *UserToken) StoreToken(srvalias string) error {
-	path, err := config.Path(true)
-	if err != nil {
-		return err
-	}
-	filename := fmt.Sprintf("%s.token", srvalias)
-	filepath := filepath.Join(path, filename)
-	file, err := os.Create(filepath)
-	if err != nil {
-		return fmt.Errorf("failed to create token file %q: %s", filepath, err.Error())
-	}
-	defer closeFile(file)
-
-	encoder := gob.NewEncoder(file)
-	err = encoder.Encode(ut)
-	if err != nil {
-		return fmt.Errorf("failed to store token at %q: %s", filepath, err.Error())
-	}
-	return nil
-}
-
-// DeleteToken deletes the token file if it exists (for finalising a logout).
-func DeleteToken(srvalias string) error {
-	path, _ := config.Path(false) // Error can only occur when create=True
-	filename := fmt.Sprintf("%s.token", srvalias)
-	tokenpath := filepath.Join(path, filename)
-	err := os.Remove(tokenpath)
-	if err != nil {
-		return fmt.Errorf("could not delete token at %q: %s", tokenpath, err.Error())
-	}
-	return nil
-}
-
 // CloseRes closes a given result buffer (for use with defer).
 func CloseRes(b io.ReadCloser) {
 	b.Close()
-}
-
-func closeFile(f *os.File) {
-	_ = f.Close()
 }

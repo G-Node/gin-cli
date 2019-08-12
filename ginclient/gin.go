@@ -1,10 +1,12 @@
 package ginclient
 
 import (
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"net/http"
 
@@ -22,6 +24,80 @@ import (
 // ginerror convenience alias to util.Error
 type ginerror = shell.Error
 
+// UserToken struct for username and token
+type UserToken struct {
+	Username string
+	Token    string
+}
+
+// Client is a client interface to the GIN server. Embeds web.Client.
+type Client struct {
+	*web.Client
+	*UserToken
+	srvalias string
+}
+
+func closeFile(f *os.File) {
+	_ = f.Close()
+}
+
+// LoadToken reads the username and auth token from the token file and sets the
+// values in the struct.
+func (ut *UserToken) LoadToken(srvalias string) error {
+	if ut.Username != "" && ut.Token != "" {
+		return nil
+	}
+	path, _ := config.Path(false) // Error can only occur when create=True
+	filename := fmt.Sprintf("%s.token", srvalias)
+	filepath := filepath.Join(path, filename)
+	file, err := os.Open(filepath)
+	if err != nil {
+		return fmt.Errorf("failed to load user token: %s", err.Error())
+	}
+	defer closeFile(file)
+
+	decoder := gob.NewDecoder(file)
+	err = decoder.Decode(ut)
+	if err != nil {
+		return fmt.Errorf("failed to parse user token: %s", err.Error())
+	}
+	return nil
+}
+
+// StoreToken saves the username and auth token to the token file.
+func (ut *UserToken) StoreToken(srvalias string) error {
+	path, err := config.Path(true)
+	if err != nil {
+		return err
+	}
+	filename := fmt.Sprintf("%s.token", srvalias)
+	filepath := filepath.Join(path, filename)
+	file, err := os.Create(filepath)
+	if err != nil {
+		return fmt.Errorf("failed to create token file %q: %s", filepath, err.Error())
+	}
+	defer closeFile(file)
+
+	encoder := gob.NewEncoder(file)
+	err = encoder.Encode(ut)
+	if err != nil {
+		return fmt.Errorf("failed to store token at %q: %s", filepath, err.Error())
+	}
+	return nil
+}
+
+// DeleteToken deletes the token file if it exists (for finalising a logout).
+func DeleteToken(srvalias string) error {
+	path, _ := config.Path(false) // Error can only occur when create=True
+	filename := fmt.Sprintf("%s.token", srvalias)
+	tokenpath := filepath.Join(path, filename)
+	err := os.Remove(tokenpath)
+	if err != nil {
+		return fmt.Errorf("could not delete token at %q: %s", tokenpath, err.Error())
+	}
+	return nil
+}
+
 // GINUser represents a API user.
 type GINUser struct {
 	ID        int64  `json:"id"`
@@ -31,28 +107,26 @@ type GINUser struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-// New returns a new client for the GIN server, configured with the server referred to by the alias in the argument.
+// New returns a new client for the GIN server, configured with the server
+// referred to by the alias in the argument.  If alias is an empty or invalid
+// name, an empty Client is returned.  This Client can be used for offline
+// operations.
 func New(alias string) *Client {
+	ut := &UserToken{}
 	if alias == "" {
-		return &Client{Client: web.New(""), srvalias: ""}
+		return &Client{Client: web.New(""), UserToken: ut, srvalias: ""}
 	}
 	srvcfg, ok := config.Read().Servers[alias]
 	if !ok {
-		return &Client{Client: web.New(""), srvalias: ""}
+		return &Client{Client: web.New(""), UserToken: ut, srvalias: ""}
 	}
-	return &Client{Client: web.New(srvcfg.Web.AddressStr()), srvalias: alias}
+	return &Client{Client: web.New(srvcfg.Web.AddressStr()), UserToken: ut, srvalias: alias}
 }
 
 // AccessToken represents a API access token.
 type AccessToken struct {
 	Name string `json:"name"`
 	Sha1 string `json:"sha1"`
-}
-
-// Client is a client interface to the GIN server. Embeds web.Client.
-type Client struct {
-	*web.Client
-	srvalias string
 }
 
 // GitAddress returns the full address string for the configured git server
@@ -257,6 +331,8 @@ func (gincl *Client) Login(username, password, clientID string) error {
 		return fmt.Errorf("Error while storing token: %s", err.Error())
 	}
 
+	gincl.SetToken(gincl.Token)
+
 	// Make keys
 	return gincl.MakeSessionKey()
 }
@@ -325,7 +401,12 @@ func (gincl *Client) NewToken(username, password, clientID string) error {
 
 // LoadToken calls the embedded UserToken.LoadToken function with the configured server alias.
 func (gincl *Client) LoadToken() error {
-	return gincl.UserToken.LoadToken(gincl.srvalias)
+	err := gincl.UserToken.LoadToken(gincl.srvalias)
+	if err != nil {
+		return err
+	}
+	gincl.Client.SetToken(gincl.Token)
+	return nil
 }
 
 // Logout logs out the currently logged in user in 3 steps:
@@ -355,7 +436,7 @@ func (gincl *Client) Logout() {
 		log.Write("Private key file deleted")
 	}
 
-	err = web.DeleteToken(gincl.srvalias)
+	err = DeleteToken(gincl.srvalias)
 	if err != nil {
 		log.Write("Error deleting token file")
 	}
