@@ -7,14 +7,20 @@ import (
 	"strings"
 
 	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
 func repoversion(cmd *cobra.Command, args []string) {
-	if !git.Checkwd() {
-		Die("This command must be run from inside a gin repository.")
+	switch git.Checkwd() {
+	case git.NotRepository:
+		Die(ginerrors.NotInRepo)
+	case git.NotAnnex:
+		Warn(ginerrors.MissingAnnex)
+	case git.UpgradeRequired:
+		annexVersionNotice()
 	}
 	count, _ := cmd.Flags().GetUint("max-count")
 	jsonout, _ := cmd.Flags().GetBool("json")

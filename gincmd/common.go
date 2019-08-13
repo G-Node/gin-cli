@@ -72,6 +72,12 @@ func Die(msg interface{}) {
 	os.Exit(1)
 }
 
+// Warn prints a warning message to stderr, logs it, and returns without interruption.
+func Warn(msg string) {
+	log.Write("Showing warning: %q", msg)
+	fmt.Fprintf(color.Error, "%s %s\n", yellow("[warning]"), msg)
+}
+
 // Exit prints a message to stdout and exits the program with status 0.
 func Exit(msg string) {
 	if len(msg) > 0 {
@@ -111,6 +117,22 @@ func CheckErrorMsg(err error, msg string) {
 // The function should be called at the start of any command that requires being logged in to run.
 func requirelogin(cmd *cobra.Command, gincl *ginclient.Client, prompt bool) {
 	gincl.LoadToken()
+}
+
+func annexVersionNotice() {
+	msg := `The current repository is using an old layout for annexed data.  It is recommended that you upgrade to the newest version.  You may still use it as is for now, but in the future the upgrade will happen automatically.  This message will continue to appear for affected git-annex operations until you upgrade.
+
+Run 'gin annex upgrade' followed by 'gin init' to upgrade this repository now.  The operation should only take a few seconds.
+
+Visit the following page for a description of how this change may affect your workflow:`
+	w := termwidth()
+	if w > 80 {
+		w = 80
+	}
+	msg = wrap.Wrap(msg, w)
+	// append URL after wrapping to avoid breaking the URL with spaces
+	msg += "https://gin.g-node.org/G-Node/gin-cli-releases/src/master/v1.7#changes"
+	fmt.Println(msg)
 }
 
 func usageDie(cmd *cobra.Command) {

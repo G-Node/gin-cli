@@ -13,8 +13,13 @@ func upload(cmd *cobra.Command, args []string) {
 	prStyle := determinePrintStyle(cmd)
 	remotes, _ := cmd.Flags().GetStringSlice("to")
 	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
-	if !git.Checkwd() {
+	switch git.Checkwd() {
+	case git.NotRepository:
 		Die(ginerrors.NotInRepo)
+	case git.NotAnnex:
+		Warn(ginerrors.MissingAnnex)
+	case git.UpgradeRequired:
+		annexVersionNotice()
 	}
 
 	// Fail early if no default remote

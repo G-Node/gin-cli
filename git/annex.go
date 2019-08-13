@@ -150,12 +150,6 @@ func AnnexInit(description string) error {
 	return nil
 }
 
-// AnnexUpgrade upgrades a repository to the current (newest) layout.
-// Use this to upgrade v5 repositories to v7.
-func AnnexUpgrade() error {
-	return nil
-}
-
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // (git annex sync --no-push [--content])
 func AnnexPull(remote string) error {

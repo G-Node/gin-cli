@@ -10,7 +10,7 @@ import (
 )
 
 func useRemote(cmd *cobra.Command, args []string) {
-	if !git.Checkwd() {
+	if git.Checkwd() == git.NotRepository {
 		Die(ginerrors.NotInRepo)
 	}
 	if len(args) > 0 {

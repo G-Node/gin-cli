@@ -15,8 +15,11 @@ import (
 )
 
 func lsRepo(cmd *cobra.Command, args []string) {
-	if !git.Checkwd() {
+	switch git.Checkwd() {
+	case git.NotRepository:
 		Die(ginerrors.NotInRepo)
+	case git.NotAnnex:
+		Warn(ginerrors.MissingAnnex)
 	}
 
 	flags := cmd.Flags()

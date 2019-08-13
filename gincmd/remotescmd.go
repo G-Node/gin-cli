@@ -15,8 +15,11 @@ func printremotes(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags()
 	jsonout, _ := flags.GetBool("json")
 
-	if !git.Checkwd() {
+	switch git.Checkwd() {
+	case git.NotRepository:
 		Die(ginerrors.NotInRepo)
+	case git.NotAnnex:
+		Warn(ginerrors.MissingAnnex)
 	}
 
 	remotes, err := git.RemoteShow()

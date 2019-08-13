@@ -16,8 +16,13 @@ func getContent(cmd *cobra.Command, args []string) {
 	// TODO: no need for client; use remotes (and all keys?)
 	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, prStyle != psJSON)
-	if !git.Checkwd() {
+	switch git.Checkwd() {
+	case git.NotRepository:
 		Die(ginerrors.NotInRepo)
+	case git.NotAnnex:
+		Warn(ginerrors.MissingAnnex)
+	case git.UpgradeRequired:
+		annexVersionNotice()
 	}
 
 	if prStyle == psDefault {
