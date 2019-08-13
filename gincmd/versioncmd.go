@@ -13,7 +13,7 @@ import (
 )
 
 func repoversion(cmd *cobra.Command, args []string) {
-	if !git.IsRepo() {
+	if !git.Checkwd() {
 		Die("This command must be run from inside a gin repository.")
 	}
 	count, _ := cmd.Flags().GetUint("max-count")

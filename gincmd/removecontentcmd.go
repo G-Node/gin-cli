@@ -24,7 +24,7 @@ func remove(cmd *cobra.Command, args []string) {
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, prStyle != psJSON)
-	if !git.IsRepo() {
+	if !git.Checkwd() {
 		Die(ginerrors.NotInRepo)
 	}
 	nitems := countItemsRemove(args)

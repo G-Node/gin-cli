@@ -16,7 +16,7 @@ func getContent(cmd *cobra.Command, args []string) {
 	// TODO: no need for client; use remotes (and all keys?)
 	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, prStyle != psJSON)
-	if !git.IsRepo() {
+	if !git.Checkwd() {
 		Die(ginerrors.NotInRepo)
 	}
 

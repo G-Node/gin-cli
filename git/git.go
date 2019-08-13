@@ -336,7 +336,7 @@ func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 
 // SetGitUser sets the user.name and user.email configuration values for the local git repository.
 func SetGitUser(name, email string) error {
-	if !IsRepo() {
+	if !Checkwd() {
 		return fmt.Errorf("not a repository")
 	}
 	err := ConfigSet("user.name", name)
@@ -519,11 +519,10 @@ func RevParse(rev string) (string, error) {
 	return string(stdout), nil
 }
 
-// IsRepo checks whether the current working directory is in a git repository.
+// Checkwd checks whether the current working directory is in a git repository.
 // This function will also return true for bare repositories that use git annex (direct mode).
-func IsRepo() bool {
+func Checkwd() bool {
 	path, _ := filepath.Abs(".")
-	log.Write("IsRepo '%s'?", path)
 	_, err := FindRepoRoot(path)
 	yes := err == nil
 	log.Write("%v", yes)

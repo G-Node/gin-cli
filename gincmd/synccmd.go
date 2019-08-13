@@ -16,7 +16,7 @@ func sync(cmd *cobra.Command, args []string) {
 	// TODO: no client necessary? Just use remotes
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)
-	if !git.IsRepo() {
+	if !git.Checkwd() {
 		Die(ginerrors.NotInRepo)
 	}
 

@@ -454,7 +454,7 @@ func (gincl *Client) CloneRepo(repopath string, clonechan chan<- git.RepoFileSta
 // If a new commit is created and a default remote exists, the new commit is pushed to initialise the remote as well.
 // Returns 'true' if (and only if) a commit was created.
 func CommitIfNew() (bool, error) {
-	if !git.IsRepo() {
+	if !git.Checkwd() {
 		return false, fmt.Errorf("not a repository")
 	}
 	_, err := git.RevParse("HEAD")
@@ -635,7 +635,7 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 // Optionally initialised as a bare repository (for annex directory remotes).
 func (gincl *Client) InitDir(bare bool) error {
 	initerr := ginerror{Origin: "InitDir", Description: "Error initialising local directory"}
-	if !git.IsRepo() {
+	if !git.Checkwd() {
 		err := git.Init(bare)
 		if err != nil {
 			initerr.UError = err.Error()

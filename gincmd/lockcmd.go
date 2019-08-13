@@ -12,7 +12,7 @@ import (
 
 func lock(cmd *cobra.Command, args []string) {
 	prStyle := determinePrintStyle(cmd)
-	if !git.IsRepo() {
+	if !git.Checkwd() {
 		Die(ginerrors.NotInRepo)
 	}
 	if prStyle != psJSON {

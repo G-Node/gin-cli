@@ -15,7 +15,7 @@ func printremotes(cmd *cobra.Command, args []string) {
 	flags := cmd.Flags()
 	jsonout, _ := flags.GetBool("json")
 
-	if !git.IsRepo() {
+	if !git.Checkwd() {
 		Die(ginerrors.NotInRepo)
 	}
 

@@ -22,7 +22,7 @@ func countItemsLockChange(paths []string) (count int) {
 
 func unlock(cmd *cobra.Command, args []string) {
 	prStyle := determinePrintStyle(cmd)
-	if !git.IsRepo() {
+	if !git.Checkwd() {
 		Die(ginerrors.NotInRepo)
 	}
 

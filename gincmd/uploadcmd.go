@@ -13,7 +13,7 @@ func upload(cmd *cobra.Command, args []string) {
 	prStyle := determinePrintStyle(cmd)
 	remotes, _ := cmd.Flags().GetStringSlice("to")
 	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
-	if !git.IsRepo() {
+	if !git.Checkwd() {
 		Die(ginerrors.NotInRepo)
 	}
 
