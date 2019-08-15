@@ -125,7 +125,8 @@ func TestCommit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("smallfile create failed: %s", err.Error())
 	}
-	addchan := git.AnnexAdd([]string{"afile"})
+	conf := config.Read()
+	addchan := git.AnnexAdd([]string{"afile"}, conf.Annex.MinSize, conf.Annex.Exclude)
 	for range addchan {
 	}
 
@@ -156,7 +157,8 @@ func TestCommitMinSize(t *testing.T) {
 		t.Fatalf("bigfile create failed: %s", err.Error())
 	}
 
-	addchan := git.AnnexAdd([]string{"smallfile", "bigfile"})
+	conf := config.Read()
+	addchan := git.AnnexAdd([]string{"smallfile", "bigfile"}, conf.Annex.MinSize, conf.Annex.Exclude)
 	for range addchan {
 	}
 
@@ -218,7 +220,8 @@ func TestCommitExcludes(t *testing.T) {
 		}
 	}
 
-	addchan := git.AnnexAdd([]string{"."})
+	conf := config.Read()
+	addchan := git.AnnexAdd([]string{"."}, conf.Annex.MinSize, conf.Annex.Exclude)
 	for range addchan {
 	}
 
