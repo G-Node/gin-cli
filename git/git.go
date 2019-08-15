@@ -151,9 +151,7 @@ func (cl *Client) Clone(remotepath string, repopath string) chan RepoFileStatus 
 		}
 		args = append(args, cl.Path)
 		cmd := Command(args...)
-		if cl.SSHCmd != "" {
-			cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
-		}
+		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
 		err := cmd.Start()
 		if err != nil {
 			clonechan <- RepoFileStatus{Err: giterror{UError: err.Error(), Origin: fn}}
@@ -237,9 +235,10 @@ func (cl *Client) Clone(remotepath string, repopath string) chan RepoFileStatus 
 
 // Pull downloads all small (git) files from the server.
 // (git pull --ff-only)
-func Pull(remote string) error {
+func (cl *Client) Pull(remote string) error {
 	// TODO: Common output handling with Push
 	cmd := Command("pull", "--ff-only", remote)
+	cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
 	stdout, stderr, err := cmd.OutputError()
 
 	if err != nil {
@@ -251,7 +250,7 @@ func Pull(remote string) error {
 
 // Push uploads all small (git) files to the server.
 // (git push)
-func Push(remote string) chan RepoFileStatus {
+func (cl *Client) Push(remote string) chan RepoFileStatus {
 	pushchan := make(chan RepoFileStatus)
 
 	go func() {
@@ -267,6 +266,7 @@ func Push(remote string) chan RepoFileStatus {
 		}
 
 		cmd := Command("push", "--progress", remote)
+		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
 		err := cmd.Start()
 		if err != nil {
 			pushchan <- RepoFileStatus{Err: err}
@@ -1153,9 +1153,12 @@ func GetGitVersion() (string, error) {
 
 // Command sets up an external git command with the provided arguments and returns a GinCmd struct.
 func Command(args ...string) shell.Cmd {
-	config := config.Read()
-	gitbin := config.Bin.Git
+	conf := config.Read()
+	cfgpath, _ := config.Path(false)
+	gitbin := conf.Bin.Git
 	cmd := shell.Command(gitbin)
+	sshcfg := filepath.Join(cfgpath, "ssh.conf")
+	cmd.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh -F %s", sshcfg))
 	cmd.Args = append(cmd.Args, args...)
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))

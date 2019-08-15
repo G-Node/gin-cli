@@ -134,9 +134,7 @@ func (cl *Client) AnnexInit(description string) error {
 	}
 	args := []string{"init", "--version=7", description}
 	cmd := AnnexCommand(args...)
-	if cl.SSHCmd != "" {
-		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
-	}
+	cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		initError := fmt.Errorf("Repository annex initialisation failed.\n%s", string(stderr))
@@ -155,9 +153,10 @@ func (cl *Client) AnnexInit(description string) error {
 
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // (git annex sync --no-push [--content])
-func AnnexPull(remote string) error {
+func (cl *Client) AnnexPull(remote string) error {
 	args := []string{"sync", "--verbose", "--no-push", "--no-commit", remote}
 	cmd := AnnexCommand(args...)
+	cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
 	stdout, stderr, err := cmd.OutputError()
 	sstdout := string(stdout)
 	sstderr := string(stderr)
@@ -191,12 +190,13 @@ func AnnexPull(remote string) error {
 // AnnexSync performs a bidirectional synchronisation between local and remote
 // repositories, automatically resolving merge conflicts.
 // (git annex sync --resolvemerge)
-func AnnexSync(content bool) error {
+func (cl *Client) AnnexSync(content bool) error {
 	cmdargs := []string{"sync", "--verbose", "--resolvemerge"}
 	if content {
 		cmdargs = append(cmdargs, "--content")
 	}
 	cmd := AnnexCommand(cmdargs...)
+	cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
 	stdout, stderr, err := cmd.OutputError()
 	sstdout := string(stdout)
 	sstderr := string(stderr)
@@ -229,11 +229,12 @@ func AnnexSync(content bool) error {
 // AnnexPush uploads all changes and new content to the default remote.
 // The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull; git annex copy --to=<defaultremote>)
-func AnnexPush(paths []string, remote string) chan RepoFileStatus {
+func (cl *Client) AnnexPush(paths []string, remote string) chan RepoFileStatus {
 	pushchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(pushchan)
 		cmd := AnnexCommand("sync", "--verbose", "--no-pull", "--no-commit", remote) // NEVER commit changes when doing annex-sync
+		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
 		stdout, stderr, err := cmd.OutputError()
 		sstderr := string(stderr)
 
@@ -281,6 +282,7 @@ func AnnexPush(paths []string, remote string) chan RepoFileStatus {
 		args = append(args, paths...)
 
 		cmd = AnnexCommand(args...)
+		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
 		err = cmd.Start()
 		if err != nil {
 			pushchan <- RepoFileStatus{Err: err}
@@ -379,11 +381,12 @@ func AnnexPush(paths []string, remote string) chan RepoFileStatus {
 	return pushchan
 }
 
-func baseAnnexGet(cmdargs []string) chan RepoFileStatus {
+func (cl *Client) baseAnnexGet(cmdargs []string) chan RepoFileStatus {
 	getchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(getchan)
 		cmd := AnnexCommand(cmdargs...)
+		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
 		if err := cmd.Start(); err != nil {
 			getchan <- RepoFileStatus{Err: err}
 			return
@@ -464,27 +467,27 @@ func baseAnnexGet(cmdargs []string) chan RepoFileStatus {
 // AnnexGet retrieves the content of specified files.
 // The status channel 'getchan' is closed when this function returns.
 // (git annex get)
-func AnnexGet(filepaths []string) chan RepoFileStatus {
+func (cl *Client) AnnexGet(filepaths []string) chan RepoFileStatus {
 	cmdargs := []string{"get"}
 	if !RawMode {
 		cmdargs = append(cmdargs, "--json-progress")
 	}
 	cmdargs = append(cmdargs, filepaths...)
-	return baseAnnexGet(cmdargs)
+	return cl.baseAnnexGet(cmdargs)
 }
 
 // AnnexGetKey retrieves the content of a single specified key.
 // The status channel 'getchan' is closed when this function returns.
 // (git annex get)
-func AnnexGetKey(key string) chan RepoFileStatus {
+func (cl *Client) AnnexGetKey(key string) chan RepoFileStatus {
 	cmdargs := []string{"get", "--json-progress", fmt.Sprintf("--key=%s", key)}
-	return baseAnnexGet(cmdargs)
+	return cl.baseAnnexGet(cmdargs)
 }
 
 // AnnexDrop drops the content of specified files.
 // The status channel 'dropchan' is closed when this function returns.
 // (git annex drop)
-func AnnexDrop(filepaths []string) chan RepoFileStatus {
+func (cl *Client) AnnexDrop(filepaths []string) chan RepoFileStatus {
 	dropchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(dropchan)
@@ -495,6 +498,7 @@ func AnnexDrop(filepaths []string) chan RepoFileStatus {
 		cmdargs = append(cmdargs, filepaths...)
 
 		cmd := AnnexCommand(cmdargs...)
+		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
 		err := cmd.Start()
 		if err != nil {
 			dropchan <- RepoFileStatus{Err: err}
@@ -1076,10 +1080,10 @@ func GetAnnexVersion() (string, error) {
 
 // AnnexCommand sets up a git annex command with the provided arguments and returns a GinCmd struct.
 func AnnexCommand(args ...string) shell.Cmd {
-	config := config.Read()
-	// gitannexbin := config.Bin.GitAnnex
-	gitbin := config.Bin.Git
-	gitannexpath := config.Bin.GitAnnexPath
+	conf := config.Read()
+	cfgpath, _ := config.Path(false)
+	gitbin := conf.Bin.Git
+	gitannexpath := conf.Bin.GitAnnexPath
 	cmdargs := []string{"annex"}
 	cmdargs = append(cmdargs, args...)
 	cmd := shell.Command(gitbin, cmdargs...)
@@ -1088,6 +1092,8 @@ func AnnexCommand(args ...string) shell.Cmd {
 		syspath += string(os.PathListSeparator) + gitannexpath
 		cmd.Setenv("PATH", syspath)
 	}
+	sshcfg := filepath.Join(cfgpath, "ssh.conf")
+	cmd.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh -F %s", sshcfg))
 	cmd.Setenv("GIT_ANNEX_USE_GIT_SSH", "1")
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))

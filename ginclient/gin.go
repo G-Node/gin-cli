@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"net/http"
 
@@ -346,7 +347,33 @@ func (gincl *Client) Login(username, password, clientID string) error {
 	gincl.web.SetToken(gincl.Token)
 
 	// Make keys
-	return gincl.MakeSessionKey()
+	err = gincl.MakeSessionKey()
+	if err != nil {
+		return err
+	}
+
+	// making SSH config file for server
+	khf, _ := GetKnownHosts()
+	sshconflines := []string{
+		"IdentitiesOnly yes",
+		"StrictHostKeyChecking yes",
+		fmt.Sprintf("UserKnownHostsFile %q", khf),
+	}
+
+	configpath, _ := config.Path(true)
+	cfg := config.Read()
+	for alias, srv := range cfg.Servers {
+		keyfilepath := filepath.Join(configpath, fmt.Sprintf("%s.key", alias))
+		idfile := fmt.Sprintf("IdentityFile %q", keyfilepath)
+		sshconflines = append(sshconflines, fmt.Sprintf("Host %s", srv.Git.Host))
+		sshconflines = append(sshconflines, idfile)
+	}
+
+	sshconf := strings.Join(sshconflines, "\n")
+	sshconffile := filepath.Join(configpath, "ssh.conf")
+	ioutil.WriteFile(sshconffile, []byte(sshconf), 0600)
+	log.Write("SSH CONFIG:\n%s", sshconf)
+	return nil
 }
 
 // GetTokens returns all the user's active access tokens from the GIN server.

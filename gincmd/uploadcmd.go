@@ -12,7 +12,6 @@ import (
 func upload(cmd *cobra.Command, args []string) {
 	prStyle := determinePrintStyle(cmd)
 	remotes, _ := cmd.Flags().GetStringSlice("to")
-	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
 	switch git.Checkwd() {
 	case git.NotRepository:
 		Die(ginerrors.NotInRepo)
@@ -49,6 +48,7 @@ func upload(cmd *cobra.Command, args []string) {
 		fmt.Println(":: Uploading")
 	}
 
+	gincl := ginclient.New("gin")
 	uploadchan := gincl.Upload(paths, remotes)
 	formatOutput(uploadchan, prStyle, 0)
 }

@@ -146,30 +146,18 @@ func GetKnownHosts() (string, error) {
 // the configured server.  The value returned string can be set as the
 // GIT_SSH_COMMAND environment variable in order to use the user's private
 // keys.  The returned string contains all available private keys.
-func sshopts() string {
+func sshopts(alias string) string {
 	// Windows git seems to require Unix paths for the SSH command -- this is dirty but works
 	fixpathsep := func(p string) string {
 		p = filepath.ToSlash(p)
 		p = strings.Replace(p, " ", "\\ ", -1)
 		return p
 	}
+	confpath, _ := config.Path(false)
 	config := config.Read()
 	sshbin := fixpathsep(config.Bin.SSH)
-	keys := PrivKeyPath()
-	keyargs := make([]string, len(keys))
-	idx := 0
-	for _, k := range keys {
-		keyargs[idx] = fmt.Sprintf("-i %s", fixpathsep(k))
-		idx++
-	}
-	keystr := strings.Join(keyargs, " ")
-	hostkeyfile, err := GetKnownHosts()
-	var hfoptstr string
-	if err == nil {
-		hfoptstr = fmt.Sprintf("-o 'UserKnownHostsFile=%q'", hostkeyfile)
-	}
-	gitSSHCmd := fmt.Sprintf("%s %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes %s", sshbin, keystr, hfoptstr)
-	log.Write("SSH Cmd %s", gitSSHCmd)
+	sshconf := filepath.Join(confpath, "ssh.conf")
+	gitSSHCmd := fmt.Sprintf("%s -F %q", sshbin, sshconf)
 	return gitSSHCmd
 }
 

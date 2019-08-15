@@ -284,6 +284,9 @@ func (gincl *Client) Upload(paths []string, remotes []string) chan git.RepoFileS
 	log.Write("Upload")
 	uploadchan := make(chan git.RepoFileStatus)
 
+	gitcl := git.New(".")
+	gitcl.SSHCmd = sshopts(gincl.srvalias)
+
 	go func() {
 		defer close(uploadchan)
 		paths, err := expandglobs(paths, false)
@@ -312,12 +315,12 @@ func (gincl *Client) Upload(paths []string, remotes []string) chan git.RepoFileS
 				continue
 			}
 
-			gitpushchan := git.Push(remote)
+			gitpushchan := gitcl.Push(remote)
 			for stat := range gitpushchan {
 				uploadchan <- stat
 			}
 
-			annexpushchan := git.AnnexPush(paths, remote)
+			annexpushchan := gitcl.AnnexPush(paths, remote)
 			for stat := range annexpushchan {
 				uploadchan <- stat
 			}
@@ -340,7 +343,9 @@ func (gincl *Client) GetContent(paths []string) chan git.RepoFileStatus {
 			return
 		}
 
-		annexgetchan := git.AnnexGet(paths)
+		gitcl := git.New(gincl.srvalias)
+		gitcl.SSHCmd = sshopts(gincl.srvalias)
+		annexgetchan := gitcl.AnnexGet(paths)
 		for stat := range annexgetchan {
 			getcontchan <- stat
 		}
@@ -361,7 +366,9 @@ func (gincl *Client) RemoveContent(paths []string) chan git.RepoFileStatus {
 			rmcchan <- git.RepoFileStatus{Err: err}
 			return
 		}
-		dropchan := git.AnnexDrop(paths)
+		gitcl := git.New(gincl.srvalias)
+		gitcl.SSHCmd = sshopts(gincl.srvalias)
+		dropchan := gitcl.AnnexDrop(paths)
 		for stat := range dropchan {
 			rmcchan <- stat
 		}
@@ -416,14 +423,18 @@ func (gincl *Client) UnlockContent(paths []string) chan git.RepoFileStatus {
 // Download downloads changes and placeholder files in an already checked out repository.
 func (gincl *Client) Download(remote string) error {
 	log.Write("Download: %q", remote)
-	return git.AnnexPull(remote)
+	gitcl := git.New(gincl.srvalias)
+	gitcl.SSHCmd = sshopts(gincl.srvalias)
+	return gitcl.AnnexPull(remote)
 }
 
 // Sync synchronises changes bidirectionally (uploads and downloads),
 // optionally transferring content between remotes and the local clone.
 func (gincl *Client) Sync(content bool) error {
 	log.Write("Sync %t", content)
-	return git.AnnexSync(content)
+	gitcl := git.New(gincl.srvalias)
+	gitcl.SSHCmd = sshopts(gincl.srvalias)
+	return gitcl.AnnexSync(content)
 }
 
 // CloneRepo clones a remote repository and initialises annex.
@@ -440,7 +451,7 @@ func (gincl *Client) CloneRepo(repopath string) chan git.RepoFileStatus {
 		here, _ := os.Getwd()
 		cloneloc := filepath.Join(here, repoName)
 		gitcl := git.New(cloneloc)
-		gitcl.SSHCmd = sshopts()
+		gitcl.SSHCmd = sshopts(gincl.srvalias)
 		clonestatus := gitcl.Clone(remotepath, repopath)
 		for stat := range clonestatus {
 			clonechan <- stat
@@ -561,7 +572,7 @@ func CheckoutVersion(commithash string, paths []string) error {
 // CheckoutFileCopies checks out copies of files specified by path from the revision with the specified commithash.
 // The checked out files are stored in the location specified by outpath.
 // The timestamp of the revision is appended to the original filenames (before the extension).
-func CheckoutFileCopies(commithash string, paths []string, outpath string, suffix string) chan FileCheckoutStatus {
+func (gincl *Client) CheckoutFileCopies(commithash string, paths []string, outpath string, suffix string) chan FileCheckoutStatus {
 	cochan := make(chan FileCheckoutStatus)
 	go func() {
 		defer close(cochan)
@@ -608,7 +619,9 @@ func CheckoutFileCopies(commithash string, paths []string, outpath string, suffi
 					_, key := path.Split(keypath)
 					contentloc, err := git.AnnexContentLocation(key)
 					if err != nil {
-						getchan := git.AnnexGetKey(key)
+						gitcl := git.New(gincl.srvalias)
+						gitcl.SSHCmd = sshopts(gincl.srvalias)
+						getchan := gitcl.AnnexGetKey(key)
 						for range getchan {
 						}
 						contentloc, err = git.AnnexContentLocation(key)
@@ -704,7 +717,7 @@ func (gincl *Client) InitDir(bare bool) error {
 	}
 
 	gitcl := git.New(".")
-	gitcl.SSHCmd = sshopts()
+	gitcl.SSHCmd = sshopts(gincl.srvalias)
 	err = gitcl.AnnexInit(description)
 	if err != nil {
 		initerr.UError = err.Error()
