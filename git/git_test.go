@@ -24,11 +24,10 @@ func TestMain(m *testing.M) {
 		os.Exit(-1)
 	}
 	// set temporary git config file path and disable systemwide
+	os.Setenv("GIN_CONFIG_DIR", tmpconfdir)
 	os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	os.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpconfdir, "gitconfig"))
 
-	// set git user
-	SetGitUser("testuser", "")
 	res := m.Run()
 
 	// Teardown test config
@@ -46,6 +45,9 @@ func TestInit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to initialise (non-bare) repository: %s", err.Error())
 	}
+
+	// set local git user
+	SetGitUser("testuser", "")
 
 	bare, _ := ConfigGet("core.bare")
 	if bare != "false" {
