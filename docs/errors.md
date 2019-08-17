@@ -2,7 +2,7 @@
 
 ## Untracked or non-annexed files
 
-This section discusses the behaviour of the gin client when annex content commands are run against untracked files or files tracked only by git, but not git-annex. In the following discussion, *untracked*, unless otherwise states, will refer to both types of files, since the behaviour is the same.
+This section discusses the behaviour of the gin client when annex content commands are run against untracked files or files tracked only by git, but not git-annex. In the following discussion, *untracked*, unless otherwise stated, will refer to both types of files, since the behaviour is the same.
 
 ### git annex behaviour
 
