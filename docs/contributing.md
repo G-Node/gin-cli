@@ -1,4 +1,4 @@
-# Contribution and developer guide
+# Contribution guide and developer resources
 
 This document is a guide for contributing to the development of the GIN client.  The document (and related linked documents) are separated into two categories:
 - [Developer resources](#developer-resources): Documents describing the project structure and conventions.  Read this before contributing code to fix bugs or add features.

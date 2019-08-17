@@ -25,4 +25,4 @@ Help and information for the client in particular can be on the following pages:
 
 ## Contributing
 
-See the [contribution and developer](docs/contributing.md) guide.
+See the [Contribution guide and Developer resources](docs/contributing.md) document.
