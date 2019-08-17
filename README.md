@@ -22,3 +22,7 @@ Help and information for the client in particular can be on the following pages:
 - [Usage guide (tutorial)](https://gin.g-node.org/G-Node/Info/wiki/GinUsageTutorial)
 - [Useful recipes and short workflows](https://gin.g-node.org/G-Node/Info/wiki/GinCliRecipes)
 - [Detailed command overview](https://gin.g-node.org/G-Node/Info/wiki/GinClientHelp)
+
+## Contributing
+
+See the [contribution and developer](docs/contributing.md) guide.
