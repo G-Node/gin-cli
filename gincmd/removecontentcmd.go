@@ -24,8 +24,13 @@ func remove(cmd *cobra.Command, args []string) {
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)
 	requirelogin(cmd, gincl, prStyle != psJSON)
-	if !git.IsRepo() {
+	switch git.Checkwd() {
+	case git.NotRepository:
 		Die(ginerrors.NotInRepo)
+	case git.NotAnnex:
+		Warn(ginerrors.MissingAnnex)
+	case git.UpgradeRequired:
+		annexVersionNotice()
 	}
 	nitems := countItemsRemove(args)
 	rmchan := make(chan git.RepoFileStatus)

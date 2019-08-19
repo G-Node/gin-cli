@@ -17,8 +17,21 @@ import (
 	"github.com/G-Node/gin-cli/git/shell"
 )
 
-const progcomplete = "100%"
-const unknownhostname = "(unknown)"
+type Error string
+
+func (e Error) Error() string {
+	return string(e)
+}
+
+const (
+	progcomplete    = "100%"
+	unknownhostname = "(unknown)"
+
+	// Constant errors
+	NotRepository   = Error("Not a repository")
+	NotAnnex        = Error("No annex found")
+	UpgradeRequired = Error("Repository upgrade needed")
+)
 
 // giterror convenience alias to util.Error
 type giterror = shell.Error
@@ -336,7 +349,8 @@ func Add(filepaths []string, addchan chan<- RepoFileStatus) {
 
 // SetGitUser sets the user.name and user.email configuration values for the local git repository.
 func SetGitUser(name, email string) error {
-	if !IsRepo() {
+	if Checkwd() == NotRepository {
+		// Other errors allowed
 		return fmt.Errorf("not a repository")
 	}
 	err := ConfigSet("user.name", name)
@@ -519,15 +533,47 @@ func RevParse(rev string) (string, error) {
 	return string(stdout), nil
 }
 
-// IsRepo checks whether the current working directory is in a git repository.
-// This function will also return true for bare repositories that use git annex (direct mode).
-func IsRepo() bool {
+// Checkwd checks whether the current working directory is in a git repository.
+// Returns NotRepository if the working directory is not inside a repository.
+// Returns NotAnnex if the working directory is inside a repository but there is no annex.
+// Returns UpgradeRequired if the annex is an old version (< v7).
+func Checkwd() error {
 	path, _ := filepath.Abs(".")
-	log.Write("IsRepo '%s'?", path)
 	_, err := FindRepoRoot(path)
-	yes := err == nil
-	log.Write("%v", yes)
-	return yes
+	if err != nil {
+		return NotRepository
+	}
+
+	annexver, err := ConfigGet("annex.version")
+	if err != nil {
+		// Annex version config key missing: Annex not initialised
+		return NotAnnex
+	}
+
+	ver, err := strconv.Atoi(annexver)
+	if err != nil {
+		// Annex version string should be number.  Something went wrong.
+		// Return UpgradeRequired to upgrade and fix the repository info.
+		return UpgradeRequired
+	}
+
+	if ver < 7 {
+		return UpgradeRequired
+	}
+
+	return nil
+}
+
+// FindRepoRoot returns the absolute path to the root of the repository.
+// For bare repositories, it returns an empty string, but no error.
+// (git rev-parse --show-toplevel)
+func FindRepoRoot(path string) (string, error) {
+	cmd := Command("rev-parse", "--show-toplevel")
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil || bytes.Contains(stderr, []byte("not a git repository")) {
+		return "", fmt.Errorf("Not a repository")
+	}
+	return string(bytes.TrimRight(stdout, "\n")), nil
 }
 
 // **************** //

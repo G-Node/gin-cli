@@ -15,4 +15,7 @@ const (
 
 	// MissingGitUser is returned when a string is assumed to be a git configuration but does not contain a user (missing @)
 	MissingGitUser = "could not determine git username (no @)"
+
+	// MissingAnnex is returned when a repository doesn't have annex initialised (can also be used as a warning)
+	MissingAnnex = "no annex information found: run 'gin init' to initialise annex"
 )

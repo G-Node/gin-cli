@@ -14,8 +14,13 @@ import (
 
 func commit(cmd *cobra.Command, args []string) {
 	prStyle := determinePrintStyle(cmd)
-	if !git.IsRepo() {
+	switch git.Checkwd() {
+	case git.NotRepository:
 		Die(ginerrors.NotInRepo)
+	case git.NotAnnex:
+		Warn(ginerrors.MissingAnnex)
+	case git.UpgradeRequired:
+		annexVersionNotice()
 	}
 
 	commitmsg, _ := cmd.Flags().GetString("message")
