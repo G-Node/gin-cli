@@ -1005,8 +1005,12 @@ func AnnexAdd(filepaths []string, addchan chan<- RepoFileStatus) {
 		logstd(nil, stderr)
 	}
 	// Add metadata
+	status.State = "Writing filename metadata"
 	for _, fname := range filenames {
 		setAnnexMetadataName(fname)
+		status.FileName = fname
+		status.Progress = progcomplete
+		addchan <- status
 	}
 	return
 }
