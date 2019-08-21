@@ -2,7 +2,7 @@
 
 How GIN CLI commands translate to git and git-annex operations.
 
-*Nb: This document does not mention any system or GIN web API calls unless they are necessary to explain a git or git-annex operation.*
+*Note: This document does not mention any system or GIN web API calls unless they are necessary to explain a git or git-annex operation.*
 
 ## gin create
 
@@ -13,22 +13,29 @@ Brief:
 ## gin get
 
 Brief:
-1. `git clone`
-2. `git config core.quotepath false`
-3. `git config core.symlinks false` (Windows only)
-4. `git commit --allow-empty -m "Initial commit: Repository initialised on <hostname>"` (if the repository is new).
-5. `git config annex.backends MD5`
-6. `git config annex.addunlocked true`
-7. `git annex init --version=7`
+1. `git clone ssh://git@<server>:<port>/<user>/<repository>`
+2. Initialises default options: See [gin init](#gin-init).
 
 Details:
 1. The `gin get` command expects the unique repository name in the form `<user>/<repository>`.  The full clone URL is created by appending this to the Git URL of the configured server: `ssh://git@gin.g-node.org:22/<user>/<repository>`
-2. The `quotepath` option is disabled since it can break JSON formatting by including escape sequences in filenames with special characters.  Keeping it enabled instead quotes filenames with special characters, which is easier to work with.
-3. Git can detect whether symlinks are supported during a repository initialisation.  On some Windows configurations this is possible, but git-annex can misbehave when this happens (see [this relevant issue on the git-annex wiki](https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/) for more info).  This might have been solved in newer versions of git-annex.
-4. If the repository is new, creating an empty commit makes commands like `gin ls` work more predictably.  Working in a repository with no HEAD makes certain commands not work.
-5. Limiting the available git-annex backends to MD5 alleviates an issue that can occur on Windows with very long path names.  See [this Wiki page](https://gin.g-node.org/G-Node/Info/wiki/SomeNotesOnGitAnnex) on GIN for more info.
-6. The `addunlocked` option has been added recently to make files get added in unlocked mode by default.  This means that files added to the annex are not converted to symlinks and makes repositories easier to work with.
-7. The annex is initialised in **version 7** mode.  Although this is still not the default for git-annex (by default, `git annex init` initialises repositories to version 5), it has many advantages that make working with repositories more straightforward, such as the `addunlocked` option described above.
+
+## gin init
+
+Brief
+1. `git config core.quotepath false`
+2. `git config core.symlinks false` (Windows only)
+3. `git commit --allow-empty -m "Initial commit: Repository initialised on <hostname>"` (if the repository is new).
+4. `git config annex.backends MD5`
+5. `git config annex.addunlocked true`
+6. `git annex init --version=7`
+
+Details:
+1. The `quotepath` option is disabled since it can break JSON formatting by including escape sequences in filenames with special characters.  Keeping it enabled instead quotes filenames with special characters, which is easier to work with.
+2. Git can detect whether symlinks are supported during a repository initialisation.  On some Windows configurations this is possible, but git-annex can misbehave when this happens (see [this relevant issue on the git-annex wiki](https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/) for more info).  This might have been solved in newer versions of git-annex.
+3. If the repository is new, creating an empty commit makes commands like `gin ls` work more predictably.  Working in a repository with no HEAD makes certain commands not work.
+4. Limiting the available git-annex backends to MD5 alleviates an issue that can occur on Windows with very long path names.  See [this Wiki page](https://gin.g-node.org/G-Node/Info/wiki/SomeNotesOnGitAnnex) on GIN for more info.
+5. The `addunlocked` option has been added recently to make files get added in unlocked mode by default.  This means that files added to the annex are not converted to symlinks and makes repositories easier to work with.
+6. The annex is initialised in **version 7** mode.  Although this is still not the default for git-annex (by default, `git annex init` initialises repositories to version 5), it has many advantages that make working with repositories more straightforward, such as the `addunlocked` option described above.
 
 ## gin upload
 
