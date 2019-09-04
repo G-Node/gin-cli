@@ -11,7 +11,8 @@ import (
 )
 
 func countItemsRemove(paths []string) int {
-	avail, err := git.AnnexFind(paths)
+	gr := git.New(".")
+	avail, err := gr.AnnexFind(paths)
 	if err != nil {
 		return 0
 	}

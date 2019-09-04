@@ -29,7 +29,8 @@ func upload(cmd *cobra.Command, args []string) {
 	// If any of the specified remotes is the special name 'all', upload to all configured remotes
 	for _, remote := range remotes {
 		if remote == allremotes {
-			confremotes, err := git.RemoteShow()
+			gr := git.New(".")
+			confremotes, err := gr.RemoteShow()
 			CheckErrorMsg(err, fmt.Sprintf("'all' remotes specified, but could not determine configured remotes: %s", err))
 			remotes = make([]string, 0, len(confremotes))
 			for r := range confremotes {

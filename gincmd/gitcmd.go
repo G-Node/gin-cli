@@ -13,7 +13,8 @@ func gitrun(cmd *cobra.Command, args []string) {
 	// TODO: Use all available keys?
 	gincl := ginclient.New("")
 	_ = gincl.LoadToken() // OK to run without token
-	gitcmd := git.Command(args...)
+	gr := git.New(".")
+	gitcmd := gr.Command(args...)
 	err := gitcmd.Start()
 	CheckError(err)
 	var line string

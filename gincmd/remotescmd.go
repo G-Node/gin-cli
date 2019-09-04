@@ -22,7 +22,8 @@ func printremotes(cmd *cobra.Command, args []string) {
 		Warn(ginerrors.MissingAnnex)
 	}
 
-	remotes, err := git.RemoteShow()
+	gr := git.New(".")
+	remotes, err := gr.RemoteShow()
 	CheckError(err)
 	defremote, err := ginclient.DefaultRemote()
 	CheckError(err)

@@ -12,7 +12,8 @@ import (
 
 func countItemsLockChange(paths []string) (count int) {
 	// BUG: Miscalculates number in some cases
-	wichan := git.AnnexWhereis(paths)
+	gr := git.New(".")
+	wichan := gr.AnnexWhereis(paths)
 	for range wichan {
 		count++
 	}
@@ -34,7 +35,8 @@ func unlock(cmd *cobra.Command, args []string) {
 		fmt.Println(":: Unlocking files")
 	}
 	// unlock should do nothing in direct mode
-	if git.IsDirect() {
+	gr := git.New(".")
+	if gr.IsDirect() {
 		fmt.Print("   Repository is in DIRECT mode: files are always unlocked")
 		return
 	}

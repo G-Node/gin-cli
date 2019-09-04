@@ -40,7 +40,8 @@ func download(cmd *cobra.Command, args []string) {
 		fmt.Fprintln(color.Output, green("OK"))
 	}
 	if content {
-		reporoot, _ := git.FindRepoRoot(".")
+		gr := git.New(".")
+		reporoot, _ := gr.FindRepoRoot(".")
 		os.Chdir(reporoot)
 		getContent(cmd, nil)
 	}

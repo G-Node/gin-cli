@@ -29,9 +29,11 @@ func repoversion(cmd *cobra.Command, args []string) {
 	copyto, _ := cmd.Flags().GetString("copy-to")
 	paths := args
 
+	gr := git.New(".")
+
 	var gcommit git.GinCommit
 	if commithash == "" {
-		commits, err := git.Log(count, "", paths, false)
+		commits, err := gr.Log(count, "", paths, false)
 		CheckError(err)
 		if jsonout {
 			j, _ := json.Marshal(commits)
@@ -43,7 +45,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 		}
 		gcommit = verprompt(commits)
 	} else {
-		commits, err := git.Log(1, commithash, paths, false)
+		commits, err := gr.Log(1, commithash, paths, false)
 		CheckError(err)
 		gcommit = commits[0]
 	}

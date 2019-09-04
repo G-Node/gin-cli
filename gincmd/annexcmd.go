@@ -9,7 +9,8 @@ import (
 )
 
 func annexrun(cmd *cobra.Command, args []string) {
-	annexcmd := git.AnnexCommand(args...)
+	gr := git.New(".")
+	annexcmd := gr.AnnexCommand(args...)
 	err := annexcmd.Start()
 	CheckError(err)
 	var line string

@@ -26,7 +26,8 @@ func lock(cmd *cobra.Command, args []string) {
 	// lock should do nothing in direct mode
 	// NOTE: Direct mode repositories are deprecated, but we should still look
 	// out for them
-	if git.IsDirect() {
+	gr := git.New(".")
+	if gr.IsDirect() {
 		fmt.Print("   Repository is in DIRECT mode: files are always unlocked")
 		return
 	}
