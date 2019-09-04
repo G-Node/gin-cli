@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git/shell"
 )
@@ -42,12 +41,19 @@ type giterror = shell.Error
 
 // Client struct for calling commands with
 type Client struct {
-	Path   string
+	// Local path where a git command will be run (usually the git root).
+	Path string
+	// Becomes the value of GIT_SSH_COMMAND env var before running any shell command.
+	// Empty string will not set the variable.
 	SSHCmd string
+	// Git binary location; can be left empty to use 'git' and rely on system PATH.
+	Bin string
+	// Git annex path (not location); can be left empty to rely on system PATH.
+	AnnexPath string
 }
 
 func New(path string) *Client {
-	return &Client{Path: path, SSHCmd: ""}
+	return &Client{Path: path, SSHCmd: "", Bin: "git"}
 }
 
 // RepoFileStatus describes the status of files when being added to the repo or transferred to/from remotes.
@@ -114,16 +120,16 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 
 // Git commands
 
-// Init initialises the current directory as a git repository.
+// Init initialises the provided directory as a git repository.
 // The repository is optionally initialised as bare.
 // (git init [--bare])
-func Init(bare bool) error {
+func (cl *Client) Init(path string, bare bool) error {
 	fn := fmt.Sprintf("Init(%v)", bare)
 	args := []string{"init"}
 	if bare {
 		args = append(args, "--bare")
 	}
-	cmd := Command(args...)
+	cmd := cl.Command(args...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error during init command")
@@ -132,6 +138,14 @@ func Init(bare bool) error {
 		return gerr
 	}
 	return nil
+}
+
+// Init initialises the provided directory as a git repository.
+// The repository is optionally initialised as bare.
+// (git init [--bare])
+func Init(path string, bare bool) error {
+	cl := New(".") // the working directory is irrelevant for this command
+	return cl.Init(path, bare)
 }
 
 // Clone downloads a repository and sets the remote fetch and push urls.
@@ -150,8 +164,7 @@ func (cl *Client) Clone(remotepath string, repopath string) chan RepoFileStatus 
 			args = append([]string{"-c", "core.symlinks=false"}, args...)
 		}
 		args = append(args, cl.Path)
-		cmd := Command(args...)
-		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
+		cmd := cl.Command(args...)
 		err := cmd.Start()
 		if err != nil {
 			clonechan <- RepoFileStatus{Err: giterror{UError: err.Error(), Origin: fn}}
@@ -237,8 +250,7 @@ func (cl *Client) Clone(remotepath string, repopath string) chan RepoFileStatus 
 // (git pull --ff-only)
 func (cl *Client) Pull(remote string) error {
 	// TODO: Common output handling with Push
-	cmd := Command("pull", "--ff-only", remote)
-	cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
+	cmd := cl.Command("pull", "--ff-only", remote)
 	stdout, stderr, err := cmd.OutputError()
 
 	if err != nil {
@@ -255,18 +267,17 @@ func (cl *Client) Push(remote string) chan RepoFileStatus {
 
 	go func() {
 		defer close(pushchan)
-		if IsDirect() {
+		if cl.IsDirect() {
 			// Set bare false and revert at the end of the function
-			err := setBare(false)
+			err := cl.SetBare(false)
 			if err != nil {
 				pushchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
 				return
 			}
-			defer setBare(true)
+			defer cl.SetBare(true)
 		}
 
-		cmd := Command("push", "--progress", remote)
-		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
+		cmd := cl.Command("push", "--progress", remote)
 		err := cmd.Start()
 		if err != nil {
 			pushchan <- RepoFileStatus{Err: err}
@@ -301,7 +312,7 @@ func (cl *Client) Push(remote string) chan RepoFileStatus {
 // In indirect mode, adding annexed files to git has no effect.
 // The status channel 'addchan' is closed when this function returns.
 // (git add)
-func Add(filepaths []string) chan RepoFileStatus {
+func (cl *Client) Add(filepaths []string) chan RepoFileStatus {
 	addchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(addchan)
@@ -310,21 +321,21 @@ func Add(filepaths []string) chan RepoFileStatus {
 			return
 		}
 
-		if IsDirect() {
+		if cl.IsDirect() {
 			// Set bare false and revert at the end of the function
-			err := setBare(false)
+			err := cl.SetBare(false)
 			if err != nil {
 				addchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
 				return
 			}
-			defer setBare(true)
+			defer cl.SetBare(true)
 			// Call addPathsDirect to collect filenames not in annex and deleted files
-			filepaths = gitAddDirect(filepaths)
+			filepaths = cl.gitAddDirect(filepaths)
 		}
 
 		cmdargs := []string{"add", "--verbose", "--"}
 		cmdargs = append(cmdargs, filepaths...)
-		cmd := Command(cmdargs...)
+		cmd := cl.Command(cmdargs...)
 		err := cmd.Start()
 		if err != nil {
 			addchan <- RepoFileStatus{Err: err}
@@ -369,25 +380,26 @@ func Add(filepaths []string) chan RepoFileStatus {
 	return addchan
 }
 
-// SetGitUser sets the user.name and user.email configuration values for the local git repository.
-func SetGitUser(name, email string) error {
+// SetGitUser sets the user.name and user.email configuration values for the
+// local git repository.
+func (cl *Client) SetGitUser(name, email string) error {
 	if Checkwd() == NotRepository {
 		// Other errors allowed
 		return fmt.Errorf("not a repository")
 	}
-	err := ConfigSet("user.name", name)
+	err := cl.ConfigSet("user.name", name)
 	if err != nil {
 		return err
 	}
-	return ConfigSet("user.email", email)
+	return cl.ConfigSet("user.email", email)
 }
 
 // ConfigGet returns the value of a given git configuration key.
 // The returned key is always a string.
 // (git config --get)
-func ConfigGet(key string) (string, error) {
+func (cl *Client) ConfigGet(key string) (string, error) {
 	fn := fmt.Sprintf("ConfigGet(%s)", key)
-	cmd := Command("config", "--get", key)
+	cmd := cl.Command("config", "--get", key)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := giterror{UError: string(stderr), Origin: fn}
@@ -402,9 +414,9 @@ func ConfigGet(key string) (string, error) {
 
 // ConfigSet sets a configuration value in the local git config.
 // (git config --local)
-func ConfigSet(key, value string) error {
+func (cl *Client) ConfigSet(key, value string) error {
 	fn := fmt.Sprintf("ConfigSet(%s, %s)", key, value)
-	cmd := Command("config", "--local", key, value)
+	cmd := cl.Command("config", "--local", key, value)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := giterror{UError: string(stderr), Origin: fn}
@@ -417,9 +429,9 @@ func ConfigSet(key, value string) error {
 
 // ConfigUnset unsets a configuration value in the local git config.
 // (git config unset --local)
-func ConfigUnset(key string) error {
+func (cl *Client) ConfigUnset(key string) error {
 	fn := fmt.Sprintf("ConfigUnset(%s)", key)
-	cmd := Command("config", "--unset", "--local", key)
+	cmd := cl.Command("config", "--unset", "--local", key)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := giterror{UError: string(stderr), Origin: fn}
@@ -432,9 +444,9 @@ func ConfigUnset(key string) error {
 
 // RemoteShow returns the configured remotes and their URL.
 // (git remote -v show -n)
-func RemoteShow() (map[string]string, error) {
+func (cl *Client) RemoteShow() (map[string]string, error) {
 	fn := "RemoteShow()"
-	cmd := Command("remote", "-v", "show", "-n")
+	cmd := cl.Command("remote", "-v", "show", "-n")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		sstderr := string(stderr)
@@ -462,9 +474,9 @@ func RemoteShow() (map[string]string, error) {
 }
 
 // RemoteAdd adds a remote named name for the repository at URL.
-func RemoteAdd(name, url string) error {
+func (cl *Client) RemoteAdd(name, url string) error {
 	fn := fmt.Sprintf("RemoteAdd(%s, %s)", name, url)
-	cmd := Command("remote", "add", name, url)
+	cmd := cl.Command("remote", "add", name, url)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		sstderr := string(stderr)
@@ -478,7 +490,7 @@ func RemoteAdd(name, url string) error {
 	}
 	// Performing fetch after adding remote to retrieve references
 	// Any errors are logged and ignored
-	cmd = Command("fetch", name)
+	cmd = cl.Command("fetch", name)
 	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
 		logstd(stdout, stderr)
@@ -487,9 +499,9 @@ func RemoteAdd(name, url string) error {
 }
 
 // RemoteRemove removes the remote named name from the repository configuration.
-func RemoteRemove(name string) error {
+func (cl *Client) RemoteRemove(name string) error {
 	fn := fmt.Sprintf("RemoteRm(%s)", name)
-	cmd := Command("remote", "remove", name)
+	cmd := cl.Command("remote", "remove", name)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		sstderr := string(stderr)
@@ -506,9 +518,9 @@ func RemoteRemove(name string) error {
 
 // BranchSetUpstream sets the default upstream remote for the current branch.
 // (git branch --set-upstream-to=)
-func BranchSetUpstream(name string) error {
+func (cl *Client) BranchSetUpstream(name string) error {
 	fn := fmt.Sprintf("BranchSetUpstream(%s)", name)
-	cmd := Command("branch", fmt.Sprintf("--set-upstream-to=%s/master", name))
+	cmd := cl.Command("branch", fmt.Sprintf("--set-upstream-to=%s/master", name))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := giterror{UError: string(stderr), Origin: fn}
@@ -522,9 +534,9 @@ func BranchSetUpstream(name string) error {
 // LsRemote performs a git ls-remote of a specific remote.
 // The argument can be a name or a URL.
 // (git ls-remote)
-func LsRemote(remote string) (string, error) {
+func (cl *Client) LsRemote(remote string) (string, error) {
 	fn := fmt.Sprintf("LsRemote(%s)", remote)
-	cmd := Command("ls-remote", remote)
+	cmd := cl.Command("ls-remote", remote)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		sstderr := string(stderr)
@@ -542,9 +554,9 @@ func LsRemote(remote string) (string, error) {
 
 // RevParse parses an argument and returns the unambiguous, SHA1 representation.
 // (git rev-parse)
-func RevParse(rev string) (string, error) {
+func (cl *Client) RevParse(rev string) (string, error) {
 	fn := fmt.Sprintf("RevParse(%s)", rev)
-	cmd := Command("rev-parse", rev)
+	cmd := cl.Command("rev-parse", rev)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error during rev-parse command")
@@ -560,13 +572,14 @@ func RevParse(rev string) (string, error) {
 // Returns NotAnnex if the working directory is inside a repository but there is no annex.
 // Returns UpgradeRequired if the annex is an old version (< v7).
 func Checkwd() error {
+	cl := New(".")
 	path, _ := filepath.Abs(".")
-	_, err := FindRepoRoot(path)
+	_, err := cl.FindRepoRoot(path)
 	if err != nil {
 		return NotRepository
 	}
 
-	annexver, err := ConfigGet("annex.version")
+	annexver, err := cl.ConfigGet("annex.version")
 	if err != nil {
 		// Annex version config key missing: Annex not initialised
 		return NotAnnex
@@ -589,8 +602,8 @@ func Checkwd() error {
 // FindRepoRoot returns the absolute path to the root of the repository.
 // For bare repositories, it returns an empty string, but no error.
 // (git rev-parse --show-toplevel)
-func FindRepoRoot(path string) (string, error) {
-	cmd := Command("rev-parse", "--show-toplevel")
+func (cl *Client) FindRepoRoot(path string) (string, error) {
+	cmd := cl.Command("rev-parse", "--show-toplevel")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil || bytes.Contains(stderr, []byte("not a git repository")) {
 		return "", fmt.Errorf("Not a repository")
@@ -602,17 +615,17 @@ func FindRepoRoot(path string) (string, error) {
 
 // Commit records changes that have been added to the repository with a given message.
 // (git commit)
-func Commit(commitmsg string) error {
-	if IsDirect() {
+func (cl *Client) Commit(commitmsg string) error {
+	if cl.IsDirect() {
 		// Set bare false and revert at the end of the function
-		err := setBare(false)
+		err := cl.SetBare(false)
 		if err != nil {
 			return fmt.Errorf("failed to toggle repository bare mode")
 		}
-		defer setBare(true)
+		defer cl.SetBare(true)
 	}
 
-	cmd := Command("commit", fmt.Sprintf("--message=%s", commitmsg))
+	cmd := cl.Command("commit", fmt.Sprintf("--message=%s", commitmsg))
 	stdout, stderr, err := cmd.OutputError()
 
 	if err != nil {
@@ -634,13 +647,13 @@ func Commit(commitmsg string) error {
 // In indirect mode (non-bare repositories) simply uses git commit with the '--allow-empty' flag.
 // In direct mode it uses git-annex sync.
 // (git commit --allow-empty or git annex sync --commit)
-func CommitEmpty(commitmsg string) error {
+func (cl *Client) CommitEmpty(commitmsg string) error {
 	msgarg := fmt.Sprintf("--message=%s", commitmsg)
 	var cmd shell.Cmd
-	if !IsDirect() {
-		cmd = Command("commit", "--allow-empty", msgarg)
+	if !cl.IsDirect() {
+		cmd = cl.Command("commit", "--allow-empty", msgarg)
 	} else {
-		cmd = AnnexCommand("sync", "--commit", msgarg)
+		cmd = cl.AnnexCommand("sync", "--commit", msgarg)
 	}
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
@@ -654,14 +667,14 @@ func CommitEmpty(commitmsg string) error {
 // DiffUpstream returns, through the provided channel, the names of all files that differ from the default remote branch.
 // The output channel 'diffchan' is closed when this function returns.
 // (git diff --name-only --relative @{upstream})
-func DiffUpstream(paths []string, upstream string) chan string {
+func (cl *Client) DiffUpstream(paths []string, upstream string) chan string {
 	diffchan := make(chan string)
 
 	go func() {
 		defer close(diffchan)
 		diffargs := []string{"diff", "-z", "--name-only", "--relative", upstream, "--"}
 		diffargs = append(diffargs, paths...)
-		cmd := Command(diffargs...)
+		cmd := cl.Command(diffargs...)
 		err := cmd.Start()
 		if err != nil {
 			log.Write("ls-files command set up failed: %s", err)
@@ -691,13 +704,13 @@ func DiffUpstream(paths []string, upstream string) chan string {
 // LsFiles lists all files known to git.
 // The output channel 'lschan' is closed when this function returns.
 // (git ls-files)
-func LsFiles(args []string) chan string {
+func (cl *Client) LsFiles(args []string) chan string {
 	lschan := make(chan string)
 
 	go func() {
 		defer close(lschan)
 		cmdargs := append([]string{"ls-files"}, args...)
-		cmd := Command(cmdargs...)
+		cmd := cl.Command(cmdargs...)
 		err := cmd.Start()
 		if err != nil {
 			log.Write("ls-files command set up failed: %s", err)
@@ -728,9 +741,9 @@ func LsFiles(args []string) chan string {
 // It is constructed using the result of 'git annex status'.
 // The description is composed of the file count for each status: added, modified, deleted
 // If 'paths' are specified, the status output is limited to files and directories matching those paths.
-func DescribeIndexShort(paths []string) (string, error) {
+func (cl *Client) DescribeIndexShort(paths []string) (string, error) {
 	// TODO: 'git annex status' doesn't list added (A) files when in direct mode.
-	statuschan := AnnexStatus(paths)
+	statuschan := cl.AnnexStatus(paths)
 	statusmap := make(map[string]int)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -756,8 +769,8 @@ func DescribeIndexShort(paths []string) (string, error) {
 // It is constructed using the result of 'git annex status'.
 // The resulting message can be used to inform the user of changes
 // that are about to be uploaded and as a long commit message.
-func DescribeIndex() (string, error) {
-	statuschan := AnnexStatus([]string{})
+func (cl *Client) DescribeIndex() (string, error) {
+	statuschan := cl.AnnexStatus([]string{})
 	statusmap := make(map[string][]string)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -780,7 +793,7 @@ func DescribeIndex() (string, error) {
 // The number of commits can be limited by the count argument.
 // If count <= 0, the entire commit history is returned.
 // Revisions which match only the deletion of the matching paths can be filtered using the showdeletes argument.
-func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCommit, error) {
+func (cl *Client) Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCommit, error) {
 	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":"%b"}`
 	cmdargs := []string{"log", "-z", fmt.Sprintf("--format=%s", logformat)}
 	if count > 0 {
@@ -797,7 +810,7 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd := Command(cmdargs...)
+	cmd := cl.Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		log.Write("Error setting up git log command")
@@ -842,7 +855,7 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 	}
 
 	// TODO: Combine diffstats into first git log invocation
-	logstats, err := LogDiffStat(count, paths, showdeletes)
+	logstats, err := cl.LogDiffStat(count, paths, showdeletes)
 	if err != nil {
 		log.Write("Failed to get diff stats")
 		return commits, nil
@@ -855,7 +868,7 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 	return commits, nil
 }
 
-func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffStat, error) {
+func (cl *Client) LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffStat, error) {
 	logformat := `::%H`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
 	if count > 0 {
@@ -868,7 +881,7 @@ func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffS
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd := Command(cmdargs...)
+	cmd := cl.Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
 		log.Write("Error during LogDiffstat")
@@ -923,16 +936,16 @@ func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffS
 
 // Checkout performs a git checkout of a specific commit.
 // Individual files or directories may be specified, otherwise the entire tree is checked out.
-func Checkout(hash string, paths []string) error {
+func (cl *Client) Checkout(hash string, paths []string) error {
 	cmdargs := []string{"checkout", hash, "--"}
 	if paths == nil || len(paths) == 0 {
-		reporoot, _ := FindRepoRoot(".")
+		reporoot, _ := cl.FindRepoRoot(".")
 		os.Chdir(reporoot)
 		paths = []string{"."}
 	}
 	cmdargs = append(cmdargs, paths...)
 
-	cmd := Command(cmdargs...)
+	cmd := cl.Command(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error during GitCheckout")
@@ -944,10 +957,10 @@ func Checkout(hash string, paths []string) error {
 
 // LsTree performs a recursive git ls-tree with a given revision (hash) and a list of paths.
 // For each item, it returns a struct which contains the type (blob, tree), the mode, the hash, and the absolute (repo rooted) path to the object (name).
-func LsTree(revision string, paths []string) ([]Object, error) {
+func (cl *Client) LsTree(revision string, paths []string) ([]Object, error) {
 	cmdargs := []string{"ls-tree", "--full-tree", "-z", "-t", "-r", revision}
 	cmdargs = append(cmdargs, paths...)
-	cmd := Command(cmdargs...)
+	cmd := cl.Command(cmdargs...)
 	// This command doesn't need to be read line-by-line
 	err := cmd.Start()
 	if err != nil {
@@ -990,8 +1003,8 @@ func LsTree(revision string, paths []string) ([]Object, error) {
 }
 
 // CatFileContents performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
-func CatFileContents(revision, filepath string) ([]byte, error) {
-	cmd := Command("cat-file", "blob", fmt.Sprintf("%s:%s", revision, filepath))
+func (cl *Client) CatFileContents(revision, filepath string) ([]byte, error) {
+	cmd := cl.Command("cat-file", "blob", fmt.Sprintf("%s:%s", revision, filepath))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error during GitCatFile (Contents)")
@@ -1002,8 +1015,8 @@ func CatFileContents(revision, filepath string) ([]byte, error) {
 }
 
 // CatFileType returns the type of a given object at a given revision (blob, tree, or commit)
-func CatFileType(object string) (string, error) {
-	cmd := Command("cat-file", "-t", object)
+func (cl *Client) CatFileType(object string) (string, error) {
+	cmd := cl.Command("cat-file", "-t", object)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error during GitCatFile (Type)")
@@ -1015,8 +1028,8 @@ func CatFileType(object string) (string, error) {
 }
 
 // RevCount returns the number of commits between two revisions.
-func RevCount(a, b string) (int, error) {
-	cmd := Command("rev-list", "--count", fmt.Sprintf("%s..%s", a, b))
+func (cl *Client) RevCount(a, b string) (int, error) {
+	cmd := cl.Command("rev-list", "--count", fmt.Sprintf("%s..%s", a, b))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		logstd(stdout, stderr)
@@ -1028,12 +1041,12 @@ func RevCount(a, b string) (int, error) {
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // If the path is a repository and no error was raised, the result it cached so that subsequent checks are faster.
-func IsDirect() bool {
+func (cl *Client) IsDirect() bool {
 	abspath, _ := filepath.Abs(".")
 	if mode, ok := annexmodecache[abspath]; ok {
 		return mode
 	}
-	cmd := Command("config", "--local", "annex.direct")
+	cmd := cl.Command("config", "--local", "annex.direct")
 	stdout, _, err := cmd.OutputError()
 	if err != nil {
 		// Don't cache this result
@@ -1048,10 +1061,11 @@ func IsDirect() bool {
 	return false
 }
 
-// IsVersion6 returns true if the repository in a given path is working in git annex 'direct' mode.
-// If path is not a repository, or is not an initialised annex repository, the result defaults to false.
-func IsVersion6() bool {
-	cmd := Command("config", "--local", "--get", "annex.version")
+// IsVersion6 returns true if the repository is working in git annex 'direct'
+// mode.  If the directory (Client.Path) is not a repository, or is not an
+// initialised annex repository, the result defaults to false.
+func (cl *Client) IsVersion6() bool {
+	cmd := cl.Command("config", "--local", "--get", "annex.version")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error while checking repository annex version")
@@ -1064,12 +1078,12 @@ func IsVersion6() bool {
 }
 
 // mergeAbort aborts an unfinished git merge.
-func mergeAbort() {
+func (cl *Client) mergeAbort() {
 	// Here, we run a git status without checking any part of the result. It
 	// seems git-annex performs some cleanup or consistency fixes to the index
 	// when git status is run and before that, the merge --abort fails.
-	Command("status").Run()
-	cmd := Command("merge", "--abort")
+	cl.Command("status").Run()
+	cmd := cl.Command("merge", "--abort")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		// log error but do nothing
@@ -1077,18 +1091,14 @@ func mergeAbort() {
 	}
 }
 
-func SetBare(state bool) {
-	setBare(state)
-}
-
-func setBare(state bool) error {
+func (cl *Client) SetBare(state bool) error {
 	var statestr string
 	if state {
 		statestr = "true"
 	} else {
 		statestr = "false"
 	}
-	cmd := Command("config", "--local", "--bool", "core.bare", statestr)
+	cmd := cl.Command("config", "--local", "--bool", "core.bare", statestr)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error switching bare status to %s", statestr)
@@ -1104,8 +1114,8 @@ func setBare(state bool) error {
 // This function filters out any files known to annex to avoid re-adding them to git as files.
 // The filtering is done twice:
 // Once against the provided paths in the current directory (recursively) and once more against the output of 'git ls-files <paths>', in order to include any files that might have been deleted.
-func gitAddDirect(paths []string) (filtered []string) {
-	wichan := AnnexWhereis(paths)
+func (cl *Client) gitAddDirect(paths []string) (filtered []string) {
+	wichan := cl.AnnexWhereis(paths)
 	var annexfiles []string
 	for wiInfo := range wichan {
 		if wiInfo.Err != nil {
@@ -1115,7 +1125,7 @@ func gitAddDirect(paths []string) (filtered []string) {
 	}
 	filtered = filterpaths(paths, annexfiles)
 
-	lschan := LsFiles(paths)
+	lschan := cl.LsFiles(paths)
 	for gitfile := range lschan {
 		gitfile = filepath.Clean(gitfile)
 		if !stringInSlice(gitfile, annexfiles) && !stringInSlice(gitfile, filtered) {
@@ -1127,8 +1137,8 @@ func gitAddDirect(paths []string) (filtered []string) {
 }
 
 // GetGitVersion returns the version string of the system's git binary.
-func GetGitVersion() (string, error) {
-	cmd := Command("version")
+func (cl *Client) GetGitVersion() (string, error) {
+	cmd := cl.Command("version")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		errmsg := string(stderr)
@@ -1151,14 +1161,19 @@ func GetGitVersion() (string, error) {
 	return verstr, nil
 }
 
+// GetGitVersion returns the version string of the system's git binary.
+func GetGitVersion() (string, error) {
+	cl := New("") // path irrelevant, just use cwd for non-instance function
+	return cl.GetGitVersion()
+}
+
 // Command sets up an external git command with the provided arguments and returns a GinCmd struct.
-func Command(args ...string) shell.Cmd {
-	conf := config.Read()
-	cfgpath, _ := config.Path(false)
-	gitbin := conf.Bin.Git
-	cmd := shell.Command(gitbin)
-	sshcfg := filepath.Join(cfgpath, "ssh.conf")
-	cmd.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh -F %s", sshcfg))
+func (cl *Client) Command(args ...string) shell.Cmd {
+	cmd := shell.Command(cl.Bin)
+	// cmd.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh -F %s", sshcfg))
+	if cl.SSHCmd != "" {
+		cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
+	}
 	cmd.Args = append(cmd.Args, args...)
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
