@@ -28,7 +28,7 @@ type ginerror = shell.Error
 // Client is a client interface to the GIN server.  Uses web.Client.
 type Client struct {
 	web      *web.Client
-	git      *git.Client
+	git      *git.Runner
 	Username string
 	Token    string
 	srvalias string

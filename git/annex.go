@@ -121,18 +121,18 @@ type AnnexInfoRes struct {
 
 // AnnexInit initialises the repository for annex.
 // (git annex init)
-func (cl *Client) AnnexInit(description string) error {
-	err := cl.ConfigSet("annex.backends", "MD5")
+func (gr *Runner) AnnexInit(description string) error {
+	err := gr.ConfigSet("annex.backends", "MD5")
 	if err != nil {
 		log.Write("Failed to set default annex backend MD5")
 	}
-	err = cl.ConfigSet("annex.addunlocked", "true")
+	err = gr.ConfigSet("annex.addunlocked", "true")
 	if err != nil {
 		log.Write("Failed to initialise annex in unlocked mode")
 		return err
 	}
 	args := []string{"init", "--version=7", description}
-	cmd := cl.AnnexCommand(args...)
+	cmd := gr.AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		initError := fmt.Errorf("Repository annex initialisation failed.\n%s", string(stderr))
@@ -140,7 +140,7 @@ func (cl *Client) AnnexInit(description string) error {
 		return initError
 	}
 
-	cmd = cl.Command("checkout", "master")
+	cmd = gr.Command("checkout", "master")
 	stdout, stderr, err = cmd.OutputError()
 	if err != nil {
 		logstd(stdout, stderr)
@@ -151,9 +151,9 @@ func (cl *Client) AnnexInit(description string) error {
 
 // AnnexPull downloads all annexed files. Optionally also downloads all file content.
 // (git annex sync --no-push [--content])
-func (cl *Client) AnnexPull(remote string) error {
+func (gr *Runner) AnnexPull(remote string) error {
 	args := []string{"sync", "--verbose", "--no-push", "--no-commit", remote}
-	cmd := cl.AnnexCommand(args...)
+	cmd := gr.AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
 	sstdout := string(stdout)
 	sstderr := string(stderr)
@@ -166,7 +166,7 @@ func (cl *Client) AnnexPull(remote string) error {
 
 	// some conflicts are resolved automatically and don't produce an error in some combinations
 	if err := checkMergeErrors(sstdout, sstderr); err != nil {
-		cl.mergeAbort() // abort a potential failed merge attempt
+		gr.mergeAbort() // abort a potential failed merge attempt
 		return fmt.Errorf("download failed: %v", err)
 	}
 
@@ -174,7 +174,7 @@ func (cl *Client) AnnexPull(remote string) error {
 		log.Write("Error during AnnexPull")
 		log.Write("[Error]: %v", err)
 		logstd(stdout, stderr)
-		cl.mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
+		gr.mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
 
 		// since we don't know what the error was, show the internal annex sync
 		// error to the user
@@ -187,12 +187,12 @@ func (cl *Client) AnnexPull(remote string) error {
 // AnnexSync performs a bidirectional synchronisation between local and remote
 // repositories, automatically resolving merge conflicts.
 // (git annex sync --resolvemerge)
-func (cl *Client) AnnexSync(content bool) error {
+func (gr *Runner) AnnexSync(content bool) error {
 	cmdargs := []string{"sync", "--verbose", "--resolvemerge"}
 	if content {
 		cmdargs = append(cmdargs, "--content")
 	}
-	cmd := cl.AnnexCommand(cmdargs...)
+	cmd := gr.AnnexCommand(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	sstdout := string(stdout)
 	sstderr := string(stderr)
@@ -205,7 +205,7 @@ func (cl *Client) AnnexSync(content bool) error {
 
 	// some conflicts are resolved automatically and don't produce an error in some combinations
 	if err := checkMergeErrors(sstdout, sstderr); err != nil {
-		cl.mergeAbort() // abort a potential failed merge attempt
+		gr.mergeAbort() // abort a potential failed merge attempt
 		return fmt.Errorf("sync failed: %v", err)
 	}
 
@@ -213,7 +213,7 @@ func (cl *Client) AnnexSync(content bool) error {
 		log.Write("Error during AnnexSync")
 		log.Write("[Error]: %v", err)
 		logstd(stdout, stderr)
-		cl.mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
+		gr.mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
 
 		// since we don't know what the error was, show the internal annex sync
 		// error to the user
@@ -225,11 +225,11 @@ func (cl *Client) AnnexSync(content bool) error {
 // AnnexPush uploads all changes and new content to the default remote.
 // The status channel 'pushchan' is closed when this function returns.
 // (git annex sync --no-pull; git annex copy --to=<defaultremote>)
-func (cl *Client) AnnexPush(paths []string, remote string) chan RepoFileStatus {
+func (gr *Runner) AnnexPush(paths []string, remote string) chan RepoFileStatus {
 	pushchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(pushchan)
-		cmd := cl.AnnexCommand("sync", "--verbose", "--no-pull", "--no-commit", remote) // NEVER commit changes when doing annex-sync
+		cmd := gr.AnnexCommand("sync", "--verbose", "--no-pull", "--no-commit", remote) // NEVER commit changes when doing annex-sync
 		stdout, stderr, err := cmd.OutputError()
 		sstderr := string(stderr)
 
@@ -244,7 +244,7 @@ func (cl *Client) AnnexPush(paths []string, remote string) chan RepoFileStatus {
 			log.Write("Error during AnnexPush")
 			log.Write("[Error]: %v", err)
 			logstd(stdout, stderr)
-			cl.mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
+			gr.mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
 
 			// since we don't know what the error was, show the internal annex sync
 			// error to the user
@@ -253,7 +253,7 @@ func (cl *Client) AnnexPush(paths []string, remote string) chan RepoFileStatus {
 		}
 
 		// check which files are annexed
-		wichan := cl.AnnexWhereis(paths)
+		wichan := gr.AnnexWhereis(paths)
 
 		// collect annex paths for annex copy command
 		annexpaths := make([]string, 0, len(paths))
@@ -276,7 +276,7 @@ func (cl *Client) AnnexPush(paths []string, remote string) chan RepoFileStatus {
 		}
 		args = append(args, paths...)
 
-		cmd = cl.AnnexCommand(args...)
+		cmd = gr.AnnexCommand(args...)
 		err = cmd.Start()
 		if err != nil {
 			pushchan <- RepoFileStatus{Err: err}
@@ -337,7 +337,7 @@ func (cl *Client) AnnexPush(paths []string, remote string) chan RepoFileStatus {
 			} else {
 				key := progress.Action.Key
 				if currentkey != key {
-					if md := cl.getAnnexMetadataName(key); md.FileName != "" {
+					if md := gr.getAnnexMetadataName(key); md.FileName != "" {
 						timestamp := md.ModTime.Format("2006-01-02 15:04:05")
 						status.FileName = fmt.Sprintf("%s (version: %s)", md.FileName, timestamp)
 					} else {
@@ -375,11 +375,11 @@ func (cl *Client) AnnexPush(paths []string, remote string) chan RepoFileStatus {
 	return pushchan
 }
 
-func (cl *Client) baseAnnexGet(cmdargs []string) chan RepoFileStatus {
+func (gr *Runner) baseAnnexGet(cmdargs []string) chan RepoFileStatus {
 	getchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(getchan)
-		cmd := cl.AnnexCommand(cmdargs...)
+		cmd := gr.AnnexCommand(cmdargs...)
 		if err := cmd.Start(); err != nil {
 			getchan <- RepoFileStatus{Err: err}
 			return
@@ -460,27 +460,27 @@ func (cl *Client) baseAnnexGet(cmdargs []string) chan RepoFileStatus {
 // AnnexGet retrieves the content of specified files.
 // The status channel 'getchan' is closed when this function returns.
 // (git annex get)
-func (cl *Client) AnnexGet(filepaths []string) chan RepoFileStatus {
+func (gr *Runner) AnnexGet(filepaths []string) chan RepoFileStatus {
 	cmdargs := []string{"get"}
 	if !RawMode {
 		cmdargs = append(cmdargs, "--json-progress")
 	}
 	cmdargs = append(cmdargs, filepaths...)
-	return cl.baseAnnexGet(cmdargs)
+	return gr.baseAnnexGet(cmdargs)
 }
 
 // AnnexGetKey retrieves the content of a single specified key.
 // The status channel 'getchan' is closed when this function returns.
 // (git annex get)
-func (cl *Client) AnnexGetKey(key string) chan RepoFileStatus {
+func (gr *Runner) AnnexGetKey(key string) chan RepoFileStatus {
 	cmdargs := []string{"get", "--json-progress", fmt.Sprintf("--key=%s", key)}
-	return cl.baseAnnexGet(cmdargs)
+	return gr.baseAnnexGet(cmdargs)
 }
 
 // AnnexDrop drops the content of specified files.
 // The status channel 'dropchan' is closed when this function returns.
 // (git annex drop)
-func (cl *Client) AnnexDrop(filepaths []string) chan RepoFileStatus {
+func (gr *Runner) AnnexDrop(filepaths []string) chan RepoFileStatus {
 	dropchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(dropchan)
@@ -490,7 +490,7 @@ func (cl *Client) AnnexDrop(filepaths []string) chan RepoFileStatus {
 		}
 		cmdargs = append(cmdargs, filepaths...)
 
-		cmd := cl.AnnexCommand(cmdargs...)
+		cmd := gr.AnnexCommand(cmdargs...)
 		err := cmd.Start()
 		if err != nil {
 			dropchan <- RepoFileStatus{Err: err}
@@ -558,10 +558,10 @@ func (cl *Client) AnnexDrop(filepaths []string) chan RepoFileStatus {
 
 // getAnnexMetadataName returns the filename, key, and last modification time stored in the metadata of an annexed file given the key.
 // If an unused key does not have a name associated with it, the filename will be empty.
-func (cl *Client) getAnnexMetadataName(key string) annexFilenameDate {
+func (gr *Runner) getAnnexMetadataName(key string) annexFilenameDate {
 	var cmdargs []string
 	cmdargs = []string{"metadata", "--json", fmt.Sprintf("--key=%s", key)}
-	cmd := cl.AnnexCommand(cmdargs...)
+	cmd := gr.AnnexCommand(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error retrieving annexed content metadata")
@@ -581,14 +581,14 @@ func (cl *Client) getAnnexMetadataName(key string) annexFilenameDate {
 // AnnexWhereis returns information about annexed files in the repository
 // The output channel 'wichan' is closed when this function returns.
 // (git annex whereis)
-func (cl *Client) AnnexWhereis(paths []string) chan AnnexWhereisRes {
+func (gr *Runner) AnnexWhereis(paths []string) chan AnnexWhereisRes {
 	wichan := make(chan AnnexWhereisRes)
 
 	go func() {
 		defer close(wichan)
 		cmdargs := []string{"whereis", "--json"}
 		cmdargs = append(cmdargs, paths...)
-		cmd := cl.AnnexCommand(cmdargs...)
+		cmd := gr.AnnexCommand(cmdargs...)
 		err := cmd.Start()
 		if err != nil {
 			log.Write("Error during AnnexWhereis")
@@ -616,13 +616,13 @@ func (cl *Client) AnnexWhereis(paths []string) chan AnnexWhereisRes {
 // AnnexStatus returns the status of a file or files in a directory
 // The output channel 'statuschan' is closed when this function returns.
 // (git annex status)
-func (cl *Client) AnnexStatus(paths []string) chan AnnexStatusRes {
+func (gr *Runner) AnnexStatus(paths []string) chan AnnexStatusRes {
 	statuschan := make(chan AnnexStatusRes)
 	go func() {
 		defer close(statuschan)
 		cmdargs := []string{"status", "--json"}
 		cmdargs = append(cmdargs, paths...)
-		cmd := cl.AnnexCommand(cmdargs...)
+		cmd := gr.AnnexCommand(cmdargs...)
 		// TODO: Parse output
 		err := cmd.Start()
 		if err != nil {
@@ -650,9 +650,9 @@ func (cl *Client) AnnexStatus(paths []string) chan AnnexStatusRes {
 
 // AnnexDescribe changes the description of a repository.
 // (git annex describe)
-func (cl *Client) AnnexDescribe(repository, description string) error {
+func (gr *Runner) AnnexDescribe(repository, description string) error {
 	fn := fmt.Sprintf("AnnexDescribe(%s, %s)", repository, description)
-	cmd := cl.AnnexCommand("describe", repository, description)
+	cmd := gr.AnnexCommand("describe", repository, description)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error during Describe")
@@ -664,8 +664,8 @@ func (cl *Client) AnnexDescribe(repository, description string) error {
 
 // AnnexInfo returns the annex information for a given repository
 // (git annex info)
-func (cl *Client) AnnexInfo() (AnnexInfoRes, error) {
-	cmd := cl.AnnexCommand("info", "--json")
+func (gr *Runner) AnnexInfo() (AnnexInfoRes, error) {
+	cmd := gr.AnnexCommand("info", "--json")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		log.Write("Error during AnnexInfo")
@@ -682,7 +682,7 @@ func (cl *Client) AnnexInfo() (AnnexInfoRes, error) {
 // If an unlocked file has modifications, it wont be locked and an error will be returned for that file.
 // The status channel 'lockchan' is closed when this function returns.
 // (git annex lock)
-func (cl *Client) AnnexLock(filepaths []string) chan RepoFileStatus {
+func (gr *Runner) AnnexLock(filepaths []string) chan RepoFileStatus {
 	lockchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(lockchan)
@@ -696,7 +696,7 @@ func (cl *Client) AnnexLock(filepaths []string) chan RepoFileStatus {
 		}
 
 		cmdargs = append(cmdargs, filepaths...)
-		cmd := cl.AnnexCommand(cmdargs...)
+		cmd := gr.AnnexCommand(cmdargs...)
 		err := cmd.Start()
 		if err != nil {
 			lockchan <- RepoFileStatus{Err: err}
@@ -761,7 +761,7 @@ func (cl *Client) AnnexLock(filepaths []string) chan RepoFileStatus {
 		}
 		// Add metadata
 		for _, fname := range filenames {
-			cl.setAnnexMetadataName(fname)
+			gr.setAnnexMetadataName(fname)
 		}
 	}()
 	return lockchan
@@ -770,7 +770,7 @@ func (cl *Client) AnnexLock(filepaths []string) chan RepoFileStatus {
 // AnnexUnlock unlocks the specified files and directory contents if they are annexed
 // The status channel 'unlockchan' is closed when this function returns.
 // (git annex unlock)
-func (cl *Client) AnnexUnlock(filepaths []string) chan RepoFileStatus {
+func (gr *Runner) AnnexUnlock(filepaths []string) chan RepoFileStatus {
 	unlockchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(unlockchan)
@@ -779,7 +779,7 @@ func (cl *Client) AnnexUnlock(filepaths []string) chan RepoFileStatus {
 			cmdargs = append(cmdargs, "--json")
 		}
 		cmdargs = append(cmdargs, filepaths...)
-		cmd := cl.AnnexCommand(cmdargs...)
+		cmd := gr.AnnexCommand(cmdargs...)
 		err := cmd.Start()
 		if err != nil {
 			unlockchan <- RepoFileStatus{Err: err}
@@ -842,12 +842,12 @@ func (cl *Client) AnnexUnlock(filepaths []string) chan RepoFileStatus {
 // Specifying 'paths' limits the search to files matching a given path.
 // Returned items are indexed by their annex key.
 // (git annex find)
-func (cl *Client) AnnexFind(paths []string) (map[string]AnnexFindRes, error) {
+func (gr *Runner) AnnexFind(paths []string) (map[string]AnnexFindRes, error) {
 	cmdargs := []string{"find", "--json"}
 	if len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd := cl.AnnexCommand(cmdargs...)
+	cmd := gr.AnnexCommand(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		logstd(stdout, stderr)
@@ -873,8 +873,8 @@ func (cl *Client) AnnexFind(paths []string) (map[string]AnnexFindRes, error) {
 // The creation is forced, so there is no guarantee that the key refers to valid repository content, nor that the content is still available in any of the remotes.
 // The location where the file is to be created must be available (no directories are created).
 // (git annex fromkey --force)
-func (cl *Client) AnnexFromKey(key, filepath string) error {
-	cmd := cl.AnnexCommand("fromkey", "--force", key, filepath)
+func (gr *Runner) AnnexFromKey(key, filepath string) error {
+	cmd := gr.AnnexCommand("fromkey", "--force", key, filepath)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		logstd(stdout, stderr)
@@ -886,8 +886,8 @@ func (cl *Client) AnnexFromKey(key, filepath string) error {
 // AnnexContentLocation returns the location of the content for a given annex
 // key. This is the location of the content file in the object store. If the
 // annexed content is not available locally, the function returns an error.
-func (cl *Client) AnnexContentLocation(key string) (string, error) {
-	cmd := cl.AnnexCommand("contentlocation", key)
+func (gr *Runner) AnnexContentLocation(key string) (string, error) {
+	cmd := gr.AnnexCommand("contentlocation", key)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		logstd(stdout, stderr)
@@ -904,10 +904,10 @@ func (cl *Client) AnnexContentLocation(key string) (string, error) {
 
 // AnnexFsck runs fsck (filesystem check) on the specified files, fixing any
 // issues with the annexed files in the working tree.
-func (cl *Client) AnnexFsck(paths []string) error {
+func (gr *Runner) AnnexFsck(paths []string) error {
 	cmdargs := []string{"fsck"}
 	cmdargs = append(cmdargs, paths...)
-	cmd := cl.AnnexCommand(cmdargs...)
+	cmd := gr.AnnexCommand(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		logstd(stdout, stderr)
@@ -938,7 +938,7 @@ func annexExclArgs(minsize string, exclude []string) string {
 // Files matching at least one exclusion pattern are also added to git.
 // The status channel 'addchan' is closed when this function returns.
 // (git annex add)
-func (cl *Client) AnnexAdd(filepaths []string, minsize string, exclude []string) chan RepoFileStatus {
+func (gr *Runner) AnnexAdd(filepaths []string, minsize string, exclude []string) chan RepoFileStatus {
 	addchan := make(chan RepoFileStatus)
 	go func() {
 		defer close(addchan)
@@ -956,7 +956,7 @@ func (cl *Client) AnnexAdd(filepaths []string, minsize string, exclude []string)
 		}
 
 		cmdargs = append(cmdargs, filepaths...)
-		cmd := cl.AnnexCommand(cmdargs...)
+		cmd := gr.AnnexCommand(cmdargs...)
 		err := cmd.Start()
 		if err != nil {
 			addchan <- RepoFileStatus{Err: err}
@@ -1024,7 +1024,7 @@ func (cl *Client) AnnexAdd(filepaths []string, minsize string, exclude []string)
 		// Add metadata
 		status.State = "Writing filename metadata"
 		for _, fname := range filenames {
-			cl.setAnnexMetadataName(fname)
+			gr.setAnnexMetadataName(fname)
 			status.FileName = fname
 			status.Progress = progcomplete
 			addchan <- status
@@ -1036,9 +1036,9 @@ func (cl *Client) AnnexAdd(filepaths []string, minsize string, exclude []string)
 // setAnnexMetadataName starts a routine and waits for input on the provided channel.
 // For each path specified, the name of the file is added to the metadata of the annexed file.
 // The function exits when the channel is closed.
-func (cl *Client) setAnnexMetadataName(path string) {
+func (gr *Runner) setAnnexMetadataName(path string) {
 	_, fname := filepath.Split(path)
-	cmd := cl.AnnexCommand("metadata", fmt.Sprintf("--set=ginfilename=%s", fname), path)
+	cmd := gr.AnnexCommand("metadata", fmt.Sprintf("--set=ginfilename=%s", fname), path)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		logstd(stdout, stderr)
@@ -1049,8 +1049,8 @@ func (cl *Client) setAnnexMetadataName(path string) {
 }
 
 // GetAnnexVersion returns the version string of the system's git-annex.
-func (cl *Client) GetAnnexVersion() (string, error) {
-	cmd := cl.AnnexCommand("version", "--raw")
+func (gr *Runner) GetAnnexVersion() (string, error) {
+	cmd := gr.AnnexCommand("version", "--raw")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		errmsg := string(stderr)
@@ -1072,14 +1072,14 @@ func (cl *Client) GetAnnexVersion() (string, error) {
 
 // GetAnnexVersion returns the version string of the system's git-annex.
 func GetAnnexVersion() (string, error) {
-	cl := New(".")
-	return cl.GetAnnexVersion()
+	gr := New(".")
+	return gr.GetAnnexVersion()
 }
 
 // AnnexCommand sets up a git annex command with the provided arguments and returns a GinCmd struct.
-func (cl *Client) AnnexCommand(args ...string) shell.Cmd {
-	gitbin := cl.Bin
-	gitannexpath := cl.AnnexPath
+func (gr *Runner) AnnexCommand(args ...string) shell.Cmd {
+	gitbin := gr.Bin
+	gitannexpath := gr.AnnexPath
 	cmdargs := []string{"annex"}
 	cmdargs = append(cmdargs, args...)
 	cmd := shell.Command(gitbin, cmdargs...)
@@ -1088,7 +1088,7 @@ func (cl *Client) AnnexCommand(args ...string) shell.Cmd {
 		cmd.Setenv("PATH", syspath)
 	}
 	// cmd.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh -F %s", sshcfg))
-	cmd.Setenv("GIT_SSH_COMMAND", cl.SSHCmd)
+	cmd.Setenv("GIT_SSH_COMMAND", gr.SSHCmd)
 	cmd.Setenv("GIT_ANNEX_USE_GIT_SSH", "1")
 	workingdir, _ := filepath.Abs(".")
 	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
