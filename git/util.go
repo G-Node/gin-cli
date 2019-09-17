@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/G-Node/gin-cli/ginclient/log"
 	humanize "github.com/dustin/go-humanize"
 )
 
@@ -37,10 +36,6 @@ func calcRate(dbytes int, dt time.Duration) string {
 	}
 	rate := int64(dbytes) * 1000000000 / dtns
 	return fmt.Sprintf("%s/s", humanize.IBytes(uint64(rate)))
-}
-
-func logstd(out, err []byte) {
-	log.Write("[stdout]\n%s\n[stderr]\n%s", string(out), string(err))
 }
 
 func cutline(b []byte) (string, bool) {
@@ -81,6 +76,7 @@ func stringInSlice(element string, strlist []string) bool {
 
 // filterpaths takes path descriptions (full paths, relative paths, files, or directories) and returns a slice of filepaths (as strings) excluding the files listed in excludes.
 func filterpaths(paths, excludes []string) (filtered []string) {
+	// NOTE: This function is only used in a deprecated function; will be removed with caller
 
 	// walker adds files to filtered if they don't match excludes
 	walker := func(path string, info os.FileInfo, err error) error {
@@ -97,12 +93,8 @@ func filterpaths(paths, excludes []string) (filtered []string) {
 	}
 
 	for _, p := range paths {
-		err := filepath.Walk(p, walker)
-		if err != nil {
-			log.Write("Error occured during path filtering: %s", err.Error())
-		}
+		filepath.Walk(p, walker)
 	}
-
 	return
 }
 

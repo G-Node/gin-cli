@@ -1130,6 +1130,7 @@ func (gr *Runner) SetBare(state bool) error {
 // The filtering is done twice:
 // Once against the provided paths in the current directory (recursively) and once more against the output of 'git ls-files <paths>', in order to include any files that might have been deleted.
 func (gr *Runner) gitAddDirect(paths []string) (filtered []string) {
+	// NOTE: Deprecated.  We don't use bare repos anymore (since v7)
 	wichan := gr.AnnexWhereis(paths)
 	var annexfiles []string
 	for wiInfo := range wichan {

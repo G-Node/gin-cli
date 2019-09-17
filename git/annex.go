@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git/shell"
 )
 
@@ -122,30 +121,28 @@ type AnnexInfoRes struct {
 // AnnexInit initialises the repository for annex.
 // (git annex init)
 func (gr *Runner) AnnexInit(description string) error {
-	err := gr.ConfigSet("annex.backends", "MD5")
+	// TODO: Show error for failed backend set
+	gr.ConfigSet("annex.backends", "MD5")
+	err := gr.ConfigSet("annex.addunlocked", "true")
 	if err != nil {
-		log.Write("Failed to set default annex backend MD5")
-	}
-	err = gr.ConfigSet("annex.addunlocked", "true")
-	if err != nil {
-		log.Write("Failed to initialise annex in unlocked mode")
 		return err
 	}
 	args := []string{"init", "--version=7", description}
 	cmd := gr.AnnexCommand(args...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		initError := fmt.Errorf("Repository annex initialisation failed.\n%s", string(stderr))
-		logstd(stdout, stderr)
-		return initError
+		gerr := giterror{
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			Description: fmt.Sprintf("repository annex initialisation failed: %s", string(stderr)),
+			Origin:      "AnnexInit()",
+		}
+		return gerr
 	}
 
 	cmd = gr.Command("checkout", "master")
-	stdout, stderr, err = cmd.OutputError()
-	if err != nil {
-		logstd(stdout, stderr)
-	}
-
+	// Ignore any errors from the checkout (will fail expectedly on new repositories)
+	cmd.Run()
 	return nil
 }
 
@@ -167,18 +164,28 @@ func (gr *Runner) AnnexPull(remote string) error {
 	// some conflicts are resolved automatically and don't produce an error in some combinations
 	if err := checkMergeErrors(sstdout, sstderr); err != nil {
 		gr.mergeAbort() // abort a potential failed merge attempt
-		return fmt.Errorf("download failed: %v", err)
+		gerr := giterror{
+			Origin:      fmt.Sprintf("AnnexPull(%s)", remote),
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			UError:      string(stderr),
+			Description: fmt.Sprintf("download failed: %s", string(stderr)),
+		}
+		return gerr
 	}
 
 	if err != nil { // command actually failed
-		log.Write("Error during AnnexPull")
-		log.Write("[Error]: %v", err)
-		logstd(stdout, stderr)
+		gerr := giterror{
+			Origin: fmt.Sprintf("AnnexPull(%s)", remote),
+			Stdout: string(stdout),
+			Stderr: string(stderr),
+			UError: string(stderr),
+			// since we don't know what the error was, show the internal annex sync
+			// error to the user
+			Description: fmt.Sprintf("download failed", string(stderr)),
+		}
 		gr.mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
-
-		// since we don't know what the error was, show the internal annex sync
-		// error to the user
-		return fmt.Errorf("download failed: %s", sstderr)
+		return gerr
 	}
 
 	return nil
@@ -197,27 +204,43 @@ func (gr *Runner) AnnexSync(content bool) error {
 	sstdout := string(stdout)
 	sstderr := string(stderr)
 
+	fn := fmt.Sprintf("AnnexSync(%t)", content)
 	// some errors don't return with an error status, so we need to check
 	// stderr for common error strings
 	if err := parseSyncErrors(sstderr); err != nil {
-		return fmt.Errorf("sync failed: %v", err)
+		gerr := giterror{
+			Origin:      fn,
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			UError:      string(stderr),
+			Description: fmt.Sprintf("sync failed: %s", err.Error()),
+		}
+		return gerr
 	}
 
 	// some conflicts are resolved automatically and don't produce an error in some combinations
 	if err := checkMergeErrors(sstdout, sstderr); err != nil {
 		gr.mergeAbort() // abort a potential failed merge attempt
-		return fmt.Errorf("sync failed: %v", err)
+		gerr := giterror{
+			Origin:      fn,
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			UError:      string(stderr),
+			Description: fmt.Sprintf("sync failed: %s", err.Error()),
+		}
+		return gerr
 	}
 
 	if err != nil { // command actually failed
-		log.Write("Error during AnnexSync")
-		log.Write("[Error]: %v", err)
-		logstd(stdout, stderr)
+		gerr := giterror{
+			Origin:      fn,
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			UError:      string(stderr),
+			Description: fmt.Sprintf("sync failed: %s", err.Error()),
+		}
 		gr.mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
-
-		// since we don't know what the error was, show the internal annex sync
-		// error to the user
-		return fmt.Errorf("sync failed: %s", sstderr)
+		return gerr
 	}
 	return nil
 }
@@ -230,25 +253,19 @@ func (gr *Runner) AnnexPush(paths []string, remote string) chan RepoFileStatus {
 	go func() {
 		defer close(pushchan)
 		cmd := gr.AnnexCommand("sync", "--verbose", "--no-pull", "--no-commit", remote) // NEVER commit changes when doing annex-sync
-		stdout, stderr, err := cmd.OutputError()
+		_, stderr, err := cmd.OutputError()
 		sstderr := string(stderr)
 
 		// some errors don't return with an error status, so we need to check
 		// stderr for common error strings
 		if err := parseSyncErrors(sstderr); err != nil {
-			pushchan <- RepoFileStatus{Err: fmt.Errorf("upload failed: %v", err)}
+			pushchan <- RepoFileStatus{Err: fmt.Errorf("upload failed: %s", err.Error())}
 			return
 		}
 
 		if err != nil { // command actually failed
-			log.Write("Error during AnnexPush")
-			log.Write("[Error]: %v", err)
-			logstd(stdout, stderr)
 			gr.mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
-
-			// since we don't know what the error was, show the internal annex sync
-			// error to the user
-			pushchan <- RepoFileStatus{Err: fmt.Errorf(sstderr)}
+			pushchan <- RepoFileStatus{Err: fmt.Errorf("upload failed: %s", sstderr)}
 			return
 		}
 
@@ -318,8 +335,6 @@ func (gr *Runner) AnnexPush(paths []string, remote string) chan RepoFileStatus {
 				err = json.Unmarshal(outline, &getresult)
 				if err != nil || getresult.Command == "" {
 					// Couldn't parse output
-					log.Write("Could not parse 'git annex copy' output")
-					log.Write(string(outline))
 					// TODO: Print error at the end: Command succeeded but there was an error understanding the output
 					continue
 				}
@@ -367,8 +382,6 @@ func (gr *Runner) AnnexPush(paths []string, remote string) chan RepoFileStatus {
 			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 				stderr = append(stderr, errline...)
 			}
-			log.Write("Error during AnnexPush")
-			log.Write(string(stderr))
 			pushchan <- RepoFileStatus{Err: fmt.Errorf(string(stderr))}
 		}
 	}()
@@ -415,9 +428,8 @@ func (gr *Runner) baseAnnexGet(cmdargs []string) chan RepoFileStatus {
 				err = json.Unmarshal(outline, &getresult)
 				if err != nil || getresult.Command == "" {
 					// Couldn't parse output
-					log.Write("Could not parse 'git annex get' output")
-					log.Write(string(outline))
-					// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+					// TODO: Print error at the end: Command succeeded but
+					// there was an error understanding the output
 					continue
 				}
 				status.FileName = getresult.File
@@ -450,8 +462,11 @@ func (gr *Runner) baseAnnexGet(cmdargs []string) chan RepoFileStatus {
 			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 				stderr = append(stderr, errline...)
 			}
-			log.Write("Error during AnnexGet")
-			log.Write(string(stderr))
+			status.State = "error"
+			status.FileName = ""
+			status.Progress = "E"
+			status.Err = fmt.Errorf(string(stderr))
+			getchan <- status
 		}
 	}()
 	return getchan
@@ -531,10 +546,8 @@ func (gr *Runner) AnnexDrop(filepaths []string) chan RepoFileStatus {
 			}
 			status.FileName = annexDropRes.File
 			if annexDropRes.Success {
-				log.Write("%s content dropped", annexDropRes.File)
 				status.Err = nil
 			} else {
-				log.Write("Error dropping %s", annexDropRes.File)
 				errmsg := annexDropRes.Note
 				if strings.Contains(errmsg, "unsafe") {
 					errmsg = "failed (unsafe): could not verify remote copy"
@@ -549,8 +562,10 @@ func (gr *Runner) AnnexDrop(filepaths []string) chan RepoFileStatus {
 			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 				stderr = append(stderr, errline...)
 			}
-			log.Write("Error during AnnexDrop")
-			log.Write("[stderr]\n%s", string(stderr))
+			status.State = "error"
+			status.FileName = ""
+			status.Progress = "E"
+			status.Err = fmt.Errorf(string(stderr))
 		}
 	}()
 	return dropchan
@@ -560,12 +575,13 @@ func (gr *Runner) AnnexDrop(filepaths []string) chan RepoFileStatus {
 // If an unused key does not have a name associated with it, the filename will be empty.
 func (gr *Runner) getAnnexMetadataName(key string) annexFilenameDate {
 	var cmdargs []string
-	cmdargs = []string{"metadata", "--json", fmt.Sprintf("--key=%s", key)}
+	cmdargs = []string{"metadata", "--json-error-messages", "--json", fmt.Sprintf("--key=%s", key)}
 	cmd := gr.AnnexCommand(cmdargs...)
-	stdout, stderr, err := cmd.OutputError()
+	stdout, _, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error retrieving annexed content metadata")
-		logstd(stdout, stderr)
+		// Metadata doesn't fail if metadata isn't set, or even if the key is wrong.
+		// This can only occur if the annex isn't initialised and that issue will be dealt elsewhere.
+		// Returning empty.
 		return annexFilenameDate{}
 	}
 	var annexmd annexMetadata
@@ -591,7 +607,6 @@ func (gr *Runner) AnnexWhereis(paths []string) chan AnnexWhereisRes {
 		cmd := gr.AnnexCommand(cmdargs...)
 		err := cmd.Start()
 		if err != nil {
-			log.Write("Error during AnnexWhereis")
 			wichan <- AnnexWhereisRes{Err: fmt.Errorf("Failed to run git-annex whereis: %s", err)}
 			return
 		}
@@ -626,7 +641,6 @@ func (gr *Runner) AnnexStatus(paths []string) chan AnnexStatusRes {
 		// TODO: Parse output
 		err := cmd.Start()
 		if err != nil {
-			log.Write("Error setting up git-annex status")
 			statuschan <- AnnexStatusRes{Err: fmt.Errorf("Failed to run git-annex status: %s", err)}
 			return
 		}
@@ -653,10 +667,8 @@ func (gr *Runner) AnnexStatus(paths []string) chan AnnexStatusRes {
 func (gr *Runner) AnnexDescribe(repository, description string) error {
 	fn := fmt.Sprintf("AnnexDescribe(%s, %s)", repository, description)
 	cmd := gr.AnnexCommand("describe", repository, description)
-	stdout, stderr, err := cmd.OutputError()
+	_, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error during Describe")
-		logstd(stdout, stderr)
 		return giterror{Origin: fn, UError: string(stderr)}
 	}
 	return nil
@@ -668,9 +680,7 @@ func (gr *Runner) AnnexInfo() (AnnexInfoRes, error) {
 	cmd := gr.AnnexCommand("info", "--json")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error during AnnexInfo")
-		logstd(stdout, stderr)
-		return AnnexInfoRes{}, fmt.Errorf("Error retrieving annex info")
+		return AnnexInfoRes{}, giterror{Origin: "AnnexInfo", UError: string(stderr), Description: "Error retrieving annex info"}
 	}
 
 	var info AnnexInfoRes
@@ -687,7 +697,7 @@ func (gr *Runner) AnnexLock(filepaths []string) chan RepoFileStatus {
 	go func() {
 		defer close(lockchan)
 		if len(filepaths) == 0 {
-			log.Write("No paths to lock. Nothing to do.")
+			// No paths to lock; nothing to do
 			return
 		}
 		cmdargs := []string{"lock"}
@@ -726,9 +736,7 @@ func (gr *Runner) AnnexLock(filepaths []string) chan RepoFileStatus {
 			err := json.Unmarshal(outline, &addresult)
 			if err != nil || addresult.Command == "" {
 				// Couldn't parse output
-				log.Write("Could not parse 'git annex lock' output")
-				log.Write(string(outline))
-				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+				// TODO: Collect errors and print at the end: Command succeeded but there was an error understanding the output
 				continue
 			}
 			status.FileName = addresult.File
@@ -737,12 +745,10 @@ func (gr *Runner) AnnexLock(filepaths []string) chan RepoFileStatus {
 			status.RawInput = input
 			status.RawOutput = string(outline)
 			if addresult.Success {
-				log.Write("%s locked", addresult.File)
 				status.Err = nil
 				filenames = append(filenames, status.FileName)
 			} else {
 				errmsgs := strings.Join(addresult.Errors, " | ")
-				log.Write("Error locking %s: %s", addresult.File, errmsgs)
 				if strings.Contains(errmsgs, "Locking this file would discard any changes") {
 					errmsgs = "Locking this file would discard any changes you have made to it. Commit (with 'gin commit') or discard any changes before locking."
 				}
@@ -756,12 +762,17 @@ func (gr *Runner) AnnexLock(filepaths []string) chan RepoFileStatus {
 			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 				stderr = append(stderr, errline...)
 			}
-			log.Write("Error during lock")
-			logstd(nil, stderr)
+			// TODO: Send through channel with the collected errors
 		}
 		// Add metadata
 		for _, fname := range filenames {
-			gr.setAnnexMetadataName(fname)
+			err := gr.setAnnexMetadataName(fname)
+			if err != nil {
+				status.Err = err
+			}
+			status.FileName = fname
+			status.Progress = progcomplete
+			lockchan <- status
 		}
 	}()
 	return lockchan
@@ -809,17 +820,13 @@ func (gr *Runner) AnnexUnlock(filepaths []string) chan RepoFileStatus {
 			err = json.Unmarshal(outline, &unlockres)
 			if err != nil || unlockres.Command == "" {
 				// Couldn't parse output
-				log.Write("Could not parse 'git annex unlock' output")
-				log.Write(string(outline))
-				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+				// TODO: Collect errors and print at the end: Command succeeded but there was an error understanding the output
 				continue
 			}
 			status.FileName = unlockres.File
 			if unlockres.Success {
-				log.Write("%s unlocked", unlockres.File)
 				status.Err = nil
 			} else {
-				log.Write("Error unlocking %s", unlockres.File)
 				status.Err = fmt.Errorf("Content not available locally. Use 'gin get-content' to download")
 			}
 			status.Progress = progcomplete
@@ -830,8 +837,7 @@ func (gr *Runner) AnnexUnlock(filepaths []string) chan RepoFileStatus {
 			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 				stderr = append(stderr, errline...)
 			}
-			log.Write("Error during AnnexUnlock")
-			logstd(nil, stderr)
+			// TODO: Send through channel with the collected errors
 		}
 		status.Progress = progcomplete
 	}()
@@ -850,7 +856,6 @@ func (gr *Runner) AnnexFind(paths []string) (map[string]AnnexFindRes, error) {
 	cmd := gr.AnnexCommand(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		logstd(stdout, stderr)
 		return nil, fmt.Errorf(string(stderr))
 	}
 
@@ -875,9 +880,8 @@ func (gr *Runner) AnnexFind(paths []string) (map[string]AnnexFindRes, error) {
 // (git annex fromkey --force)
 func (gr *Runner) AnnexFromKey(key, filepath string) error {
 	cmd := gr.AnnexCommand("fromkey", "--force", key, filepath)
-	stdout, stderr, err := cmd.OutputError()
+	_, stderr, err := cmd.OutputError()
 	if err != nil {
-		logstd(stdout, stderr)
 		return fmt.Errorf(string(stderr))
 	}
 	return nil
@@ -890,7 +894,6 @@ func (gr *Runner) AnnexContentLocation(key string) (string, error) {
 	cmd := gr.AnnexCommand("contentlocation", key)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		logstd(stdout, stderr)
 		errmsg := "content not available locally"
 		if len(stderr) > 0 {
 			errmsg = string(stderr)
@@ -908,9 +911,8 @@ func (gr *Runner) AnnexFsck(paths []string) error {
 	cmdargs := []string{"fsck"}
 	cmdargs = append(cmdargs, paths...)
 	cmd := gr.AnnexCommand(cmdargs...)
-	stdout, stderr, err := cmd.OutputError()
+	_, stderr, err := cmd.OutputError()
 	if err != nil {
-		logstd(stdout, stderr)
 		return fmt.Errorf("error fixing working tree files: %s", string(stderr))
 	}
 	return nil
@@ -943,7 +945,7 @@ func (gr *Runner) AnnexAdd(filepaths []string, minsize string, exclude []string)
 	go func() {
 		defer close(addchan)
 		if len(filepaths) == 0 {
-			log.Write("No paths to add to annex. Nothing to do.")
+			// No paths to add to annex; nothing to do
 			return
 		}
 		cmdargs := []string{"add"}
@@ -986,9 +988,7 @@ func (gr *Runner) AnnexAdd(filepaths []string, minsize string, exclude []string)
 			err := json.Unmarshal(outline, &addresult)
 			if err != nil || addresult.Command == "" {
 				// Couldn't parse output
-				log.Write("Could not parse 'git annex add' output")
-				log.Write(string(outline))
-				// TODO: Print error at the end: Command succeeded but there was an error understanding the output
+				// TODO: Collect errors and print at the end: Command succeeded but there was an error understanding the output
 				continue
 			}
 			status.FileName = addresult.File
@@ -999,15 +999,13 @@ func (gr *Runner) AnnexAdd(filepaths []string, minsize string, exclude []string)
 			if addresult.Success {
 				if addresult.Note == addedToGitNote {
 					status.State = "Added to git"
-					log.Write("%s added to git", addresult.File)
 				} else {
 					status.State = "Added to annex"
-					log.Write("%s added to annex", addresult.File)
 				}
 				status.Err = nil
 				filenames = append(filenames, status.FileName)
 			} else {
-				log.Write("Error adding %s", addresult.File)
+				// TODO: Collect errors and print at the end: Command succeeded but there was an error understanding the output
 				status.Err = fmt.Errorf("failed")
 			}
 			status.Progress = progcomplete
@@ -1018,13 +1016,15 @@ func (gr *Runner) AnnexAdd(filepaths []string, minsize string, exclude []string)
 			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 				stderr = append(stderr, errline...)
 			}
-			log.Write("Error during AnnexAdd")
-			logstd(nil, stderr)
+			// TODO: Send through channel with the collected errors from above
 		}
 		// Add metadata
 		status.State = "Writing filename metadata"
 		for _, fname := range filenames {
-			gr.setAnnexMetadataName(fname)
+			err := gr.setAnnexMetadataName(fname)
+			if err != nil {
+				status.Err = err
+			}
 			status.FileName = fname
 			status.Progress = progcomplete
 			addchan <- status
@@ -1033,19 +1033,16 @@ func (gr *Runner) AnnexAdd(filepaths []string, minsize string, exclude []string)
 	return addchan
 }
 
-// setAnnexMetadataName starts a routine and waits for input on the provided channel.
-// For each path specified, the name of the file is added to the metadata of the annexed file.
-// The function exits when the channel is closed.
-func (gr *Runner) setAnnexMetadataName(path string) {
+// setAnnexMetadataName adds the filepath as a metadata value to an annexed file under the key "ginfilename".
+// This helps keep track of the filenames that annexed content was associated with.
+func (gr *Runner) setAnnexMetadataName(path string) error {
 	_, fname := filepath.Split(path)
 	cmd := gr.AnnexCommand("metadata", fmt.Sprintf("--set=ginfilename=%s", fname), path)
-	stdout, stderr, err := cmd.OutputError()
+	_, stderr, err := cmd.OutputError()
 	if err != nil {
-		logstd(stdout, stderr)
-	} else {
-		log.Write("ginfilename metadata key set to %s", fname)
+		return fmt.Errorf(string(stderr))
 	}
-	return
+	return nil
 }
 
 // GetAnnexVersion returns the version string of the system's git-annex.
@@ -1054,7 +1051,6 @@ func (gr *Runner) GetAnnexVersion() (string, error) {
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		errmsg := string(stderr)
-		log.Write("Error while preparing git-annex version command")
 		if strings.Contains(err.Error(), "executable file not found") {
 			return "", fmt.Errorf("git-annex executable not found: %s", err.Error())
 		}
@@ -1090,8 +1086,6 @@ func (gr *Runner) AnnexCommand(args ...string) shell.Cmd {
 	// cmd.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh -F %s", sshcfg))
 	cmd.Setenv("GIT_SSH_COMMAND", gr.SSHCmd)
 	cmd.Setenv("GIT_ANNEX_USE_GIT_SSH", "1")
-	workingdir, _ := filepath.Abs(".")
-	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
 	return cmd
 }
 
