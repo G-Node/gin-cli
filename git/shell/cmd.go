@@ -62,6 +62,10 @@ type Error struct {
 	Origin string
 	// Human-readable description of error and conditions
 	Description string
+	// Shell command standard output
+	Stdout string
+	// Shell command standard error
+	Stderr string
 }
 
 func (e Error) Error() string {
