@@ -1061,22 +1061,6 @@ func (gr *Runner) IsDirect() bool {
 	return false
 }
 
-// IsVersion6 returns true if the repository is working in git annex 'direct'
-// mode.  If the directory (Runner.Path) is not a repository, or is not an
-// initialised annex repository, the result defaults to false.
-func (gr *Runner) IsVersion6() bool {
-	cmd := gr.Command("config", "--local", "--get", "annex.version")
-	stdout, stderr, err := cmd.OutputError()
-	if err != nil {
-		log.Write("Error while checking repository annex version")
-		logstd(stdout, stderr)
-		return false
-	}
-	ver := strings.TrimSpace(string(stdout))
-	log.Write("Annex version is %s", ver)
-	return ver == "6"
-}
-
 // mergeAbort aborts an unfinished git merge.
 func (gr *Runner) mergeAbort() {
 	// Here, we run a git status without checking any part of the result. It
