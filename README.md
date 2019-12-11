@@ -1,5 +1,5 @@
 # GIN-CLI
-TGhis is my test forkk.
+This is a bad fork.
 
 [![GoDoc](https://godoc.org/github.com/G-Node/gin-cli?status.svg)](http://godoc.org/github.com/G-Node/gin-cli)
 
