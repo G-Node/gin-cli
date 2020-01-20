@@ -14,7 +14,6 @@ require (
 	github.com/gogits/go-gogs-client v0.0.0-20190710002546-4c3c18947c15
 	github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c
 	github.com/mattn/go-colorable v0.1.2 // indirect
-	github.com/pkg/errors v0.8.0
 	github.com/shibukawa/configdir v0.0.0-20170330084843-e180dbdc8da0
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
