@@ -1100,7 +1100,7 @@ func checkMergeErrors(stdout, stderr string) error {
 		// abort merge
 	} else if strings.Contains(messages, "merge conflict was automatically resolved") {
 		// Merge conflict in annex files (automatically resolved by keeping both copies)
-		return fmt.Errorf("files changed locally and remotely. Both files have been kept:\n %s", strings.Join(parseFilesAnnexConflict(stdout), ", "))
+		return fmt.Errorf("files changed locally and remotely and the conflict was automatically resolved; you may want to examine the result")
 		// TODO: This should probably instead become a warning or notice, instead of a full error
 	}
 	return nil
