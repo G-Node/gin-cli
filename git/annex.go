@@ -1084,8 +1084,11 @@ func (gr *Runner) AnnexCommand(args ...string) shell.Cmd {
 		cmd.Setenv("PATH", syspath)
 	}
 	// cmd.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh -F %s", sshcfg))
-	cmd.Setenv("GIT_SSH_COMMAND", gr.SSHCmd)
+	if gr.SSHCmd != "" {
+		cmd.Setenv("GIT_SSH_COMMAND", gr.SSHCmd)
+	}
 	cmd.Setenv("GIT_ANNEX_USE_GIT_SSH", "1")
+	cmd.Setenv("GIT_SSH_VARIANT", "ssh")
 	return cmd
 }
 

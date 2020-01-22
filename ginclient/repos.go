@@ -286,7 +286,7 @@ func (gincl *Client) Upload(paths []string, remotes []string) chan git.RepoFileS
 	uploadchan := make(chan git.RepoFileStatus)
 
 	gr := git.New(".")
-	gr.SSHCmd = sshopts(gincl.srvalias)
+	gr.SSHCmd = SSHOpts()
 
 	go func() {
 		defer close(uploadchan)
@@ -345,7 +345,7 @@ func (gincl *Client) GetContent(paths []string) chan git.RepoFileStatus {
 		}
 
 		gitcl := git.New(gincl.srvalias)
-		gitcl.SSHCmd = sshopts(gincl.srvalias)
+		gitcl.SSHCmd = SSHOpts()
 		annexgetchan := gitcl.AnnexGet(paths)
 		for stat := range annexgetchan {
 			getcontchan <- stat
@@ -368,7 +368,7 @@ func (gincl *Client) RemoveContent(paths []string) chan git.RepoFileStatus {
 			return
 		}
 		gitcl := git.New(gincl.srvalias)
-		gitcl.SSHCmd = sshopts(gincl.srvalias)
+		gitcl.SSHCmd = SSHOpts()
 		dropchan := gitcl.AnnexDrop(paths)
 		for stat := range dropchan {
 			rmcchan <- stat
@@ -427,7 +427,7 @@ func (gincl *Client) UnlockContent(paths []string) chan git.RepoFileStatus {
 func (gincl *Client) Download(remote string) error {
 	log.Write("Download: %q", remote)
 	gitcl := git.New(gincl.srvalias)
-	gitcl.SSHCmd = sshopts(gincl.srvalias)
+	gitcl.SSHCmd = SSHOpts()
 	return gitcl.AnnexPull(remote)
 }
 
@@ -436,7 +436,7 @@ func (gincl *Client) Download(remote string) error {
 func (gincl *Client) Sync(content bool) error {
 	log.Write("Sync %t", content)
 	gitcl := git.New(gincl.srvalias)
-	gitcl.SSHCmd = sshopts(gincl.srvalias)
+	gitcl.SSHCmd = SSHOpts()
 	return gitcl.AnnexSync(content)
 }
 
@@ -454,7 +454,7 @@ func (gincl *Client) CloneRepo(repopath string) chan git.RepoFileStatus {
 		here, _ := os.Getwd()
 		cloneloc := filepath.Join(here, repoName)
 		gitcl := git.New(cloneloc)
-		gitcl.SSHCmd = sshopts(gincl.srvalias)
+		gitcl.SSHCmd = SSHOpts()
 		clonestatus := gitcl.Clone(remotepath, repopath)
 		for stat := range clonestatus {
 			clonechan <- stat
@@ -630,7 +630,7 @@ func (gincl *Client) CheckoutFileCopies(commithash string, paths []string, outpa
 					contentloc, err := gr.AnnexContentLocation(key)
 					if err != nil {
 						gitcl := git.New(gincl.srvalias)
-						gitcl.SSHCmd = sshopts(gincl.srvalias)
+						gitcl.SSHCmd = SSHOpts()
 						getchan := gitcl.AnnexGetKey(key)
 						for range getchan {
 						}
@@ -728,7 +728,7 @@ func (gincl *Client) InitDir(bare bool) error {
 	}
 
 	gitcl := git.New(".")
-	gitcl.SSHCmd = sshopts(gincl.srvalias)
+	gitcl.SSHCmd = SSHOpts()
 	err = gitcl.AnnexInit(description)
 	if err != nil {
 		initerr.UError = err.Error()

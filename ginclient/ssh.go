@@ -142,10 +142,10 @@ func GetKnownHosts() (string, error) {
 	return hkpath, err
 }
 
-// sshopts returns a series of SSH options that can be used to connect to the
-// configured server.  The returned string can be set as the GIT_SSH_COMMAND
+// SSHOpts returns a series of SSH options that can be used to connect to the
+// configured servers.  The returned string can be set as the GIT_SSH_COMMAND
 // environment variable.
-func sshopts(alias string) string {
+func SSHOpts() string {
 	// Windows git seems to require Unix paths for the SSH command -- this is dirty but works
 	fixpathsep := func(p string) string {
 		p = filepath.ToSlash(p)

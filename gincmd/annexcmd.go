@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	ginclient "github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
 )
 
 func annexrun(cmd *cobra.Command, args []string) {
 	gr := git.New(".")
+	gr.SSHCmd = ginclient.SSHOpts()
 	annexcmd := gr.AnnexCommand(args...)
 	err := annexcmd.Start()
 	CheckError(err)
