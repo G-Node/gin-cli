@@ -80,6 +80,7 @@ func checkRemote(cmd *cobra.Command, url string) (err error) {
 	// Check if the remote is accessible
 	fmt.Print(":: Checking remote: ")
 	gr := git.New(".")
+	gr.SSHCmd = ginclient.SSHOpts()
 	if _, err = gr.LsRemote(url); err == nil {
 		fmt.Fprintln(color.Output, green("OK"))
 		return nil
@@ -112,6 +113,7 @@ func createDirRemote(rmt remote) {
 	err = gincl.InitDir(true)
 	CheckError(err)
 	gr := git.New(".")
+	gr.SSHCmd = ginclient.SSHOpts()
 	gr.AnnexDescribe("here", "GIN Storage")
 }
 
@@ -177,6 +179,7 @@ func addRemote(cmd *cobra.Command, args []string) {
 		}
 	}
 	gr := git.New(".")
+	gr.SSHCmd = ginclient.SSHOpts()
 	err = gr.RemoteAdd(name, rmt.url)
 	CheckError(err)
 	fmt.Printf(":: Added new remote: %s [%s]\n", name, rmt.url)

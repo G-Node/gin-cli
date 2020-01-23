@@ -51,6 +51,7 @@ func createRepo(cmd *cobra.Command, args []string) {
 		CheckError(err)
 		url := fmt.Sprintf("%s/%s", gincl.GitAddress(), repopath)
 		gr := git.New(".")
+		gr.SSHCmd = ginclient.SSHOpts()
 		err = gr.RemoteAdd("origin", url)
 		CheckError(err)
 		defaultRemoteIfUnset("origin")

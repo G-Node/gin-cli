@@ -866,6 +866,7 @@ func lfDirect(paths ...string) (map[string]FileStatus, error) {
 
 func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 	gr := git.New(".")
+	gr.SSHCmd = SSHOpts()
 
 	// TODO: Determine if added files (LocalChanges) are new or not (new status needed?)
 	statuses := make(map[string]FileStatus)
@@ -1010,12 +1011,13 @@ func lfIndirect(paths ...string) (map[string]FileStatus, error) {
 
 // ListFiles lists the files and directories specified by paths and their sync status.
 func (gincl *Client) ListFiles(paths ...string) (map[string]FileStatus, error) {
-	gr := git.New(".")
+	gr := git.New(".") // TODO: Remove (only needed for IsDirect)
 	paths, err := expandglobs(paths, false)
 	if err != nil {
 		return nil, err
 	}
 	if gr.IsDirect() {
+		// TODO: Remove (deprecated)
 		return lfDirect(paths...)
 	}
 	return lfIndirect(paths...)
