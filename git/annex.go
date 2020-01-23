@@ -169,7 +169,7 @@ func (gr *Runner) AnnexPull(remote string) error {
 			Stdout:      string(stdout),
 			Stderr:      string(stderr),
 			UError:      string(stderr),
-			Description: fmt.Sprintf("download failed: %s", string(stderr)),
+			Description: fmt.Sprintf("download failed: %s", err.Error()),
 		}
 		return gerr
 	}
@@ -182,7 +182,7 @@ func (gr *Runner) AnnexPull(remote string) error {
 			UError: string(stderr),
 			// since we don't know what the error was, show the internal annex sync
 			// error to the user
-			Description: fmt.Sprintf("download failed", string(stderr)),
+			Description: fmt.Sprintf("download failed: %s", string(stderr)),
 		}
 		gr.mergeAbort() // abort a potential failed merge attempt (that wasn't caught earlier)
 		return gerr
