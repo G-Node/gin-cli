@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/spf13/cobra"
 )
