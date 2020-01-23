@@ -41,15 +41,17 @@ func TestInit(t *testing.T) {
 
 	defer cleanupdir(tmpgitdir)
 
-	err := Init(false)
+	err := Init(tmpgitdir, false)
 	if err != nil {
 		t.Fatalf("Failed to initialise (non-bare) repository: %s", err.Error())
 	}
 
-	// set local git user
-	SetGitUser("testuser", "")
+	gr := New(".")
 
-	bare, _ := ConfigGet("core.bare")
+	// set local git user
+	gr.SetGitUser("testuser", "")
+
+	bare, _ := gr.ConfigGet("core.bare")
 	if bare != "false" {
 		t.Fatalf("Expected non-bare repository: %s", bare)
 	}
@@ -60,12 +62,12 @@ func TestInit(t *testing.T) {
 
 	defer cleanupdir(tmpbaredir)
 
-	err = Init(true)
+	err = Init(tmpbaredir, true)
 	if err != nil {
 		t.Fatalf("Failed to initialise bare repository: %s", err.Error())
 	}
 
-	bare, _ = ConfigGet("core.bare")
+	bare, _ = gr.ConfigGet("core.bare")
 	if bare != "true" {
 		t.Fatalf("Expected bare repository: %s", bare)
 	}
