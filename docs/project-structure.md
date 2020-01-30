@@ -91,7 +91,7 @@ Functions in this package are separated into three files:
 
 *Package config handles reading of the user configuration for the client.*
 
-Holds the default configuration values, loads user configurations form the file and writes new configuration values.
+Holds the default configuration values, loads user configurations from the file and writes new configuration values.
 
 The `GinCliCfg` represents the entire GIN CLI configuration.
 
