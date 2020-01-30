@@ -40,7 +40,7 @@ gincmd: Defines command line interface subcommands and common top-level function
 ```
 
 
-The following list describes the purpose of each subpackage and some its key functions.  This list is ordered in a *top-down*, *depth first* fashion; it explains higher level functionality first, starting from the package that the user interfaces with directly.
+The following list describes the purpose of each subpackage and some of its key functions.  This list is ordered in a *top-down*, *depth first* fashion; it explains higher level functionality first, starting from the package that the user interfaces with directly.
 
 
 ## gincmd
