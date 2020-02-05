@@ -26,7 +26,8 @@ func lock(cmd *cobra.Command, args []string) {
 	// lock should do nothing in direct mode
 	// NOTE: Direct mode repositories are deprecated, but we should still look
 	// out for them
-	if git.IsDirect() {
+	gr := git.New(".")
+	if gr.IsDirect() {
 		fmt.Print("   Repository is in DIRECT mode: files are always unlocked")
 		return
 	}
@@ -34,9 +35,8 @@ func lock(cmd *cobra.Command, args []string) {
 	conf := config.Read()
 	gincl := ginclient.New(conf.DefaultServer)
 	nitems := countItemsLockChange(args)
-	lockchan := make(chan git.RepoFileStatus)
 
-	go gincl.LockContent(args, lockchan)
+	lockchan := gincl.LockContent(args)
 	formatOutput(lockchan, prStyle, nitems)
 }
 

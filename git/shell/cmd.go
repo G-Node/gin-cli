@@ -5,6 +5,8 @@ package shell
 import (
 	"bufio"
 	"bytes"
+	"fmt"
+	"os"
 	"os/exec"
 )
 
@@ -21,11 +23,16 @@ type Cmd struct {
 // given arguments.
 func Command(name string, args ...string) Cmd {
 	cmd := exec.Command(name, args...)
+	cmd.Env = os.Environ()
 	outpipe, _ := cmd.StdoutPipe()
 	errpipe, _ := cmd.StderrPipe()
 	outreader := bufio.NewReader(outpipe)
 	errreader := bufio.NewReader(errpipe)
 	return Cmd{cmd, outreader, errreader, nil}
+}
+
+func (cmd *Cmd) Setenv(key, value string) {
+	cmd.Cmd.Env = append(cmd.Cmd.Env, fmt.Sprintf("%s=%s", key, value))
 }
 
 // OutputError runs the command and returns the standard output and standard
@@ -55,6 +62,10 @@ type Error struct {
 	Origin string
 	// Human-readable description of error and conditions
 	Description string
+	// Shell command standard output
+	Stdout string
+	// Shell command standard error
+	Stderr string
 }
 
 func (e Error) Error() string {

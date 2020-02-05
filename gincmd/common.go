@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/bbrks/wrap"
@@ -144,6 +144,11 @@ func usageDie(cmd *cobra.Command) {
 func printJSON(statuschan <-chan git.RepoFileStatus) (filesuccess map[string]bool) {
 	filesuccess = make(map[string]bool)
 	for stat := range statuschan {
+		if stat.State == "error" {
+			// error line: collect and continue
+			// TODO: Collect error messages
+			continue
+		}
 		j, _ := json.Marshal(stat)
 		fmt.Println(string(j))
 		filesuccess[stat.FileName] = true
@@ -208,6 +213,11 @@ func printProgressWithBar(statuschan <-chan git.RepoFileStatus, nitems int) (fil
 	prevlinewidth := 0
 	ncompleted := 0
 	for stat := range statuschan {
+		if stat.State == "error" {
+			// error line: collect and continue
+			// TODO: Collect error messages
+			continue
+		}
 		ncompleted++
 		if ncompleted > nitems {
 			// BUG: Not sure when this occurs, but it's been happening in the
@@ -259,6 +269,11 @@ func printProgressOutput(statuschan <-chan git.RepoFileStatus) (filesuccess map[
 
 	printed := false
 	for stat := range statuschan {
+		if stat.State == "error" {
+			// error line: collect and continue
+			// TODO: Collect error messages
+			continue
+		}
 		outline.Reset()
 		outline.WriteString(" ")
 		if stat.FileName != fname || stat.State != state {

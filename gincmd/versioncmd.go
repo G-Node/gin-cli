@@ -6,7 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/fatih/color"
@@ -28,9 +29,11 @@ func repoversion(cmd *cobra.Command, args []string) {
 	copyto, _ := cmd.Flags().GetString("copy-to")
 	paths := args
 
+	gr := git.New(".")
+
 	var gcommit git.GinCommit
 	if commithash == "" {
-		commits, err := git.Log(count, "", paths, false)
+		commits, err := gr.Log(count, "", paths, false)
 		CheckError(err)
 		if jsonout {
 			j, _ := json.Marshal(commits)
@@ -42,7 +45,7 @@ func repoversion(cmd *cobra.Command, args []string) {
 		}
 		gcommit = verprompt(commits)
 	} else {
-		commits, err := git.Log(1, commithash, paths, false)
+		commits, err := gr.Log(1, commithash, paths, false)
 		CheckError(err)
 		gcommit = commits[0]
 	}
@@ -62,8 +65,9 @@ func checkoutcopies(commit git.GinCommit, paths []string, destination string) {
 	hash := commit.AbbreviatedHash
 	isodate := commit.Date.Format("2006-01-02-150405")
 	prettydate := commit.Date.Format("Jan 2 15:04:05 2006 (-0700)")
-	checkoutchan := make(chan ginclient.FileCheckoutStatus)
-	go ginclient.CheckoutFileCopies(hash, paths, destination, isodate, checkoutchan)
+	conf := config.Read()
+	gincl := ginclient.New(conf.DefaultServer)
+	checkoutchan := gincl.CheckoutFileCopies(hash, paths, destination, isodate)
 
 	// TODO: JSON output
 	var newfiles int

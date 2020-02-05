@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
@@ -31,8 +31,7 @@ func commit(cmd *cobra.Command, args []string) {
 		if prStyle == psDefault {
 			fmt.Println(":: Adding file changes")
 		}
-		addchan := make(chan git.RepoFileStatus)
-		go ginclient.Add(paths, addchan)
+		addchan := ginclient.Add(paths)
 		formatOutput(addchan, prStyle, 0)
 	}
 
@@ -42,7 +41,8 @@ func commit(cmd *cobra.Command, args []string) {
 	if commitmsg == "" {
 		commitmsg = makeCommitMessage("commit", paths)
 	}
-	err := git.Commit(commitmsg)
+	gr := git.New(".")
+	err := gr.Commit(commitmsg)
 	var stat string
 	if err != nil {
 		if err.Error() == "Nothing to commit" {
@@ -65,7 +65,8 @@ func makeCommitMessage(action string, paths []string) (commitmsg string) {
 		log.Write("Could not retrieve hostname")
 		hostname = unknownhostname
 	}
-	changes, err := git.DescribeIndexShort(paths)
+	gr := git.New(".")
+	changes, err := gr.DescribeIndexShort(paths)
 	if err != nil {
 		log.Write("Failed to determine changes for commit message")
 		changes = ""

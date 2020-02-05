@@ -55,7 +55,8 @@ func setupLocalRepoWithDirRemote(c *Client) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	git.RemoteAdd("origin", remote)
+	gr := git.New(".")
+	gr.RemoteAdd("origin", remote)
 
 	return local, nil
 }
@@ -100,7 +101,8 @@ func TestInit(t *testing.T) {
 	}
 
 	// Check annex info
-	info, err := git.AnnexInfo()
+	gr := git.New(".")
+	info, err := gr.AnnexInfo()
 	if err != nil {
 		t.Fatalf("Failed to get annex info: %s", err.Error())
 	}
@@ -117,7 +119,8 @@ func TestCommit(t *testing.T) {
 		t.Fatalf("Failed to initialise local and remote repositories: %s", err.Error())
 	}
 
-	err = git.Commit("")
+	gr := git.New(".")
+	err = gr.Commit("")
 	if err == nil {
 		t.Fatalf("Empty commit should fail")
 	}
@@ -125,12 +128,12 @@ func TestCommit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("smallfile create failed: %s", err.Error())
 	}
-	addchan := make(chan git.RepoFileStatus)
-	go git.AnnexAdd([]string{"afile"}, addchan)
+	conf := config.Read()
+	addchan := gr.AnnexAdd([]string{"afile"}, conf.Annex.MinSize, conf.Annex.Exclude)
 	for range addchan {
 	}
 
-	err = git.Commit("Test commit")
+	err = gr.Commit("Test commit")
 	if err != nil {
 		t.Fatalf("Commit failed: %s", err.Error())
 	}
@@ -157,17 +160,18 @@ func TestCommitMinSize(t *testing.T) {
 		t.Fatalf("bigfile create failed: %s", err.Error())
 	}
 
-	addchan := make(chan git.RepoFileStatus)
-	go git.AnnexAdd([]string{"smallfile", "bigfile"}, addchan)
+	conf := config.Read()
+	gr := git.New(".")
+	addchan := gr.AnnexAdd([]string{"smallfile", "bigfile"}, conf.Annex.MinSize, conf.Annex.Exclude)
 	for range addchan {
 	}
 
-	err = git.Commit("Test commit")
+	err = gr.Commit("Test commit")
 	if err != nil {
 		t.Fatalf("Commit failed: %s", err.Error())
 	}
 
-	gitobjs, err := git.LsTree("HEAD", nil)
+	gitobjs, err := gr.LsTree("HEAD", nil)
 	if err != nil {
 		t.Fatalf("git ls-tree failed: %s", err.Error())
 	}
@@ -175,7 +179,7 @@ func TestCommitMinSize(t *testing.T) {
 		t.Fatalf("Expected 2 git objects, got %d", len(gitobjs))
 	}
 
-	contents, err := git.CatFileContents("HEAD", "smallfile")
+	contents, err := gr.CatFileContents("HEAD", "smallfile")
 	if err != nil {
 		t.Fatalf("Couldn't read git file contents for smallfile")
 	}
@@ -183,7 +187,7 @@ func TestCommitMinSize(t *testing.T) {
 		t.Fatalf("Git file content size doesn't match original file size: %d (expected 100)", len(contents))
 	}
 
-	contents, err = git.CatFileContents("HEAD", "bigfile")
+	contents, err = gr.CatFileContents("HEAD", "bigfile")
 	if err != nil {
 		t.Fatalf("Couldn't read annex file contents for bigfile")
 	}
@@ -220,17 +224,18 @@ func TestCommitExcludes(t *testing.T) {
 		}
 	}
 
-	addchan := make(chan git.RepoFileStatus)
-	go git.AnnexAdd([]string{"."}, addchan)
+	conf := config.Read()
+	gr := git.New(".")
+	addchan := gr.AnnexAdd([]string{"."}, conf.Annex.MinSize, conf.Annex.Exclude)
 	for range addchan {
 	}
 
-	err = git.Commit("Test commit")
+	err = gr.Commit("Test commit")
 	if err != nil {
 		t.Fatalf("Commit failed: %s", err.Error())
 	}
 
-	gitobjs, err := git.LsTree("HEAD", nil)
+	gitobjs, err := gr.LsTree("HEAD", nil)
 	if err != nil {
 		t.Fatalf("git ls-tree failed: %s", err.Error())
 	}
@@ -240,7 +245,7 @@ func TestCommitExcludes(t *testing.T) {
 
 	// all file sizes in git should be fsize
 	for _, fn := range fnames {
-		contents, err := git.CatFileContents("HEAD", fn)
+		contents, err := gr.CatFileContents("HEAD", fn)
 		if err != nil {
 			t.Fatalf("Couldn't read git file contents for %s", fn)
 		}

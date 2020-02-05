@@ -3,7 +3,7 @@ package gincmd
 import (
 	"fmt"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
@@ -12,8 +12,8 @@ import (
 
 func countItemsLockChange(paths []string) (count int) {
 	// BUG: Miscalculates number in some cases
-	wichan := make(chan git.AnnexWhereisRes)
-	go git.AnnexWhereis(paths, wichan)
+	gr := git.New(".")
+	wichan := gr.AnnexWhereis(paths)
 	for range wichan {
 		count++
 	}
@@ -35,7 +35,8 @@ func unlock(cmd *cobra.Command, args []string) {
 		fmt.Println(":: Unlocking files")
 	}
 	// unlock should do nothing in direct mode
-	if git.IsDirect() {
+	gr := git.New(".")
+	if gr.IsDirect() {
 		fmt.Print("   Repository is in DIRECT mode: files are always unlocked")
 		return
 	}
@@ -45,8 +46,7 @@ func unlock(cmd *cobra.Command, args []string) {
 	defserver := conf.DefaultServer
 	gincl := ginclient.New(defserver)
 	nitems := countItemsLockChange(args)
-	unlockchan := make(chan git.RepoFileStatus)
-	go gincl.UnlockContent(args, unlockchan)
+	unlockchan := gincl.UnlockContent(args)
 	formatOutput(unlockchan, prStyle, nitems)
 }
 

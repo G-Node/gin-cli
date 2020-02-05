@@ -42,7 +42,7 @@ windows: $(BUILDLOC)/windows/$(GIN).exe
 macos: $(BUILDLOC)/darwin/$(GIN)
 
 clean:
-	rm -r $(BUILDLOC)
+	rm -rf $(BUILDLOC)
 
 uninstall:
 	rm $(INSTLOC)/$(GIN)

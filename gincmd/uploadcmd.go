@@ -3,7 +3,7 @@ package gincmd
 import (
 	"fmt"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
 	"github.com/spf13/cobra"
@@ -12,7 +12,6 @@ import (
 func upload(cmd *cobra.Command, args []string) {
 	prStyle := determinePrintStyle(cmd)
 	remotes, _ := cmd.Flags().GetStringSlice("to")
-	gincl := ginclient.New("gin") // TODO: probably doesn't need a client
 	switch git.Checkwd() {
 	case git.NotRepository:
 		Die(ginerrors.NotInRepo)
@@ -30,7 +29,8 @@ func upload(cmd *cobra.Command, args []string) {
 	// If any of the specified remotes is the special name 'all', upload to all configured remotes
 	for _, remote := range remotes {
 		if remote == allremotes {
-			confremotes, err := git.RemoteShow()
+			gr := git.New(".")
+			confremotes, err := gr.RemoteShow()
 			CheckErrorMsg(err, fmt.Sprintf("'all' remotes specified, but could not determine configured remotes: %s", err))
 			remotes = make([]string, 0, len(confremotes))
 			for r := range confremotes {
@@ -49,8 +49,8 @@ func upload(cmd *cobra.Command, args []string) {
 		fmt.Println(":: Uploading")
 	}
 
-	uploadchan := make(chan git.RepoFileStatus)
-	go gincl.Upload(paths, remotes, uploadchan)
+	gincl := ginclient.New("gin")
+	uploadchan := gincl.Upload(paths, remotes)
 	formatOutput(uploadchan, prStyle, 0)
 }
 

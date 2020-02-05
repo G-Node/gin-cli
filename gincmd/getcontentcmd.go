@@ -3,7 +3,7 @@ package gincmd
 import (
 	"fmt"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
@@ -28,8 +28,7 @@ func getContent(cmd *cobra.Command, args []string) {
 	if prStyle == psDefault {
 		fmt.Println(":: Downloading file content")
 	}
-	getcchan := make(chan git.RepoFileStatus)
-	go gincl.GetContent(args, getcchan)
+	getcchan := gincl.GetContent(args)
 	formatOutput(getcchan, prStyle, 0)
 }
 

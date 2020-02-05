@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/G-Node/gin-cli/ginclient/config"
-	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/git/shell"
 )
 
@@ -39,6 +37,23 @@ type giterror = shell.Error
 // **************** //
 
 // Types
+
+// Runner struct for calling commands with
+type Runner struct {
+	// Local path where a git command will be run (usually the git root).
+	Path string
+	// Becomes the value of GIT_SSH_COMMAND env var before running any shell command.
+	// Empty string will not set the variable.
+	SSHCmd string
+	// Git binary location; can be left empty to use 'git' and rely on system PATH.
+	Bin string
+	// Git annex path (not location); can be left empty to rely on system PATH.
+	AnnexPath string
+}
+
+func New(path string) *Runner {
+	return &Runner{Path: path, SSHCmd: "", Bin: "git"}
+}
 
 // RepoFileStatus describes the status of files when being added to the repo or transferred to/from remotes.
 type RepoFileStatus struct {
@@ -104,176 +119,204 @@ func (s RepoFileStatus) MarshalJSON() ([]byte, error) {
 
 // Git commands
 
-// Init initialises the current directory as a git repository.
+// Init initialises the provided directory as a git repository.
 // The repository is optionally initialised as bare.
 // (git init [--bare])
-func Init(bare bool) error {
+func (gr *Runner) Init(path string, bare bool) error {
 	fn := fmt.Sprintf("Init(%v)", bare)
 	args := []string{"init"}
 	if bare {
 		args = append(args, "--bare")
 	}
-	cmd := Command(args...)
+	cmd := gr.Command(args...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error during init command")
-		logstd(stdout, stderr)
-		gerr := giterror{UError: string(stderr), Origin: fn}
+		gerr := giterror{
+			UError:      string(stderr),
+			Origin:      fn,
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			Description: fmt.Sprintf("Failed to initialise repository: %s", string(stderr)),
+		}
 		return gerr
 	}
 	return nil
 }
 
+// Init initialises the provided directory as a git repository.
+// The repository is optionally initialised as bare.
+// (git init [--bare])
+func Init(path string, bare bool) error {
+	gr := New(".") // the working directory is irrelevant for this command
+	return gr.Init(path, bare)
+}
+
 // Clone downloads a repository and sets the remote fetch and push urls.
 // The status channel 'clonechan' is closed when this function returns.
 // (git clone ...)
-func Clone(remotepath string, repopath string, clonechan chan<- RepoFileStatus) {
+func (gr *Runner) Clone(remotepath string, repopath string) chan RepoFileStatus {
 	// TODO: This function is crazy huge - simplify
 	fn := fmt.Sprintf("Clone(%s)", remotepath)
-	defer close(clonechan)
-	args := []string{"clone", "--progress", remotepath}
-	if runtime.GOOS == "windows" {
-		// force disable symlinks even if user can create them
-		// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
-		args = append([]string{"-c", "core.symlinks=false"}, args...)
-	}
-	cmd := Command(args...)
-	err := cmd.Start()
-	if err != nil {
-		clonechan <- RepoFileStatus{Err: giterror{UError: err.Error(), Origin: fn}}
-		return
-	}
+	clonechan := make(chan RepoFileStatus)
+	go func() {
+		defer close(clonechan)
+		args := []string{"clone", "--progress", remotepath}
+		if runtime.GOOS == "windows" {
+			// force disable symlinks even if user can create them
+			// see https://git-annex.branchable.com/bugs/Symlink_support_on_Windows_10_Creators_Update_with_Developer_Mode/
+			args = append([]string{"-c", "core.symlinks=false"}, args...)
+		}
+		args = append(args, gr.Path)
+		cmd := gr.Command(args...)
+		err := cmd.Start()
+		if err != nil {
+			clonechan <- RepoFileStatus{Err: giterror{UError: err.Error(), Origin: fn}}
+			return
+		}
 
-	var line string
-	var stderr []byte
-	var status RepoFileStatus
-	status.State = "Downloading repository"
-	clonechan <- status
-	var rerr error
-	readbuffer := make([]byte, 1024)
-	var nread, errhead int
-	var eob, eof bool
-	lineInput := cmd.Args
-	input := strings.Join(lineInput, " ")
-	status.RawInput = input
-	// git clone progress prints to stderr
-	for eof = false; !eof; nread, rerr = cmd.ErrReader.Read(readbuffer) {
-		if rerr != nil && errhead == len(stderr) {
-			eof = true
-		}
-		stderr = append(stderr, readbuffer[:nread]...)
-		for eob = false; !eob || errhead < len(stderr); line, eob = cutline(stderr[errhead:]) {
-			if len(line) == 0 {
-				errhead++
-				break
-			}
-			errhead += len(line) + 1
-			words := strings.Fields(line)
-			status.FileName = repopath
-			if strings.HasPrefix(line, "Receiving objects") {
-				if len(words) > 2 {
-					status.Progress = words[2]
-				}
-				if len(words) > 8 {
-					rate := fmt.Sprintf("%s%s", words[7], words[8])
-					if strings.HasSuffix(rate, ",") {
-						rate = strings.TrimSuffix(rate, ",")
-					}
-					status.Rate = rate
-					status.RawOutput = line
-				}
-			}
-			clonechan <- status
-		}
-	}
-
-	errstring := string(stderr)
-	if err = cmd.Wait(); err != nil {
-		log.Write("Error during clone command")
-		repoPathParts := strings.SplitN(repopath, "/", 2)
-		repoOwner := repoPathParts[0]
-		repoName := repoPathParts[1]
-		gerr := giterror{UError: errstring, Origin: fn}
-		if strings.Contains(errstring, "does not exist") {
-			gerr.Description = fmt.Sprintf("Repository download failed\n"+
-				"Make sure you typed the repository path correctly\n"+
-				"Type 'gin repos %s' to see if the repository exists and if you have access to it",
-				repoOwner)
-		} else if strings.Contains(errstring, "already exists and is not an empty directory") {
-			gerr.Description = fmt.Sprintf("Repository download failed.\n"+
-				"'%s' already exists in the current directory and is not empty.", repoName)
-		} else if strings.Contains(errstring, "Host key verification failed") {
-			gerr.Description = "Server key does not match known/configured host key."
-		} else {
-			gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", errstring)
-		}
-		status.Err = gerr
+		var line string
+		var stderr []byte
+		var status RepoFileStatus
+		status.State = "Downloading repository"
 		clonechan <- status
-		// doesn't really need to break here, but let's not send the progcomplete
-		return
-	}
-	// Progress doesn't show 100% if cloning an empty repository, so let's force it
-	status.Progress = progcomplete
-	clonechan <- status
-	return
+		var rerr error
+		readbuffer := make([]byte, 1024)
+		var nread, errhead int
+		var eob, eof bool
+		lineInput := cmd.Args
+		input := strings.Join(lineInput, " ")
+		status.RawInput = input
+		// git clone progress prints to stderr
+		for eof = false; !eof; nread, rerr = cmd.ErrReader.Read(readbuffer) {
+			if rerr != nil && errhead == len(stderr) {
+				eof = true
+			}
+			stderr = append(stderr, readbuffer[:nread]...)
+			for eob = false; !eob || errhead < len(stderr); line, eob = cutline(stderr[errhead:]) {
+				if len(line) == 0 {
+					errhead++
+					break
+				}
+				errhead += len(line) + 1
+				words := strings.Fields(line)
+				status.FileName = repopath
+				if strings.HasPrefix(line, "Receiving objects") {
+					if len(words) > 2 {
+						status.Progress = words[2]
+					}
+					if len(words) > 8 {
+						rate := fmt.Sprintf("%s%s", words[7], words[8])
+						if strings.HasSuffix(rate, ",") {
+							rate = strings.TrimSuffix(rate, ",")
+						}
+						status.Rate = rate
+						status.RawOutput = line
+					}
+				}
+				clonechan <- status
+			}
+		}
+
+		errstring := string(stderr)
+		if err = cmd.Wait(); err != nil {
+			repoPathParts := strings.SplitN(repopath, "/", 2)
+			repoOwner := repoPathParts[0]
+			repoName := repoPathParts[1]
+			gerr := giterror{
+				UError: errstring,
+				Origin: fn,
+				Stderr: errstring,
+			}
+			if strings.Contains(errstring, "does not exist") {
+				gerr.Description = fmt.Sprintf("Repository download failed\n"+
+					"Make sure you typed the repository path correctly\n"+
+					"Type 'gin repos %s' to see if the repository exists and if you have access to it",
+					repoOwner)
+			} else if strings.Contains(errstring, "already exists and is not an empty directory") {
+				gerr.Description = fmt.Sprintf("Repository download failed.\n"+
+					"'%s' already exists in the current directory and is not empty.", repoName)
+			} else if strings.Contains(errstring, "Host key verification failed") {
+				gerr.Description = "Server key does not match known/configured host key."
+			} else {
+				gerr.Description = fmt.Sprintf("Repository download failed. Internal git command returned: %s", errstring)
+			}
+			status.Err = gerr
+			clonechan <- status
+			// doesn't really need to break here, but let's not send the progcomplete
+			return
+		}
+		// Progress doesn't show 100% if cloning an empty repository, so let's force it
+		status.Progress = progcomplete
+		clonechan <- status
+	}()
+	return clonechan
 }
 
 // Pull downloads all small (git) files from the server.
 // (git pull --ff-only)
-func Pull(remote string) error {
+func (gr *Runner) Pull(remote string) error {
 	// TODO: Common output handling with Push
-	cmd := Command("pull", "--ff-only", remote)
+	cmd := gr.Command("pull", "--ff-only", remote)
 	stdout, stderr, err := cmd.OutputError()
 
 	if err != nil {
-		logstd(stdout, stderr)
-		return fmt.Errorf("download command failed: %s", string(stderr))
+		gerr := giterror{
+			Origin:      fmt.Sprintf("Pull(%s)", remote),
+			UError:      string(stderr),
+			Stderr:      string(stderr),
+			Stdout:      string(stdout),
+			Description: fmt.Sprintf("download command failed: %s", string(stderr)),
+		}
+		return gerr
 	}
 	return nil
 }
 
 // Push uploads all small (git) files to the server.
 // (git push)
-func Push(remote string, pushchan chan<- RepoFileStatus) {
-	defer close(pushchan)
+func (gr *Runner) Push(remote string) chan RepoFileStatus {
+	pushchan := make(chan RepoFileStatus)
 
-	if IsDirect() {
-		// Set bare false and revert at the end of the function
-		err := setBare(false)
+	go func() {
+		defer close(pushchan)
+		if gr.IsDirect() {
+			// Set bare false and revert at the end of the function
+			err := gr.SetBare(false)
+			if err != nil {
+				pushchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
+				return
+			}
+			defer gr.SetBare(true)
+		}
+
+		cmd := gr.Command("push", "--progress", remote)
+		err := cmd.Start()
 		if err != nil {
-			pushchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
-			return
+			pushchan <- RepoFileStatus{Err: err}
 		}
-		defer setBare(true)
-	}
 
-	cmd := Command("push", "--progress", remote)
-	err := cmd.Start()
-	if err != nil {
-		pushchan <- RepoFileStatus{Err: err}
-	}
-
-	var status RepoFileStatus
-	var line string
-	var rerr error
-	re := regexp.MustCompile(`(?P<state>Compressing|Writing) objects:\s+(?P<progress>[0-9]{2,3})% \((?P<n>[0-9]+)/(?P<N>[0-9]+)\)`)
-	lineInput := cmd.Args
-	input := strings.Join(lineInput, " ")
-	status.RawInput = input
-	for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\r') {
-		if !re.MatchString(line) {
-			continue
+		var status RepoFileStatus
+		var line string
+		var rerr error
+		re := regexp.MustCompile(`(?P<state>Compressing|Writing) objects:\s+(?P<progress>[0-9]{2,3})% \((?P<n>[0-9]+)/(?P<N>[0-9]+)\)`)
+		lineInput := cmd.Args
+		input := strings.Join(lineInput, " ")
+		status.RawInput = input
+		for rerr = nil; rerr == nil; line, rerr = cmd.ErrReader.ReadString('\r') {
+			if !re.MatchString(line) {
+				continue
+			}
+			match := re.FindStringSubmatch(line)
+			status.State = match[1]
+			if status.State == "Writing" {
+				status.State = fmt.Sprintf("Uploading git files (to: %s)", remote)
+			}
+			status.Progress = fmt.Sprintf("%s%%", match[2])
+			status.RawOutput = line
+			pushchan <- status
 		}
-		match := re.FindStringSubmatch(line)
-		status.State = match[1]
-		if status.State == "Writing" {
-			status.State = fmt.Sprintf("Uploading git files (to: %s)", remote)
-		}
-		status.Progress = fmt.Sprintf("%s%%", match[2])
-		status.RawOutput = line
-		pushchan <- status
-	}
-	return
+	}()
+	return pushchan
 }
 
 // Add adds paths to git directly (not annex).
@@ -281,96 +324,100 @@ func Push(remote string, pushchan chan<- RepoFileStatus) {
 // In indirect mode, adding annexed files to git has no effect.
 // The status channel 'addchan' is closed when this function returns.
 // (git add)
-func Add(filepaths []string, addchan chan<- RepoFileStatus) {
-	defer close(addchan)
-	if len(filepaths) == 0 {
-		log.Write("No paths to add to git. Nothing to do.")
-		return
-	}
-
-	if IsDirect() {
-		// Set bare false and revert at the end of the function
-		err := setBare(false)
-		if err != nil {
-			addchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
+func (gr *Runner) Add(filepaths []string) chan RepoFileStatus {
+	addchan := make(chan RepoFileStatus)
+	go func() {
+		defer close(addchan)
+		if len(filepaths) == 0 {
 			return
 		}
-		defer setBare(true)
-		// Call addPathsDirect to collect filenames not in annex and deleted files
-		filepaths = gitAddDirect(filepaths)
-	}
 
-	// exclargs := annexExclArgs()
-	cmdargs := []string{"add", "--verbose", "--"}
-	cmdargs = append(cmdargs, filepaths...)
-	cmd := Command(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
-		addchan <- RepoFileStatus{Err: err}
-		return
-	}
-	var status RepoFileStatus
-	var line string
-	var rerr error
-	lineInput := cmd.Args
-	input := strings.Join(lineInput, " ")
-	status.RawInput = input
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		fname := strings.TrimSpace(line)
-		status.RawOutput = line
-		if len(fname) == 0 {
-			// skip empty lines
-			continue
+		if gr.IsDirect() {
+			// Set bare false and revert at the end of the function
+			err := gr.SetBare(false)
+			if err != nil {
+				addchan <- RepoFileStatus{Err: fmt.Errorf("failed to toggle repository bare mode")}
+				return
+			}
+			defer gr.SetBare(true)
+			// Call addPathsDirect to collect filenames not in annex and deleted files
+			filepaths = gr.gitAddDirect(filepaths)
 		}
-		if strings.HasPrefix(fname, "add") {
-			status.State = "Adding (git)  "
-			fname = strings.TrimPrefix(fname, "add '")
-		} else if strings.HasPrefix(fname, "remove") {
-			status.State = "Removing"
-			fname = strings.TrimPrefix(fname, "remove '")
+
+		cmdargs := []string{"add", "--verbose", "--"}
+		cmdargs = append(cmdargs, filepaths...)
+		cmd := gr.Command(cmdargs...)
+		err := cmd.Start()
+		if err != nil {
+			addchan <- RepoFileStatus{Err: err}
+			return
 		}
-		fname = strings.TrimSuffix(fname, "'")
-		status.FileName = fname
-		log.Write("'%s' added to git", fname)
-		// Error conditions?
-		status.Progress = progcomplete
-		addchan <- status
-	}
-	var stderr, errline []byte
-	if cmd.Wait() != nil {
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
+		var status RepoFileStatus
+		var line string
+		var rerr error
+		lineInput := cmd.Args
+		input := strings.Join(lineInput, " ")
+		status.RawInput = input
+		for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+			fname := strings.TrimSpace(line)
+			status.RawOutput = line
+			if len(fname) == 0 {
+				// skip empty lines
+				continue
+			}
+			if strings.HasPrefix(fname, "add") {
+				status.State = "Adding (git)  "
+				fname = strings.TrimPrefix(fname, "add '")
+			} else if strings.HasPrefix(fname, "remove") {
+				status.State = "Removing"
+				fname = strings.TrimPrefix(fname, "remove '")
+			}
+			fname = strings.TrimSuffix(fname, "'")
+			status.FileName = fname
+			// Error conditions?
+			status.Progress = progcomplete
+			addchan <- status
 		}
-		log.Write("Error during GitAdd")
-		logstd(nil, stderr)
-	}
-	return
+		var stderr, errline []byte
+		if cmd.Wait() != nil {
+			for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
+				stderr = append(stderr, errline...)
+			}
+			err := giterror{
+				UError:      string(stderr),
+				Stderr:      string(stderr),
+				Description: fmt.Sprintf("Error during git add command: %s", string(stderr)),
+				Origin:      fmt.Sprintf("Add(%v)", filepaths),
+			}
+			addchan <- RepoFileStatus{Err: err}
+		}
+	}()
+	return addchan
 }
 
-// SetGitUser sets the user.name and user.email configuration values for the local git repository.
-func SetGitUser(name, email string) error {
+// SetGitUser sets the user.name and user.email configuration values for the
+// local git repository.
+func (gr *Runner) SetGitUser(name, email string) error {
 	if Checkwd() == NotRepository {
 		// Other errors allowed
 		return fmt.Errorf("not a repository")
 	}
-	err := ConfigSet("user.name", name)
+	err := gr.ConfigSet("user.name", name)
 	if err != nil {
 		return err
 	}
-	return ConfigSet("user.email", email)
+	return gr.ConfigSet("user.email", email)
 }
 
 // ConfigGet returns the value of a given git configuration key.
 // The returned key is always a string.
 // (git config --get)
-func ConfigGet(key string) (string, error) {
+func (gr *Runner) ConfigGet(key string) (string, error) {
 	fn := fmt.Sprintf("ConfigGet(%s)", key)
-	cmd := Command("config", "--get", key)
+	cmd := gr.Command("config", "--get", key)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := giterror{UError: string(stderr), Origin: fn}
-		log.Write("Error during config get")
-		logstd(stdout, stderr)
 		return "", gerr
 	}
 	value := string(stdout)
@@ -380,14 +427,17 @@ func ConfigGet(key string) (string, error) {
 
 // ConfigSet sets a configuration value in the local git config.
 // (git config --local)
-func ConfigSet(key, value string) error {
+func (gr *Runner) ConfigSet(key, value string) error {
 	fn := fmt.Sprintf("ConfigSet(%s, %s)", key, value)
-	cmd := Command("config", "--local", key, value)
+	cmd := gr.Command("config", "--local", key, value)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		gerr := giterror{UError: string(stderr), Origin: fn}
-		log.Write("Error during config set")
-		logstd(stdout, stderr)
+		gerr := giterror{
+			UError: string(stderr),
+			Origin: fn,
+			Stdout: string(stdout),
+			Stderr: string(stderr),
+		}
 		return gerr
 	}
 	return nil
@@ -395,14 +445,12 @@ func ConfigSet(key, value string) error {
 
 // ConfigUnset unsets a configuration value in the local git config.
 // (git config unset --local)
-func ConfigUnset(key string) error {
+func (gr *Runner) ConfigUnset(key string) error {
 	fn := fmt.Sprintf("ConfigUnset(%s)", key)
-	cmd := Command("config", "--unset", "--local", key)
-	stdout, stderr, err := cmd.OutputError()
+	cmd := gr.Command("config", "--unset", "--local", key)
+	_, stderr, err := cmd.OutputError()
 	if err != nil {
 		gerr := giterror{UError: string(stderr), Origin: fn}
-		log.Write("Error during config unset")
-		logstd(stdout, stderr)
 		return gerr
 	}
 	return nil
@@ -410,15 +458,13 @@ func ConfigUnset(key string) error {
 
 // RemoteShow returns the configured remotes and their URL.
 // (git remote -v show -n)
-func RemoteShow() (map[string]string, error) {
+func (gr *Runner) RemoteShow() (map[string]string, error) {
 	fn := "RemoteShow()"
-	cmd := Command("remote", "-v", "show", "-n")
+	cmd := gr.Command("remote", "-v", "show", "-n")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		sstderr := string(stderr)
 		gerr := giterror{UError: sstderr, Origin: fn}
-		log.Write("Error during remote show command")
-		logstd(stdout, stderr)
 		return nil, gerr
 	}
 	remotes := make(map[string]string)
@@ -430,7 +476,6 @@ func RemoteShow() (map[string]string, error) {
 		}
 		parts := strings.Fields(line)
 		if len(parts) != 3 {
-			log.Write("Unexpected output: %s", line)
 			continue
 		}
 		remotes[parts[0]] = parts[1]
@@ -440,40 +485,33 @@ func RemoteShow() (map[string]string, error) {
 }
 
 // RemoteAdd adds a remote named name for the repository at URL.
-func RemoteAdd(name, url string) error {
+func (gr *Runner) RemoteAdd(name, url string) error {
 	fn := fmt.Sprintf("RemoteAdd(%s, %s)", name, url)
-	cmd := Command("remote", "add", name, url)
-	stdout, stderr, err := cmd.OutputError()
+	cmd := gr.Command("remote", "add", name, url)
+	_, stderr, err := cmd.OutputError()
 	if err != nil {
 		sstderr := string(stderr)
 		gerr := giterror{UError: sstderr, Origin: fn}
-		log.Write("Error during remote add command")
-		logstd(stdout, stderr)
 		if strings.Contains(sstderr, "already exists") {
 			gerr.Description = fmt.Sprintf("remote with name '%s' already exists", name)
 		}
 		return gerr
 	}
 	// Performing fetch after adding remote to retrieve references
-	// Any errors are logged and ignored
-	cmd = Command("fetch", name)
-	stdout, stderr, err = cmd.OutputError()
-	if err != nil {
-		logstd(stdout, stderr)
-	}
+	// Errors are ignored
+	cmd = gr.Command("fetch", name)
+	cmd.OutputError()
 	return nil
 }
 
 // RemoteRemove removes the remote named name from the repository configuration.
-func RemoteRemove(name string) error {
+func (gr *Runner) RemoteRemove(name string) error {
 	fn := fmt.Sprintf("RemoteRm(%s)", name)
-	cmd := Command("remote", "remove", name)
-	stdout, stderr, err := cmd.OutputError()
+	cmd := gr.Command("remote", "remove", name)
+	_, stderr, err := cmd.OutputError()
 	if err != nil {
 		sstderr := string(stderr)
 		gerr := giterror{UError: sstderr, Origin: fn}
-		log.Write("Error during remote remove command")
-		logstd(stdout, stderr)
 		if strings.Contains(sstderr, "No such remote") {
 			gerr.Description = fmt.Sprintf("remote with name '%s' does not exist", name)
 		}
@@ -484,14 +522,12 @@ func RemoteRemove(name string) error {
 
 // BranchSetUpstream sets the default upstream remote for the current branch.
 // (git branch --set-upstream-to=)
-func BranchSetUpstream(name string) error {
+func (gr *Runner) BranchSetUpstream(name string) error {
 	fn := fmt.Sprintf("BranchSetUpstream(%s)", name)
-	cmd := Command("branch", fmt.Sprintf("--set-upstream-to=%s/master", name))
+	cmd := gr.Command("branch", fmt.Sprintf("--set-upstream-to=%s/master", name))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		gerr := giterror{UError: string(stderr), Origin: fn}
-		log.Write("Error during branch set-upstream-to")
-		logstd(stdout, stderr)
+		gerr := giterror{UError: string(stderr), Origin: fn, Stdout: string(stdout)}
 		return gerr
 	}
 	return nil
@@ -500,18 +536,16 @@ func BranchSetUpstream(name string) error {
 // LsRemote performs a git ls-remote of a specific remote.
 // The argument can be a name or a URL.
 // (git ls-remote)
-func LsRemote(remote string) (string, error) {
+func (gr *Runner) LsRemote(remote string) (string, error) {
 	fn := fmt.Sprintf("LsRemote(%s)", remote)
-	cmd := Command("ls-remote", remote)
+	cmd := gr.Command("ls-remote", remote)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		sstderr := string(stderr)
-		gerr := giterror{UError: sstderr, Origin: fn}
+		gerr := giterror{UError: sstderr, Origin: fn, Stdout: string(stdout), Stderr: sstderr}
 		if strings.Contains(sstderr, "does not exist") || strings.Contains(sstderr, "Permission denied") {
 			gerr.Description = fmt.Sprintf("remote %s does not exist", remote)
 		}
-		log.Write("Error during ls-remote command")
-		logstd(stdout, stderr)
 		return "", gerr
 	}
 
@@ -520,14 +554,17 @@ func LsRemote(remote string) (string, error) {
 
 // RevParse parses an argument and returns the unambiguous, SHA1 representation.
 // (git rev-parse)
-func RevParse(rev string) (string, error) {
+func (gr *Runner) RevParse(rev string) (string, error) {
 	fn := fmt.Sprintf("RevParse(%s)", rev)
-	cmd := Command("rev-parse", rev)
+	cmd := gr.Command("rev-parse", rev)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error during rev-parse command")
-		logstd(stdout, stderr)
-		gerr := giterror{UError: string(stderr), Origin: fn}
+		gerr := giterror{
+			UError: string(stderr),
+			Origin: fn,
+			Stdout: string(stdout),
+			Stderr: string(stderr),
+		}
 		return "", gerr
 	}
 	return string(stdout), nil
@@ -538,13 +575,14 @@ func RevParse(rev string) (string, error) {
 // Returns NotAnnex if the working directory is inside a repository but there is no annex.
 // Returns UpgradeRequired if the annex is an old version (< v7).
 func Checkwd() error {
+	gr := New(".")
 	path, _ := filepath.Abs(".")
-	_, err := FindRepoRoot(path)
+	_, err := gr.FindRepoRoot(path)
 	if err != nil {
 		return NotRepository
 	}
 
-	annexver, err := ConfigGet("annex.version")
+	annexver, err := gr.ConfigGet("annex.version")
 	if err != nil {
 		// Annex version config key missing: Annex not initialised
 		return NotAnnex
@@ -567,8 +605,8 @@ func Checkwd() error {
 // FindRepoRoot returns the absolute path to the root of the repository.
 // For bare repositories, it returns an empty string, but no error.
 // (git rev-parse --show-toplevel)
-func FindRepoRoot(path string) (string, error) {
-	cmd := Command("rev-parse", "--show-toplevel")
+func (gr *Runner) FindRepoRoot(path string) (string, error) {
+	cmd := gr.Command("rev-parse", "--show-toplevel")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil || bytes.Contains(stderr, []byte("not a git repository")) {
 		return "", fmt.Errorf("Not a repository")
@@ -580,29 +618,32 @@ func FindRepoRoot(path string) (string, error) {
 
 // Commit records changes that have been added to the repository with a given message.
 // (git commit)
-func Commit(commitmsg string) error {
-	if IsDirect() {
+func (gr *Runner) Commit(commitmsg string) error {
+	if gr.IsDirect() {
 		// Set bare false and revert at the end of the function
-		err := setBare(false)
+		err := gr.SetBare(false)
 		if err != nil {
-			return fmt.Errorf("failed to toggle repository bare mode")
+			return err
 		}
-		defer setBare(true)
+		defer gr.SetBare(true)
 	}
 
-	cmd := Command("commit", fmt.Sprintf("--message=%s", commitmsg))
+	cmd := gr.Command("commit", fmt.Sprintf("--message=%s", commitmsg))
 	stdout, stderr, err := cmd.OutputError()
 
 	if err != nil {
 		sstdout := string(stdout)
 		if strings.Contains(sstdout, "nothing to commit") || strings.Contains(sstdout, "nothing added to commit") || strings.Contains(sstdout, "no changes added to commit") {
 			// Return special error
-			log.Write("Nothing to commit")
 			return fmt.Errorf("Nothing to commit")
 		}
-		log.Write("Error during GitCommit")
-		logstd(stdout, stderr)
-		return fmt.Errorf(string(stderr))
+		gerr := giterror{
+			Origin: "Commit()",
+			Stdout: string(stdout),
+			Stderr: string(stderr),
+			UError: string(stderr),
+		}
+		return gerr
 	}
 	return nil
 }
@@ -612,19 +653,24 @@ func Commit(commitmsg string) error {
 // In indirect mode (non-bare repositories) simply uses git commit with the '--allow-empty' flag.
 // In direct mode it uses git-annex sync.
 // (git commit --allow-empty or git annex sync --commit)
-func CommitEmpty(commitmsg string) error {
+func (gr *Runner) CommitEmpty(commitmsg string) error {
 	msgarg := fmt.Sprintf("--message=%s", commitmsg)
 	var cmd shell.Cmd
-	if !IsDirect() {
-		cmd = Command("commit", "--allow-empty", msgarg)
+	if !gr.IsDirect() {
+		cmd = gr.Command("commit", "--allow-empty", msgarg)
 	} else {
-		cmd = AnnexCommand("sync", "--commit", msgarg)
+		cmd = gr.AnnexCommand("sync", "--commit", msgarg)
 	}
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error during CommitEmpty")
-		logstd(stdout, stderr)
-		return fmt.Errorf(string(stderr))
+		gerr := giterror{
+			UError:      string(stderr),
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			Origin:      "CommitEmpty()",
+			Description: fmt.Sprintf("Error during git commit (empty): %s", string(stderr)),
+		}
+		return gerr
 	}
 	return nil
 }
@@ -632,76 +678,71 @@ func CommitEmpty(commitmsg string) error {
 // DiffUpstream returns, through the provided channel, the names of all files that differ from the default remote branch.
 // The output channel 'diffchan' is closed when this function returns.
 // (git diff --name-only --relative @{upstream})
-func DiffUpstream(paths []string, upstream string, diffchan chan<- string) {
-	defer close(diffchan)
-	diffargs := []string{"diff", "-z", "--name-only", "--relative", upstream, "--"}
-	diffargs = append(diffargs, paths...)
-	cmd := Command(diffargs...)
-	err := cmd.Start()
-	if err != nil {
-		log.Write("ls-files command set up failed: %s", err)
-		return
-	}
-	var line []byte
-	var rerr error
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadBytes('\000') {
-		line = bytes.TrimSuffix(line, []byte("\000"))
-		if len(line) > 0 {
-			diffchan <- string(line)
-		}
-	}
+func (gr *Runner) DiffUpstream(paths []string, upstream string) chan string {
+	// TODO: Rethink this function: goroutine necessary?
+	// Making it a regular function would let us return (and handle) errors
+	diffchan := make(chan string)
 
-	var stderr, errline []byte
-	if cmd.Wait() != nil {
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
+	go func() {
+		defer close(diffchan)
+		diffargs := []string{"diff", "-z", "--name-only", "--relative", upstream, "--"}
+		diffargs = append(diffargs, paths...)
+		cmd := gr.Command(diffargs...)
+		err := cmd.Start()
+		if err != nil {
+			return
 		}
-		log.Write("Error during DiffUpstream")
-		logstd(nil, stderr)
-	}
-	return
+		var line []byte
+		var rerr error
+		for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadBytes('\000') {
+			line = bytes.TrimSuffix(line, []byte("\000"))
+			if len(line) > 0 {
+				diffchan <- string(line)
+			}
+		}
+
+		cmd.Wait()
+	}()
+	return diffchan
 }
 
 // LsFiles lists all files known to git.
 // The output channel 'lschan' is closed when this function returns.
 // (git ls-files)
-func LsFiles(args []string, lschan chan<- string) {
-	defer close(lschan)
-	cmdargs := append([]string{"ls-files"}, args...)
-	cmd := Command(cmdargs...)
-	err := cmd.Start()
-	if err != nil {
-		log.Write("ls-files command set up failed: %s", err)
-		return
-	}
-	var line string
-	var rerr error
-	for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
-		line = strings.TrimSuffix(line, "\n")
-		if line != "" {
-			lschan <- line
-		}
-	}
+func (gr *Runner) LsFiles(args []string) chan string {
+	// TODO: Rethink this function: goroutine necessary?
+	// Making it a regular function would let us return (and handle) errors
+	lschan := make(chan string)
 
-	var stderr, errline []byte
-	if cmd.Wait() != nil {
-		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
-			stderr = append(stderr, errline...)
+	go func() {
+		defer close(lschan)
+		cmdargs := append([]string{"ls-files"}, args...)
+		cmd := gr.Command(cmdargs...)
+		err := cmd.Start()
+		if err != nil {
+			return
 		}
-		log.Write("Error during GitLsFiles")
-		logstd(nil, stderr)
-	}
-	return
+		var line string
+		var rerr error
+		for rerr = nil; rerr == nil; line, rerr = cmd.OutReader.ReadString('\n') {
+			line = strings.TrimSuffix(line, "\n")
+			if line != "" {
+				lschan <- line
+			}
+		}
+
+		cmd.Wait()
+	}()
+	return lschan
 }
 
 // DescribeIndexShort returns a string which represents a condensed form of the git (annex) index.
 // It is constructed using the result of 'git annex status'.
 // The description is composed of the file count for each status: added, modified, deleted
 // If 'paths' are specified, the status output is limited to files and directories matching those paths.
-func DescribeIndexShort(paths []string) (string, error) {
+func (gr *Runner) DescribeIndexShort(paths []string) (string, error) {
 	// TODO: 'git annex status' doesn't list added (A) files when in direct mode.
-	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus(paths, statuschan)
+	statuschan := gr.AnnexStatus(paths)
 	statusmap := make(map[string]int)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -727,9 +768,8 @@ func DescribeIndexShort(paths []string) (string, error) {
 // It is constructed using the result of 'git annex status'.
 // The resulting message can be used to inform the user of changes
 // that are about to be uploaded and as a long commit message.
-func DescribeIndex() (string, error) {
-	statuschan := make(chan AnnexStatusRes)
-	go AnnexStatus([]string{}, statuschan)
+func (gr *Runner) DescribeIndex() (string, error) {
+	statuschan := gr.AnnexStatus([]string{})
 	statusmap := make(map[string][]string)
 	for item := range statuschan {
 		if item.Err != nil {
@@ -752,7 +792,7 @@ func DescribeIndex() (string, error) {
 // The number of commits can be limited by the count argument.
 // If count <= 0, the entire commit history is returned.
 // Revisions which match only the deletion of the matching paths can be filtered using the showdeletes argument.
-func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCommit, error) {
+func (gr *Runner) Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCommit, error) {
 	logformat := `{"hash":"%H","abbrevhash":"%h","authorname":"%an","authoremail":"%ae","date":"%aI","subject":"%s","body":"%b"}`
 	cmdargs := []string{"log", "-z", fmt.Sprintf("--format=%s", logformat)}
 	if count > 0 {
@@ -769,11 +809,14 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd := Command(cmdargs...)
+	cmd := gr.Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
-		log.Write("Error setting up git log command")
-		return nil, fmt.Errorf("error retrieving version logs - malformed git log command")
+		gerr := giterror{
+			Origin:      fmt.Sprintf("Log(%s)", strings.Join(cmdargs, ", ")),
+			Description: fmt.Sprintf("error retrieving version logs: %s", err.Error()),
+		}
+		return nil, gerr
 	}
 
 	var line []byte
@@ -790,9 +833,6 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 		var commit GinCommit
 		ierr := json.Unmarshal(line, &commit)
 		if ierr != nil {
-			log.Write("Error parsing git log")
-			log.Write(string(line))
-			log.Write(ierr.Error())
 			continue
 		}
 		// Trim potential newline or spaces at end of body
@@ -805,18 +845,25 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.Write("Error getting git log")
-		errmsg := string(stderr)
-		if strings.Contains(errmsg, "bad revision") {
-			errmsg = fmt.Sprintf("'%s' does not match a known version ID or name", revrange)
+		sstderr := string(stderr)
+		gerr := giterror{
+			Origin: fmt.Sprintf("Log(%s)", strings.Join(cmdargs, ", ")),
+			Stderr: sstderr,
+			UError: sstderr,
 		}
-		return nil, fmt.Errorf(errmsg)
+		if strings.Contains(sstderr, "bad revision") {
+			gerr.Description = fmt.Sprintf("'%s' does not match a known version ID or name", revrange)
+		} else {
+			gerr.Description = sstderr
+		}
+		return nil, gerr
 	}
 
 	// TODO: Combine diffstats into first git log invocation
-	logstats, err := LogDiffStat(count, paths, showdeletes)
+	logstats, err := gr.LogDiffStat(count, paths, showdeletes)
 	if err != nil {
-		log.Write("Failed to get diff stats")
+		// Ignore error to show log without diffstats
+		// TODO: Reconsider error eating
 		return commits, nil
 	}
 
@@ -827,7 +874,7 @@ func Log(count uint, revrange string, paths []string, showdeletes bool) ([]GinCo
 	return commits, nil
 }
 
-func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffStat, error) {
+func (gr *Runner) LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffStat, error) {
 	logformat := `::%H`
 	cmdargs := []string{"log", fmt.Sprintf("--format=%s", logformat), "--name-status"}
 	if count > 0 {
@@ -840,11 +887,14 @@ func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffS
 	if paths != nil && len(paths) > 0 {
 		cmdargs = append(cmdargs, paths...)
 	}
-	cmd := Command(cmdargs...)
+	cmd := gr.Command(cmdargs...)
 	err := cmd.Start()
 	if err != nil {
-		log.Write("Error during LogDiffstat")
-		return nil, err
+		gerr := giterror{
+			Origin:      fmt.Sprintf("LogDiffStat(%v)", paths),
+			Description: fmt.Sprintf("error setting up LogDiffStat: %s", err.Error()),
+		}
+		return nil, gerr
 	}
 
 	stats := make(map[string]DiffStat)
@@ -883,8 +933,6 @@ func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffS
 			case "R100":
 				// Ignore renames
 			default:
-				log.Write("Could not parse diffstat line")
-				log.Write(line)
 			}
 			stats[curhash] = curstat
 		}
@@ -895,31 +943,36 @@ func LogDiffStat(count uint, paths []string, showdeletes bool) (map[string]DiffS
 
 // Checkout performs a git checkout of a specific commit.
 // Individual files or directories may be specified, otherwise the entire tree is checked out.
-func Checkout(hash string, paths []string) error {
+func (gr *Runner) Checkout(hash string, paths []string) error {
 	cmdargs := []string{"checkout", hash, "--"}
 	if paths == nil || len(paths) == 0 {
-		reporoot, _ := FindRepoRoot(".")
+		reporoot, _ := gr.FindRepoRoot(".")
 		os.Chdir(reporoot)
 		paths = []string{"."}
 	}
 	cmdargs = append(cmdargs, paths...)
 
-	cmd := Command(cmdargs...)
+	cmd := gr.Command(cmdargs...)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error during GitCheckout")
-		logstd(stdout, stderr)
-		return fmt.Errorf(string(stderr))
+		gerr := giterror{
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			Origin:      fmt.Sprintf("Checkout(%s, %v)", hash, paths),
+			Description: fmt.Sprintf("failed to checkout file versions: %s", string(stderr)),
+			UError:      string(stderr),
+		}
+		return gerr
 	}
 	return nil
 }
 
 // LsTree performs a recursive git ls-tree with a given revision (hash) and a list of paths.
 // For each item, it returns a struct which contains the type (blob, tree), the mode, the hash, and the absolute (repo rooted) path to the object (name).
-func LsTree(revision string, paths []string) ([]Object, error) {
+func (gr *Runner) LsTree(revision string, paths []string) ([]Object, error) {
 	cmdargs := []string{"ls-tree", "--full-tree", "-z", "-t", "-r", revision}
 	cmdargs = append(cmdargs, paths...)
-	cmd := Command(cmdargs...)
+	cmd := gr.Command(cmdargs...)
 	// This command doesn't need to be read line-by-line
 	err := cmd.Start()
 	if err != nil {
@@ -953,46 +1006,64 @@ func LsTree(revision string, paths []string) ([]Object, error) {
 		for rerr = nil; rerr == nil; errline, rerr = cmd.OutReader.ReadBytes('\000') {
 			stderr = append(stderr, errline...)
 		}
-		log.Write("Error during GitLsTree")
-		logstd(nil, stderr)
-		return nil, fmt.Errorf(string(stderr))
+		gerr := giterror{
+			Origin:      fmt.Sprintf("LsTree(%s, %v)", revision, paths),
+			Stderr:      string(stderr),
+			UError:      string(stderr),
+			Description: fmt.Sprintf("error running git ls-tree: %s", string(stderr)),
+		}
+		return nil, gerr
 	}
 
 	return objects, nil
 }
 
 // CatFileContents performs a git-cat-file of a specific file from a specific commit and returns the file contents (as bytes).
-func CatFileContents(revision, filepath string) ([]byte, error) {
-	cmd := Command("cat-file", "blob", fmt.Sprintf("%s:%s", revision, filepath))
+func (gr *Runner) CatFileContents(revision, filepath string) ([]byte, error) {
+	cmd := gr.Command("cat-file", "blob", fmt.Sprintf("%s:%s", revision, filepath))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error during GitCatFile (Contents)")
-		logstd(nil, stderr)
-		return nil, fmt.Errorf(string(stderr))
+		gerr := giterror{
+			Origin:      fmt.Sprintf("CatFileContents(%s, %s)", revision, filepath),
+			Stderr:      string(stderr),
+			UError:      string(stderr),
+			Description: fmt.Sprintf("error running git cat-file blob: %s", string(stderr)),
+		}
+		return nil, gerr
 	}
 	return stdout, nil
 }
 
 // CatFileType returns the type of a given object at a given revision (blob, tree, or commit)
-func CatFileType(object string) (string, error) {
-	cmd := Command("cat-file", "-t", object)
+func (gr *Runner) CatFileType(object string) (string, error) {
+	cmd := gr.Command("cat-file", "-t", object)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error during GitCatFile (Type)")
-		logstd(stdout, stderr)
-		err = fmt.Errorf(string(stderr))
-		return "", err
+		gerr := giterror{
+			Origin:      fmt.Sprintf("CatFileType(%s)", object),
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			UError:      string(stderr),
+			Description: fmt.Sprintf("error running git cat-file -t: %s", string(stderr)),
+		}
+		return "", gerr
 	}
 	return string(stdout), nil
 }
 
 // RevCount returns the number of commits between two revisions.
-func RevCount(a, b string) (int, error) {
-	cmd := Command("rev-list", "--count", fmt.Sprintf("%s..%s", a, b))
+func (gr *Runner) RevCount(a, b string) (int, error) {
+	cmd := gr.Command("rev-list", "--count", fmt.Sprintf("%s..%s", a, b))
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		logstd(stdout, stderr)
-		return 0, fmt.Errorf(string(stderr))
+		gerr := giterror{
+			Origin:      fmt.Sprintf("RevCount(%s, %s)", a, b),
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			UError:      string(stderr),
+			Description: fmt.Sprintf("error running git rev-list --count: %s", string(stderr)),
+		}
+		return -1, gerr
 	}
 	return strconv.Atoi(string(stdout))
 }
@@ -1000,12 +1071,12 @@ func RevCount(a, b string) (int, error) {
 // IsDirect returns true if the repository in a given path is working in git annex 'direct' mode.
 // If path is not a repository, or is not an initialised annex repository, the result defaults to false.
 // If the path is a repository and no error was raised, the result it cached so that subsequent checks are faster.
-func IsDirect() bool {
+func (gr *Runner) IsDirect() bool {
 	abspath, _ := filepath.Abs(".")
 	if mode, ok := annexmodecache[abspath]; ok {
 		return mode
 	}
-	cmd := Command("config", "--local", "annex.direct")
+	cmd := gr.Command("config", "--local", "annex.direct")
 	stdout, _, err := cmd.OutputError()
 	if err != nil {
 		// Don't cache this result
@@ -1020,54 +1091,36 @@ func IsDirect() bool {
 	return false
 }
 
-// IsVersion6 returns true if the repository in a given path is working in git annex 'direct' mode.
-// If path is not a repository, or is not an initialised annex repository, the result defaults to false.
-func IsVersion6() bool {
-	cmd := Command("config", "--local", "--get", "annex.version")
-	stdout, stderr, err := cmd.OutputError()
-	if err != nil {
-		log.Write("Error while checking repository annex version")
-		logstd(stdout, stderr)
-		return false
-	}
-	ver := strings.TrimSpace(string(stdout))
-	log.Write("Annex version is %s", ver)
-	return ver == "6"
-}
-
 // mergeAbort aborts an unfinished git merge.
-func mergeAbort() {
+func (gr *Runner) mergeAbort() {
 	// Here, we run a git status without checking any part of the result. It
 	// seems git-annex performs some cleanup or consistency fixes to the index
 	// when git status is run and before that, the merge --abort fails.
-	Command("status").Run()
-	cmd := Command("merge", "--abort")
-	stdout, stderr, err := cmd.OutputError()
-	if err != nil {
-		// log error but do nothing
-		logstd(stdout, stderr)
-	}
+	gr.Command("status").Run()
+	cmd := gr.Command("merge", "--abort")
+	cmd.Run() // Ignore errors
 }
 
-func SetBare(state bool) {
-	setBare(state)
-}
-
-func setBare(state bool) error {
+func (gr *Runner) SetBare(state bool) error {
 	var statestr string
 	if state {
 		statestr = "true"
 	} else {
 		statestr = "false"
 	}
-	cmd := Command("config", "--local", "--bool", "core.bare", statestr)
+	cmd := gr.Command("config", "--local", "--bool", "core.bare", statestr)
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
-		log.Write("Error switching bare status to %s", statestr)
-		logstd(stdout, stderr)
-		err = fmt.Errorf(string(stderr))
+		gerr := giterror{
+			Origin:      fmt.Sprintf("SetBare(%t)", state),
+			Stdout:      string(stdout),
+			Stderr:      string(stderr),
+			UError:      string(stderr),
+			Description: fmt.Sprintf("error switching bare mode: %s", string(stderr)),
+		}
+		return gerr
 	}
-	return err
+	return nil
 }
 
 // gitAddDirect determines which files to be added to git when in direct mode.
@@ -1076,9 +1129,9 @@ func setBare(state bool) error {
 // This function filters out any files known to annex to avoid re-adding them to git as files.
 // The filtering is done twice:
 // Once against the provided paths in the current directory (recursively) and once more against the output of 'git ls-files <paths>', in order to include any files that might have been deleted.
-func gitAddDirect(paths []string) (filtered []string) {
-	wichan := make(chan AnnexWhereisRes)
-	go AnnexWhereis(paths, wichan)
+func (gr *Runner) gitAddDirect(paths []string) (filtered []string) {
+	// NOTE: Deprecated.  We don't use bare repos anymore (since v7)
+	wichan := gr.AnnexWhereis(paths)
 	var annexfiles []string
 	for wiInfo := range wichan {
 		if wiInfo.Err != nil {
@@ -1088,8 +1141,7 @@ func gitAddDirect(paths []string) (filtered []string) {
 	}
 	filtered = filterpaths(paths, annexfiles)
 
-	lschan := make(chan string)
-	go LsFiles(paths, lschan)
+	lschan := gr.LsFiles(paths)
 	for gitfile := range lschan {
 		gitfile = filepath.Clean(gitfile)
 		if !stringInSlice(gitfile, annexfiles) && !stringInSlice(gitfile, filtered) {
@@ -1101,12 +1153,11 @@ func gitAddDirect(paths []string) (filtered []string) {
 }
 
 // GetGitVersion returns the version string of the system's git binary.
-func GetGitVersion() (string, error) {
-	cmd := Command("version")
+func (gr *Runner) GetGitVersion() (string, error) {
+	cmd := gr.Command("version")
 	stdout, stderr, err := cmd.OutputError()
 	if err != nil {
 		errmsg := string(stderr)
-		log.Write("Error while preparing git version command")
 		if strings.Contains(err.Error(), "executable file not found") {
 			return "", fmt.Errorf("git executable not found: %s", err.Error())
 		}
@@ -1125,15 +1176,19 @@ func GetGitVersion() (string, error) {
 	return verstr, nil
 }
 
+// GetGitVersion returns the version string of the system's git binary.
+func GetGitVersion() (string, error) {
+	gr := New("") // path irrelevant, just use cwd for non-instance function
+	return gr.GetGitVersion()
+}
+
 // Command sets up an external git command with the provided arguments and returns a GinCmd struct.
-func Command(args ...string) shell.Cmd {
-	config := config.Read()
-	gitbin := config.Bin.Git
-	cmd := shell.Command(gitbin)
+func (gr *Runner) Command(args ...string) shell.Cmd {
+	cmd := shell.Command(gr.Bin)
+	// cmd.Setenv("GIT_SSH_COMMAND", fmt.Sprintf("ssh -F %s", sshcfg))
+	if gr.SSHCmd != "" {
+		cmd.Setenv("GIT_SSH_COMMAND", gr.SSHCmd)
+	}
 	cmd.Args = append(cmd.Args, args...)
-	env := os.Environ()
-	cmd.Env = append(env, sshEnv())
-	workingdir, _ := filepath.Abs(".")
-	log.Write("Running shell command (Dir: %s): %s", workingdir, strings.Join(cmd.Args, " "))
 	return cmd
 }

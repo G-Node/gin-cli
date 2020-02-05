@@ -3,7 +3,7 @@ package gincmd
 import (
 	"fmt"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
@@ -11,7 +11,8 @@ import (
 )
 
 func countItemsRemove(paths []string) int {
-	avail, err := git.AnnexFind(paths)
+	gr := git.New(".")
+	avail, err := gr.AnnexFind(paths)
 	if err != nil {
 		return 0
 	}
@@ -33,11 +34,10 @@ func remove(cmd *cobra.Command, args []string) {
 		annexVersionNotice()
 	}
 	nitems := countItemsRemove(args)
-	rmchan := make(chan git.RepoFileStatus)
 	if prStyle == psProgress {
 		fmt.Println(":: Removing file content")
 	}
-	go gincl.RemoveContent(args, rmchan)
+	rmchan := gincl.RemoveContent(args)
 	formatOutput(rmchan, prStyle, nitems)
 }
 

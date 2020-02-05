@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
 	"github.com/G-Node/gin-cli/git"
@@ -40,7 +40,8 @@ func download(cmd *cobra.Command, args []string) {
 		fmt.Fprintln(color.Output, green("OK"))
 	}
 	if content {
-		reporoot, _ := git.FindRepoRoot(".")
+		gr := git.New(".")
+		reporoot, _ := gr.FindRepoRoot(".")
 		os.Chdir(reporoot)
 		getContent(cmd, nil)
 	}

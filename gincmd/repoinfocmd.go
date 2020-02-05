@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	ginclient "github.com/G-Node/gin-cli/ginclient"
+	"github.com/G-Node/gin-cli/ginclient"
 	"github.com/G-Node/gin-cli/ginclient/config"
 	gogs "github.com/gogits/go-gogs-client"
 	"github.com/spf13/cobra"
