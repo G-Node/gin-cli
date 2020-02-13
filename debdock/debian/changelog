@@ -1,5 +1,14 @@
+gin-cli (1.10); urgency=low
+
+  * Release 1.10
+  * When adding files to the annex, a new message is displayed at the end of the add step: "Writing filename metadata".  This step was performed before but did not produce any output.
+  * Warns when a repository is using an old format version and offers instructions to upgrade.
+  * Files involved in a merge conflict are no longer listed in the error message.  This is a limitation with the underlying Git-annex messages.
+  * Fixes client hanging after adding a large number of files.
+
 gin-cli (1.9); urgency=low
 
+  * Release 1.9
   * Default address for GIN server is now `gin.g-node.org`.  The old web address, `web.gin.g-node.org` still works but will be unavailable in the future.
 
 gin-cli (1.8); urgency=low

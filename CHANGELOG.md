@@ -2,6 +2,22 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.10
+
+### Changes
+- When adding files to the annex, a new message is displayed at the end of the add step: "Writing filename metadata".  This step was performed before but did not produce any output.
+- Warns when a repository is using an old format version and offers instructions to upgrade.
+- Files involved in a merge conflict are no longer listed in the error message.  This is a limitation with the underlying Git-annex messages.
+
+### Bug fixes
+- Fixes client hanging after adding a large number of files.
+
+### Relevant PRs
+- #268: Fix for add command seemingly hanging at the end
+- #279: [annex] Print progress of metadata writing
+- #271: Annex upgrade notice
+- #275: Error message update for new annex
+
 ## Version 1.9
 
 ### Changes
