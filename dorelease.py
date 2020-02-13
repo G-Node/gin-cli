@@ -27,7 +27,7 @@ PKGDIR = os.path.join(DESTDIR, "pkg")
 ETAGFILE = os.path.join(DESTDIR, "etags")
 ETAGS = {}
 
-VERSION = {}
+VERSION = ""
 
 
 def run(cmd, **kwargs):
@@ -113,28 +113,14 @@ def build():
     """
     Build binaries.
     """
-    platforms = ["linux/amd64", "windows/386", "windows/amd64", "darwin/amd64"]
-    print(f"--> Building binary for {', '.join(platforms)}")
+    run(["make", "clean"])  # clean before build
+    cmd = ["make", "allplatforms"]
     verfilename = "version"
     with open(verfilename) as verfile:
         verinfo = verfile.read()
 
-    VERSION["version"] = re.search(r"version=(.*)", verinfo).group(1)
-    cmd = ["git", "rev-list", "--count", "HEAD"]
-    VERSION["build"] = int(check_output(cmd).strip().decode())
-    cmd = ["git", "rev-parse", "HEAD"]
-    VERSION["commit"] = check_output(cmd).strip().decode()
-    print(("Version: {version} "
-           "Build: {build:06d} "
-           "Commit: {commit}").format(**VERSION))
-    ldflags = ("-X main.gincliversion={version} "
-               "-X main.build={build:06d} "
-               "-X main.commit={commit}").format(**VERSION)
-    output = os.path.join(DESTDIR, "{{.OS}}-{{.Arch}}", "gin")
-    cmd = [
-        "gox", f"-output={output}",
-        f"-osarch={' '.join(platforms)}", f"-ldflags={ldflags}"
-    ]
+    global VERSION
+    VERSION = re.search(r"version=(.*)", verinfo).group(1)
     print(f"Running {' '.join(cmd)}")
     if run(cmd) > 0:
         die("Build failed")
@@ -142,8 +128,8 @@ def build():
     print()
     print("--> Build succeeded")
     print("--> The following files were built:")
-    ginfiles = glob(os.path.join(DESTDIR, "*", "gin"))
-    ginfiles.extend(glob(os.path.join(DESTDIR, "*", "gin.exe")))
+    ginfiles = glob(os.path.join("build", "*", "gin"))
+    ginfiles.extend(glob(os.path.join("build", "*", "gin.exe")))
     print("\n".join(ginfiles), end="\n\n")
 
     plat = sys.platform
@@ -216,7 +202,7 @@ def package_linux_plain(binfile):
     _, osarch = os.path.split(dirname)
     # simple binary archive
     shutil.copy("README.md", dirname)
-    arc = f"gin-cli-{VERSION['version']}-{osarch}.tar.gz"
+    arc = f"gin-cli-{VERSION}-{osarch}.tar.gz"
     archive = os.path.join(PKGDIR, arc)
     cmd = ["tar", "-czf", archive, "-C", dirname, fname, "README.md"]
     print(f"Running {' '.join(cmd)}")
@@ -265,7 +251,7 @@ def debianize(binfile, annexsa_archive):
 
         # create directory structure
         pkgname = "gin-cli"
-        pkgnamever = f"{pkgname}-{VERSION['version']}"
+        pkgnamever = f"{pkgname}-{VERSION}"
         debmdsrc = os.path.join("debdock", "debian")
         pkgdir = os.path.join(tmpdir, pkgname)
         debcapdir = os.path.join(pkgdir, "DEBIAN")
@@ -301,7 +287,7 @@ def debianize(binfile, annexsa_archive):
         # Adding version number to debian control file
         controlpath = os.path.join(debcapdir, "control")
         with open(controlpath) as controlfile:
-            controllines = controlfile.read().format(**VERSION)
+            controllines = controlfile.read().format(version=VERSION)
 
         with open(controlpath, "w") as controlfile:
             controlfile.write(controllines)
@@ -361,7 +347,7 @@ def package_mac_plain(binfile):
     osarch = osarch.replace("darwin", "macos")
     # simple binary archive
     shutil.copy("README.md", dirname)
-    archive = f"gin-cli-{VERSION['version']}-{osarch}.tar.gz"
+    archive = f"gin-cli-{VERSION}-{osarch}.tar.gz"
     archive = os.path.join(PKGDIR, archive)
     cmd = ["tar", "-czf", archive, "-C", dirname, fname, "README.md"]
     print(f"Running {' '.join(cmd)}")
@@ -407,8 +393,8 @@ def package_mac_bundle(binfile, annex_tar):
 
         with open("./macapp/gin-Info.plist", "rb") as plistfile:
             info = plistlib.load(plistfile, fmt=plistlib.FMT_XML)
-            info["CFBundleVersion"] = VERSION["version"]
-            info["CFBundleShortVersionString"] = VERSION["version"]
+            info["CFBundleVersion"] = VERSION
+            info["CFBundleShortVersionString"] = VERSION
             # info["CFBundleExecutable"] = "runshell"
         with open(os.path.join(ginapproot, "Contents", "Info.plist"),
                   "wb") as plistfile:
@@ -418,7 +404,7 @@ def package_mac_bundle(binfile, annex_tar):
         _, osarch = os.path.split(dirname)
         osarch = osarch.replace("darwin", "macos")
 
-        archive = f"gin-cli-{VERSION['version']}-{osarch}-bundle.tar.gz"
+        archive = f"gin-cli-{VERSION}-{osarch}-bundle.tar.gz"
         archive = os.path.join(PKGDIR, archive)
         print("Creating macOS bundle")
         if os.path.exists(archive):
@@ -481,7 +467,7 @@ def winbundle(binfile, git_pkg, annex_pkg):
         dirname, _ = os.path.split(binfile)
         _, osarch = os.path.split(dirname)
 
-        arc = f"gin-cli-{VERSION['version']}-{osarch}.zip"
+        arc = f"gin-cli-{VERSION}-{osarch}.zip"
         arc = os.path.join(PKGDIR, arc)
         print("Creating Windows zip file")
         # need to change paths before making zip file
@@ -536,6 +522,7 @@ def main():
         print(f"Linux: {len(linux_bins)}")
         print(f"Windows: {len(win_bins)}")
         print(f"macOS: {len(darwin_bins)}")
+        sys.exit(1)
 
     # package stuff
     linux_pkg = package_linux_plain(linux_bins[0])
@@ -546,8 +533,8 @@ def main():
     mac_pkg = package_mac_plain(darwin_bins[0])
     mac_bundle = package_mac_bundle(darwin_bins[0], mac_annex_tar)
 
-    win_bin_32 = [wb for wb in win_bins if "386" in wb][0]
-    win_bin_64 = [wb for wb in win_bins if "amd64" in wb][0]
+    win_bin_32 = [wb for wb in win_bins if "windows32" in wb][0]
+    win_bin_64 = [wb for wb in win_bins if "windows64" in wb][0]
     win_git_32 = [wg for wg in win_git_files if "32-bit" in wg][0]
     win_git_64 = [wg for wg in win_git_files if "64-bit" in wg][0]
 
@@ -559,7 +546,7 @@ def main():
         Create symlinks with the version part replaced by 'latest' for the
         newly built package.
         """
-        latestname = fname.replace(VERSION["version"], "latest")
+        latestname = fname.replace(VERSION, "latest")
         print(f"Linking {fname} to {latestname}")
         if os.path.lexists(latestname):
             os.unlink(latestname)
