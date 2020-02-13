@@ -17,16 +17,18 @@ environment:
   matrix:
     # 32-bit
     - arch: "386"
+      bits: 32
 
     # 64-bit
     - arch: "amd64"
+      bits: 64
 
 install:
   - set PATH=C:\Python37-x64\;%PATH%;%GOPATH%\bin;c:\gin-bundle\git\usr\bin
   # download latest stable gin-cli-windows-bundle
   - md c:\gin-bundle
   - cd c:\gin-bundle
-  - ps: Invoke-WebRequest -URI $env:BUNDLEREPO/gin-cli-latest-windows-$env:arch.zip -OutFile "gin-cli-bundle.zip"
+  - ps: Invoke-WebRequest -URI $env:BUNDLEREPO/gin-cli-latest-windows$env:bits.zip -OutFile "gin-cli-bundle.zip"
   - 7z x gin-cli-bundle.zip
   - git-annex version
   # go stuff
