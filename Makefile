@@ -48,14 +48,14 @@ uninstall:
 	rm $(INSTLOC)/$(GIN)
 
 $(BUILDLOC)/$(GIN): $(SOURCES)
-	go build $(LDFLAGS) -o $(BUILDLOC)/$(GIN)
+	go build -trimpath $(LDFLAGS) -o $(BUILDLOC)/$(GIN)
 
 $(BUILDLOC)/linux/$(GIN): $(SOURCES)
-	GOOS=linux GOARCH=amd64 go build -o $(BUILDLOC)/linux/$(GIN) $(LDFLAGS)
+	GOOS=linux GOARCH=amd64 go build -trimpath -o $(BUILDLOC)/linux/$(GIN) $(LDFLAGS)
 
 $(BUILDLOC)/windows/$(GIN).exe: $(SOURCES)
-	GOOS=windows GOARCH=386 go build -o $(BUILDLOC)/windows32/$(GIN).exe $(LDFLAGS)
-	GOOS=windows GOARCH=amd64 go build -o $(BUILDLOC)/windows64/$(GIN).exe $(LDFLAGS)
+	GOOS=windows GOARCH=386 go build -trimpath -o $(BUILDLOC)/windows32/$(GIN).exe $(LDFLAGS)
+	GOOS=windows GOARCH=amd64 go build -trimpath -o $(BUILDLOC)/windows64/$(GIN).exe $(LDFLAGS)
 
 $(BUILDLOC)/darwin/$(GIN): $(SOURCES)
-	GOOS=darwin GOARCH=amd64 go build -o $(BUILDLOC)/darwin/$(GIN) $(LDFLAGS)
+	GOOS=darwin GOARCH=amd64 go build -trimpath -o $(BUILDLOC)/darwin/$(GIN) $(LDFLAGS)
