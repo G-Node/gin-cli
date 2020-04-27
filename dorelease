@@ -188,12 +188,9 @@ def get_git_annex_for_windows():
     """
     Download the git annex for windows installer.
     """
-    # win_git_annex_url = ("https://downloads.kitenet.net/git-annex/windows/"
-    #                      "current/git-annex-installer.exe")
-    # return download(win_git_annex_url)
-    # fixing windows installer version (again)
-    fname = os.path.join(DESTDIR, "downloads", "git-annex-installer.exe")
-    return fname
+    win_git_annex_url = ("https://downloads.kitenet.net/git-annex/windows/"
+                         "current/git-annex-installer.exe")
+    return download(win_git_annex_url)
 
 
 def package_linux_plain(binfile):
@@ -364,6 +361,8 @@ def package_mac_bundle(binfile, annex_tar):
     For each macOS binary make a zip that includes the annex.app with the gin
     binary in its path.
     """
+    if not annex_tar:
+        return None
     with TemporaryDirectory(suffix="gin-macos") as tmpdir:
         # extract macOS git-annex tar into pkgroot
         cmd = ["tar", "-xjf", annex_tar, "-C", tmpdir]
