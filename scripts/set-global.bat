@@ -8,9 +8,9 @@ echo off
 
 set curdir=%~dp0
 
-echo Adding %curdir% to path
 set ginbinpath=%curdir%\bin
 set gitpaths=%curdir%\git\usr\bin;%curdir%\git\bin
+echo Appending "%ginbinpath%;%gitpaths%" to path
 echo %path%|find /I "%curdir%">nul || setx path "%path%;%ginbinpath%;%gitpaths%"
 echo GIN CLI is ready
 pause
