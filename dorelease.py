@@ -446,6 +446,7 @@ def winbundle(binfile, git_pkg, annex_pkg):
         shutil.copy(binfile, bindir)
         shutil.copy("README.md", pkgroot)
         shutil.copy(os.path.join("scripts", "gin-shell.bat"), pkgroot)
+        shutil.copy(os.path.join("scripts", "set-global.bat"), pkgroot)
 
         gitdir = os.path.join(pkgroot, "git")
         os.makedirs(gitdir)
