@@ -2,6 +2,12 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.11
+
+### Changes
+- Updated bundled git-annex for Windows packages to 8.20200330.
+- Added bat script in Windows bundles that adds the GIN extraction path to the user's run path to make it globally available outside the GIN shell.
+
 ## Version 1.10
 
 ### Changes
