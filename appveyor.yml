@@ -3,7 +3,7 @@ build: off
 
 clone_folder: C:\gopath\src\github.com\G-Node\gin-cli
 
-stack: go 1.12
+stack: go 1.14
 
 environment:
   SRCDIR: C:\gopath\src\github.com\G-Node\gin-cli
