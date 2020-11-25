@@ -3,6 +3,6 @@ Version: {version}
 Section: base
 Priority: optional
 Architecture: amd64
-Maintainer: Achilleas Koutsou <achilleas.k@bio.lmu.de>
+Maintainer: Achilleas Koutsou <koutsou@bio.lmu.de>
 Description: GIN (G-Node INfrastructure services) command line client
 
