@@ -453,14 +453,14 @@ def winbundle(binfile, git_pkg, annex_pkg):
         os.makedirs(gitdir)
 
         # extract git portable and annex into git dir
-        cmd = ["7z", "x", f"-o{gitdir}", git_pkg]
+        cmd = ["7z", "x", "-y", f"-o{gitdir}", git_pkg]
         print(f"Running {' '.join(cmd)}")
         if run(cmd, stdout=DEVNULL) > 0:
             print(f"Failed to extract git archive {git_pkg} to {gitdir}",
                   file=sys.stderr)
             return None
 
-        cmd = ["7z", "x", f"-o{gitdir}", annex_pkg]
+        cmd = ["7z", "x", "-y", f"-o{gitdir}", annex_pkg]
         print(f"Running {' '.join(cmd)}")
         if run(cmd, stdout=DEVNULL) > 0:
             print(f"Failed to extract git archive {annex_pkg} to {gitdir}",
