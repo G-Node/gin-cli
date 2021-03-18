@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/G-Node/gin-cli/ginclient/log"
 	"github.com/G-Node/gin-cli/gincmd/ginerrors"
@@ -51,7 +52,9 @@ var (
 
 	// configuration cache: used to avoid rereading during a single command invocation
 	configuration GinCliCfg
-	set           = false
+
+	// configReadOnce to read config only once per run
+	configReadOnce sync.Once
 )
 
 // Types
@@ -114,9 +117,11 @@ type GinCliCfg struct {
 // Read loads in the configuration from the config file(s), merges any defined values into the default configuration, and returns a populated GinConfiguration struct.
 // The configuration is cached. Subsequent reads reuse the already loaded configuration.
 func Read() GinCliCfg {
-	if set {
-		return configuration
-	}
+	configReadOnce.Do(read)
+	return configuration
+}
+
+func read() {
 	viper.Reset()
 	viper.SetTypeByDefaultValue(true)
 
@@ -155,9 +160,6 @@ func Read() GinCliCfg {
 		path, _ := filepath.Split(configuration.Bin.GitAnnex)
 		configuration.Bin.GitAnnexPath = path
 	}
-
-	set = true
-	return configuration
 }
 
 func removeInvalidServerConfs() {
@@ -200,7 +202,7 @@ func SetConfig(key string, value interface{}) error {
 	v.Set(key, value)
 	v.WriteConfig()
 	// invalidate the read cache
-	set = false
+	configReadOnce = sync.Once{}
 	return nil
 }
 
@@ -223,7 +225,8 @@ func RmServerConf(alias string) {
 	delete(c.Servers, alias)
 	v.Set("servers", c.Servers)
 	v.WriteConfig()
-	set = false
+	// invalidate the read cache
+	configReadOnce = sync.Once{}
 }
 
 // SetDefaultServer writes the given name to the config file to server as the default server for web calls.

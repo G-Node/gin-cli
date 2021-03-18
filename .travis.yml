@@ -19,6 +19,7 @@ matrix:
       os: linux
     - go: "1.14.x"
       os: osx
+      osx_image: xcode12.2
       addons:
         homebrew:
           packages:

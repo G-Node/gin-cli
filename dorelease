@@ -19,8 +19,8 @@ import re
 from glob import glob
 from subprocess import check_output, call, DEVNULL
 from tempfile import TemporaryDirectory
-import requests
 import plistlib
+import requests
 from requests.exceptions import ConnectionError as ConnError
 
 DESTDIR = "dist"
@@ -71,8 +71,10 @@ def download(url, fname=None):
     except ConnError:
         print(f"Error while trying to download {url}", file=sys.stderr)
         print("Skipping.", file=sys.stderr)
-        return
-    size = int(req.headers.get("content-length"))
+        return None
+    size = 0
+    if sizestr := req.headers.get("content-length"):
+        size = int(sizestr)
     etag = req.headers.get("etag")
     oldet = ETAGS.get(url)
     if etag == oldet and os.path.exists(fname):
@@ -215,15 +217,6 @@ def debianize(binfile, annexsa_archive):
     """
     For each Linux binary make a deb package with git annex standalone.
     """
-    def docker_cleanup():
-        print("Stopping and cleaning up docker container")
-        cmd = ["docker", "kill", "gin-deb-build"]
-        run(cmd)
-        cmd = ["docker", "container", "rm", "gin-deb-build"]
-        run(cmd)
-
-    docker_cleanup()
-
     # The default temporary root on macOS is /var/folders
     # Docker currently has issues mounting directories under /var
     # Forcing temporary directory to be rooted at /tmp instead
@@ -316,7 +309,6 @@ def debianize(binfile, annexsa_archive):
         print("Running debian build script")
         if run(cmd) > 0:
             print("Deb build failed", file=sys.stderr)
-            docker_cleanup()
             return
 
         debfilename = f"{pkgname}.deb"
@@ -326,7 +318,6 @@ def debianize(binfile, annexsa_archive):
             os.remove(debfiledest)
         shutil.copy(debfilepath, debfiledest)
         print("Done")
-        docker_cleanup()
     return debfiledest
 
 
@@ -448,19 +439,20 @@ def winbundle(binfile, git_pkg, annex_pkg):
         shutil.copy("README.md", pkgroot)
         shutil.copy(os.path.join("scripts", "gin-shell.bat"), pkgroot)
         shutil.copy(os.path.join("scripts", "set-global.bat"), pkgroot)
+        shutil.copy(os.path.join("scripts", "gin.bat"), pkgroot)
 
         gitdir = os.path.join(pkgroot, "git")
         os.makedirs(gitdir)
 
         # extract git portable and annex into git dir
-        cmd = ["7z", "x", f"-o{gitdir}", git_pkg]
+        cmd = ["7z", "x", "-y", f"-o{gitdir}", git_pkg]
         print(f"Running {' '.join(cmd)}")
         if run(cmd, stdout=DEVNULL) > 0:
             print(f"Failed to extract git archive {git_pkg} to {gitdir}",
                   file=sys.stderr)
             return None
 
-        cmd = ["7z", "x", f"-o{gitdir}", annex_pkg]
+        cmd = ["7z", "x", "-y", f"-o{gitdir}", annex_pkg]
         print(f"Running {' '.join(cmd)}")
         if run(cmd, stdout=DEVNULL) > 0:
             print(f"Failed to extract git archive {annex_pkg} to {gitdir}",
