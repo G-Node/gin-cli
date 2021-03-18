@@ -47,7 +47,7 @@ func TestInit(t *testing.T) {
 		t.Fatalf("Failed to initialise (non-bare) repository: %s", err.Error())
 	}
 
-	bare, _ := ConfigGet("core.bare")
+	bare, _ := ConfigGetLocal("core.bare")
 	if bare != "false" {
 		t.Fatalf("Expected non-bare repository: %s", bare)
 	}
@@ -63,7 +63,7 @@ func TestInit(t *testing.T) {
 		t.Fatalf("Failed to initialise bare repository: %s", err.Error())
 	}
 
-	bare, _ = ConfigGet("core.bare")
+	bare, _ = ConfigGetLocal("core.bare")
 	if bare != "true" {
 		t.Fatalf("Expected bare repository: %s", bare)
 	}

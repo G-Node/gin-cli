@@ -360,7 +360,27 @@ func SetGitUser(name, email string) error {
 	return ConfigSet("user.email", email)
 }
 
-// ConfigGet returns the value of a given git configuration key.
+// ConfigGetLocal returns the value of a given git configuration key
+// using the local git configuration only.
+// The returned key is always a string.
+// (git config --local --get)
+func ConfigGetLocal(key string) (string, error) {
+	fn := fmt.Sprintf("ConfigGet(%s)", key)
+	cmd := Command("config", "--local", "--get", key)
+	stdout, stderr, err := cmd.OutputError()
+	if err != nil {
+		gerr := giterror{UError: string(stderr), Origin: fn}
+		log.Write("Error during config get")
+		logstd(stdout, stderr)
+		return "", gerr
+	}
+	value := string(stdout)
+	value = strings.TrimSpace(value)
+	return value, nil
+}
+
+// ConfigGet returns the value of a given git configuration key
+// using the default git configuration.
 // The returned key is always a string.
 // (git config --get)
 func ConfigGet(key string) (string, error) {
@@ -544,7 +564,7 @@ func Checkwd() error {
 		return NotRepository
 	}
 
-	annexver, err := ConfigGet("annex.version")
+	annexver, err := ConfigGetLocal("annex.version")
 	if err != nil {
 		// Annex version config key missing: Annex not initialised
 		return NotAnnex
