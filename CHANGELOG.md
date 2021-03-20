@@ -2,6 +2,18 @@
 
 **Beta** releases are not listed. Changes for beta releases are included in the next full release. Current changes are listed in the top **Unreleased** section.
 
+## Version 1.12
+
+### Changes
+- Adding a script that, when run, sets up the user's `%path%` to be able to run gin from anywhere on Windows.
+- Adding a new wrapper script for running gin commands on Windows. The new script (gin.bat) acts as the main entrypoint for commands on Windows. It sets up a temporary (local) path where the gin-cli can find all necessary binaries (git, git-annex, etc.) and then runs the command with the user's arguments. If this script is in the user's %path%, the rest of the software doesn't need to be. The bundled binaries take precedence over any existing binaries with the same name in the %path% since the temporary paths are prepended before calling gin.exe. The set-global.bat file has been adjusted to add only the path with the gin.bat in it. It also prompts the user to clean their path of any existing GIN CLI directories, if any are detected. This is better done manually, since parsing and editing the path is too error prone.
+- When fetching git config keys, only use keys from the local git configuration and never include a global config.
+
+### Relevant PRs
+- #290 Windows global cmd
+- #301 Less intrusive Windows paths
+- #307 Use only local git config keys
+
 ## Version 1.11
 
 ### Changes
