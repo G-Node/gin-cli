@@ -481,12 +481,12 @@ func CommitIfNew() (bool, error) {
 // DefaultRemote returns the name of the configured default gin remote.
 // If a remote is not set in the config, the remote of the default git upstream is set and returned.
 func DefaultRemote() (string, error) {
-	defremote, err := git.ConfigGet("gin.remote")
+	defremote, err := git.ConfigGetLocal("gin.remote")
 	if err == nil {
 		return defremote, nil
 	}
 	log.Write("Default remote not set. Checking master remote.")
-	defremote, err = git.ConfigGet("branch.master.remote")
+	defremote, err = git.ConfigGetLocal("branch.master.remote")
 	if err == nil {
 		SetDefaultRemote(defremote)
 		log.Write("Set default remote to %s", defremote)
