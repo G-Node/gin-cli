@@ -1,8 +1,6 @@
 # GIN-CLI
 
 [![GoDoc](https://godoc.org/github.com/G-Node/gin-cli?status.svg)](http://godoc.org/github.com/G-Node/gin-cli)
-
-[![Build Status](https://travis-ci.org/G-Node/gin-cli.svg?branch=master)](https://travis-ci.org/G-Node/gin-cli)
 [![Build status](https://ci.appveyor.com/api/projects/status/gu9peb10f9k8ed3d/branch/master?svg=true)](https://ci.appveyor.com/project/G-Node/gin-cli/branch/master)
 
 ---
