@@ -37,10 +37,10 @@ func init() {
 		annexVer = err.Error()
 	}
 	verinfo.Annex = annexVer
+	err = log.Init()
 	if err != nil {
 		fmt.Println("Failed to initialise log file")
 	}
-	err = log.Init()
 	log.Write("VERSION: %s", verinfo.String())
 }
 
