@@ -28,19 +28,21 @@ func init() {
 
 	gitVer, err := git.GetGitVersion()
 	if err != nil {
-		gitVer = err.Error()
+		fmt.Fprintf(os.Stderr, "Failed to get git version: %s", err.Error())
+		gitVer = ""
 	}
 	verinfo.Git = gitVer
 
 	annexVer, err := git.GetAnnexVersion()
 	if err != nil {
-		annexVer = err.Error()
+		fmt.Fprintf(os.Stderr, "Failed to get git-annex version: %s", err.Error())
+		annexVer = ""
 	}
 	verinfo.Annex = annexVer
-	if err != nil {
-		fmt.Println("Failed to initialise log file")
-	}
 	err = log.Init()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to initialise log file")
+	}
 	log.Write("VERSION: %s", verinfo.String())
 }
 
