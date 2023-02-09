@@ -10,14 +10,13 @@ require (
 	github.com/bbrks/wrap v2.3.0+incompatible
 	github.com/docker/docker v0.0.0-00010101000000-000000000000
 	github.com/dustin/go-humanize v1.0.0
-	github.com/fatih/color v1.7.0
+	github.com/fatih/color v1.13.0
 	github.com/gogits/go-gogs-client v0.0.0-20190710002546-4c3c18947c15
 	github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c
-	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/shibukawa/configdir v0.0.0-20170330084843-e180dbdc8da0
 	github.com/spf13/cobra v0.0.5
-	github.com/spf13/pflag v1.0.3
-	github.com/spf13/viper v1.4.0
-	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
+	github.com/spf13/pflag v1.0.5
+	github.com/spf13/viper v1.15.0
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
 	gotest.tools v2.2.0+incompatible // indirect
 )
